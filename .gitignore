@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# tracking files
+example/trackdata/
+
+# Mac files
+.DS_Store
