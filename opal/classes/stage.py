@@ -1,14 +1,15 @@
-from src.classes.Trackable import *
 from abc import abstractmethod
 from matplotlib import patches
+from opal.classes.trackable import Trackable
 
-class Source(Trackable):
+class Stage(Trackable):
     
     @abstractmethod
     def __init__(self):
         pass
         
     def track(self, beam):
+        beam.stageNumber += 1
         return super().track(beam)
     
     @abstractmethod
@@ -16,9 +17,8 @@ class Source(Trackable):
         pass
     
     @abstractmethod
-    def energy(self):
+    def energyGain(self):
         pass
     
     def plotObject(self):
-        rect = patches.Rectangle((0, -0.5), self.length(), 1)
-        return rect
+        return patches.Rectangle((0, -1), self.length(), 2)

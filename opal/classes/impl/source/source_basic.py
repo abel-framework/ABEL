@@ -1,6 +1,6 @@
-from src.classes.Source import *
-from src.classes.Beam import *
-from src.utilities import *
+from opal import Beam, Source
+from opal.utilities import SI
+from opal.utilities.beamphysics import generateTraceSpace
 import numpy as np
 
 class SourceBasic(Source):

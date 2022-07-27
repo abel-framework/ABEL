@@ -1,4 +1,4 @@
-from src.utilities import SI
+from opal.utilities import SI
 import numpy as np
 
 # plasma wavenumber

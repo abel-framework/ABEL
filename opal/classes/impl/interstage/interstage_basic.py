@@ -1,4 +1,4 @@
-from src.classes.Interstage import *
+from opal import Interstage
 
 class InterstageBasic(Interstage):
     
@@ -7,6 +7,11 @@ class InterstageBasic(Interstage):
         self.E0 = E0
         self.L = L
         
+    def length(self):
+        if callable(self.L):
+            return self.L(self.E0)
+        else:
+            return self.L
         
     def track(self, beam):
 
@@ -25,10 +30,3 @@ class InterstageBasic(Interstage):
         
         return super().track(beam)
     
-    
-    def length(self):
-        if callable(self.L):
-            return self.L(self.E0)
-        else:
-            return self.L
-        

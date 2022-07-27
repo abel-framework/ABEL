@@ -1,4 +1,4 @@
-from src.classes.Stage import *
+from opal import Stage
 
 class StageBasic(Stage):
     
@@ -6,7 +6,13 @@ class StageBasic(Stage):
         self.deltaE = deltaE
         self.L = L
         self.chirp = chirp
-        
+       
+    def length(self):
+        return self.L
+    
+    def energyGain(self):
+        return self.deltaE
+    
     def track(self, beam):
         
         # adiabatic damping
@@ -21,8 +27,3 @@ class StageBasic(Stage):
 
         return super().track(beam)
     
-    def length(self):
-        return self.L
-    
-    def energyGain(self):
-        return self.deltaE

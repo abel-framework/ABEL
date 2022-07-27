@@ -1,8 +1,8 @@
-from src.classes.Trackable import *
 from abc import abstractmethod
 from matplotlib import patches
+from opal import Trackable
 
-class Interstage(Trackable):
+class Source(Trackable):
     
     @abstractmethod
     def __init__(self):
@@ -15,8 +15,10 @@ class Interstage(Trackable):
     def length(self):
         pass
     
+    @abstractmethod
+    def energy(self):
+        pass
+    
     def plotObject(self):
-        rect = patches.Rectangle((0, -0.05), self.length(), 0.1)
-        rect.set_facecolor = 'k'
+        rect = patches.Rectangle((0, -0.5), self.length(), 1)
         return rect
-        

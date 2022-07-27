@@ -1,11 +1,9 @@
-from src.classes.Trackable import *
-from src.classes.Beam import *
-from src.classes.Source import *
-from src.classes.Stage import *
+from opal import Beam, Trackable, Source, Stage
 import copy
 from os import listdir, remove, mkdir
 from os.path import isfile, join, exists
 from matplotlib import pyplot as plt
+import numpy as np
 
 class Linac(Trackable):
     

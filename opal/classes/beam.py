@@ -1,5 +1,5 @@
+from opal.utilities import SI
 import numpy as np
-from src.utilities.SI import *
 
 class Beam():
     
