@@ -1,48 +1,148 @@
-from opal.utilities import SI
 import numpy as np
+from opal.utilities import SI
+from opal.utilities.relativity import *
+from matplotlib import pyplot as plt
 
 class Beam():
     
     # empty beam
     def __init__(self, phasespace = None, Npart = 1000):
-        
+
+        # the phase space variable is private
         if phasespace is not None:
-            self.phasespace = phasespace
+            self.__phasespace = phasespace
         else:
-            self.phasespace = np.zeros((8, Npart))
+            self.__phasespace = self.resetPhaseSpace(Npart)
             
         self.trackableNumber = 0
         self.stageNumber = 0
         self.location = 0        
     
     
+    # reset phase space
+    def resetPhaseSpace(self, Npart):
+        self.__phasespace = np.zeros((8, Npart))
+    
+    
+    # filter out macroparticles based on a mask
+    def filterPhaseSpace(self, mask):
+        if not(mask).any():
+            self.__phasespace = np.delete(self.__phasespace, np.where(mask), 1)
+            
+        
+    # set phase space
+    def setPhaseSpace(self, Q, xs, ys, zs, wxs=None, wys=None, wzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None):
+        
+        # make empty phase space
+        Npart = len(xs)
+        self.resetPhaseSpace(Npart)
+        
+        # add positions
+        self.__setXs(xs)
+        self.__setYs(ys)
+        self.__setZs(zs)
+        
+        # add momenta
+        if wzs is None:
+            if pzs is not None:
+                wzs = momentum2properVelocity(pzs)
+            elif Es is not None:
+                wzs = energy2properVelocity(Es)
+        self.__phasespace[5,:] = wzs
+        if wxs is None:
+            if pxs is not None:
+                wxs = momentum2properVelocity(pxs)
+            elif xps is not None:
+                wxs = xps * wzs
+        self.__phasespace[3,:] = wxs
+        if wys is None:
+            if pys is not None:
+                wys = momentum2properVelocity(pys)
+            elif yps is not None:
+                wys = yps * wzs
+        self.__phasespace[4,:] = wys
+        
+        # charge
+        self.__phasespace[6,:] = Q/Npart
+            
+        
+    
     ## BEAM ARRAYS
 
-    def xs(self):
-        return self.phasespace[0,:]
-    def xps(self):
-        return self.phasespace[1,:]
-    def ys(self):
-        return self.phasespace[2,:]
-    def yps(self):
-        return self.phasespace[3,:]
-    def zs(self):
-        return self.phasespace[4,:]
-    def Es(self):
-        return self.phasespace[5,:]
-    def gammas(self):
-        return self.Es() * SI.e / (SI.me * SI.c**2)
-    def qs(self):
-        return self.phasespace[6,:]
+    # number of macroparticles
+    def Npart(self):
+        return self.__phasespace.shape[1]
      
+    # get phase space variables
+    def xs(self):
+        return self.__phasespace[0,:]
+    def ys(self):
+        return self.__phasespace[1,:]
+    def zs(self):
+        return self.__phasespace[2,:]
+    def wxs(self):
+        return self.__phasespace[3,:]
+    def wys(self):
+        return self.__phasespace[4,:]
+    def wzs(self):
+        return self.__phasespace[5,:]
+    def qs(self):
+        return self.__phasespace[6,:]
+    
+    # set phase space (private)
+    def __setXs(self, xs):
+        self.__phasespace[0,:] = xs
+    def __setYs(self, ys):
+        self.__phasespace[1,:] = ys
+    def __setZs(self, zs):
+        self.__phasespace[2,:] = zs
         
+    # set phase space (private)
+    def __setWxs(self, wxs):
+        self.__phasespace[3,:] = wxs
+    def __setWys(self, wys):
+        self.__phasespace[4,:] = wys
+    def __setWzs(self, wzs):
+        self.__phasespace[5,:] = wzs
+    
+    
+    def pxs(self):
+        return properVelocity2momentum(self.wxs())
+    def pys(self):
+        return properVelocity2momentum(self.wys())
+    def pzs(self):
+        return properVelocity2momentum(self.wzs())
+    
+    def xps(self):
+        return self.wxs()/self.wzs()
+    def yps(self):
+        return self.wys()/self.wzs()
+
+    def gammas(self):
+        return properVelocity2gamma(self.wzs())
+    def Es(self):
+        return properVelocity2energy(self.wzs())
+    
+    def ts(self):
+        return self.zs()/SI.c
+    
+    def Ns(self):
+        return self.qs()/SI.e
+    
+    
     ## BEAM STATISTICS
     
     def charge(self):
         return np.sum(self.qs())
     
+    def absCharge(self):
+        return abs(self.charge())
+    
     def energy(self):
         return np.mean(self.Es())
+    
+    def gammaRelativistic(self):
+        return np.mean(self.gammas())
     
     def energySpread(self):
         return np.std(self.Es())
@@ -50,8 +150,17 @@ class Beam():
     def relEnergySpread(self):
         return self.energySpread()/self.energy()
     
+    def offsetZ(self):
+        return np.mean(self.zs())
+    
     def bunchLength(self):
         return np.std(self.zs())
+    
+    def offsetX(self):
+        return np.mean(self.xs())
+    
+    def offsetY(self):
+        return np.mean(self.ys())
     
     def beamSizeX(self):
         return np.std(self.xs())
@@ -60,27 +169,115 @@ class Beam():
         return np.std(self.ys())
     
     def normEmittanceX(self):
-        return np.sqrt(np.linalg.det(np.cov(self.phasespace[0:2,:]))) * np.mean(self.gammas())
+        return np.sqrt(np.linalg.det(np.cov(self.xs(), self.wxs()/SI.c)))
     
     def normEmittanceY(self):
-        return np.sqrt(np.linalg.det(np.cov(self.phasespace[2:4,:]))) * np.mean(self.gammas())
+        return np.sqrt(np.linalg.det(np.cov(self.ys(), self.wys()/SI.c)))
+    
+    
+    ## BEAM PROJECTIONS
+    
+    def projectedDensity(self, fcn, bins=None):
+        if bins is None:
+            nsig = 5
+            Nbins = int(np.sqrt(self.Npart())/2)
+            bins = np.mean(fcn()) + nsig * np.std(fcn()) * np.arange(-1, 1, 2/Nbins)
+        counts, edges = np.histogram(fcn(), weights=self.qs(), bins=bins)
+        ctrs = (edges[0:-1] + edges[1:])/2
+        proj = counts/np.diff(edges)
+        return proj, ctrs
+        
+    def currentProfile(self, bins=None):
+        return self.projectedDensity(self.ts, bins=bins)
+        return dQdt, ts
+    
+    def longitudinalNumberDensity(self, bins=None):
+        dQdz, zs = self.projectedDensity(self.zs, bins=bins)
+        dNdz = dQdz / SI.e
+        return dNdz, zs
+    
+    def energyProfile(self, bins=None):
+        return self.projectedDensity(self.Es, bins=bins)
+    
+    def relEnergyProfile(self, E0=None, bins=None):
+        if E0 is None:
+            E0 = self.energy()
+        return self.projectedDensity(lambda: self.Es()/E0-1, bins=bins)
+    
+    ## phase spaces
+    
+    def phaseSpaceDensity(self, hfcn, vfcn, hbins=None, vbins=None):
+        nsig = 4
+        Nbins = int(np.sqrt(self.Npart())/2)
+        if hbins is None:
+            hbins = np.mean(hfcn()) + nsig * np.std(hfcn()) * np.arange(-1, 1, 2/Nbins)
+        if vbins is None:
+            vbins = np.mean(vfcn()) + nsig * np.std(vfcn()) * np.arange(-1, 1, 2/Nbins)
+        counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
+        hctrs = (hedges[0:-1] + hedges[1:])/2
+        vctrs = (vedges[0:-1] + vedges[1:])/2
+        density = (counts/np.diff(vedges)).T/np.diff(hedges)
+        return density, hctrs, vctrs
+    
+    def densityLPS(self, hbins=None, vbins=None):
+        return self.phaseSpaceDensity(self.zs, self.Es, hbins=hbins, vbins=vbins)
         
         
+    
+    ## PLOTTING
+    def plotCurrentProfile(self):
+        dQdt, ts = self.currentProfile()
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(6)
+        fig.set_figheight(4)        
+        ax.plot(ts*SI.c*1e6, -dQdt/1e3)
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('Beam current (kA)')
+    
+    def plotLPS(self):
+        dQdzdE, zs, Es = self.densityLPS()
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu')
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('E (GeV)')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
+        
+    
     ## CHANGE BEAM
     
-    def accelerate(self, deltaE, chirp = 0):
-        self.phasespace[5,:] += deltaE + self.zs() * chirp
+    def accelerate(self, deltaE = 0, chirp = 0, z0 = 0):
+        
+        # add energy and chirp
+        Es = self.Es() + deltaE 
+        Es = Es + np.sign(self.qs()) * (self.zs()-z0) * chirp
+        self.__setWzs(energy2properVelocity(Es))
+        
+        # remove particles with subzero energy
+        self.filterPhaseSpace(Es < 0)
+        self.filterPhaseSpace(np.isnan(Es))
         
     def compress(self, R56, E0):
-        self.phasespace[4,:] += (1-self.Es()/E0) * R56
+        zs = self.zs() + (1-self.Es()/E0) * R56
+        self.__setZs(zs)
         
-    def adiabaticDamping(self, E0, E):
-        self.phasespace[0:4,:] *= np.sqrt(E0/E)
+    # betatron damping (must be done before acceleration)
+    def betatronDamping(self, deltaE):
+        gammasBoosted = energy2gamma(self.Es()+deltaE)
+        factor = np.sqrt(self.gammas()/gammasBoosted)
+        self.__setXs(self.xs() * factor)
+        self.__setYs(self.ys() * factor)
+        self.__setWxs(self.wxs() / factor)
+        self.__setWys(self.wys() / factor)
         
     def flipTransversePhaseSpaces(self):
-        self.phasespace[1,:] *= -1
-        self.phasespace[3,:] *= -1
-    
+        self.__setWxs(-self.wxs())
+        self.__setWys(-self.wys())
+        
   
     ## SAVE AND LOAD BEAM
     
@@ -90,7 +287,7 @@ class Beam():
       
     # save beam
     def save(self, linac):
-        np.savetxt(linac.trackingfolder + self.filename(), self.phasespace)
+        np.savetxt(linac.trackingfolder + self.filename(), self.__phasespace)
     
     # load beam
     @classmethod

@@ -8,6 +8,7 @@ from .classes.interstage import Interstage
 from .classes.linac import Linac
 from .classes.impl.source.source_basic import SourceBasic
 from .classes.impl.stage.stage_basic import StageBasic
+from .classes.impl.stage.stage_nonlinear_1D import StageNonlinear1D
 from .classes.impl.interstage.interstage_basic import InterstageBasic
 
-__all__ = ["beam", "Trackable", "Source", "Stage", "Interstage", "Linac", "SourceBasic", "StageBasic", "InterstageBasic"]
+__all__ = ["beam", "Trackable", "Source", "Stage", "Interstage", "Linac", "SourceBasic", "StageBasic", "StageNonlinear1D", "InterstageBasic"]

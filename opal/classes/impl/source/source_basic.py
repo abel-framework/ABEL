@@ -1,15 +1,17 @@
-from opal import Beam, Source
+from opal import Source, Beam
 from opal.utilities import SI
 from opal.utilities.beamphysics import generateTraceSpace
+from opal.utilities.relativity import energy2gamma
 import numpy as np
 
 class SourceBasic(Source):
     
-    def __init__(self, E = None, Q = None, sigE = None, sigz = None, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
+    def __init__(self, E = None, Q = None, sigE = None, sigz = None, z = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
         self.E = E
         self.Q = Q
         self.sigE = sigE # [eV]
         self.sigz = sigz # [m]
+        self.z = z # [m]
         self.Npart = Npart
         self.emitnx = emitnx # [m rad]
         self.emitny = emitny # [m rad]
@@ -20,30 +22,24 @@ class SourceBasic(Source):
         self.L = L # [m]
         self.Npart = Npart
         
-    def track(self, _):
+    def track(self, _ = None):
         
-        # create empty beam
-        beam = Beam(Npart = self.Npart)
-            
+        # make empty beam
+        beam = Beam()
+        
         # Lorentz gamma
-        gamma = self.energy() * SI.e / (SI.me * SI.c**2)
+        gamma = energy2gamma(self.E)
 
-        # horizontal phase space
+        # horizontal and vertical phase spaces
         xs, xps = generateTraceSpace(self.emitnx/gamma, self.betax, self.alphax, self.Npart)
-        beam.phasespace[0,:] = xs
-        beam.phasespace[1,:] = xps
-
-        # vertical phase space
         ys, yps = generateTraceSpace(self.emitny/gamma, self.betay, self.alphay, self.Npart)
-        beam.phasespace[2,:] = ys
-        beam.phasespace[3,:] = yps
-
+        
         # longitudinal phase space
-        beam.phasespace[4,:] = np.random.normal(scale = self.sigz, size = self.Npart)
-        beam.phasespace[5,:] = np.random.normal(loc = self.E, scale = self.sigE, size = self.Npart)
+        zs = np.random.normal(loc = self.z, scale = self.sigz, size = self.Npart)
+        Es = np.random.normal(loc = self.E, scale = self.sigE, size = self.Npart)
 
-        # charge
-        beam.phasespace[6,:] = self.Q/self.Npart
+        # create phase space
+        beam.setPhaseSpace(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.Q)
 
         return super().track(beam)
     
