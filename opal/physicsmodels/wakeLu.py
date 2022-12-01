@@ -29,7 +29,6 @@ def sheathRadius_Lu(n0, kRb, beam=None):
     # flip the z direction
     kpmax = max([max(-kzs0), kRb])
     Nstep = round(kpmax/resolution)
-    #kzs = np.arange(0, kRb, resolution)
     kzs = np.linspace(0, kpmax, Nstep)
     
     # numerical integration

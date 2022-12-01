@@ -6,8 +6,8 @@ import numpy as np
 
 class SourceBasic(Source):
     
-    def __init__(self, E = None, Q = None, sigE = None, sigz = None, z = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
-        self.E = E
+    def __init__(self, E0 = None, Q = None, sigE = None, sigz = None, z = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
+        self.E0 = E0
         self.Q = Q
         self.sigE = sigE # [eV]
         self.sigz = sigz # [m]
@@ -28,7 +28,7 @@ class SourceBasic(Source):
         beam = Beam()
         
         # Lorentz gamma
-        gamma = energy2gamma(self.E)
+        gamma = energy2gamma(self.E0)
 
         # horizontal and vertical phase spaces
         xs, xps = generateTraceSpace(self.emitnx/gamma, self.betax, self.alphax, self.Npart)
@@ -36,15 +36,15 @@ class SourceBasic(Source):
         
         # longitudinal phase space
         zs = np.random.normal(loc = self.z, scale = self.sigz, size = self.Npart)
-        Es = np.random.normal(loc = self.E, scale = self.sigE, size = self.Npart)
+        Es = np.random.normal(loc = self.E0, scale = self.sigE, size = self.Npart)
 
         # create phase space
         beam.setPhaseSpace(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.Q)
-
+        
         return super().track(beam)
     
     def length(self):
         return self.L
     
     def energy(self):
-        return self.E
+        return self.E0

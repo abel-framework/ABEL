@@ -1,6 +1,9 @@
 import numpy as np
 from opal.utilities import SI
 from opal.utilities.relativity import *
+from opal.utilities.statistics import prct_clean, prct_clean2D
+from opal.utilities.plasmaphysics import k_p
+from opal.physicsmodels.betatronHills import evolveHillsEquation
 from matplotlib import pyplot as plt
 
 class Beam():
@@ -24,9 +27,9 @@ class Beam():
         self.__phasespace = np.zeros((8, Npart))
     
     
-    # filter out macroparticles based on a mask
+    # filter out macroparticles based on a mask (true means delete)
     def filterPhaseSpace(self, mask):
-        if not(mask).any():
+        if mask.any():
             self.__phasespace = np.delete(self.__phasespace, np.where(mask), 1)
             
         
@@ -96,6 +99,10 @@ class Beam():
         self.__phasespace[1,:] = ys
     def __setZs(self, zs):
         self.__phasespace[2,:] = zs
+    def __setXps(self, xps):
+        self.__setWxs(xps*self.wzs())
+    def __setYps(self, yps):
+        self.__setWys(yps*self.wzs())
         
     # set phase space (private)
     def __setWxs(self, wxs):
@@ -104,7 +111,17 @@ class Beam():
         self.__phasespace[4,:] = wys
     def __setWzs(self, wzs):
         self.__phasespace[5,:] = wzs
+        
+    def __setQs(self, qs):
+        self.__phasespace[6,:] = qs
     
+    # copy another beam's macroparticle charge
+    def copyParticleCharge(self, beam):
+        self.__setQs(np.median(beam.qs()))
+    
+    
+    def rs(self):
+        return np.sqrt(self.xs()**2 + self.ys()**2)
     
     def pxs(self):
         return properVelocity2momentum(self.wxs())
@@ -138,41 +155,54 @@ class Beam():
     def absCharge(self):
         return abs(self.charge())
     
-    def energy(self):
-        return np.mean(self.Es())
+    def energy(self, clean=True):
+        return np.mean(prct_clean(self.Es(), clean))
     
-    def gammaRelativistic(self):
-        return np.mean(self.gammas())
+    def gammaRelativistic(self, clean=True):
+        return np.mean(prct_clean(self.gammas(), clean))
     
-    def energySpread(self):
-        return np.std(self.Es())
+    def energySpread(self, clean=True):
+        return np.std(prct_clean(self.Es(), clean))
     
-    def relEnergySpread(self):
-        return self.energySpread()/self.energy()
+    def relEnergySpread(self, clean=True):
+        return self.energySpread(clean)/self.energy(clean)
     
-    def offsetZ(self):
-        return np.mean(self.zs())
+    def offsetZ(self, clean=True):
+        return np.mean(prct_clean(self.zs(), clean))
     
-    def bunchLength(self):
-        return np.std(self.zs())
+    def bunchLength(self, clean=True):
+        return np.std(prct_clean(self.zs(), clean))
     
-    def offsetX(self):
-        return np.mean(self.xs())
+    def offsetX(self, clean=True):
+        return np.mean(prct_clean(self.xs(), clean))
     
-    def offsetY(self):
-        return np.mean(self.ys())
+    def offsetY(self, clean=True):
+        return np.mean(prct_clean(self.ys(), clean))
     
-    def beamSizeX(self):
-        return np.std(self.xs())
+    def beamSizeX(self, clean=True):
+        return np.std(prct_clean(self.xs(), clean))
 
-    def beamSizeY(self):
-        return np.std(self.ys())
+    def beamSizeY(self, clean=True):
+        return np.std(prct_clean(self.ys(), clean))
     
-    def normEmittanceX(self):
-        return np.sqrt(np.linalg.det(np.cov(self.xs(), self.wxs()/SI.c)))
+    def normEmittanceX(self, clean=True):
+        xs, wxs = prct_clean2D(self.xs(), self.wxs(), clean)
+        #return np.sqrt(np.linalg.det(np.cov(self.xs(), self.wxs()/SI.c)))
+        return np.sqrt(np.linalg.det(np.cov(xs, wxs/SI.c)))
     
-    def normEmittanceY(self):
-        return np.sqrt(np.linalg.det(np.cov(self.ys(), self.wys()/SI.c)))
+    def normEmittanceY(self, clean=True):
+        ys, wys = prct_clean2D(self.ys(), self.wys(), clean)
+        return np.sqrt(np.linalg.det(np.cov(ys, wys/SI.c)))
+    
+    def betaX(self, clean=True):
+        xs, xps = prct_clean2D(self.xs(), self.xps(), clean)
+        covx = np.cov(xs, xps)
+        return covx[0,0]/np.sqrt(np.linalg.det(covx))
+    
+    def betaY(self, clean=True):
+        ys, yps = prct_clean2D(self.ys(), self.yps(), clean)
+        covy = np.cov(ys, yps)
+        return covy[0,0]/np.sqrt(np.linalg.det(covy))
     
     
     ## BEAM PROJECTIONS
@@ -203,6 +233,12 @@ class Beam():
         if E0 is None:
             E0 = self.energy()
         return self.projectedDensity(lambda: self.Es()/E0-1, bins=bins)
+    
+    def transverseProfileX(self, bins=None):
+        return self.projectedDensity(self.xs, bins=bins)
+    
+    def transverseProfileY(self, bins=None):
+        return self.projectedDensity(self.ys, bins=bins)
     
     ## phase spaces
     
@@ -278,6 +314,21 @@ class Beam():
         self.__setWxs(-self.wxs())
         self.__setWys(-self.wys())
         
+        
+    def betatronMotion(self, L, n0, deltaEs):
+        kps = lambda s: k_p(n0)
+        xs, wxs, ys, wys = self.xs(), self.wxs(), self.ys(), self.wys()
+        gamma0s = energy2gamma(self.Es())
+        gammas = energy2gamma(self.Es()+deltaEs)
+        for i in range(self.Npart()):
+            gamma = lambda s: gamma0s[i] + (gammas[i]-gamma0s[i])*s/L
+            xs[i], wxs[i], _ = evolveHillsEquation(xs[i], wxs[i], L, gamma, kps, fast=False)
+            ys[i], wys[i], _ = evolveHillsEquation(ys[i], wys[i], L, gamma, kps, fast=False)
+        self.__setXs(xs)
+        self.__setWxs(wxs)
+        self.__setYs(ys)
+        self.__setWys(wys)
+        
   
     ## SAVE AND LOAD BEAM
     
@@ -287,7 +338,7 @@ class Beam():
       
     # save beam
     def save(self, linac):
-        np.savetxt(linac.trackingfolder + self.filename(), self.__phasespace)
+        np.savetxt(linac.trackPath() + self.filename(), self.__phasespace)
     
     # load beam
     @classmethod
@@ -297,7 +348,8 @@ class Beam():
         beam = Beam(phasespace = np.loadtxt(filename))
             
         # find stage and location from filename
-        parts = filename.split('_')
+        parts0 = filename.split('/')
+        parts = parts0[-1].split('_')
         beam.trackableNumber = int(parts[1])
         beam.stageNumber = int(parts[2])
         subparts = parts[3].split('.')
