@@ -2,14 +2,13 @@ from abc import abstractmethod
 from matplotlib import patches
 from opal.classes.trackable import Trackable
 
-class Stage(Trackable):
+class Dipole(Trackable):
     
     @abstractmethod
     def __init__(self):
         pass
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        beam.stageNumber += 1
         return super().track(beam, savedepth, runnable, verbose)
     
     @abstractmethod
@@ -17,8 +16,10 @@ class Stage(Trackable):
         pass
     
     @abstractmethod
-    def energyGain(self):
+    def field(self):
         pass
     
     def plotObject(self):
-        return patches.Rectangle((0, -1), self.length(), 2)
+        rect = patches.Rectangle((0, -1), self.length(), 2)
+        rect.set_facecolor = 'r'
+        return rect

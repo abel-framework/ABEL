@@ -1,15 +1,15 @@
 from abc import abstractmethod
 from matplotlib import patches
 from opal.classes.trackable import Trackable
+import numpy as np
 
-class Stage(Trackable):
+class Quadrupole(Trackable):
     
     @abstractmethod
     def __init__(self):
         pass
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        beam.stageNumber += 1
         return super().track(beam, savedepth, runnable, verbose)
     
     @abstractmethod
@@ -17,8 +17,8 @@ class Stage(Trackable):
         pass
     
     @abstractmethod
-    def energyGain(self):
+    def strength(self):
         pass
     
     def plotObject(self):
-        return patches.Rectangle((0, -1), self.length(), 2)
+        return patches.Rectangle((0, 0), self.length(), float(np.sign(self.strength())))

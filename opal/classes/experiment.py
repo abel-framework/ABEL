@@ -1,13 +1,13 @@
-from opal import Beam, Trackable, Linac, Source, BeamDeliverySystem, Stage, Spectrometer
+from opal import Runnable, Beam, Beamline, Source, BeamDeliverySystem, Stage, Spectrometer
 from matplotlib import pyplot as plt
 #from os.path import isfile, join, exists
 #from os import listdir, remove, mkdir
 import numpy as np
 
-class LinacExperiment(Linac):
+class Experiment(Beamline):
     
     # constructor
-    def __init__(self, source=None, bds=None, stage=None, spectrometer=None, runname=None):
+    def __init__(self, source=None, bds=None, stage=None, spectrometer=None):
         
         # check element classes, then assemble
         assert(isinstance(source, Source))
@@ -17,29 +17,30 @@ class LinacExperiment(Linac):
         
         # run linac constructor
         trackables = [source, bds, stage, spectrometer]
-        super().__init__(trackables, runname)
+        super().__init__(trackables)
     
     
     # density plots
-    def plotSpectrometer(self):
+    def plotSpectrometerScreen(self):
         
         # load phase space
-        files = self.trackData()
-        beam = Beam.load(self.trackPath() + files[-1])
+        files = self.runData()
+        beam = Beam.load(self.runPath() + files[-1])
 
         # make screen projection
-        image, xedges, yedges = np.histogram2d(beam.xs(), beam.ys())
+        dQdxdy, yedges, xedges = beam.densityTransverse()
         
         # prepare figure
         fig, ax = plt.subplots(1,1)
-        fig.set_figwidth(4)
-        fig.set_figheight(10)
+        fig.set_figwidth(8)
+        fig.set_figheight(5)
         
         # current profile
-        c0 = ax.pcolor(yedges*1e6, xedges*1e6, image, cmap='GnBu')
+        c0 = ax.pcolor(xedges*1e3, yedges*1e3, abs(dQdxdy)*1e6, cmap='GnBu')
         cbar0 = fig.colorbar(c0, ax=ax)
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('y (um)')
-        cbar0.ax.set_ylabel('Charge density (counts)')
+        ax.set_xlabel('x (mm)')
+        ax.set_ylabel('y (mm)')
+        ax.set_title('Spectrometer screen')
+        cbar0.ax.set_ylabel('Charge density (pC/mm^2)')
         
         

@@ -16,8 +16,8 @@ class StageNonlinear1D(Stage):
         self.sigt_jitter = sigt_jitter
         self.enableBetatron = True
         
-    def track(self, beam):
-            
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        
         # calculate energy gain for each particle
         EzFcn, rFcn = self.wakefieldFcn(beam)
         
@@ -37,7 +37,7 @@ class StageNonlinear1D(Stage):
         # add energy gain
         beam.accelerate(deltaEs)
         
-        return super().track(beam)
+        return super().track(beam, savedepth, runnable, verbose)
     
     
     # wakefield (Lu equation)

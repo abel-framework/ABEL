@@ -139,12 +139,32 @@ class Beam():
         return properVelocity2gamma(self.wzs())
     def Es(self):
         return properVelocity2energy(self.wzs())
+    def deltas(self, pz0=None):
+        if pz0 is None:
+            pz0 = np.mean(self.pzs())
+        return self.pzs()/pz0 -1
     
     def ts(self):
         return self.zs()/SI.c
     
     def Ns(self):
         return self.qs()/SI.e
+    
+    # vector of transverse positions and angles: (x, x', y, y')
+    def transverseVector(self):
+        X = np.zeros((4,self.Npart()))
+        X[0,:] = self.xs()
+        X[1,:] = self.xps()
+        X[2,:] = self.ys()
+        X[3,:] = self.yps()
+        return X
+    
+    # set phase space based on transverse vector: (x, x', y, y')
+    def setTransverseVector(self, X):
+        self.__setXs(X[0,:])
+        self.__setXps(X[1,:])
+        self.__setYs(X[2,:])
+        self.__setYps(X[3,:])  
     
     
     ## BEAM STATISTICS
@@ -154,6 +174,9 @@ class Beam():
     
     def absCharge(self):
         return abs(self.charge())
+    
+    def chargeSign(self):
+        return self.charge()/self.absCharge()
     
     def energy(self, clean=True):
         return np.mean(prct_clean(self.Es(), clean))
@@ -244,7 +267,7 @@ class Beam():
     
     def phaseSpaceDensity(self, hfcn, vfcn, hbins=None, vbins=None):
         nsig = 4
-        Nbins = int(np.sqrt(self.Npart())/2)
+        Nbins = int(np.sqrt(self.Npart()))
         if hbins is None:
             hbins = np.mean(hfcn()) + nsig * np.std(hfcn()) * np.arange(-1, 1, 2/Nbins)
         if vbins is None:
@@ -257,7 +280,9 @@ class Beam():
     
     def densityLPS(self, hbins=None, vbins=None):
         return self.phaseSpaceDensity(self.zs, self.Es, hbins=hbins, vbins=vbins)
-        
+    
+    def densityTransverse(self, hbins=None, vbins=None):
+        return self.phaseSpaceDensity(self.ys, self.xs, hbins=hbins, vbins=vbins)    
         
     
     ## PLOTTING
@@ -280,6 +305,7 @@ class Beam():
         p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu')
         ax.set_xlabel('z (um)')
         ax.set_ylabel('E (GeV)')
+        ax.set_title('Longitudinal phase space')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/GeV)')
         
@@ -312,8 +338,7 @@ class Beam():
         
     def flipTransversePhaseSpaces(self):
         self.__setWxs(-self.wxs())
-        self.__setWys(-self.wys())
-        
+        self.__setWys(-self.wys()) 
         
     def betatronMotion(self, L, n0, deltaEs):
         kps = lambda s: k_p(n0)
@@ -337,8 +362,8 @@ class Beam():
         return "beam_" + str(self.trackableNumber).zfill(3) + "_"  + str(self.stageNumber).zfill(3) + "_" + "{:012.6F}".format(self.location) + ".txt"
       
     # save beam
-    def save(self, linac):
-        np.savetxt(linac.trackPath() + self.filename(), self.__phasespace)
+    def save(self, runnable):
+        np.savetxt(runnable.runPath() + self.filename(), self.__phasespace)
     
     # load beam
     @classmethod

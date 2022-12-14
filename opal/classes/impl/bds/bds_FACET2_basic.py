@@ -1,19 +1,19 @@
-from opal import BeamDeliverySystem
+from opal import BeamDeliverySystem, Beamline, DriftBasic
 
 class BeamDeliverySystemFACET2Basic(BeamDeliverySystem):
     
-    def __init__(self, beta_waist = None, s_waist = None, L = 10):
+    def __init__(self, beta_waist = None, s_waist = None):
         self.beta_waist = beta_waist
         self.s_waist = s_waist
-        self.L = L
+        
+    def beamline(self):
+        drift1 = DriftBasic(0.1) # zero length for now
+        return Beamline([drift1])
         
     def length(self):
-        return self.L
-        
-    def track(self, beam):
-
-        # increment beam location
-        beam.location += self.length()
-        
-        return super().track(beam)
+        return self.beamline().length()
+    
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        return self.beamline().track(beam, savedepth, runnable, verbose)
+    
     

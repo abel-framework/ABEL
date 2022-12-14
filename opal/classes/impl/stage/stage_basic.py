@@ -14,7 +14,7 @@ class StageBasic(Stage):
     def energyGain(self):
         return self.deltaE
     
-    def track(self, beam):
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
         # adiabatic damping
         beam.betatronDamping(self.deltaE)
@@ -25,6 +25,6 @@ class StageBasic(Stage):
         # accelerate beam
         beam.accelerate(deltaE = self.deltaE, chirp = self.chirp, z0 = self.z0)
 
-        return super().track(beam)
+        return super().track(beam, savedepth, runnable, verbose)
         
     

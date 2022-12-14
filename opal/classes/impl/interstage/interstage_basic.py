@@ -13,7 +13,7 @@ class InterstageBasic(Interstage):
         else:
             return self.L
         
-    def track(self, beam):
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
 
         # compress beam
         if callable(self.R56):
@@ -24,9 +24,6 @@ class InterstageBasic(Interstage):
 
         # flip transverse phase spaces
         beam.flipTransversePhaseSpaces()
-
-        # increment beam location
-        beam.location += self.length()
         
-        return super().track(beam)
+        return super().track(beam, savedepth, runnable, verbose)
     

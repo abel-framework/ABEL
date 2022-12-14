@@ -22,7 +22,7 @@ class SourceBasic(Source):
         self.L = L # [m]
         self.Npart = Npart
         
-    def track(self, _ = None):
+    def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
         
         # make empty beam
         beam = Beam()
@@ -41,7 +41,7 @@ class SourceBasic(Source):
         # create phase space
         beam.setPhaseSpace(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.Q)
         
-        return super().track(beam)
+        return super().track(beam, savedepth, runnable, verbose)
     
     def length(self):
         return self.L

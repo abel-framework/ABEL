@@ -214,7 +214,7 @@ class InterstageELEGANT(Interstage):
         
 
     # track a beam through the lattice using ELEGANT
-    def track(self, beam0):
+    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
         # environment variables
         envars = {}
@@ -228,5 +228,5 @@ class InterstageELEGANT(Interstage):
         runfile = self.makeRunScript()
         beam = elegant_run(runfile, beam0, beamfile, envars, quiet=True)
         
-        return super().track(beam)
+        return super().track(beam, savedepth, runnable, verbose)
     

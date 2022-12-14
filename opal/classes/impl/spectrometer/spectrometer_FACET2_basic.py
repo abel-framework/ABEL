@@ -1,22 +1,23 @@
-from opal import Spectrometer
+from opal import Spectrometer, Beamline, DriftBasic, DipoleSpectrometerBasic
 
 class SpectrometerFACET2Basic(Spectrometer):
     
-    def __init__(self, B_spec = None, E_img = None, s_obj = None):
-        self.B_spec = B_spec
+    def __init__(self, B_dip = None, E_img = None, s_obj = None):
+        self.B_dip = B_dip        
         self.E_img = E_img
         self.s_obj = s_obj
-        self.L = 10
+
+    def beamline(self):
+        drift1 = DriftBasic(2)
+        dipole = DipoleSpectrometerBasic(1, self.B_dip, True)
+        drift2 = DriftBasic(6)
+        return Beamline([drift1, dipole, drift2])
+        
         
     def length(self):
-        if callable(self.L):
-            return self.L(self.E0)
-        else:
-            return self.L
+        return self.beamline().length()
+    
+    
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        return self.beamline().track(beam, savedepth, runnable, verbose)
         
-    def track(self, beam):
-        
-        # increment beam location
-        beam.location += self.length()
-        
-        return super().track(beam)

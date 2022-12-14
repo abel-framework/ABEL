@@ -8,8 +8,8 @@ class Interstage(Trackable):
     def __init__(self):
         pass
         
-    def track(self, beam):
-        return super().track(beam)
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        return super().track(beam, savedepth, runnable, verbose)
     
     @abstractmethod
     def length(self):
