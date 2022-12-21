@@ -1,4 +1,7 @@
 import numpy as np
+import openpmd_api as io
+from datetime import datetime
+from pytz import timezone
 from opal.utilities import SI
 from opal.utilities.relativity import *
 from opal.utilities.statistics import prct_clean, prct_clean2D
@@ -30,7 +33,9 @@ class Beam():
     # filter out macroparticles based on a mask (true means delete)
     def filterPhaseSpace(self, mask):
         if mask.any():
-            self.__phasespace = np.delete(self.__phasespace, np.where(mask), 1)
+            
+            # perform filtering and fix memory allocation
+            self.__phasespace = np.ascontiguousarray(np.delete(self.__phasespace, np.where(mask), 1))
             
         
     # set phase space
@@ -67,6 +72,9 @@ class Beam():
         
         # charge
         self.__phasespace[6,:] = Q/Npart
+        
+        # ids
+        self.__phasespace[7,:] = np.arange(Npart)
             
         
     
@@ -91,6 +99,8 @@ class Beam():
         return self.__phasespace[5,:]
     def qs(self):
         return self.__phasespace[6,:]
+    def ids(self):
+        return self.__phasespace[7,:]
     
     # set phase space (private)
     def __setXs(self, xs):
@@ -114,6 +124,11 @@ class Beam():
         
     def __setQs(self, qs):
         self.__phasespace[6,:] = qs
+    def __setIds(self, ids):
+        self.__phasespace[7,:] = ids
+        
+    def weightings(self):
+        return self.__phasespace[6,:]/(self.chargeSign()*SI.e)
     
     # copy another beam's macroparticle charge
     def copyParticleCharge(self, beam):
@@ -267,7 +282,7 @@ class Beam():
     
     def phaseSpaceDensity(self, hfcn, vfcn, hbins=None, vbins=None):
         nsig = 4
-        Nbins = int(np.sqrt(self.Npart()))
+        Nbins = int(np.sqrt(self.Npart())/2)
         if hbins is None:
             hbins = np.mean(hfcn()) + nsig * np.std(hfcn()) * np.arange(-1, 1, 2/Nbins)
         if vbins is None:
@@ -357,28 +372,104 @@ class Beam():
   
     ## SAVE AND LOAD BEAM
     
-    # make filename for beam 
-    def filename(self):
-        return "beam_" + str(self.trackableNumber).zfill(3) + "_"  + str(self.stageNumber).zfill(3) + "_" + "{:012.6F}".format(self.location) + ".txt"
-      
-    # save beam
-    def save(self, runnable):
-        np.savetxt(runnable.runPath() + self.filename(), self.__phasespace)
+    def filename(self, runnable):
+        return runnable.shotPath() + "/beam_{:012.6F}".format(self.location) + ".h5"
     
-    # load beam
-    @classmethod
-    def load(_, filename):
+      
+    # save beam (to OpenPMD format)
+    def save(self, runnable):
         
-        # create beam from phase space
-        beam = Beam(phasespace = np.loadtxt(filename))
-            
-        # find stage and location from filename
-        parts0 = filename.split('/')
-        parts = parts0[-1].split('_')
-        beam.trackableNumber = int(parts[1])
-        beam.stageNumber = int(parts[2])
-        subparts = parts[3].split('.')
-        beam.location = float(subparts[0] + '.' + subparts[1])
+        # open a new file
+        series = io.Series(self.filename(runnable), io.Access.create)
+        series.particles_path = "particles"
+        
+        # add metadata
+        series.author = "OPAL (the Optimizable Plasma-Accelerator Linac code)"
+        series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
+        
+        # make step (only one)
+        i = series.iterations[0]
+        
+        # add attributes
+        i.set_attribute("time", self.location/SI.c)
+        for key, value in self.__dict__.items():
+            if not "__phasespace" in key:
+                i.set_attribute(key, value)
+        
+        # make beam record
+        beam = i.particles["beam"]
+        
+        # declare dataset structure
+        dset = io.Dataset(self.ids().dtype, self.ids().shape)
+        beam["id"][io.Record_Component.SCALAR].reset_dataset(dset)
+        beam["weighting"][io.Record_Component.SCALAR].reset_dataset(dset)
+        beam["position"]["z"].reset_dataset(dset)
+        beam["position"]["x"].reset_dataset(dset)
+        beam["position"]["y"].reset_dataset(dset)
+        beam["momentum"]["z"].reset_dataset(dset)
+        beam["momentum"]["x"].reset_dataset(dset)
+        beam["momentum"]["y"].reset_dataset(dset)
+        
+        # save dataset structure to file
+        series.flush()
+        
+        # add beam attributes
+        beam["charge"][io.Record_Component.SCALAR].set_attribute("value", self.chargeSign()*SI.e)
+        beam["mass"][io.Record_Component.SCALAR].set_attribute("value", SI.me)
+        
+        # store data
+        beam["id"][io.Record_Component.SCALAR].store_chunk(self.ids())
+        beam["weighting"][io.Record_Component.SCALAR].store_chunk(self.weightings())
+        beam["position"]["z"].store_chunk(self.zs())
+        beam["position"]["x"].store_chunk(self.xs())
+        beam["position"]["y"].store_chunk(self.ys())
+        beam["momentum"]["z"].store_chunk(self.wzs())
+        beam["momentum"]["x"].store_chunk(self.wxs())
+        beam["momentum"]["y"].store_chunk(self.wys())
+        
+        # TODO: try/catch if data has strides, and fix by removing satellite particles
+        
+        # save data to file
+        series.flush()
+        
+        # now the file is closed
+        del series
+        
+        
+    # load beam (from OpenPMD format)
+    @classmethod
+    def load(_, filename):    
+        
+        # load file
+        series = io.Series(filename, io.Access.read_only)
+        i = series.iterations[0]
+        
+        # get particle data
+        b = i.particles["beam"]
+        
+        # get attributes
+        charge = b["charge"][io.Record_Component.SCALAR].get_attribute("value")
+        mass = b["mass"][io.Record_Component.SCALAR].get_attribute("value")
+        
+        # extract phase space
+        xs = b["position"]["x"].load_chunk()
+        ys = b["position"]["y"].load_chunk()
+        zs = b["position"]["z"].load_chunk()
+        wxs = b["momentum"]["x"].load_chunk()
+        wys = b["momentum"]["y"].load_chunk()
+        wzs = b["momentum"]["z"].load_chunk()
+        ids = b["id"][io.Record_Component.SCALAR].load_chunk()
+        weightings = b["weighting"][io.Record_Component.SCALAR].load_chunk()
+        series.flush()
+        
+        # make beam
+        beam = Beam()
+        beam.setPhaseSpace(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, wxs=wxs, wys=wys, wzs=wzs)
+        
+        # add metadata
+        for key, value in beam.__dict__.items():
+            if not "__phasespace" in key:
+                setattr(beam, key, i.get_attribute(key))
         
         return beam
       

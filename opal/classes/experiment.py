@@ -25,7 +25,7 @@ class Experiment(Beamline):
         
         # load phase space
         files = self.runData()
-        beam = Beam.load(self.runPath() + files[-1])
+        beam = Beam.load(files[-1][-1])
 
         # make screen projection
         dQdxdy, yedges, xedges = beam.densityTransverse()

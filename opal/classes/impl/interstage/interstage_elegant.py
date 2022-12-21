@@ -113,7 +113,7 @@ class InterstageELEGANT(Interstage):
     
     # make run script file
     def makeRunScript(self):
-        return CONFIG.opal_path + 'runscript_interstage.ele'
+        return CONFIG.opal_path + 'opal/apis/elegant/templates/runscript_interstage.ele'
     
     
     def makeLattice(self, beam, output_filename):

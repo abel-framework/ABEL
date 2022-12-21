@@ -5,7 +5,6 @@
     lattice             = "{printenv LATTICE}",
     use_beamline        = "ACHROMAT",
     p_central_mev       = "({printenv ENERGY})",
-    output              = "%s.out",
     random_number_seed  = 0,
 &end
 
@@ -13,7 +12,7 @@
 &end
 
 &sdds_beam
-    input               = "$beam_filename"
+    input               = "{printenv BEAM}",
 &end
 
 &track

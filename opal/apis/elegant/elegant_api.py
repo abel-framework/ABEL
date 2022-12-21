@@ -114,7 +114,7 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
     # convert SDDS output to beam object
     beam = elegant_read_beam(beamfile)
         
-    # add previous beam metadata
+    # copy previous beam metadata
     beam.location = beam0.location
     beam.trackableNumber = beam0.trackableNumber
     beam.stageNumber = beam0.stageNumber

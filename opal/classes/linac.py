@@ -64,23 +64,31 @@ class Linac(Beamline):
         files = self.runData()
         
         # declare data structure
-        vals = np.empty((len(files), len(fcns)))
-        stageNumbers = np.empty(len(files))
+        Nsteps = len(files[0])
+        stageNumbers = np.empty(Nsteps)
+        vals_mean = np.empty((Nsteps, len(fcns)))
+        vals_std = np.empty((Nsteps, len(fcns)))
+        
         
         # go through files
-        for i in range(len(files)):
-
-            # load phase space
-            beam = Beam.load(self.runPath() + files[i])
-
+        for i in range(Nsteps):
+            
+            # load beams and apply functions
+            vals = np.empty((len(files), len(fcns)))
+            for j in range(len(files)):
+                beam = Beam.load(files[j][i])
+                for k in range(len(fcns)):
+                    vals[j,k] = fcns[k](beam)
+            
+            # calculate mean and standard dev
+            for k in range(len(fcns)):
+                vals_mean[i,k] = np.mean(vals[:,k])
+                vals_std[i,k] = np.std(vals[:,k])
+            
             # find stage number
             stageNumbers[i] = beam.stageNumber
-            
-            # apply all functions
-            for j in range(len(fcns)):
-                vals[i,j] = fcns[j](beam)
-                
-        return vals, stageNumbers
+
+        return stageNumbers, vals_mean, vals_std
  
 
     # apply waterfall function to all beam files
@@ -88,6 +96,7 @@ class Linac(Beamline):
         
         # find tracking data
         files = self.runData()
+        files = files[-1]
         
         # declare data structure
         waterfalls = [None] * len(fcns)
@@ -100,7 +109,7 @@ class Linac(Beamline):
         for i in range(len(files)):
 
             # load phase space
-            beam = Beam.load(self.runPath() + files[i])
+            beam = Beam.load(files[i])
 
             # find stage number
             stageNumbers[i] = beam.stageNumber
@@ -118,79 +127,117 @@ class Linac(Beamline):
     def plotEvolution(self):
         
         # calculate values
-        vals, stageNums = self.evolutionFcn([Beam.absCharge, \
+        stageNums, vals_mean, vals_std = self.evolutionFcn([Beam.absCharge, \
                                              Beam.energy, Beam.relEnergySpread, \
                                              Beam.bunchLength, Beam.offsetZ, \
                                              Beam.normEmittanceX, Beam.normEmittanceY, \
                                              Beam.betaX, Beam.betaY, \
                                              Beam.offsetX, Beam.offsetY])
-        Qs = vals[:,0]
-        Es = vals[:,1]
-        sigdeltas = vals[:,2]
-        sigzs = vals[:,3]
-        z0s = vals[:,4]
-        emnxs = vals[:,5]
-        emnys = vals[:,6]
-        betaxs = vals[:,7]
-        betays = vals[:,8]
-        x0s = vals[:,9]
-        y0s = vals[:,10]
+        
+        # mean values
+        Qs = vals_mean[:,0]
+        Es = vals_mean[:,1]
+        sigdeltas = vals_mean[:,2]
+        sigzs = vals_mean[:,3]
+        z0s = vals_mean[:,4]
+        emnxs = vals_mean[:,5]
+        emnys = vals_mean[:,6]
+        betaxs = vals_mean[:,7]
+        betays = vals_mean[:,8]
+        x0s = vals_mean[:,9]
+        y0s = vals_mean[:,10]
+        
+        # errors
+        Qs_error = vals_std[:,0]
+        Es_error = vals_std[:,1]
+        sigdeltas_error = vals_std[:,2]
+        sigzs_error = vals_std[:,3]
+        z0s_error = vals_std[:,4]
+        emnxs_error = vals_std[:,5]
+        emnys_error = vals_std[:,6]
+        betaxs_error = vals_std[:,7]
+        betays_error = vals_std[:,8]
+        x0s_error = vals_std[:,9]
+        y0s_error = vals_std[:,10]
         
         # target energies
         _, Es_target = self.targetEnergy()
         deltas = Es/Es_target - 1
+        deltas_error = Es_error/Es_target
         
         # initial charge
         Q0 = Qs[0]
+        
+        # line format
+        fmt = "-"
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        af = 0.2
         
         # plot evolution
         fig, axs = plt.subplots(3,3)
         fig.set_figwidth(20)
         fig.set_figheight(12)
         
-        axs[0,0].plot(stageNums, Es_target / 1e9, ':', color='gray')
-        axs[0,0].plot(stageNums, Es / 1e9, '-')
+        axs[0,0].plot(stageNums, Es_target / 1e9, ':', color=col0)
+        axs[0,0].plot(stageNums, Es / 1e9, color=col1)
+        axs[0,0].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((Es+Es_error, np.flip(Es-Es_error))) / 1e9, color=col1, alpha=af)
         axs[0,0].set_xlabel('Stage number')
         axs[0,0].set_ylabel('Energy (GeV)')
         
-        axs[1,0].plot(stageNums, sigdeltas * 100, '-')
+        axs[1,0].plot(stageNums, sigdeltas * 100, color=col1)
+        axs[1,0].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((sigdeltas+sigdeltas_error, np.flip(sigdeltas-sigdeltas_error))) * 100, color=col1, alpha=af)
         axs[1,0].set_xlabel('Stage number')
         axs[1,0].set_ylabel('Energy spread (%)')
         axs[1,0].set_yscale('log')
         
-        axs[2,0].plot(stageNums, np.zeros(deltas.shape), ':', color='gray')
-        axs[2,0].plot(stageNums, deltas * 100, '-')
+        axs[2,0].plot(stageNums, np.zeros(deltas.shape), ':', color=col0)
+        axs[2,0].plot(stageNums, deltas * 100, color=col1)
+        axs[2,0].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((deltas+deltas_error, np.flip(deltas-deltas_error))) * 100, color=col1, alpha=af)
         axs[2,0].set_xlabel('Stage number')
         axs[2,0].set_ylabel('Energy offset (%)')
         
-        axs[0,1].plot(stageNums, Q0 * np.ones(Qs.shape) * 1e9, ':', color='gray')
-        axs[0,1].plot(stageNums, Qs * 1e9, '-')
+        axs[0,1].plot(stageNums, Q0 * np.ones(Qs.shape) * 1e9, ':', color=col0)
+        axs[0,1].plot(stageNums, Qs * 1e9, color=col1)
+        axs[0,1].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
         axs[0,1].set_xlabel('Stage number')
         axs[0,1].set_ylabel('Charge (nC)')
         
-        axs[1,1].plot(stageNums, sigzs*1e6, '-')
+        axs[1,1].plot(stageNums, sigzs*1e6, color=col1)
+        axs[1,1].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((sigzs+sigzs_error, np.flip(sigzs-sigzs_error))) * 1e6, color=col1, alpha=af)
         axs[1,1].set_xlabel('Stage number')
         axs[1,1].set_ylabel('Bunch length (um)')
         
-        axs[2,1].plot(stageNums, z0s*1e6, '-')
+        axs[2,1].plot(stageNums, z0s*1e6, color=col1)
+        axs[2,1].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((z0s+z0s_error, np.flip(z0s-z0s_error))) * 1e6, color=col1, alpha=af)
         axs[2,1].set_xlabel('Stage number')
         axs[2,1].set_ylabel('Longitudinal offset (um)')
         
-        axs[0,2].plot(stageNums, np.ones(len(stageNums))*emnxs[0]*1e6, ':', color='gray')
-        axs[0,2].plot(stageNums, np.ones(len(stageNums))*emnys[0]*1e6, ':', color='gray')
-        axs[0,2].plot(stageNums, emnxs*1e6, '-', stageNums, emnys*1e6, '-')
+        axs[0,2].plot(stageNums, np.ones(len(stageNums))*emnxs[0]*1e6, ':', color=col0)
+        axs[0,2].plot(stageNums, np.ones(len(stageNums))*emnys[0]*1e6, ':', color=col0)
+        axs[0,2].plot(stageNums, emnxs*1e6, color=col1)
+        axs[0,2].plot(stageNums, emnys*1e6, color=col2)
+        axs[0,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((emnxs+emnxs_error, np.flip(emnxs-emnxs_error))) * 1e6, color=col1, alpha=af)
+        axs[0,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((emnys+emnys_error, np.flip(emnys-emnys_error))) * 1e6, color=col2, alpha=af)
         axs[0,2].set_xlabel('Stage number')
         axs[0,2].set_ylabel('Emittance, rms (mm mrad)')
         axs[0,2].set_yscale('log')
         
-        axs[1,2].plot(stageNums, np.sqrt(Es_target/Es_target[0])*betaxs[0]*1e3, ':', color='gray')
-        axs[1,2].plot(stageNums, betaxs*1e3, '-', stageNums, betays*1e3, '-')
+        axs[1,2].plot(stageNums, np.sqrt(Es_target/Es_target[0])*betaxs[0]*1e3, ':', color=col0)
+        axs[1,2].plot(stageNums, betaxs*1e3, color=col1)
+        axs[1,2].plot(stageNums, betays*1e3, color=col2)
+        axs[1,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((betaxs+betaxs_error, np.flip(betaxs-betaxs_error))) * 1e3, color=col1, alpha=af)
+        axs[1,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((betays+betays_error, np.flip(betays-betays_error))) * 1e3, color=col2, alpha=af)
         axs[1,2].set_xlabel('Stage number')
         axs[1,2].set_ylabel('Beta function (mm)')
         axs[1,2].set_yscale('log')
         
-        axs[2,2].plot(stageNums, np.zeros(x0s.shape), ':', color='gray')
-        axs[2,2].plot(stageNums, x0s*1e6, '-', stageNums, y0s*1e6, '-')
+        axs[2,2].plot(stageNums, np.zeros(x0s.shape), ':', color=col0)
+        axs[2,2].plot(stageNums, x0s*1e6, color=col1)
+        axs[2,2].plot(stageNums, y0s*1e6, color=col2)
+        axs[2,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((x0s+x0s_error, np.flip(x0s-x0s_error))) * 1e6, color=col1, alpha=af)
+        axs[2,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((y0s+y0s_error, np.flip(y0s-y0s_error))) * 1e6, color=col2, alpha=af)
         axs[2,2].set_xlabel('Stage number')
         axs[2,2].set_ylabel('Transverse offset (um)')
         
