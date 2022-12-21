@@ -223,9 +223,16 @@ class Beam():
     def beamSizeY(self, clean=True):
         return np.std(prct_clean(self.ys(), clean))
     
+    def geomEmittanceX(self, clean=True):
+        xs, xps = prct_clean2D(self.xs(), self.xps(), clean)
+        return np.sqrt(np.linalg.det(np.cov(xs, xps)))
+    
+    def geomEmittanceY(self, clean=True):
+        ys, yps = prct_clean2D(self.ys(), self.yps(), clean)
+        return np.sqrt(np.linalg.det(np.cov(ys, yps)))
+    
     def normEmittanceX(self, clean=True):
         xs, wxs = prct_clean2D(self.xs(), self.wxs(), clean)
-        #return np.sqrt(np.linalg.det(np.cov(self.xs(), self.wxs()/SI.c)))
         return np.sqrt(np.linalg.det(np.cov(xs, wxs/SI.c)))
     
     def normEmittanceY(self, clean=True):

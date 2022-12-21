@@ -1,7 +1,5 @@
 from opal import Runnable, Beam, Beamline, Source, BeamDeliverySystem, Stage, Spectrometer
 from matplotlib import pyplot as plt
-#from os.path import isfile, join, exists
-#from os import listdir, remove, mkdir
 import numpy as np
 
 class Experiment(Beamline):

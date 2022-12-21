@@ -15,7 +15,7 @@ class Runnable(ABC):
             self.runname = runname
         
         # declare shots list
-        self.shots = []
+        self.shotnames = []
         
         # make base folder and clear tracking directory
         if not exists(self.runPath()):
@@ -23,17 +23,15 @@ class Runnable(ABC):
         else:
             if overwrite:
                 self.clearRunData()
-            else:
-                print("Run folder already exists and will not be overwritten.")
         
         # perform tracking
-        for i in range(shots):
+        for i in range(1, shots+1):
             
             # make shot folder
             self.shotname = "/shot_" + str(i)
             
             # add to shots list
-            self.shots.append(self.shotname)
+            self.shotnames.append(self.shotname)
             
             # make and clear tracking directory
             if not exists(self.shotPath()):
@@ -43,18 +41,17 @@ class Runnable(ABC):
                     self.clearRunData(i)
                 else:
                     print("Shot #" + str(i) + " already exists and will not be overwritten.")
-                    files = self.runData(i)
+                    files = self.runData(self.shotname)
                     beam = Beam.load(files[0][-1])
                     continue
 
             # run tracking
-            if shots > 1:
-                print(">> SHOT #" + str(i))
-                
+            if shots > 1 and verbose:
+                print(">> SHOT #" + str(i))  
             beam = self.track(beam=None, savedepth=savedepth, runnable=self, verbose=verbose)
                 
 
-        # return beam from last run
+        # return beam from last shot
         return beam
     
     
@@ -69,19 +66,19 @@ class Runnable(ABC):
     # generate track path(s)
     def shotPathsAll(self):
         paths = []
-        for i in range(len(self.shots)):
-            paths.append(self.runPath() + self.shots[i])
+        for shotname in self.shotnames:
+            paths.append(self.runPath() + shotname)
         return paths
     
     
     # get tracking data
-    def runData(self, shot=None):
+    def runData(self, shotname=None):
         
         # collect shots
-        if shot is None:
+        if shotname is None:
             shotPaths = self.shotPathsAll()
         else:
-            shotPaths = [self.shotPathsAll()[shot]]
+            shotPaths = [self.shotPathsAll()[self.shotnames.index(shotname)]]
         
         # find filenames
         files = []
@@ -94,11 +91,9 @@ class Runnable(ABC):
     
     
     # clear tracking data
-    def clearRunData(self, shot=None):
-        
-        # get files
-        if shot is not None:
-            files = self.runData(shot)
+    def clearRunData(self, shotname=None):
+        if shotname is not None:
+            files = self.runData(shotname)
             for shotFiles in files:
                 for file in shotFiles:
                     remove(file)
@@ -111,6 +106,4 @@ class Runnable(ABC):
                     rmdir(path)
                 else:
                     remove(path)
-            
-        # delete files
     
