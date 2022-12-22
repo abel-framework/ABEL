@@ -21,7 +21,8 @@ class SourceBasic(Source):
         self.alphay = alphay # [m]
         self.L = L # [m]
         self.Npart = Npart
-        
+    
+    
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
         
         # make empty beam
@@ -43,8 +44,10 @@ class SourceBasic(Source):
         
         return super().track(beam, savedepth, runnable, verbose)
     
+    
     def length(self):
         return self.L
+    
     
     def energy(self):
         return self.E0

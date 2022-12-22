@@ -1,26 +1,35 @@
-from opal import Runnable, Linac, InteractionPoint
+from opal import Runnable, Linac, BeamDeliverySystem, InteractionPoint
 from matplotlib import pyplot as plt
 import numpy as np
 from os import listdir, remove, mkdir
 from os.path import isfile, join, exists
+from copy import deepcopy
 
 class Collider(Runnable):
     
     # constructor
-    def __init__(self, linac1=None, linac2=None, ip=None):
+    def __init__(self, linac1=None, bds1=None, ip=None, linac2=None, bds2=None):
         
         # check element classes, then assemble
         assert(isinstance(linac1, Linac))
-        assert(isinstance(linac2, Linac))
+        assert(isinstance(bds1, BeamDeliverySystem))
         assert(isinstance(ip, InteractionPoint))
         
         self.linac1 = linac1
         self.linac2 = linac2
+        self.bds1 = bds1
+        self.bds2 = bds2
         self.ip = ip
     
     
     # run simulation
     def run(self, runname=None, shots=1, savedepth=2, verbose=True, overwrite=True):
+        
+        # copy second arm if undefined
+        if self.linac2 is None:
+            self.linac2 = deepcopy(self.linac1)
+        if self.bds2 is None:
+            self.bds2 = deepcopy(self.bds1)
         
         # define run name (generate if not given)
         if runname is None:
@@ -47,7 +56,7 @@ class Collider(Runnable):
         
         if verbose:
             print(">> INTERACTION POINT")
-        event = self.ip.run(self.linac1, self.linac2, self.runname + "/ip", allByAll=True)
+        event = self.ip.run(self.linac1, self.linac2, self.runname + "/ip", allByAll=False)
         
         # return beams from last shot
         return beam1, beam2, event

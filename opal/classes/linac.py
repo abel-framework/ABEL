@@ -1,6 +1,6 @@
-from opal import Runnable, Beam, Beamline, Source, Stage, Interstage
+from opal import Runnable, Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem
 from opal.utilities import SI
-import copy
+from copy import deepcopy
 from os import listdir, remove, mkdir
 from os.path import isfile, join, exists
 from datetime import datetime
@@ -9,7 +9,7 @@ import numpy as np
 
 class Linac(Beamline):
     
-    def __init__(self, source=None, stage=None, interstage=None, Nstages=1):
+    def __init__(self, source=None, stage=None, interstage=None, bds=None, Nstages=1):
         
         # check element classes, then assemble
         assert(isinstance(source, Source))
@@ -17,7 +17,7 @@ class Linac(Beamline):
         assert(isinstance(interstage, Interstage))
         
         # declare list of trackables
-        trackables = [None] * (2*Nstages)
+        trackables = [None] * (2*Nstages + int(bds is not None))
         
         # add source
         trackables[0] = source
@@ -26,12 +26,17 @@ class Linac(Beamline):
         for i in range(Nstages):
             
             # add stages
-            trackables[1+2*i] = copy.deepcopy(stage)
+            trackables[1+2*i] = deepcopy(stage)
             
             # add interstages
             if i < Nstages-1:
-                trackables[2+2*i] = copy.deepcopy(interstage)
+                trackables[2+2*i] = deepcopy(interstage)
                 trackables[2+2*i].E0 = source.energy() + (i+1) * stage.energyGain()
+        
+        # add beam delivery system
+        if bds is not None:
+            assert(isinstance(bds, BeamDeliverySystem))
+            trackables[2*Nstages] = bds
         
         # run linac constructor
         super().__init__(trackables)

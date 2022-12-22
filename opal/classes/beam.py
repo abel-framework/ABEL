@@ -249,6 +249,26 @@ class Beam():
         covy = np.cov(ys, yps)
         return covy[0,0]/np.sqrt(np.linalg.det(covy))
     
+    def alphaX(self, clean=True):
+        xs, xps = prct_clean2D(self.xs(), self.xps(), clean)
+        covx = np.cov(xs, xps)
+        return -covx[1,0]/np.sqrt(np.linalg.det(covx))
+    
+    def alphaY(self, clean=True):
+        ys, yps = prct_clean2D(self.ys(), self.yps(), clean)
+        covy = np.cov(ys, yps)
+        return -covy[1,0]/np.sqrt(np.linalg.det(covy))
+    
+    def gammaX(self, clean=True):
+        xs, xps = prct_clean2D(self.xs(), self.xps(), clean)
+        covx = np.cov(xs, xps)
+        return covx[1,1]/np.sqrt(np.linalg.det(covx))
+    
+    def gammaY(self, clean=True):
+        ys, yps = prct_clean2D(self.ys(), self.yps(), clean)
+        covy = np.cov(ys, yps)
+        return covy[1,1]/np.sqrt(np.linalg.det(covy))
+    
     
     ## BEAM PROJECTIONS
     

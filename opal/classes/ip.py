@@ -72,7 +72,10 @@ class InteractionPoint(Runnable):
                 
                 # get event
                 event = self.interact(beam1, beam2)
-                
+                if verbose:
+                    print("Full luminosity: " + str(event.fullLuminosity()) + " m^-2")
+                    print("Geom. luminosity: " + str(event.geometricLuminosity()) + " m^-2")
+
                 # increment event number
                 n += 1
         

@@ -26,8 +26,10 @@ from .classes.impl.stage.stage_basic import StageBasic
 from .classes.impl.stage.stage_nonlinear1D import StageNonlinear1D
 from .classes.impl.interstage.interstage_basic import InterstageBasic
 from .classes.impl.interstage.interstage_elegant import InterstageELEGANT
+from .classes.impl.bds.bds_basic import BeamDeliverySystemBasic
 from .classes.impl.bds.bds_FACET2_basic import BeamDeliverySystemFACET2Basic
 from .classes.impl.spectrometer.spectrometer_FACET2_basic import SpectrometerFACET2Basic
 from .classes.impl.ip.ip_basic import InteractionPointBasic
+from .classes.impl.ip.ip_guineapig import InteractionPointGUINEAPIG
 
 __all__ = ["CONFIG", "Beam", "Trackable", "Source", "Stage", "Interstage", "Linac", "LinacMultistage", "LinacExperiment", "SourceBasic", "StageBasic", "StageNonlinear1D", "InterstageBasic", "InterstageELEGANT", "Experiment", "BeamDeliverySystem", "Spectrometer", "BeamDeliverySystemFACET2Basic", "SpectrometerFACET2Basic"]
