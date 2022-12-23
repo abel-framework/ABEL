@@ -60,6 +60,21 @@ class Linac(Beamline):
     
     
     
+    ## BEAMS
+    
+    # initial beam
+    def initialBeam(self, shot=0):
+        files = self.runData()
+        files = files[shot-1]
+        return Beam.load(files[0])
+    
+    # final beam
+    def finalBeam(self, shot=0):
+        files = self.runData()
+        files = files[shot-1]
+        return Beam.load(files[-1])
+
+    
     ## PLOT EVOLUTION
     
     # apply function to all beam files
@@ -71,6 +86,7 @@ class Linac(Beamline):
         # declare data structure
         Nsteps = len(files[0])
         stageNumbers = np.empty(Nsteps)
+        ss = np.empty(Nsteps)
         vals_mean = np.empty((Nsteps, len(fcns)))
         vals_std = np.empty((Nsteps, len(fcns)))
         
@@ -92,8 +108,9 @@ class Linac(Beamline):
             
             # find stage number
             stageNumbers[i] = beam.stageNumber
+            ss[i] = beam.location
 
-        return stageNumbers, vals_mean, vals_std
+        return ss, vals_mean, vals_std, stageNumbers
  
 
     # apply waterfall function to all beam files
@@ -129,15 +146,22 @@ class Linac(Beamline):
         return waterfalls, stageNumbers, bins
              
         
-    def plotEvolution(self):
+    def plotEvolution(self, useStageNumbers=False):
         
         # calculate values
-        stageNums, vals_mean, vals_std = self.evolutionFcn([Beam.absCharge, \
+        ss, vals_mean, vals_std, stageNums = self.evolutionFcn([Beam.absCharge, \
                                              Beam.energy, Beam.relEnergySpread, \
                                              Beam.bunchLength, Beam.offsetZ, \
                                              Beam.normEmittanceX, Beam.normEmittanceY, \
                                              Beam.betaX, Beam.betaY, \
                                              Beam.offsetX, Beam.offsetY])
+        
+        if useStageNumbers:
+            long_axis = stageNums
+            long_label = 'Stage number'
+        else:
+            long_axis = ss
+            long_label = 'Location (m)'
         
         # mean values
         Qs = vals_mean[:,0]
@@ -185,65 +209,65 @@ class Linac(Beamline):
         fig.set_figwidth(20)
         fig.set_figheight(12)
         
-        axs[0,0].plot(stageNums, Es_target / 1e9, ':', color=col0)
-        axs[0,0].plot(stageNums, Es / 1e9, color=col1)
-        axs[0,0].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((Es+Es_error, np.flip(Es-Es_error))) / 1e9, color=col1, alpha=af)
-        axs[0,0].set_xlabel('Stage number')
+        axs[0,0].plot(long_axis, Es_target / 1e9, ':', color=col0)
+        axs[0,0].plot(long_axis, Es / 1e9, color=col1)
+        axs[0,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Es+Es_error, np.flip(Es-Es_error))) / 1e9, color=col1, alpha=af)
+        axs[0,0].set_xlabel(long_label)
         axs[0,0].set_ylabel('Energy (GeV)')
         
-        axs[1,0].plot(stageNums, sigdeltas * 100, color=col1)
-        axs[1,0].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((sigdeltas+sigdeltas_error, np.flip(sigdeltas-sigdeltas_error))) * 100, color=col1, alpha=af)
-        axs[1,0].set_xlabel('Stage number')
+        axs[1,0].plot(long_axis, sigdeltas * 100, color=col1)
+        axs[1,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigdeltas+sigdeltas_error, np.flip(sigdeltas-sigdeltas_error))) * 100, color=col1, alpha=af)
+        axs[1,0].set_xlabel(long_label)
         axs[1,0].set_ylabel('Energy spread (%)')
         axs[1,0].set_yscale('log')
         
-        axs[2,0].plot(stageNums, np.zeros(deltas.shape), ':', color=col0)
-        axs[2,0].plot(stageNums, deltas * 100, color=col1)
-        axs[2,0].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((deltas+deltas_error, np.flip(deltas-deltas_error))) * 100, color=col1, alpha=af)
-        axs[2,0].set_xlabel('Stage number')
+        axs[2,0].plot(long_axis, np.zeros(deltas.shape), ':', color=col0)
+        axs[2,0].plot(long_axis, deltas * 100, color=col1)
+        axs[2,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((deltas+deltas_error, np.flip(deltas-deltas_error))) * 100, color=col1, alpha=af)
+        axs[2,0].set_xlabel(long_label)
         axs[2,0].set_ylabel('Energy offset (%)')
         
-        axs[0,1].plot(stageNums, Q0 * np.ones(Qs.shape) * 1e9, ':', color=col0)
-        axs[0,1].plot(stageNums, Qs * 1e9, color=col1)
-        axs[0,1].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
-        axs[0,1].set_xlabel('Stage number')
+        axs[0,1].plot(long_axis, Q0 * np.ones(Qs.shape) * 1e9, ':', color=col0)
+        axs[0,1].plot(long_axis, Qs * 1e9, color=col1)
+        axs[0,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
+        axs[0,1].set_xlabel(long_label)
         axs[0,1].set_ylabel('Charge (nC)')
         
-        axs[1,1].plot(stageNums, sigzs*1e6, color=col1)
-        axs[1,1].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((sigzs+sigzs_error, np.flip(sigzs-sigzs_error))) * 1e6, color=col1, alpha=af)
-        axs[1,1].set_xlabel('Stage number')
+        axs[1,1].plot(long_axis, sigzs*1e6, color=col1)
+        axs[1,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigzs+sigzs_error, np.flip(sigzs-sigzs_error))) * 1e6, color=col1, alpha=af)
+        axs[1,1].set_xlabel(long_label)
         axs[1,1].set_ylabel('Bunch length (um)')
         
-        axs[2,1].plot(stageNums, z0s*1e6, color=col1)
-        axs[2,1].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((z0s+z0s_error, np.flip(z0s-z0s_error))) * 1e6, color=col1, alpha=af)
-        axs[2,1].set_xlabel('Stage number')
+        axs[2,1].plot(long_axis, z0s*1e6, color=col1)
+        axs[2,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((z0s+z0s_error, np.flip(z0s-z0s_error))) * 1e6, color=col1, alpha=af)
+        axs[2,1].set_xlabel(long_label)
         axs[2,1].set_ylabel('Longitudinal offset (um)')
         
-        axs[0,2].plot(stageNums, np.ones(len(stageNums))*emnxs[0]*1e6, ':', color=col0)
-        axs[0,2].plot(stageNums, np.ones(len(stageNums))*emnys[0]*1e6, ':', color=col0)
-        axs[0,2].plot(stageNums, emnxs*1e6, color=col1)
-        axs[0,2].plot(stageNums, emnys*1e6, color=col2)
-        axs[0,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((emnxs+emnxs_error, np.flip(emnxs-emnxs_error))) * 1e6, color=col1, alpha=af)
-        axs[0,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((emnys+emnys_error, np.flip(emnys-emnys_error))) * 1e6, color=col2, alpha=af)
-        axs[0,2].set_xlabel('Stage number')
+        axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnxs[0]*1e6, ':', color=col0)
+        axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnys[0]*1e6, ':', color=col0)
+        axs[0,2].plot(long_axis, emnxs*1e6, color=col1)
+        axs[0,2].plot(long_axis, emnys*1e6, color=col2)
+        axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnxs+emnxs_error, np.flip(emnxs-emnxs_error))) * 1e6, color=col1, alpha=af)
+        axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnys+emnys_error, np.flip(emnys-emnys_error))) * 1e6, color=col2, alpha=af)
+        axs[0,2].set_xlabel(long_label)
         axs[0,2].set_ylabel('Emittance, rms (mm mrad)')
         axs[0,2].set_yscale('log')
         
-        axs[1,2].plot(stageNums, np.sqrt(Es_target/Es_target[0])*betaxs[0]*1e3, ':', color=col0)
-        axs[1,2].plot(stageNums, betaxs*1e3, color=col1)
-        axs[1,2].plot(stageNums, betays*1e3, color=col2)
-        axs[1,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((betaxs+betaxs_error, np.flip(betaxs-betaxs_error))) * 1e3, color=col1, alpha=af)
-        axs[1,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((betays+betays_error, np.flip(betays-betays_error))) * 1e3, color=col2, alpha=af)
-        axs[1,2].set_xlabel('Stage number')
+        axs[1,2].plot(long_axis, np.sqrt(Es_target/Es_target[0])*betaxs[0]*1e3, ':', color=col0)
+        axs[1,2].plot(long_axis, betaxs*1e3, color=col1)
+        axs[1,2].plot(long_axis, betays*1e3, color=col2)
+        axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((betaxs+betaxs_error, np.flip(betaxs-betaxs_error))) * 1e3, color=col1, alpha=af)
+        axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((betays+betays_error, np.flip(betays-betays_error))) * 1e3, color=col2, alpha=af)
+        axs[1,2].set_xlabel(long_label)
         axs[1,2].set_ylabel('Beta function (mm)')
         axs[1,2].set_yscale('log')
         
-        axs[2,2].plot(stageNums, np.zeros(x0s.shape), ':', color=col0)
-        axs[2,2].plot(stageNums, x0s*1e6, color=col1)
-        axs[2,2].plot(stageNums, y0s*1e6, color=col2)
-        axs[2,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((x0s+x0s_error, np.flip(x0s-x0s_error))) * 1e6, color=col1, alpha=af)
-        axs[2,2].fill(np.concatenate((stageNums, np.flip(stageNums))), np.concatenate((y0s+y0s_error, np.flip(y0s-y0s_error))) * 1e6, color=col2, alpha=af)
-        axs[2,2].set_xlabel('Stage number')
+        axs[2,2].plot(long_axis, np.zeros(x0s.shape), ':', color=col0)
+        axs[2,2].plot(long_axis, x0s*1e6, color=col1)
+        axs[2,2].plot(long_axis, y0s*1e6, color=col2)
+        axs[2,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((x0s+x0s_error, np.flip(x0s-x0s_error))) * 1e6, color=col1, alpha=af)
+        axs[2,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((y0s+y0s_error, np.flip(y0s-y0s_error))) * 1e6, color=col2, alpha=af)
+        axs[2,2].set_xlabel(long_label)
         axs[2,2].set_ylabel('Transverse offset (um)')
         
         plt.show()
@@ -273,7 +297,6 @@ class Linac(Beamline):
         ts = bins[0]
         c0 = axs[0].pcolor(stageNums, ts*SI.c*1e6, -Is/1e3, cmap='GnBu')
         cbar0 = fig.colorbar(c0, ax=axs[0])
-        #axs[0].set_xlabel('Stage number')
         axs[0].set_ylabel('Longitudinal position (um)')
         cbar0.ax.set_ylabel('Beam current (kA)')
         
@@ -282,7 +305,6 @@ class Linac(Beamline):
         deltas = bins[1]
         c1 = axs[1].pcolor(stageNums, deltas*1e2, -dQddeltas*1e7, cmap='GnBu')
         cbar1 = fig.colorbar(c1, ax=axs[1])
-        #axs[1].set_xlabel('Stage number')
         axs[1].set_ylabel('Energy offset (%)')
         cbar1.ax.set_ylabel('Spectral density (nC/%)')
         
@@ -290,7 +312,6 @@ class Linac(Beamline):
         xs = bins[2]
         c2 = axs[2].pcolor(stageNums, xs*1e6, -densityX*1e3, cmap='GnBu')
         cbar2 = fig.colorbar(c2, ax=axs[2])
-        #axs[2].set_xlabel('Stage number')
         axs[2].set_ylabel('Horizontal position (um)')
         cbar2.ax.set_ylabel('Charge density (nC/um)')
         

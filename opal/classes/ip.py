@@ -1,12 +1,12 @@
 from abc import abstractmethod
 from opal import Runnable, Event, Beam
-from os import mkdir
-from os.path import exists
+from os import listdir, mkdir
+from os.path import isfile, join, exists
 
 class InteractionPoint(Runnable):
     
     # run simulation
-    def run(self, runnable1, runnable2, runname=None, allByAll=False, verbose=True, overwrite=True):
+    def run(self, runnable1, runnable2, runname=None, allByAll=False, verbose=True, overwrite=False):
         
         # define run name (generate if not given)
         if runname is None:
@@ -29,6 +29,8 @@ class InteractionPoint(Runnable):
                 self.clearRunData()
         
         # perform tracking
+        existing_events = []
+        existing_flag = False
         n = 1
         for i in range(len(runnable1.shotnames)):
             
@@ -50,38 +52,54 @@ class InteractionPoint(Runnable):
                 # add to shots list
                 self.shotnames.append(self.shotname)
 
-                # make and clear tracking directory
-                if not exists(self.shotPath()):
-                    mkdir(self.shotPath())
+                # load or run event
+                files = self.runData(self.shotname)
+                if files:
+                    existing_events.append(n)
+                    event = Event.load(files[0], loadBeams=False)
                 else:
-                    if overwrite:
-                        self.clearRunData(n)
-                    else:
-                        print("Event #" + str(n) + " already exists and will not be overwritten.")
-                        #files = self.runData(self.shotname)
-                        files = '' # TODO
-                        event = Event.load(files[0][0])
-                        continue
+                    
+                    # flush message of existing events
+                    if verbose and len(existing_events) > 0:
+                        if len(existing_events) == 1:
+                            print("Event #" + str(n) + " already exists.")
+                        else:
+                            print("Events #" + str(min(existing_events)) + "-" + str(max(existing_events)) + " already exist.")
+                        existing_events = []    
+                        existing_flag = True
+                        
+                    # run tracking
+                    if len(runnable1.shotnames) > 1 and verbose:
+                        print(">> EVENT #" + str(n))
+                    
+                    # get second beam
+                    beam2 = Beam.load(runnable2.runData(runnable2.shotnames[j])[-1][-1])
+                    
+                    # get event
+                    event = self.interact(beam1, beam2)
+                    event.save(self)
+                    
+                    if verbose:
+                        print(f"Full luminosity:  {event.fullLuminosity()/1e34:.3} \u03BCb")
+                        print(f"Geom. luminosity: {event.geometricLuminosity()/1e34:.3} \u03BCb")
                 
-                # run tracking
-                if len(runnable1.shotnames) > 1 and verbose:
-                    print(">> EVENT #" + str(n))
-                
-                # get second beam
-                beam2 = Beam.load(runnable2.runData(runnable2.shotnames[j])[-1][-1])
-                
-                # get event
-                event = self.interact(beam1, beam2)
-                if verbose:
-                    print("Full luminosity: " + str(event.fullLuminosity()) + " m^-2")
-                    print("Geom. luminosity: " + str(event.geometricLuminosity()) + " m^-2")
-
                 # increment event number
                 n += 1
+        
+        # print
+        if existing_events and not existing_flag:
+            print("All events (#" + str(min(existing_events)) + "-" + str(max(existing_events)) + ") already exist.")
         
         # return event from last interaction
         return event
     
+    # get tracking data
+    def runData(self, shotname=None):
+        files = [self.runPath() + "/" + f for f in listdir(self.runPath()) if (isfile(join(self.runPath(), f)) and not ".DS_Store" in f)]
+        files.sort()
+        if shotname is not None:
+            files = [f for f in files if shotname in f]
+        return files
     
     # interact
     @abstractmethod

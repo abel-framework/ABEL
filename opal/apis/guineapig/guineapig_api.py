@@ -1,8 +1,9 @@
-import tempfile, subprocess, csv
+import tempfile, shlex, subprocess, csv
 from os.path import exists
 from os import mkdir, remove
 import numpy as np
 from opal import CONFIG, Event
+import time
 
 def guineapig_run(inputfile, beam1, beam2):
     
@@ -19,11 +20,9 @@ def guineapig_run(inputfile, beam1, beam2):
     outputfile = tmpfolder + "/output.ref"
     
     # run GUINEA-PIG
-    subprocess.call(CONFIG.guineapig_path + 'guinea default default ' + outputfile \
-                                          + ' --el_file=' + beamfile1 + ' --pos_file=' + beamfile2 \
-                                          + ' --acc_file=' + inputfile, shell=True)
+    cmd = CONFIG.guineapig_path + 'guinea default default ' + outputfile + ' --el_file=' + beamfile1 + ' --pos_file=' + beamfile2 + ' --acc_file=' + inputfile
+    subprocess.run(cmd, shell=True, check=True, capture_output=True)
     
-               
     # parse outputs
     lumi_ee_full, lumi_ee_peak, lumi_ee_geom = guineapig_read_output(outputfile)
     

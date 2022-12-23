@@ -402,101 +402,99 @@ class Beam():
     def filename(self, runnable):
         return runnable.shotPath() + "/beam_{:012.6F}".format(self.location) + ".h5"
     
-      
+    
     # save beam (to OpenPMD format)
-    def save(self, runnable):
+    def save(self, runnable=None, beamName="beam", series=None):
         
-        # open a new file
-        series = io.Series(self.filename(runnable), io.Access.create)
-        series.particles_path = "particles"
+        # make new file if not provided
+        if series is None:
+            
+            # open a new file
+            series = io.Series(self.filename(runnable), io.Access.create)
         
-        # add metadata
-        series.author = "OPAL (the Optimizable Plasma-Accelerator Linac code)"
-        series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
-        
+            # add metadata
+            series.author = "OPAL (the Optimizable Plasma-Accelerator Linac code)"
+            series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
+
         # make step (only one)
-        i = series.iterations[0]
+        iteration = series.iterations[0]
         
         # add attributes
-        i.set_attribute("time", self.location/SI.c)
+        iteration.set_attribute("time", self.location/SI.c)
         for key, value in self.__dict__.items():
             if not "__phasespace" in key:
-                i.set_attribute(key, value)
+                iteration.set_attribute(key, value)
         
         # make beam record
-        beam = i.particles["beam"]
+        b = iteration.particles[beamName]
         
         # declare dataset structure
         dset = io.Dataset(self.ids().dtype, self.ids().shape)
-        beam["id"][io.Record_Component.SCALAR].reset_dataset(dset)
-        beam["weighting"][io.Record_Component.SCALAR].reset_dataset(dset)
-        beam["position"]["z"].reset_dataset(dset)
-        beam["position"]["x"].reset_dataset(dset)
-        beam["position"]["y"].reset_dataset(dset)
-        beam["momentum"]["z"].reset_dataset(dset)
-        beam["momentum"]["x"].reset_dataset(dset)
-        beam["momentum"]["y"].reset_dataset(dset)
+        b["id"][io.Record_Component.SCALAR].reset_dataset(dset)
+        b["weighting"][io.Record_Component.SCALAR].reset_dataset(dset)
+        b["position"]["z"].reset_dataset(dset)
+        b["position"]["x"].reset_dataset(dset)
+        b["position"]["y"].reset_dataset(dset)
+        b["momentum"]["z"].reset_dataset(dset)
+        b["momentum"]["x"].reset_dataset(dset)
+        b["momentum"]["y"].reset_dataset(dset)
         
         # save dataset structure to file
         series.flush()
         
         # add beam attributes
-        beam["charge"][io.Record_Component.SCALAR].set_attribute("value", self.chargeSign()*SI.e)
-        beam["mass"][io.Record_Component.SCALAR].set_attribute("value", SI.me)
+        b["charge"][io.Record_Component.SCALAR].set_attribute("value", self.chargeSign()*SI.e)
+        b["mass"][io.Record_Component.SCALAR].set_attribute("value", SI.me)
         
         # store data
-        beam["id"][io.Record_Component.SCALAR].store_chunk(self.ids())
-        beam["weighting"][io.Record_Component.SCALAR].store_chunk(self.weightings())
-        beam["position"]["z"].store_chunk(self.zs())
-        beam["position"]["x"].store_chunk(self.xs())
-        beam["position"]["y"].store_chunk(self.ys())
-        beam["momentum"]["z"].store_chunk(self.wzs())
-        beam["momentum"]["x"].store_chunk(self.wxs())
-        beam["momentum"]["y"].store_chunk(self.wys())
-        
-        # TODO: try/catch if data has strides, and fix by removing satellite particles
+        b["id"][io.Record_Component.SCALAR].store_chunk(self.ids())
+        b["weighting"][io.Record_Component.SCALAR].store_chunk(self.weightings())
+        b["position"]["z"].store_chunk(self.zs())
+        b["position"]["x"].store_chunk(self.xs())
+        b["position"]["y"].store_chunk(self.ys())
+        b["momentum"]["z"].store_chunk(self.wzs())
+        b["momentum"]["x"].store_chunk(self.wxs())
+        b["momentum"]["y"].store_chunk(self.wys())
         
         # save data to file
         series.flush()
         
-        # now the file is closed
-        del series
+        return series
         
         
     # load beam (from OpenPMD format)
     @classmethod
-    def load(_, filename):    
+    def load(_, filename, beamName="beam"):    
         
         # load file
         series = io.Series(filename, io.Access.read_only)
-        i = series.iterations[0]
         
         # get particle data
-        b = i.particles["beam"]
+        b = series.iterations[0].particles[beamName]
         
         # get attributes
         charge = b["charge"][io.Record_Component.SCALAR].get_attribute("value")
         mass = b["mass"][io.Record_Component.SCALAR].get_attribute("value")
         
         # extract phase space
+        ids = b["id"][io.Record_Component.SCALAR].load_chunk()
+        weightings = b["weighting"][io.Record_Component.SCALAR].load_chunk()
         xs = b["position"]["x"].load_chunk()
         ys = b["position"]["y"].load_chunk()
         zs = b["position"]["z"].load_chunk()
         wxs = b["momentum"]["x"].load_chunk()
         wys = b["momentum"]["y"].load_chunk()
         wzs = b["momentum"]["z"].load_chunk()
-        ids = b["id"][io.Record_Component.SCALAR].load_chunk()
-        weightings = b["weighting"][io.Record_Component.SCALAR].load_chunk()
         series.flush()
         
         # make beam
         beam = Beam()
         beam.setPhaseSpace(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, wxs=wxs, wys=wys, wzs=wzs)
         
-        # add metadata
-        for key, value in beam.__dict__.items():
-            if not "__phasespace" in key:
-                setattr(beam, key, i.get_attribute(key))
+        # add metadata to beam
+        beam.trackableNumber = series.iterations[0].get_attribute("trackableNumber")
+        beam.stageNumber = series.iterations[0].get_attribute("stageNumber")
+        beam.location = series.iterations[0].get_attribute("location")  
         
         return beam
       
