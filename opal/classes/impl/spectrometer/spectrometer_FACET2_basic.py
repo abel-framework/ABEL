@@ -1,4 +1,4 @@
-from opal import Spectrometer, Beamline, DriftBasic, DipoleSpectrometerBasic
+from opal import Spectrometer, Beamline, DriftBasic, DipoleSpectrometerBasic, QuadrupoleVer, QuadrupoleHor
 
 class SpectrometerFACET2Basic(Spectrometer):
     
@@ -11,7 +11,10 @@ class SpectrometerFACET2Basic(Spectrometer):
         drift1 = DriftBasic(2)
         dipole = DipoleSpectrometerBasic(1, self.B_dip, True)
         drift2 = DriftBasic(6)
-        return Beamline([drift1, dipole, drift2])
+        quadVer = QuadrupoleVer(1,2)
+        quadHor = QuadrupoleHor(1,2)
+        
+        return Beamline([drift1, dipole, drift2,quadVer, quadHor])
         
         
     def length(self):

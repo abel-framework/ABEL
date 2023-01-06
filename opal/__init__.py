@@ -11,7 +11,8 @@ from .classes.drift import Drift
 from .classes.dipole import Dipole
 from .classes.quadrupole import Quadrupole
 from .classes.impl.beamline_elements.drift_basic import DriftBasic
-from .classes.impl.beamline_elements.quadrupole_basic import QuadrupoleBasic
+from .classes.impl.beamline_elements.quadrupole_ver import QuadrupoleVer
+from .classes.impl.beamline_elements.quadrupole_hor import QuadrupoleHor
 from .classes.impl.beamline_elements.dipole_spectrometer_basic import DipoleSpectrometerBasic
 from .classes.source import Source
 from .classes.stage import Stage
@@ -32,4 +33,4 @@ from .classes.impl.spectrometer.spectrometer_FACET2_basic import SpectrometerFAC
 from .classes.impl.ip.ip_basic import InteractionPointBasic
 from .classes.impl.ip.ip_guineapig import InteractionPointGUINEAPIG
 
-__all__ = ["CONFIG", "Beam", "Trackable", "Source", "Stage", "Interstage", "Linac", "LinacMultistage", "LinacExperiment", "SourceBasic", "StageBasic", "StageNonlinear1D", "InterstageBasic", "InterstageELEGANT", "Experiment", "BeamDeliverySystem", "Spectrometer", "BeamDeliverySystemFACET2Basic", "SpectrometerFACET2Basic"]
+__all__ = ["CONFIG", "Beam", "Trackable", "Source", "Stage", "Interstage", "Linac", "LinacMultistage", "LinacExperiment", "SourceBasic", "StageBasic", "StageNonlinear1D", "InterstageBasic", "InterstageELEGANT", "Experiment", "BeamDeliverySystem", "Spectrometer", "BeamDeliverySystemFACET2Basic", "SpectrometerFACET2Basic", "Dipole"]
