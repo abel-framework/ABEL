@@ -11,8 +11,7 @@ from .classes.drift import Drift
 from .classes.dipole import Dipole
 from .classes.quadrupole import Quadrupole
 from .classes.impl.beamline_elements.drift_basic import DriftBasic
-from .classes.impl.beamline_elements.quadrupole_ver import QuadrupoleVer
-from .classes.impl.beamline_elements.quadrupole_hor import QuadrupoleHor
+from .classes.impl.beamline_elements.quadrupole_basic import QuadrupoleBasic
 from .classes.impl.beamline_elements.dipole_spectrometer_basic import DipoleSpectrometerBasic
 from .classes.source import Source
 from .classes.stage import Stage
