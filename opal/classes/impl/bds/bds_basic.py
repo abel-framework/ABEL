@@ -4,7 +4,7 @@ from copy import deepcopy
 
 class BeamDeliverySystemBasic(BeamDeliverySystem):
     
-    def __init__(self, beta_waist_x = None, beta_waist_y = None, L = None):
+    def __init__(self, beta_waist_x = None, beta_waist_y = None, L = 0):
         self.beta_waist_x = beta_waist_x
         self.beta_waist_y = beta_waist_y
         self.L = L

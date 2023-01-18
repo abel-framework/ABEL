@@ -76,7 +76,11 @@ class Beam():
         # ids
         self.__phasespace[7,:] = np.arange(Npart)
             
-        
+    
+    # add beam to phasespace (combining beams)
+    def addBeam(self, beam):
+        self.__phasespace = np.append(self.__phasespace, beam.__phasespace, axis=1)
+    
     
     ## BEAM ARRAYS
 

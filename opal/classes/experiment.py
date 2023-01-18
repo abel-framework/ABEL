@@ -34,7 +34,7 @@ class Experiment(Beamline):
         fig.set_figheight(5)
         
         # current profile
-        c0 = ax.pcolor(xedges*1e3, yedges*1e3, abs(dQdxdy)*1e6, cmap='GnBu')
+        c0 = ax.pcolor(xedges*1e3, yedges*1e3, abs(dQdxdy.T)*1e6, cmap='GnBu')
         cbar0 = fig.colorbar(c0, ax=ax)
         ax.set_xlabel('x (mm)')
         ax.set_ylabel('y (mm)')

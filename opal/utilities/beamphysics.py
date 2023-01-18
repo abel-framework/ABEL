@@ -1,6 +1,7 @@
 import numpy as np
 import time
 
+# generate trace space from geometric emittance and twiss parameters
 def generateTraceSpace(epsilon, beta, alpha, N):
 
     gamma = (1 + alpha**2) / beta; # Twiss gamma

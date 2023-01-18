@@ -41,3 +41,29 @@ class DipoleSpectrometerBasic(Dipole):
     
     def field(self):
         return self.B
+    
+    # TODO: make correct (fringe fields and weak focusing)
+    def transferMatrix(self, E0=None):
+        
+        # first make a drift
+        R = np.eye(4)
+        R[0,1] = self.L
+        R[2,3] = self.L
+
+        if E0 is not None:
+            
+            # calculate bending radius
+            rho = self.B*SI.c/E0
+            
+            if not self.isVertical: # horizontal dipole
+                R[0,0] = np.cos(self.L/rho)
+                R[0,1] = rho*np.sin(self.L/rho)
+                R[1,0] = -1/rho*np.sin(self.L/rho)
+                R[1,1] = np.cos(self.L/rho)
+            else: # vertical dipole
+                R[2,2] = np.cos(self.L/rho)
+                R[2,3] = rho*np.sin(self.L/rho)
+                R[3,2] = -1/rho*np.sin(self.L/rho)
+                R[3,3] = np.cos(self.L/rho)
+
+        return R

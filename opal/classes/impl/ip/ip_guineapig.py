@@ -19,7 +19,7 @@ class InteractionPointGUINEAPIG(InteractionPoint):
                   'emitt_x1': beam1.normEmittanceX()*1e6, # [mm mrad]
                   'emitt_y1': beam1.normEmittanceY()*1e6, # [mm mrad]
                   'sigma_z1': beam1.bunchLength()*1e6, # [um]
-                  'espread1': beam1.relEnergySpread(), # [um]
+                  'espread1': beam1.relEnergySpread(),
                   'offset_x1': beam1.offsetX()*1e9, # [nm]
                   'offset_y1': beam1.offsetY()*1e9, # [nm]
                   'energy2': beam2.energy()/1e9, # [GeV]

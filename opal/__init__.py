@@ -22,6 +22,8 @@ from .classes.linac import Linac
 from .classes.experiment import Experiment
 from .classes.collider import Collider
 from .classes.impl.source.source_basic import SourceBasic
+from .classes.impl.source.source_trapezoid import SourceTrapezoid
+from .classes.impl.source.source_combiner import SourceCombiner
 from .classes.impl.stage.stage_basic import StageBasic
 from .classes.impl.stage.stage_nonlinear1D import StageNonlinear1D
 from .classes.impl.interstage.interstage_basic import InterstageBasic

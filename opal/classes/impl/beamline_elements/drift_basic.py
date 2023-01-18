@@ -32,3 +32,9 @@ class DriftBasic(Drift):
         rect = patches.Rectangle((0, 0), self.length(), 0)
         rect.set_facecolor = 'k'
         return rect
+    
+    def transferMatrix(self):
+        R = np.eye(4)
+        R[0,1] = self.L
+        R[2,3] = self.L
+        return R
