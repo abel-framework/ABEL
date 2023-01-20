@@ -26,6 +26,7 @@ from .classes.impl.source.source_trapezoid import SourceTrapezoid
 from .classes.impl.source.source_combiner import SourceCombiner
 from .classes.impl.stage.stage_basic import StageBasic
 from .classes.impl.stage.stage_nonlinear1D import StageNonlinear1D
+from .classes.impl.stage.stage_driven_nonlinear1D import StageDrivenNonlinear1D
 from .classes.impl.interstage.interstage_basic import InterstageBasic
 from .classes.impl.interstage.interstage_elegant import InterstageELEGANT
 from .classes.impl.bds.bds_basic import BeamDeliverySystemBasic

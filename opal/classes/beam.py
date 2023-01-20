@@ -274,6 +274,10 @@ class Beam():
         return covy[1,1]/np.sqrt(np.linalg.det(covy))
     
     
+    def peakDensity(self):
+        return (self.charge()/SI.e)/(np.sqrt(2*np.pi)**3*self.beamSizeX()*self.beamSizeY()*self.bunchLength())
+    
+    
     ## BEAM PROJECTIONS
     
     def projectedDensity(self, fcn, bins=None):
@@ -312,13 +316,8 @@ class Beam():
     ## phase spaces
     
     def phaseSpaceDensity(self, hfcn, vfcn, hbins=None, vbins=None):
-        nsig = 4
         Nbins = int(np.sqrt(self.Npart())/2)
-        if hbins is None:
-            hbins = np.mean(hfcn()) + nsig * np.std(hfcn()) * np.arange(-1, 1, 2/Nbins)
-        if vbins is None:
-            vbins = np.mean(vfcn()) + nsig * np.std(vfcn()) * np.arange(-1, 1, 2/Nbins)
-        counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
+        counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(Nbins, Nbins))
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
         density = (counts/np.diff(vedges)).T/np.diff(hedges)

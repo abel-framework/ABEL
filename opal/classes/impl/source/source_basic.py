@@ -6,10 +6,11 @@ import numpy as np
 
 class SourceBasic(Source):
     
-    def __init__(self, E0 = None, Q = None, sigE = None, sigz = None, z = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
+    def __init__(self, E0 = None, Q = None, sigE = None, relsigE = None, sigz = None, z = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
         self.E0 = E0
         self.Q = Q
         self.sigE = sigE # [eV]
+        self.relsigE = relsigE # [eV]
         self.sigz = sigz # [m]
         self.z = z # [m]
         self.Npart = Npart
@@ -21,13 +22,20 @@ class SourceBasic(Source):
         self.alphay = alphay # [m]
         self.L = L # [m]
         self.Npart = Npart
-    
+        
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
-        
+             
         # make empty beam
         beam = Beam()
         
+        # make energy spread
+        if self.relsigE is not None:
+            if self.sigE is None:
+                self.sigE = self.E0 * self.relsigE
+            elif abs(self.sigE - self.E0 * self.relsigE) > 0:
+                raise Exception("Both absolute and relative energy spread defined.")
+           
         # Lorentz gamma
         gamma = energy2gamma(self.E0)
 
