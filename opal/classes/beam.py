@@ -6,7 +6,7 @@ from opal.utilities import SI
 from opal.utilities.relativity import *
 from opal.utilities.statistics import prct_clean, prct_clean2D
 from opal.utilities.plasmaphysics import k_p
-from opal.physicsmodels.betatronHills import evolveHillsEquation
+from opal.physicsmodels.betatronHills import evolveHillsEquation_analytic
 from matplotlib import pyplot as plt
 
 class Beam():
@@ -189,7 +189,8 @@ class Beam():
     ## BEAM STATISTICS
     
     def charge(self):
-        return np.sum(self.qs())
+        qs = self.qs()
+        return np.sum(qs[~np.isnan(qs)])
     
     def absCharge(self):
         return abs(self.charge())
@@ -282,9 +283,8 @@ class Beam():
     
     def projectedDensity(self, fcn, bins=None):
         if bins is None:
-            nsig = 5
-            Nbins = int(np.sqrt(self.Npart())/2)
-            bins = np.mean(fcn()) + nsig * np.std(fcn()) * np.arange(-1, 1, 2/Nbins)
+            Nbins = int(np.sqrt(self.Npart()/2))
+            bins = np.linspace(min(fcn()), max(fcn()), Nbins)
         counts, edges = np.histogram(fcn(), weights=self.qs(), bins=bins)
         ctrs = (edges[0:-1] + edges[1:])/2
         proj = counts/np.diff(edges)
@@ -292,7 +292,6 @@ class Beam():
         
     def currentProfile(self, bins=None):
         return self.projectedDensity(self.ts, bins=bins)
-        return dQdt, ts
     
     def longitudinalNumberDensity(self, bins=None):
         dQdz, zs = self.projectedDensity(self.zs, bins=bins)
@@ -316,8 +315,11 @@ class Beam():
     ## phase spaces
     
     def phaseSpaceDensity(self, hfcn, vfcn, hbins=None, vbins=None):
-        Nbins = int(np.sqrt(self.Npart())/2)
-        counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(Nbins, Nbins))
+        if hbins is None:
+            hbins = int(np.sqrt(self.Npart())/2)
+        if vbins is None:
+            vbins = int(np.sqrt(self.Npart())/2)
+        counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
         density = (counts/np.diff(vedges)).T/np.diff(hedges)
@@ -386,14 +388,12 @@ class Beam():
         self.__setWys(-self.wys()) 
         
     def betatronMotion(self, L, n0, deltaEs):
-        kps = lambda s: k_p(n0)
         xs, wxs, ys, wys = self.xs(), self.wxs(), self.ys(), self.wys()
         gamma0s = energy2gamma(self.Es())
         gammas = energy2gamma(self.Es()+deltaEs)
-        for i in range(self.Npart()):
-            gamma = lambda s: gamma0s[i] + (gammas[i]-gamma0s[i])*s/L
-            xs[i], wxs[i], _ = evolveHillsEquation(xs[i], wxs[i], L, gamma, kps, fast=False)
-            ys[i], wys[i], _ = evolveHillsEquation(ys[i], wys[i], L, gamma, kps, fast=False)
+        dgamma_ds = (gammas-gamma0s)/L
+        xs, wxs = evolveHillsEquation_analytic(self.xs(), self.wxs(), L, gamma0s, dgamma_ds, k_p(n0))
+        ys, wys = evolveHillsEquation_analytic(self.ys(), self.wys(), L, gamma0s, dgamma_ds, k_p(n0))
         self.__setXs(xs)
         self.__setWxs(wxs)
         self.__setYs(ys)
@@ -408,6 +408,9 @@ class Beam():
     
     # save beam (to OpenPMD format)
     def save(self, runnable=None, beamName="beam", series=None):
+        
+        if self.Npart() == 0:
+            return
         
         # make new file if not provided
         if series is None:

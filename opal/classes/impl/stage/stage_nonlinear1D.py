@@ -1,5 +1,5 @@
+from opal.physicsmodels.plasmawake1D import wakefield1D
 from opal import Stage
-from opal.physicsmodels.wakeLu import wakefield_Lu
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy.optimize import root, root_scalar
@@ -8,56 +8,80 @@ from opal.utilities import SI
 
 class StageNonlinear1D(Stage):
     
-    def __init__(self, deltaE=None, L=None, n0=None, kRb=None, sigt_jitter=0, enableBetatron=True):
+    def __init__(self, deltaE=None, L=None, n0=None, kRb=None, driverSource=None, enableBetatron=True, addDriverToBeam=False):
         self.deltaE = deltaE
         self.L = L
         self.n0 = n0
-        self.kRb = kRb
-        self.sigt_jitter = sigt_jitter
         self.enableBetatron = enableBetatron
+        self.addDriverToBeam = addDriverToBeam
+        self.driverSource = driverSource
+        self.driverInitial = None
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
 
-        # calculate energy gain for each particle
+        # calculate wakefield function
         EzFcn, rFcn = self.wakefieldFcn(beam)
 
         # remove particles beyond the wake radius
         beam.filterPhaseSpace(beam.rs() > rFcn(beam.zs()))
-
-        # calculate energy change
+        
+        # calculate energy change (zero for particles outside the wake)
         deltaEs = np.sign(beam.qs()) * EzFcn(beam.zs()) * self.L
         
         # perform betatron motion
         if self.enableBetatron:
             beam.betatronMotion(self.L, self.n0, deltaEs)
         else:
-            beam.betatronDamping(deltaEs)
+            beam.betatronDamping(deltaEs) # TODO: seems to not work at damping beta function
             beam.flipTransversePhaseSpaces()
         
         # add energy gain
         beam.accelerate(deltaEs)
         
+        # remove particles with nan energies
+        beam.filterPhaseSpace(np.isnan(beam.Es()))
+        
+        # simulate and add driver to the beam (if desired)
+        if self.addDriverToBeam and self.driverSource is not None:
+            driver = self.driverSource.track()
+            deltaEs_driver = np.where(driver.rs() > rFcn(driver.zs()), 0, np.sign(driver.qs()) * EzFcn(driver.zs()) * self.L)
+            driver.betatronDamping(deltaEs_driver)
+            driver.flipTransversePhaseSpaces()
+            driver.accelerate(deltaEs_driver)
+            driver.filterPhaseSpace(np.isnan(beam.Es()))
+            beam.addBeam(driver)
+            
         return super().track(beam, savedepth, runnable, verbose)
     
     
     # wakefield (Lu equation)
     def wakefield(self, beam=None):
         
-        # get wakefield
-        Ezs, zs, rs = wakefield_Lu(self.n0, self.kRb, beam)
+        # if driver has not been generated, do so
+        if self.driverInitial is None:
+            self.driverInitial = self.driverSource.track()
         
-        # add timing jitter
-        dz = np.random.normal() * self.sigt_jitter * SI.c
-        zs = zs + dz
-        
+        # try several times in case of solver issues (new driver every time)
+        Ntries = 5
+        for n in range(Ntries):
+            try:
+                Ezs, zs, rs = wakefield1D(self.n0, self.driverInitial, beam)
+                break
+            except:
+                self.driverInitial = self.driverSource.track()
+                print(f">> Recalculating wakefield with new driver, problem with ODE solver (attempt #{n+1})")
+          
         return Ezs, zs, rs
+    
     
     # wakefield function (Lu equation)
     def wakefieldFcn(self, beam=None):
-        Ezs, zs, rs = self.wakefield(beam)
-        EzFcn = lambda z: np.interp(z, zs, Ezs)
-        rFcn = lambda z: np.interp(z, zs, rs)
+        Ezs, zs, rbs = self.wakefield(beam)
+        nanmask = ~np.isnan(zs * rbs * Ezs)
+        EzFcn = lambda z: np.interp(z, zs[nanmask], Ezs[nanmask], right=0, left=np.nan)
+        rFcn = lambda z: np.interp(z, zs[nanmask], rbs[nanmask], left=0)
         return EzFcn, rFcn
+    
     
     def plotWakefield(self, beam=None):
         
@@ -65,12 +89,11 @@ class StageNonlinear1D(Stage):
         Ezs, zs, rs = self.wakefield(beam)
         
         # get current profile
+        driver = self.driverSource.track()
         if beam is not None:
-            Is, ts = beam.currentProfile()
-            zs0 = ts*SI.c
-        else:
-            zs0 = zs
-            Is = np.zeros(len(zs))
+            driver.addBeam(beam)
+        Is, ts = driver.currentProfile(bins=np.linspace(min(zs/SI.c), max(zs/SI.c), int(np.sqrt(driver.Npart()))))
+        zs0 = ts*SI.c
         
         # plot it
         fig, axs = plt.subplots(1,3)
@@ -87,36 +110,13 @@ class StageNonlinear1D(Stage):
         axs[1].set_xlabel('z (um)')
         axs[1].set_ylabel('Plasma-wake radius (um)')
         axs[1].set_xlim(zlims)
-        axs[1].set_ylim(0, self.kRb/k_p(self.n0)*1.1e6)
+        axs[1].set_ylim(bottom=0)
         
         axs[2].plot(zs*1e6, Ezs/1e9, '-')
         axs[2].set_xlabel('z (um)')
         axs[2].set_ylabel('Electric field (GV/m)')
         axs[2].set_xlim(zlims)
-        axs[2].set_ylim(-Ez_wavebreaking(self.n0)*self.kRb/1e9,0)
-        
-    def optimalInjectionPosition(self, source):
-        
-        # target field strength
-        Ez_target = -self.deltaE/self.L
-        
-        # initial guess (no beam loading)
-        z_guess = -1/k_p(self.n0)
-        Ez0 = self.wakefieldFcn()
-        Ez, zs, _ = self.wakefield()
-        sol0 = root(lambda z: Ez0(z)-Ez_target, z_guess)
-        
-        # define optimizer function
-        def fcn(z):
-            source.z = z
-            EzFcn = self.wakefieldFcn(source.track())
-            return EzFcn(z)-Ez_target
-        
-        # find optimum
-        sol = root_scalar(fcn, x0=sol0.x[0], bracket=[min(zs), max(zs)])
-        z_opt = sol.root
-        
-        return z_opt
+        axs[2].set_ylim(bottom=-Ez_wavebreaking(self.n0)/1e9, top=Ez_wavebreaking(self.n0)/1e9)
         
         
     def length(self):

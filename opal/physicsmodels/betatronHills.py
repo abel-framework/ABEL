@@ -1,38 +1,61 @@
 import numpy as np
 from scipy.integrate import odeint
 from opal.utilities import SI
+from opal.utilities.relativity import gamma2properVelocity
+import scipy.special as scispec
 
-# damped Hill's equation: x''(s) + gamma'(s)/gamma(s)*x'(s) - k_p^2/(2*gamma(s))*x(s) = 0
+
+# damped Hill's equation: x''(s) + gamma'(s)/gamma(s)*x'(s) + k_p^2/(2*gamma(s))*x(s) = 0
 def ode_Hills(u, s, gamma, kp):
     x, wx = u
     return wx/(gamma(s)*SI.c), -x*(SI.c/2)*kp(s)**2
 
+
 # solve Hill's equation
-def evolveHillsEquation(x0, wx0, L, gamma, kp, fast=False):
+def evolveHillsEquation_ode(x0, wx0, L, gamma, kp):
     
     # find longitudinal steps
-    if not fast:
-        gamma_min = min(gamma(0), gamma(L))
-        kp_max = max(kp(0), kp(L))
-        beta_matched_max = np.sqrt(2*gamma_min)/kp_max
-        res = 1/10
-        Nstep = int(round(L/(beta_matched_max*res)))
-        ss = np.linspace(0, L, Nstep)
-        evolution = np.empty([3, len(ss)])
-    else:
-        ss = np.linspace(0, L, 2)
-        evolution = None
+    gamma_min = min(gamma(0), gamma(L))
+    kp_max = max(kp(0), kp(L))
+    beta_matched_max = np.sqrt(2*gamma_min)/kp_max
+    res = 1/10
+    Nstep = min(10000, max(int(L/(beta_matched_max*res)),10))
+    ss = np.linspace(0, L, Nstep)
+    evolution = np.empty([3, len(ss)])
     
     # numerical integration
     u0 = np.array([x0, wx0])
     sol = odeint(ode_Hills, u0, ss, args=(gamma, kp))
-    x = sol[-1, 0]
-    wx = sol[-1, 1]
+    x = sol[-1,0]
+    wx = sol[-1,1]
     
-    # save evolution
-    if not fast:
-        evolution[0,:] = ss
-        evolution[1,:] = sol[:, 0]
-        evolution[2,:] = sol[:, 1]
+    return x, wx
+
+
+# solve Hill's equation
+def evolveHillsEquation_analytic(x0, wx0, L, gamma0, dgamma_ds, kp):
     
-    return x, wx, evolution
+    # convert initial proper velocities to angles
+    xp0 = wx0 / gamma2properVelocity(gamma0)
+    
+    # find final gamma factor
+    gamma = gamma0 + dgamma_ds*L
+    
+    # calculate Bessel arguments
+    C = np.sqrt(2)*kp/dgamma_ds
+    A0 = C * np.sqrt(gamma0)
+    A = C * np.sqrt(gamma)
+    
+    # calculate complex co-efficients
+    Di = (kp**2*x0*scispec.iv(1,A0*1j) + A0*1j*dgamma_ds*xp0*scispec.iv(0,A0*1j))
+    Dk = (kp**2*x0*scispec.kv(1,A0*1j) - A0*1j*dgamma_ds*xp0*scispec.kv(0,A0*1j))
+    E = kp**2*(scispec.iv(1,A0*1j)*scispec.kv(0,A0*1j) + scispec.iv(0,A0*1j)*scispec.kv(1,A0*1j))*1j
+    
+    # calculate final positions and angles (imaginary part is zero)
+    x = np.real(1j*(Di*scispec.kv(0,A*1j) + Dk*scispec.iv(0,A*1j))/E)
+    xp = np.real((dgamma_ds*C**2/(2*A*E))*(Dk*scispec.iv(1,A*1j) - Di*scispec.kv(1,A*1j)))
+    
+    # convert angles back to proper velocoties
+    wx = xp * gamma2properVelocity(gamma)
+    
+    return x, wx

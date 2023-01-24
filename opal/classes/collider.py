@@ -69,6 +69,7 @@ class Collider(Runnable):
         # load luminosities
         files = self.ip.runData()
         Nevents = len(files)
+        print(Nevents)
         lumi_geom = np.empty(Nevents)
         lumi_full = np.empty(Nevents)
         lumi_peak = np.empty(Nevents)

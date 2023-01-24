@@ -26,7 +26,6 @@ from .classes.impl.source.source_trapezoid import SourceTrapezoid
 from .classes.impl.source.source_combiner import SourceCombiner
 from .classes.impl.stage.stage_basic import StageBasic
 from .classes.impl.stage.stage_nonlinear1D import StageNonlinear1D
-from .classes.impl.stage.stage_driven_nonlinear1D import StageDrivenNonlinear1D
 from .classes.impl.interstage.interstage_basic import InterstageBasic
 from .classes.impl.interstage.interstage_elegant import InterstageELEGANT
 from .classes.impl.bds.bds_basic import BeamDeliverySystemBasic
@@ -35,4 +34,4 @@ from .classes.impl.spectrometer.spectrometer_FACET2_basic import SpectrometerFAC
 from .classes.impl.ip.ip_basic import InteractionPointBasic
 from .classes.impl.ip.ip_guineapig import InteractionPointGUINEAPIG
 
-__all__ = ["CONFIG", "Beam", "Trackable", "Source", "Stage", "Interstage", "Linac", "LinacMultistage", "LinacExperiment", "SourceBasic", "StageBasic", "StageNonlinear1D", "InterstageBasic", "InterstageELEGANT", "Experiment", "BeamDeliverySystem", "Spectrometer", "BeamDeliverySystemFACET2Basic", "SpectrometerFACET2Basic", "Dipole"]
+__all__ = ["CONFIG", "Beam", "Event", "Trackable", "Source", "Stage", "Interstage", "Linac", "LinacExperiment", "SourceBasic", "StageBasic", "StageNonlinear1D", "InterstageBasic", "InterstageELEGANT", "Experiment", "BeamDeliverySystem", "Spectrometer", "BeamDeliverySystemFACET2Basic", "SpectrometerFACET2Basic", "Dipole"]
