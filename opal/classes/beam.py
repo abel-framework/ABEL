@@ -204,6 +204,9 @@ class Beam():
     def gammaRelativistic(self, clean=True):
         return np.mean(prct_clean(self.gammas(), clean))
     
+    def totalEnergy(self):
+        return self.absCharge()*self.energy()
+    
     def energySpread(self, clean=True):
         return np.std(prct_clean(self.Es(), clean))
     
@@ -356,6 +359,19 @@ class Beam():
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/GeV)')
         
+    def plotTraceSpaceX(self):
+        dQdxdxp, xs, xps = self.phaseSpaceDensity(self.xs, self.xps, hbins=np.linspace(-5e-6, 5e-6, 50), vbins=np.linspace(-5e-4, 5e-4, 50))
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap='GnBu')
+        ax.set_xlabel('x (um)')
+        ax.set_ylabel('x'' (mrad)')
+        ax.set_title('Horizontal trace space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
+        
     
     ## CHANGE BEAM
     
@@ -376,36 +392,55 @@ class Beam():
         
     # betatron damping (must be done before acceleration)
     def betatronDamping(self, deltaE):
-        gammasBoosted = energy2gamma(self.Es()+deltaE)
+        
+        # remove particles with subzero energy
+        self.filterPhaseSpace(self.Es() < 0)
+        self.filterPhaseSpace(np.isnan(self.Es()))
+        
+        gammasBoosted = energy2gamma(abs(self.Es()+deltaE))
         factor = np.sqrt(self.gammas()/gammasBoosted)
         self.__setXs(self.xs() * factor)
         self.__setYs(self.ys() * factor)
         self.__setWxs(self.wxs() / factor)
         self.__setWys(self.wys() / factor)
         
-    def flipTransversePhaseSpaces(self):
-        self.__setWxs(-self.wxs())
-        self.__setWys(-self.wys()) 
+    def flipTransversePhaseSpaces(self, flipMomenta=True, flipPositions=False):
+        if flipMomenta:
+            self.__setWxs(-self.wxs())
+            self.__setWys(-self.wys())
+        if flipPositions:
+            self.__setXs(-self.xs())
+            self.__setYs(-self.ys())
         
-    def betatronMotion(self, L, n0, deltaEs):
-        xs, wxs, ys, wys = self.xs(), self.wxs(), self.ys(), self.wys()
+    def betatronMotion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0):
+        
+        # remove particles with subzero energy
+        self.filterPhaseSpace(self.Es() < 0)
+        self.filterPhaseSpace(np.isnan(self.Es()))
+        
+        # determine initial and final Lorentz factor
         gamma0s = energy2gamma(self.Es())
-        gammas = energy2gamma(self.Es()+deltaEs)
+        gammas = energy2gamma(abs(self.Es()+deltaEs))
         dgamma_ds = (gammas-gamma0s)/L
-        xs, wxs = evolveHillsEquation_analytic(self.xs(), self.wxs(), L, gamma0s, dgamma_ds, k_p(n0))
-        ys, wys = evolveHillsEquation_analytic(self.ys(), self.wys(), L, gamma0s, dgamma_ds, k_p(n0))
-        self.__setXs(xs)
+        
+        # calculate final positions and angles after betatron motion
+        xs, wxs = evolveHillsEquation_analytic(self.xs()-x0_driver, self.wxs(), L, gamma0s, dgamma_ds, k_p(n0))
+        ys, wys = evolveHillsEquation_analytic(self.ys()-y0_driver, self.wys(), L, gamma0s, dgamma_ds, k_p(n0))
+        
+        # set new beam positions and angles (shift back driver offsets)
+        self.__setXs(xs+x0_driver)
         self.__setWxs(wxs)
-        self.__setYs(ys)
+        self.__setYs(ys+y0_driver)
         self.__setWys(wys)
         
   
     ## SAVE AND LOAD BEAM
     
-    def filename(self, runnable):
-        return runnable.shotPath() + "/beam_{:012.6F}".format(self.location) + ".h5"
+    def filename(self, runnable, beamName):
+        return runnable.shotPath() + "/" + beamName + "_" + str(self.trackableNumber).zfill(3) + "_{:012.6F}".format(self.location) + ".h5"
+        #return runnable.shotPath() + "/beam.h5"
     
-    
+    # TODO: save as group_based properly (in one file)
     # save beam (to OpenPMD format)
     def save(self, runnable=None, beamName="beam", series=None):
         
@@ -416,14 +451,17 @@ class Beam():
         if series is None:
             
             # open a new file
-            series = io.Series(self.filename(runnable), io.Access.create)
+            series = io.Series(self.filename(runnable, beamName), io.Access.create)
+            #series.iteration_encoding = io.Iteration_Encoding.group_based
         
             # add metadata
             series.author = "OPAL (the Optimizable Plasma-Accelerator Linac code)"
             series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
 
         # make step (only one)
-        iteration = series.iterations[0]
+        #index = self.trackableNumber-1
+        index = 0
+        iteration = series.iterations[index]
         
         # add attributes
         iteration.set_attribute("time", self.location/SI.c)
@@ -470,13 +508,17 @@ class Beam():
         
     # load beam (from OpenPMD format)
     @classmethod
-    def load(_, filename, beamName="beam"):    
+    def load(_, filename, beamName="beam"):
+        
+        # find index
+        index = 0
+        #index = int(((filename.split("/")[-1]).split(".")[0]).split("_")[1])-1
         
         # load file
         series = io.Series(filename, io.Access.read_only)
         
         # get particle data
-        b = series.iterations[0].particles[beamName]
+        b = series.iterations[index].particles[beamName]
         
         # get attributes
         charge = b["charge"][io.Record_Component.SCALAR].get_attribute("value")
@@ -498,9 +540,9 @@ class Beam():
         beam.setPhaseSpace(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, wxs=wxs, wys=wys, wzs=wzs)
         
         # add metadata to beam
-        beam.trackableNumber = series.iterations[0].get_attribute("trackableNumber")
-        beam.stageNumber = series.iterations[0].get_attribute("stageNumber")
-        beam.location = series.iterations[0].get_attribute("location")  
+        beam.trackableNumber = series.iterations[index].get_attribute("trackableNumber")
+        beam.stageNumber = series.iterations[index].get_attribute("stageNumber")
+        beam.location = series.iterations[index].get_attribute("location")  
         
         return beam
       

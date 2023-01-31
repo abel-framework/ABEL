@@ -23,3 +23,6 @@ class Source(Trackable):
     def plotObject(self):
         rect = patches.Rectangle((0, -0.5), self.length(), 1)
         return rect
+    
+    def energyUsage(self):
+        return self.energy()*abs(self.charge())/self.energyEfficiency()

@@ -5,22 +5,57 @@ import numpy as np
 from scipy.optimize import root, root_scalar
 from opal.utilities.plasmaphysics import *
 from opal.utilities import SI
+from copy import deepcopy
+import warnings
+from types import SimpleNamespace
 
 class StageNonlinear1D(Stage):
     
-    def __init__(self, deltaE=None, L=None, n0=None, kRb=None, driverSource=None, enableBetatron=True, addDriverToBeam=False):
+    def __init__(self, deltaE=None, L=None, n0=None, driverSource=None, enableBetatron=True, addDriverToBeam=False):
         self.deltaE = deltaE
         self.L = L
         self.n0 = n0
         self.enableBetatron = enableBetatron
         self.addDriverToBeam = addDriverToBeam
         self.driverSource = driverSource
+            
         self.driverInitial = None
+        self.driverFinal = None
+        
+        self.driverToWakeEfficiency = None
+        self.wakeToBeamEfficiency = None
+        self.driverToBeamEfficiency = None
+        
+        self.reljitter = SimpleNamespace()
+        self.reljitter.n0 = 0
+        
+        self.__n = None
+        
+    
+    def __getInitialDriver(self, resample=False):
+        if resample or self.driverInitial is None:
+            self.driverInitial = self.driverSource.track()
+        return self.driverInitial
+    
+    def __getDensity(self, resample=False):
+        if resample or self.__n is None:
+            self.__n = self.n0 * np.random.normal(loc = 1, scale = self.reljitter.n0)
+        return self.__n
+        
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
 
+        # get driver
+        driver0 = self.__getInitialDriver(resample=True)
+        
+        # initial beam energy and charge
+        Etot0_beam = beam.totalEnergy()
+        
+        # sample the density (with jitter)
+        n0 = self.__getDensity(resample=True)
+        
         # calculate wakefield function
-        EzFcn, rFcn = self.wakefieldFcn(beam)
+        EzFcn, rFcn = self.__wakefieldFcn(beam, driver=driver0, density=n0)
 
         # remove particles beyond the wake radius
         beam.filterPhaseSpace(beam.rs() > rFcn(beam.zs()))
@@ -30,7 +65,9 @@ class StageNonlinear1D(Stage):
         
         # perform betatron motion
         if self.enableBetatron:
-            beam.betatronMotion(self.L, self.n0, deltaEs)
+            x0_driver = np.random.normal(scale=self.driverSource.jitter.x0)
+            y0_driver = np.random.normal(scale=self.driverSource.jitter.y0)
+            beam.betatronMotion(self.L, n0, deltaEs, x0_driver=x0_driver, y0_driver=y0_driver)
         else:
             beam.betatronDamping(deltaEs) # TODO: seems to not work at damping beta function
             beam.flipTransversePhaseSpaces()
@@ -41,42 +78,59 @@ class StageNonlinear1D(Stage):
         # remove particles with nan energies
         beam.filterPhaseSpace(np.isnan(beam.Es()))
         
-        # simulate and add driver to the beam (if desired)
-        if self.addDriverToBeam and self.driverSource is not None:
-            driver = self.driverSource.track()
-            deltaEs_driver = np.where(driver.rs() > rFcn(driver.zs()), 0, np.sign(driver.qs()) * EzFcn(driver.zs()) * self.L)
-            driver.betatronDamping(deltaEs_driver)
-            driver.flipTransversePhaseSpaces()
-            driver.accelerate(deltaEs_driver)
-            driver.filterPhaseSpace(np.isnan(beam.Es()))
+        # simulate the driver
+        driver = deepcopy(driver0)
+        deltaEs_driver = np.where(driver.rs() > rFcn(driver.zs()), 0, np.sign(driver.qs()) * EzFcn(driver.zs()) * self.L)
+        depleted_frac = np.sum(driver.Es() + deltaEs_driver < 0)/driver.Npart()
+        if depleted_frac > 0:
+            print(f"WARNING: {depleted_frac*100:.1f}% of driver particles were energy depleted.")
+        driver.betatronDamping(deltaEs_driver)
+        driver.flipTransversePhaseSpaces()
+        driver.accelerate(deltaEs_driver)
+        driver.filterPhaseSpace(np.isnan(beam.Es()))
+        
+        # calculate efficiency
+        Etot_beam = beam.totalEnergy()
+        Etot0_driver = driver0.totalEnergy()
+        Etot_driver = driver.totalEnergy()
+        self.driverToWakeEfficiency = (Etot0_driver-Etot_driver)/Etot0_driver
+        self.wakeToBeamEfficiency = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
+        self.driverToBeamEfficiency = self.driverToWakeEfficiency*self.wakeToBeamEfficiency
+         
+        # add the driver to the beam (if desired)
+        if self.addDriverToBeam:
             beam.addBeam(driver)
-            
+             
         return super().track(beam, savedepth, runnable, verbose)
     
     
     # wakefield (Lu equation)
-    def wakefield(self, beam=None):
+    def __wakefield(self, beam=None, driver=None, density=None):
         
-        # if driver has not been generated, do so
-        if self.driverInitial is None:
-            self.driverInitial = self.driverSource.track()
+        # get density
+        if density is None:
+            density = self.__getDensity()
+            
+        # get driver
+        if driver is None:
+            driver = self.__getInitialDriver()
         
         # try several times in case of solver issues (new driver every time)
         Ntries = 5
         for n in range(Ntries):
             try:
-                Ezs, zs, rs = wakefield1D(self.n0, self.driverInitial, beam)
+                Ezs, zs, rs = wakefield1D(density, driver, beam)
                 break
             except:
-                self.driverInitial = self.driverSource.track()
+                driver = self.__getInitialDriver(resample=True)
                 print(f">> Recalculating wakefield with new driver, problem with ODE solver (attempt #{n+1})")
           
         return Ezs, zs, rs
     
     
     # wakefield function (Lu equation)
-    def wakefieldFcn(self, beam=None):
-        Ezs, zs, rbs = self.wakefield(beam)
+    def __wakefieldFcn(self, beam=None, driver=None, density=None):
+        Ezs, zs, rbs = self.__wakefield(beam, driver, density)
         nanmask = ~np.isnan(zs * rbs * Ezs)
         EzFcn = lambda z: np.interp(z, zs[nanmask], Ezs[nanmask], right=0, left=np.nan)
         rFcn = lambda z: np.interp(z, zs[nanmask], rbs[nanmask], left=0)
@@ -86,10 +140,10 @@ class StageNonlinear1D(Stage):
     def plotWakefield(self, beam=None):
         
         # get wakefield
-        Ezs, zs, rs = self.wakefield(beam)
+        Ezs, zs, rs = self.__wakefield(beam)
         
         # get current profile
-        driver = self.driverSource.track()
+        driver = deepcopy(self.__getInitialDriver())
         if beam is not None:
             driver.addBeam(beam)
         Is, ts = driver.currentProfile(bins=np.linspace(min(zs/SI.c), max(zs/SI.c), int(np.sqrt(driver.Npart()))))
@@ -124,3 +178,13 @@ class StageNonlinear1D(Stage):
     
     def energyGain(self):
         return self.deltaE
+    
+    def energyEfficiency(self):
+        return self.driverToBeamEfficiency, self.driverToWakeEfficiency, self.wakeToBeamEfficiency
+    
+    def wallplugEfficiency(self):
+        return self.driverToBeamEfficiency*self.driverSource.energyEfficiency()
+    
+    def energyUsage(self):
+        return self.driverSource.energyUsage()
+    

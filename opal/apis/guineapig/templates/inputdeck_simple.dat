@@ -32,7 +32,7 @@ $$PARAMETERS:: default
 {
     charge_sign = -1;
     ecm_min = $ecm_min;
-    load_beam = 3;
+    load_beam = $load_beam;
     n_x = $n_x;
     n_y = $n_y;
     n_z = $n_z;

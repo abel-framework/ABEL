@@ -20,5 +20,13 @@ class Stage(Trackable):
     def energyGain(self):
         pass
     
+    @abstractmethod
+    def energyEfficiency(self):
+        pass
+    
+    @abstractmethod
+    def energyUsage(self):
+        pass
+    
     def plotObject(self):
         return patches.Rectangle((0, -1), self.length(), 2)

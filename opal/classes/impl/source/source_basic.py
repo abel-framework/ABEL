@@ -3,16 +3,20 @@ from opal.utilities import SI
 from opal.utilities.beamphysics import generateTraceSpace
 from opal.utilities.relativity import energy2gamma
 import numpy as np
+from types import SimpleNamespace
+import time
 
 class SourceBasic(Source):
     
-    def __init__(self, E0 = None, Q = None, sigE = None, relsigE = None, sigz = None, z = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
+    def __init__(self, E0 = None, Q = None, sigE = None, relsigE = None, sigz = None, z = 0, x0 = 0, y0 = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000, wallplugEfficiency = 1, acceleratingGradient = None):
         self.E0 = E0
         self.Q = Q
         self.sigE = sigE # [eV]
-        self.relsigE = relsigE # [eV]
+        self.relsigE = relsigE
         self.sigz = sigz # [m]
         self.z = z # [m]
+        self.x0 = x0 # [m]
+        self.y0 = y0 # [m]
         self.Npart = Npart
         self.emitnx = emitnx # [m rad]
         self.emitny = emitny # [m rad]
@@ -22,6 +26,14 @@ class SourceBasic(Source):
         self.alphay = alphay # [m]
         self.L = L # [m]
         self.Npart = Npart
+        self.wallplugEfficiency = wallplugEfficiency
+        self.acceleratingGradient = acceleratingGradient
+        
+        self.jitter = SimpleNamespace()
+        self.jitter.x0 = 0
+        self.jitter.y0 = 0
+        self.jitter.z0 = 0
+        self.jitter.t0 = 0
         
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
@@ -47,6 +59,17 @@ class SourceBasic(Source):
         zs = np.random.normal(loc = self.z, scale = self.sigz, size = self.Npart)
         Es = np.random.normal(loc = self.E0, scale = self.sigE, size = self.Npart)
 
+        # add transverse jitters and offsets
+        xs += np.random.normal(scale = self.jitter.x0) + self.x0
+        ys += np.random.normal(scale = self.jitter.y0) + self.y0
+        
+        # add longitudinal jitters
+        if self.jitter.t0 == 0:
+            self.jitter.t0 = self.jitter.z0/SI.c
+        if self.jitter.z0 == 0:
+            self.jitter.z0 = self.jitter.t0*SI.c
+        zs += np.random.normal(scale = self.jitter.z0)
+        
         # create phase space
         beam.setPhaseSpace(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.Q)
         
@@ -54,8 +77,17 @@ class SourceBasic(Source):
     
     
     def length(self):
-        return self.L
+        if self.acceleratingGradient is not None:
+            return self.E0/self.acceleratingGradient
+        else:
+            return self.L
     
+    def charge(self):
+        return self.Q
     
     def energy(self):
         return self.E0
+    
+    def energyEfficiency(self):
+        return self.wallplugEfficiency
+    

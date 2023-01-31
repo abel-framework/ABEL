@@ -69,8 +69,8 @@ class InteractionPoint(Runnable):
                         existing_flag = True
                         
                     # run tracking
-                    if len(runnable1.shotnames) > 1 and verbose:
-                        print(">> EVENT #" + str(n))
+                    #if len(runnable1.shotnames) > 1 and verbose:
+                        #print(">> EVENT #" + str(n))
                     
                     # get second beam
                     beam2 = Beam.load(runnable2.runData(runnable2.shotnames[j])[-1][-1])
@@ -80,8 +80,8 @@ class InteractionPoint(Runnable):
                     event.save(self)
                     
                     if verbose:
-                        print(f"Full luminosity:  {event.fullLuminosity()/1e34:.3} \u03BCb")
-                        print(f"Geom. luminosity: {event.geometricLuminosity()/1e34:.3} \u03BCb")
+                        #print(f"Luminosity: {event.fullLuminosity()/1e34:.3}/\u03BCb (full), {event.peakLuminosity()/1e34:.3}/\u03BCb (peak), {event.geometricLuminosity()/1e34:.3}/\u03BCb (geom.)")
+                        print(f">> EVENT #{n}: Luminosity (full/peak/geom.): {event.fullLuminosity()/1e34:.2} / {event.peakLuminosity()/1e34:.2} / {event.geometricLuminosity()/1e34:.2} \u03BCb^-1")
                 
                 # increment event number
                 n += 1

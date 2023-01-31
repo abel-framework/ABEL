@@ -13,6 +13,12 @@ class Experiment(Beamline):
         assert(isinstance(stage, Stage))
         assert(isinstance(spectrometer, Spectrometer))
         
+        # save as variables
+        self.source = source
+        self.bds = bds
+        self.stage = stage
+        self.spectrometer = spectrometer
+        
         # run linac constructor
         trackables = [source, bds, stage, spectrometer]
         super().__init__(trackables)

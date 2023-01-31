@@ -10,12 +10,14 @@ import matplotlib.pyplot as plt
 
 class InterstageELEGANT(Interstage):
     
-    def __init__(self, E0 = None, beta0 = None, Ldip = None, Bdip = 1):
+    def __init__(self, E0 = None, beta0 = None, Ldip = None, Bdip = 1, enableISR = True, enableCSR = True):
         self.E0 = E0
         self.beta0 = beta0
         self.Ldip = Ldip
         self.Bdip = Bdip
-        self.g_max = 1000 # [T/m]
+        self.g_max = 1000 # [T/m] 
+        self.enableISR = enableISR
+        self.enableCSR = enableCSR
     
     # evaluate beta function 
     def initialBetaFunction(self):
@@ -122,6 +124,8 @@ class InterstageELEGANT(Interstage):
         g_lens, tau_lens, B_corr, m_sext = self.match()
         
         # make lens field
+        #lensdim_x, lensdim_y = self.findFieldMapSize(beam)
+        #lensfile = elegant_apl_fieldmap2D(tau_lens, lensdim_x, lensdim_y)
         lensfile = elegant_apl_fieldmap2D(tau_lens)
         
         # inputs
@@ -137,7 +141,9 @@ class InterstageELEGANT(Interstage):
                   'spacer_length': self.spacerLength(),
                   'sextupole_length': self.sextupoleLength(),
                   'sextupole_strength': m_sext,
-                  'output_filename': output_filename}
+                  'output_filename': output_filename,
+                  'enable_ISR': int(self.enableISR),
+                  'enable_CSR': int(self.enableCSR)}
 
         # make lattice file from template
         lattice_template = CONFIG.opal_path + 'opal/apis/elegant/templates/lattice_interstage.lte'
@@ -149,6 +155,31 @@ class InterstageELEGANT(Interstage):
         return latticefile
     
     
+    # calculate the required size of the 2D lens field map
+    def findFieldMapSize(self, beam):
+        
+        # find beta function and dispersion in the lens
+        ls, inv_rhos, ks, _, _ = self.quarterLattice()
+        beta, _, _ = evolveBetaFunction(ls, ks, self.initialBetaFunction(), fast=True)
+        Dx, _, _ = evolveDispersion(ls, inv_rhos, ks, fast=True)
+        
+        print(beta)
+        print(Dx)
+        
+        # calculate lens dimensions
+        nsig = 5
+        relEnergySpread_max = 0.05
+        offset_max = 50e-6
+        #lensdim_x = abs(Dx*(abs(beam.energy()/self.E0-1)+nsig*beam.relEnergySpread())) + nsig*np.sqrt(beta*beam.geomEmittanceX())
+        lensdim_x = abs(Dx*relEnergySpread_max) + nsig*np.sqrt(beta*beam.geomEmittanceX()) + offset_max
+        lensdim_y = nsig*np.sqrt(beta*beam.geomEmittanceY()) + offset_max
+        
+        print(lensdim_x)
+        print(lensdim_y)
+        
+        return lensdim_x, lensdim_y
+        
+        
     # match the beta function, first- and second-order dispersions
     def match(self):
         

@@ -3,15 +3,19 @@ from opal.utilities import SI
 from opal.utilities.beamphysics import generateTraceSpace
 from opal.utilities.relativity import energy2gamma
 import numpy as np
+from types import SimpleNamespace
 
 class SourceTrapezoid(Source):
     
-    def __init__(self, E0 = None, Q = None, sigE = None, deltaz = None, Ihead = 0, z = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000):
+    def __init__(self, E0 = None, Q = None, sigE = None, relsigE = None, deltaz = None, Ihead = 0, z = 0, x0 = 0, y0 = 0, emitnx = None, emitny = None, betax = None, betay = None, alphax = 0, alphay = 0, L = 0, Npart = 1000, wallplugEfficiency = 1):
         self.E0 = E0
         self.Q = Q
         self.sigE = sigE # [eV]
+        self.relsigE = relsigE # [eV]
         self.deltaz = deltaz # [m]
         self.z = z # [m]
+        self.x0 = x0 # [m]
+        self.y0 = y0 # [m]
         self.Ihead = Ihead # [A]
         self.Npart = Npart
         self.emitnx = emitnx # [m rad]
@@ -22,6 +26,13 @@ class SourceTrapezoid(Source):
         self.alphay = alphay # [m]
         self.L = L # [m]
         self.Npart = Npart
+        self.wallplugEfficiency = wallplugEfficiency
+        
+        self.jitter = SimpleNamespace()
+        self.jitter.x0 = 0
+        self.jitter.y0 = 0
+        self.jitter.z0 = 0
+        self.jitter.t0 = 0
     
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
@@ -29,12 +40,23 @@ class SourceTrapezoid(Source):
         # make empty beam
         beam = Beam()
         
+        # make energy spread
+        if self.relsigE is not None:
+            if self.sigE is None:
+                self.sigE = self.E0 * self.relsigE
+            elif abs(self.sigE - self.E0 * self.relsigE) > 0:
+                raise Exception("Both absolute and relative energy spread defined.")
+           
         # Lorentz gamma
         gamma = energy2gamma(self.E0)
 
         # horizontal and vertical phase spaces
         xs, xps = generateTraceSpace(self.emitnx/gamma, self.betax, self.alphax, self.Npart)
         ys, yps = generateTraceSpace(self.emitny/gamma, self.betay, self.alphay, self.Npart)
+        
+        # add transverse jitters and offsets
+        xs += np.random.normal(scale = self.jitter.x0) + self.x0
+        ys += np.random.normal(scale = self.jitter.y0) + self.y0
         
         # longitudinal positions
         Q_uniform = abs(self.Ihead) * self.deltaz / SI.c
@@ -70,6 +92,12 @@ class SourceTrapezoid(Source):
     def length(self):
         return self.L
     
+    def charge(self):
+        return self.Q
     
     def energy(self):
         return self.E0
+    
+    def energyEfficiency(self):
+        return self.wallplugEfficiency
+    

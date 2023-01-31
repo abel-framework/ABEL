@@ -4,8 +4,8 @@
 C: CHARGE, TOTAL = $charge
 
 ! dipoles
-DIPOLE : CSRCSBEND, L = $dipole_length, ANGLE = $dipole_angle, BINS = 100, ISR=1, CSR = 1
-CORRECTOR : CSRCSBEND, L = $corrector_length, ANGLE = $corrector_angle, BINS = 100, ISR=1, CSR = 1
+DIPOLE : CSRCSBEND, L = $dipole_length, ANGLE = $dipole_angle, BINS = 100, ISR = $enable_ISR, CSR = $enable_CSR
+CORRECTOR : CSRCSBEND, L = $corrector_length, ANGLE = $corrector_angle, BINS = 100, ISR = $enable_ISR, CSR = $enable_CSR
 
 ! plasma lens (transversely tapered)
 PLASMALENS : BMAPXY, L = $lens_length, FILENAME="$lens_filename", STRENGTH=$lens_strength, ACCURACY=1E-9, METHOD="runge-kutta"

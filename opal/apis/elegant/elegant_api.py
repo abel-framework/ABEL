@@ -125,11 +125,11 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
     return beam
 
 
-def elegant_apl_fieldmap2D(tau_lens, filename = None):
+def elegant_apl_fieldmap2D(tau_lens, lensdim_x=5e-3, lensdim_y=1e-3, filename = None):
     
     # transverse dimensions
-    xs = np.linspace(-6e-3, 6e-3, 1201);
-    ys = np.linspace(-2e-3, 2e-3, 401);
+    xs = np.linspace(-lensdim_x, lensdim_x, 1001)
+    ys = np.linspace(-lensdim_y, lensdim_y, 201)
     
     # create temporary CSV file
     tmpfile = tempfile.gettempdir() + '/map.csv'

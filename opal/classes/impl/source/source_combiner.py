@@ -23,6 +23,15 @@ class SourceCombiner(Source):
     def length(self):
         return max(self.source1.length(), self.source2.length())
     
-    
+    def charge(self):
+        return self.source1.charge() + self.source2.charge()
+        
     def energy(self):
-        return np.mean(self.source1.energy(), self.source2.energy())
+        return (self.source1.energy()*self.source1.charge() + self.source2.energy()*self.source2.charge())/self.charge()
+    
+    def energyEfficiency(self):
+        Etot1 = self.source1.energy()*self.source1.charge()
+        Etot2 = self.source2.energy()*self.source2.charge()
+        return (self.source1.energyEfficiency()*Etot1 + self.source2.energyEfficiency()*Etot2)/(Etot1+Etot2)
+    
+    
