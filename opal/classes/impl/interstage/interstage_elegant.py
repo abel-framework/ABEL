@@ -18,6 +18,7 @@ class InterstageELEGANT(Interstage):
         self.g_max = 1000 # [T/m] 
         self.enableISR = enableISR
         self.enableCSR = enableCSR
+        self.disableNonlinearity = False
     
     # evaluate beta function 
     def initialBetaFunction(self):
@@ -118,39 +119,50 @@ class InterstageELEGANT(Interstage):
         return CONFIG.opal_path + 'opal/apis/elegant/templates/runscript_interstage.ele'
     
     
-    def makeLattice(self, beam, output_filename):
+    def makeLattice(self, beam, output_filename, dumpBeams=False):
         
         # perform matching to find exact element strengths
         g_lens, tau_lens, B_corr, m_sext = self.match()
         
+        if self.disableNonlinearity:
+            tau_lens = 0
+            m_sext = 0
+        
         # make lens field
-        #lensdim_x, lensdim_y = self.findFieldMapSize(beam)
-        #lensfile = elegant_apl_fieldmap2D(tau_lens, lensdim_x, lensdim_y)
         lensfile = elegant_apl_fieldmap2D(tau_lens)
+        
+        # make lattice file from template
+        if not dumpBeams:
+            lattice_template = CONFIG.opal_path + 'opal/apis/elegant/templates/lattice_interstage.lte'
+            Ndumps = 1
+        else:
+            lattice_template = CONFIG.opal_path + 'opal/apis/elegant/templates/lattice_interstage_10dumps.lte'
+            Ndumps = 10
         
         # inputs
         inputs = {'charge': abs(beam.charge()),
-                  'dipole_length': self.dipoleLength(),
-                  'dipole_angle': self.dipoleLength()*self.dipoleField()*SI.c/self.E0,
-                  'corrector_length': self.correctorLength(),
-                  'corrector_angle': self.correctorLength()*B_corr*SI.c/self.E0,
-                  'lens_length': self.lensLength(),
+                  'dipole_length': self.dipoleLength() / Ndumps,
+                  'dipole_angle': self.dipoleLength()*self.dipoleField()*SI.c/self.E0 / Ndumps,
+                  'corrector_length': self.correctorLength() / Ndumps,
+                  'corrector_angle': self.correctorLength()*B_corr*SI.c/self.E0 / Ndumps,
+                  'lens_length': self.lensLength() / Ndumps,
                   'lens_filename': lensfile,
                   'lens_strength': g_lens,
-                  'drift_length': self.driftLength(),
-                  'spacer_length': self.spacerLength(),
-                  'sextupole_length': self.sextupoleLength(),
+                  'drift_length': self.driftLength() / Ndumps,
+                  'spacer_length': self.spacerLength() / Ndumps,
+                  'sextupole_length': self.sextupoleLength() / Ndumps,
                   'sextupole_strength': m_sext,
                   'output_filename': output_filename,
                   'enable_ISR': int(self.enableISR),
                   'enable_CSR': int(self.enableCSR)}
 
-        # make lattice file from template
-        lattice_template = CONFIG.opal_path + 'opal/apis/elegant/templates/lattice_interstage.lte'
         latticefile = tempfile.gettempdir() + '/interstage.lte'
         with open(lattice_template, 'r') as fin, open(latticefile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
+
+            
+                
         
         return latticefile
     

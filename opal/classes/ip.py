@@ -81,7 +81,7 @@ class InteractionPoint(Runnable):
                     
                     if verbose:
                         #print(f"Luminosity: {event.fullLuminosity()/1e34:.3}/\u03BCb (full), {event.peakLuminosity()/1e34:.3}/\u03BCb (peak), {event.geometricLuminosity()/1e34:.3}/\u03BCb (geom.)")
-                        print(f">> EVENT #{n}: Luminosity (full/peak/geom.): {event.fullLuminosity()/1e34:.2} / {event.peakLuminosity()/1e34:.2} / {event.geometricLuminosity()/1e34:.2} \u03BCb^-1")
+                        print(f">> EVENT #{n}: Luminosity (full/peak/geom.): {event.fullLuminosity()/1e34:.3} / {event.peakLuminosity()/1e34:.3} / {event.geometricLuminosity()/1e34:.2} \u03BCb^-1")
                 
                 # increment event number
                 n += 1

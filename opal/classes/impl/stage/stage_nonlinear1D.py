@@ -2,7 +2,6 @@ from opal.physicsmodels.plasmawake1D import wakefield1D
 from opal import Stage
 from matplotlib import pyplot as plt
 import numpy as np
-from scipy.optimize import root, root_scalar
 from opal.utilities.plasmaphysics import *
 from opal.utilities import SI
 from copy import deepcopy
@@ -18,9 +17,6 @@ class StageNonlinear1D(Stage):
         self.enableBetatron = enableBetatron
         self.addDriverToBeam = addDriverToBeam
         self.driverSource = driverSource
-            
-        self.driverInitial = None
-        self.driverFinal = None
         
         self.driverToWakeEfficiency = None
         self.wakeToBeamEfficiency = None
@@ -29,7 +25,14 @@ class StageNonlinear1D(Stage):
         self.reljitter = SimpleNamespace()
         self.reljitter.n0 = 0
         
+        self.rampBetaMagnification = 1
+        
+        # implement radiation reaction in the betatron motion
+        self.radiationReaction = False
+        
+        # internally sampled values (given some jitter)
         self.__n = None
+        self.driverInitial = None
         
     
     def __getInitialDriver(self, resample=False):
@@ -41,8 +44,13 @@ class StageNonlinear1D(Stage):
         if resample or self.__n is None:
             self.__n = self.n0 * np.random.normal(loc = 1, scale = self.reljitter.n0)
         return self.__n
-        
-        
+    
+    
+    # matched beta function of the stage (for a given energy)
+    def matchedBetaFunction(self, E):
+        return beta_matched(self.n0, E) * self.rampBetaMagnification
+    
+    # track the particles through
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
 
         # get driver
@@ -53,6 +61,11 @@ class StageNonlinear1D(Stage):
         
         # sample the density (with jitter)
         n0 = self.__getDensity(resample=True)
+        
+        # apply plasma-density down ramp (demagnify beta function)
+        if self.rampBetaMagnification is not None:
+            beam.magnifyBetaFunction(1/self.rampBetaMagnification)
+            driver0.magnifyBetaFunction(1/self.rampBetaMagnification)
         
         # calculate wakefield function
         EzFcn, rFcn = self.__wakefieldFcn(beam, driver=driver0, density=n0)
@@ -65,9 +78,17 @@ class StageNonlinear1D(Stage):
         
         # perform betatron motion
         if self.enableBetatron:
+            
+            # find driver offset (to shift the beam relative)
             x0_driver = np.random.normal(scale=self.driverSource.jitter.x0)
             y0_driver = np.random.normal(scale=self.driverSource.jitter.y0)
-            beam.betatronMotion(self.L, n0, deltaEs, x0_driver=x0_driver, y0_driver=y0_driver)
+            
+            # calculate betatron motion (with or without radiation reaction)
+            if self.radiationReaction:
+                beam.betatronMotionRadiative(self.L, n0, deltaEs, x0_driver=x0_driver, y0_driver=y0_driver) # TODO: (Daniel)
+            else:
+                beam.betatronMotion(self.L, n0, deltaEs, x0_driver=x0_driver, y0_driver=y0_driver)
+                
         else:
             beam.betatronDamping(deltaEs) # TODO: seems to not work at damping beta function
             beam.flipTransversePhaseSpaces()
@@ -96,11 +117,16 @@ class StageNonlinear1D(Stage):
         self.driverToWakeEfficiency = (Etot0_driver-Etot_driver)/Etot0_driver
         self.wakeToBeamEfficiency = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
         self.driverToBeamEfficiency = self.driverToWakeEfficiency*self.wakeToBeamEfficiency
-         
+        
+        # apply plasma-density up ramp (magnify beta function)
+        if self.rampBetaMagnification is not None:
+            beam.magnifyBetaFunction(self.rampBetaMagnification)
+            driver.magnifyBetaFunction(self.rampBetaMagnification)
+           
         # add the driver to the beam (if desired)
         if self.addDriverToBeam:
             beam.addBeam(driver)
-             
+         
         return super().track(beam, savedepth, runnable, verbose)
     
     
@@ -137,7 +163,7 @@ class StageNonlinear1D(Stage):
         return EzFcn, rFcn
     
     
-    def plotWakefield(self, beam=None):
+    def plotWakefield(self, beam=None, saveToFile=None, includeWakeRadius=True):
         
         # get wakefield
         Ezs, zs, rs = self.__wakefield(beam)
@@ -146,31 +172,45 @@ class StageNonlinear1D(Stage):
         driver = deepcopy(self.__getInitialDriver())
         if beam is not None:
             driver.addBeam(beam)
-        Is, ts = driver.currentProfile(bins=np.linspace(min(zs/SI.c), max(zs/SI.c), int(np.sqrt(driver.Npart()))))
+        Is, ts = driver.currentProfile(bins=np.linspace(min(zs/SI.c), max(zs/SI.c), int(np.sqrt(driver.Npart())/2)))
         zs0 = ts*SI.c
         
         # plot it
-        fig, axs = plt.subplots(1,3)
-        fig.set_figwidth(20)
-        fig.set_figheight(4)
+        fig, axs = plt.subplots(2+int(includeWakeRadius),1)
+        fig.set_figwidth(5.5)
+        fig.set_figheight(11*(2+int(includeWakeRadius))/3)
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        af = 0.1
         zlims = [min(zs)*1e6, max(zs)*1e6]
         
-        axs[0].plot(zs0*1e6, -Is/1e3, '-')
+        axs[0].plot(zs*1e6, np.zeros(zs.shape), ':', color=col0)
+        axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1)
         axs[0].set_xlabel('z (um)')
-        axs[0].set_ylabel('Beam current (kA)')
+        axs[0].set_ylabel('Longitudinal electric field (GV/m)')
         axs[0].set_xlim(zlims)
+        axs[0].set_ylim(bottom=-Ez_wavebreaking(self.n0)/1e9, top=1.3*max(Ezs)/1e9)
         
-        axs[1].plot(zs*1e6, rs*1e6, '-')
+        axs[1].fill(np.concatenate((zs0, np.flip(zs0)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
+        axs[1].plot(zs0*1e6, -Is/1e3, '-', color=col1)
         axs[1].set_xlabel('z (um)')
-        axs[1].set_ylabel('Plasma-wake radius (um)')
+        axs[1].set_ylabel('Beam current (kA)')
         axs[1].set_xlim(zlims)
-        axs[1].set_ylim(bottom=0)
+        axs[1].set_ylim(bottom=0, top=1.2*max(-Is)/1e3)
         
-        axs[2].plot(zs*1e6, Ezs/1e9, '-')
-        axs[2].set_xlabel('z (um)')
-        axs[2].set_ylabel('Electric field (GV/m)')
-        axs[2].set_xlim(zlims)
-        axs[2].set_ylim(bottom=-Ez_wavebreaking(self.n0)/1e9, top=Ez_wavebreaking(self.n0)/1e9)
+        if includeWakeRadius:
+            axs[2].fill(np.concatenate((zs, np.flip(zs)))*1e6, np.concatenate((rs, np.ones(zs.shape)))*1e6, color=col2, alpha=af)
+            axs[2].plot(zs*1e6, rs*1e6, '-', color=col2)
+            axs[2].set_xlabel('z (um)')
+            axs[2].set_ylabel('Plasma-wake radius (um)')
+            axs[2].set_xlim(zlims)
+            axs[2].set_ylim(bottom=0, top=max(rs*1.2)*1e6)
+
+        # save to file
+        if saveToFile is not None:
+            plt.savefig(saveToFile, format="pdf", bbox_inches="tight")
+        
         
         
     def length(self):

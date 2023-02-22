@@ -42,9 +42,10 @@ class SourceBasic(Source):
         beam = Beam()
         
         # make energy spread
+        sigE = self.sigE
         if self.relsigE is not None:
-            if self.sigE is None:
-                self.sigE = self.E0 * self.relsigE
+            if sigE is None:
+                sigE = self.E0 * self.relsigE
             elif abs(self.sigE - self.E0 * self.relsigE) > 0:
                 raise Exception("Both absolute and relative energy spread defined.")
            
@@ -57,7 +58,7 @@ class SourceBasic(Source):
         
         # longitudinal phase space
         zs = np.random.normal(loc = self.z, scale = self.sigz, size = self.Npart)
-        Es = np.random.normal(loc = self.E0, scale = self.sigE, size = self.Npart)
+        Es = np.random.normal(loc = self.E0, scale = sigE, size = self.Npart)
 
         # add transverse jitters and offsets
         xs += np.random.normal(scale = self.jitter.x0) + self.x0

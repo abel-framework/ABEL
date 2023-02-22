@@ -10,6 +10,8 @@ $$ACCELERATOR:: default
     espread.1 = $espread1;
     offset_x.1 = $offset_x1;
     offset_y.1 = $offset_y1;
+    waist_x.1 = $waist_x1;
+    waist_y.1 = $waist_y1;
     
     energy.2 = $energy2;
     particles.2 = $particles2;
@@ -21,6 +23,8 @@ $$ACCELERATOR:: default
     espread.2 = $espread2;
     offset_x.2 = $offset_x2;
     offset_y.2 = $offset_y2;
+    waist_x.2 = $waist_x2;
+    waist_y.2 = $waist_y2;
     
     which_espread = 3;
     dist_z = 0;

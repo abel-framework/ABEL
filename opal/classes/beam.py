@@ -231,6 +231,12 @@ class Beam():
     def beamSizeY(self, clean=True):
         return np.std(prct_clean(self.ys(), clean))
     
+    def divergenceX(self, clean=True):
+        return np.std(prct_clean(self.xps(), clean))
+
+    def divergenceY(self, clean=True):
+        return np.std(prct_clean(self.yps(), clean))
+    
     def geomEmittanceX(self, clean=True):
         xs, xps = prct_clean2D(self.xs(), self.xps(), clean)
         return np.sqrt(np.linalg.det(np.cov(xs, xps)))
@@ -360,7 +366,7 @@ class Beam():
         cb.ax.set_ylabel('Charge density (pC/um/GeV)')
         
     def plotTraceSpaceX(self):
-        dQdxdxp, xs, xps = self.phaseSpaceDensity(self.xs, self.xps, hbins=np.linspace(-5e-6, 5e-6, 50), vbins=np.linspace(-5e-4, 5e-4, 50))
+        dQdxdxp, xs, xps = self.phaseSpaceDensity(self.xs, self.xps)#, hbins=np.linspace(-5e-6, 5e-6, 50), vbins=np.linspace(-5e-4, 5e-4, 50))
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
@@ -390,6 +396,9 @@ class Beam():
         zs = self.zs() + (1-self.Es()/E0) * R56
         self.__setZs(zs)
         
+    def stretchToLength(self, sigz):
+        self.__setZs(self.zs()*sigz/self.bunchLength())
+        
     # betatron damping (must be done before acceleration)
     def betatronDamping(self, deltaE):
         
@@ -398,11 +407,18 @@ class Beam():
         self.filterPhaseSpace(np.isnan(self.Es()))
         
         gammasBoosted = energy2gamma(abs(self.Es()+deltaE))
-        factor = np.sqrt(self.gammas()/gammasBoosted)
-        self.__setXs(self.xs() * factor)
-        self.__setYs(self.ys() * factor)
-        self.__setWxs(self.wxs() / factor)
-        self.__setWys(self.wys() / factor)
+        betamag = self.gammas()/gammasBoosted
+        self.magnifyBetaFunction(betamag)
+        
+    
+    # magnify beta function (increase beam size, decrease divergence)
+    def magnifyBetaFunction(self, betamag):
+        mag = np.sqrt(betamag)
+        self.__setXs(self.xs() * mag)
+        self.__setYs(self.ys() * mag)
+        self.__setWxs(self.wxs() / mag)
+        self.__setWys(self.wys() / mag)
+        
         
     def flipTransversePhaseSpaces(self, flipMomenta=True, flipPositions=False):
         if flipMomenta:
@@ -432,6 +448,12 @@ class Beam():
         self.__setWxs(wxs)
         self.__setYs(ys+y0_driver)
         self.__setWys(wys)
+        
+    
+    # TODO: implement radiation reaction (Daniel)
+    def betatronMotionRadiative(self, L, n0, deltaEs):
+        pass
+        
         
   
     ## SAVE AND LOAD BEAM

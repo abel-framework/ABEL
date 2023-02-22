@@ -9,7 +9,7 @@ import numpy as np
 
 class Linac(Beamline):
     
-    def __init__(self, source=None, stage=None, interstage=None, bds=None, Nstages=1, alternatingInterstagePolarity=False):
+    def __init__(self, source=None, stage=None, interstage=None, bds=None, Nstages=0, alternatingInterstagePolarity=False):
         
         # check element classes, then assemble
         assert(isinstance(source, Source))
@@ -24,7 +24,7 @@ class Linac(Beamline):
         self.source = source
         self.bds = bds
         self.stages = [None]*Nstages
-        self.interstages = [None]*(Nstages-1)
+        self.interstages = [None]*max(0,Nstages-1)
         
         # declare list of trackables
         trackables = [None] * (1 + Nstages + max(0,Nstages-1) + int(bds is not None))
@@ -33,25 +33,28 @@ class Linac(Beamline):
         trackables[0] = source
         
         # add stages
-        for i in range(Nstages):
+        if (stage is not None) and (interstage is not None):
+            for i in range(Nstages):
+
+                # add stages
+                stage_instance = deepcopy(stage)
+                trackables[1+2*i] = stage_instance
+                self.stages[i] = stage_instance
+
+                # add interstages
+                if i < Nstages-1:
+                    interstage_instance = deepcopy(interstage)
+                    interstage_instance.E0 = source.energy() + (i+1) * stage.energyGain()
+                    if alternatingInterstagePolarity:
+                        interstage_instance.Bdip = (2*(i%2)-1)*interstage_instance.Bdip
+                    trackables[2+2*i] = interstage_instance
+                    self.interstages[i] = interstage_instance
             
-            # add stages
-            stage_instance = deepcopy(stage)
-            trackables[1+2*i] = stage_instance
-            self.stages[i] = stage_instance
-            
-            # add interstages
-            if i < Nstages-1:
-                interstage_instance = deepcopy(interstage)
-                interstage_instance.E0 = source.energy() + (i+1) * stage.energyGain()
-                if alternatingInterstagePolarity:
-                    interstage_instance.Bdip = (2*(i%2)-1)*interstage_instance.Bdip
-                trackables[2+2*i] = interstage_instance
-                self.interstages[i] = interstage_instance
-        
         # add beam delivery system
         if bds is not None:
-            bds.E0 = source.energy() + Nstages * stage.energyGain()
+            bds.E0 = source.energy()
+            if stage is not None:
+                bds.E0 += Nstages * stage.energyGain()
             assert(isinstance(bds, BeamDeliverySystem))
             trackables[max(1,2*Nstages)] = bds
         

@@ -10,7 +10,7 @@ class CONFIG:
     hipace_path = opal_path + 'hipace/'
     
     # path to GUINEA-PIG directory
-    guineapig_path = opal_path + 'guineapig/bin/'
+    guineapig_path = opal_path + 'guinea-pig/bin/'
     
     # path to tracking data directory
     rundata_path = 'rundata/'

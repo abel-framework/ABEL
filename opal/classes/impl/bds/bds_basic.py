@@ -4,17 +4,18 @@ from copy import deepcopy
 
 class BeamDeliverySystemBasic(BeamDeliverySystem):
     
-    def __init__(self, beta_waist_x = None, beta_waist_y = None, L = 0, E0 = None):
+    def __init__(self, beta_waist_x = None, beta_waist_y = None, sigz = None, L = 0, E0 = None):
         self.beta_waist_x = beta_waist_x
         self.beta_waist_y = beta_waist_y
+        self.sigz = sigz
         self.L = L
         self.E0 = E0
     
     def length(self):
-        if self.E0 is None:
-            return self.L
-        else:
+        if self.E0 is not None:
             return np.sqrt(self.E0/1e12)*2250 # [m] scaled from ILC
+        else:
+            return self.L
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
@@ -34,6 +35,10 @@ class BeamDeliverySystemBasic(BeamDeliverySystem):
         X[2,:] = Y[2,:] * np.sqrt(self.beta_waist_y/beamy.betaY())
         X[3,:] = Y[3,:] / np.sqrt(self.beta_waist_y/beamy.betaY()) 
         beam.setTransverseVector(X)
+        
+        # stretch or compress longitudinally 
+        if self.sigz is not None:
+            beam.stretchToLength(self.sigz)
         
         return super().track(beam, savedepth, runnable, verbose)
         

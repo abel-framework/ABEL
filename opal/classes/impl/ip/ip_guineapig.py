@@ -8,6 +8,9 @@ from opal.apis.guineapig.guineapig_api import guineapig_run
 
 class InteractionPointGUINEAPIG(InteractionPoint):
     
+    def __init__(self, enableWaistShift = False):
+        self.enableWaistShift = enableWaistShift
+        
     # perform GUINEA-PIG simulation
     def interact(self, beam1, beam2, loadBeams=False):
         
@@ -22,6 +25,8 @@ class InteractionPointGUINEAPIG(InteractionPoint):
                   'espread1': beam1.relEnergySpread(),
                   'offset_x1': beam1.offsetX()*1e9, # [nm]
                   'offset_y1': beam1.offsetY()*1e9, # [nm]
+                  'waist_x1': 0, # [um]
+                  'waist_y1': int(self.enableWaistShift)*beam1.bunchLength()*1e6, # [um]
                   'energy2': beam2.energy()/1e9, # [GeV]
                   'particles2': abs(beam2.charge()/SI.e)/1e10, # [1e10]
                   'beta_x2': beam2.betaX()*1e3, # [mm]
@@ -32,6 +37,8 @@ class InteractionPointGUINEAPIG(InteractionPoint):
                   'espread2': beam2.relEnergySpread(), # [um]
                   'offset_x2': beam2.offsetX()*1e9, # [nm]
                   'offset_y2': beam2.offsetY()*1e9, # [nm]
+                  'waist_x2': 0, # [um]
+                  'waist_y2': int(self.enableWaistShift)*beam2.bunchLength()*1e6, # [um]
                   'ecm_min': 0.99*np.sqrt(4*beam1.energy()*beam2.energy())/1e9, # [GeV] 1% peak
                   'n_x': int(np.sqrt(beam1.Npart()/2)),
                   'n_y': int(np.sqrt(beam1.Npart()/2)),

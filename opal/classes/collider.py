@@ -5,6 +5,7 @@ from os import listdir, remove, mkdir
 from os.path import isfile, join, exists
 from copy import deepcopy
 from matplotlib import lines
+from datetime import datetime
 
 class Collider(Runnable):
     
@@ -34,8 +35,18 @@ class Collider(Runnable):
     def energyUsage(self):
         return self.linac1.energyUsage() + self.linac2.energyUsage()
     
-    # luminosity per crossing [m^-2]
-    def luminosityPerCrossing(self):
+    # full luminosity per crossing [m^-2]
+    def fullLuminosityPerCrossing(self):
+        files = self.ip.runData()
+        Nevents = len(files)
+        lumi_full = np.empty(Nevents)
+        for i in range(Nevents):
+            event = Event.load(files[i], loadBeams=False)
+            lumi_full[i] = event.fullLuminosity()
+        return np.mean(lumi_full)
+    
+    # peak luminosity per crossing [m^-2]
+    def peakLuminosityPerCrossing(self):
         files = self.ip.runData()
         Nevents = len(files)
         lumi_peak = np.empty(Nevents)
@@ -44,13 +55,17 @@ class Collider(Runnable):
             lumi_peak[i] = event.peakLuminosity()
         return np.mean(lumi_peak)
         
-    # luminosity per power [m^-2/J]
-    def luminosityPerPower(self):
-        return self.luminosityPerCrossing() / self.energyUsage()
+    # full luminosity per power [m^-2/J]
+    def fullLuminosityPerPower(self):
+        return self.fullLuminosityPerCrossing() / self.energyUsage()
+    
+    # peak luminosity per power [m^-2/J]
+    def peakLuminosityPerPower(self):
+        return self.peakLuminosityPerCrossing() / self.energyUsage()
     
     # integrated energy usage (to reach target integrated luminosity)
     def integratedEnergyUsage(self):
-        return self.targetIntegratedLuminosity / self.luminosityPerPower()
+        return self.targetIntegratedLuminosity / self.peakLuminosityPerPower()
     
     # integrated cost of energy
     def runningCost(self):
@@ -107,7 +122,7 @@ class Collider(Runnable):
         event = self.ip.run(self.linac1, self.linac2, self.runname + "/ip", allByAll=True, overwrite=(overwrite or overwriteIP))
         
         # return beams from last shot
-        return beam1, beam2, event
+        return beam1, beam2
     
     
     # plot the distribution of luminosity per power
@@ -172,8 +187,8 @@ class Collider(Runnable):
             valILC250peak = 5.35e31 # [cm^-2 s^-1 MW^-1]
             valILC500full = 1.10e32 # [cm^-2 s^-1 MW^-1] wall-plug power = 163 MW
             valILC500peak = 6.41e31 # [cm^-2 s^-1 MW^-1]
-            valCLIC500full = 1.12e32 # [cm^-2 s^-1 MW^-1] wall-plug power ≈ 204 MW
-            valCLIC500peak = 6.86e31 # [cm^-2 s^-1 MW^-1]
+            valCLIC380full = 2.09e32 # [cm^-2 s^-1 MW^-1] wall-plug power ≈ 110 MW
+            valCLIC380peak = 1.18e32 # [cm^-2 s^-1 MW^-1]
             valCLIC3000full = 1.01e32 # [cm^-2 s^-1 MW^-1] wall-plug power = 582 MW
             valCLIC3000peak = 3.43e31 # [cm^-2 s^-1 MW^-1]
         else:
@@ -181,16 +196,16 @@ class Collider(Runnable):
             valILC250peak = 9.96e33 # [m^-2]
             valILC500full = 2.74e34 # [m^-2]
             valILC500peak = 1.60e34 # [m^-2]
-            valCLIC500full = 1.47e34 # [m^-2]
-            valCLIC500peak = 8.97e33 # [m^-2]
+            valCLIC380full = 1.3e34 # [m^-2]
+            valCLIC380peak = 7.39e33 # [m^-2]
             valCLIC3000full = 3.78e34 # [m^-2]
             valCLIC3000peak = 1.28e34 # [m^-2]
         axs[0].add_artist(lines.Line2D([valILC250full, valILC250full], axs[0].get_ylim(), linestyle='-', color='lightgreen', label='ILC 250'))
         axs[1].add_artist(lines.Line2D([valILC250peak, valILC250peak], axs[1].get_ylim(), linestyle='-', color='lightgreen', label='ILC 250'))
         axs[0].add_artist(lines.Line2D([valILC500full, valILC500full], axs[0].get_ylim(), linestyle='-', color='forestgreen', label='ILC 500'))
         axs[1].add_artist(lines.Line2D([valILC500peak, valILC500peak], axs[1].get_ylim(), linestyle='-', color='forestgreen', label='ILC 500'))
-        axs[0].add_artist(lines.Line2D([valCLIC500full, valCLIC500full], axs[0].get_ylim(), linestyle='-', color='lightcoral', label='CLIC 500'))
-        axs[1].add_artist(lines.Line2D([valCLIC500peak, valCLIC500peak], axs[1].get_ylim(), linestyle='-', color='lightcoral', label='CLIC 500'))
+        axs[0].add_artist(lines.Line2D([valCLIC380full, valCLIC380full], axs[0].get_ylim(), linestyle='-', color='lightcoral', label='CLIC 380'))
+        axs[1].add_artist(lines.Line2D([valCLIC380peak, valCLIC380peak], axs[1].get_ylim(), linestyle='-', color='lightcoral', label='CLIC 380'))
         axs[0].add_artist(lines.Line2D([valCLIC3000full, valCLIC3000full], axs[0].get_ylim(), linestyle='-', color='indianred', label='CLIC 3000'))
         axs[1].add_artist(lines.Line2D([valCLIC3000peak, valCLIC3000peak], axs[1].get_ylim(), linestyle='-', color='indianred', label='CLIC 3000'))
         axs[0].legend(loc='upper left')

@@ -122,6 +122,10 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
     # reset previous macroparticle charge
     beam.copyParticleCharge(beam0)
     
+    # get all dumped beams
+    # get files in dumped beams folder
+    # for all dumped beams, make beam object
+    
     return beam
 
 

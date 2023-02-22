@@ -1,20 +1,8 @@
 import numpy as np
-#from scipy.integrate import odeint, solve_ivp
 import scipy.integrate as sciint
 import scipy.interpolate as sciinterp
 from opal.utilities import SI
 from opal.utilities.plasmaphysics import k_p
-
-
-# Golovanov equation (from Golovanov 2021 PPCF paper)
-def ode_Golovanov(psi, kz, alephFcn, n0):
-    return psi[1], -psi[1]**2/(2*psi[0]) + alephFcn(2*np.sqrt(psi[0]), kz) - 1/2
-
-
-#def ode_Lu(kr, kz, dN_dkz, n0):
-#    return kr[1], -2*kr[1]**2/kr[0] - 1/kr[0] - 2*k_p(n0)**3*dN_dkz(kz)/(np.pi*n0*kr[0]**3)
-def ode_Lu(kz, kr, dN_dkz, n0):
-    return kr[1], -2*kr[1]**2/kr[0] - 1/kr[0] - 2*k_p(n0)**3*dN_dkz(kz)/(np.pi*n0*kr[0]**3)
 
 
 # calculate the longitudinal electric field
@@ -44,6 +32,10 @@ def wakefield1D(n0, driver, beam=None):
     alephFcn = lambda kr, kz: -2*(np.trapz(kr_span(kr) * \
                rhos_interp(np.array([kr_span(kr), kz*np.ones(kr_span(kr).shape)]).T), x=kr_span(kr), axis=0).T / kr**2).T
     
+    # Golovanov equation (from Golovanov 2021 PPCF paper)
+    def ode_Golovanov(psi, kz):
+        return psi[1], -psi[1]**2/(2*psi[0]) + alephFcn(2*np.sqrt(psi[0]), kz) - 1/2
+    
     # find z axis for integration (starts at a given current treshold)
     rhos_onaxis = rhos_interp(np.array([np.zeros(kzs_ctrs.shape).T, kzs_ctrs.T]).T)
     rho_threshold = 1
@@ -51,7 +43,7 @@ def wakefield1D(n0, driver, beam=None):
     
     # numerical integration (driver)
     psi0 = np.array([1e-3, 0])
-    sol = sciint.odeint(ode_Golovanov, psi0, kzs, args=(alephFcn, n0), mxhnil=1, mxstep=1000)
+    sol = sciint.odeint(ode_Golovanov, psi0, kzs, mxhnil=1, mxstep=1000)
     psi = sol[:, 0]
     dpsi_dkz = sol[:, 1]
     krbs = 2*np.sqrt(psi)
@@ -65,12 +57,15 @@ def wakefield1D(n0, driver, beam=None):
         kzs_beam0 = k_p(n0)*zs_beam
         dN_dkzFcn = lambda kz: np.interp(-kz, kzs_beam0, dN_dz/k_p(n0), left=0, right=0)
         
+        # Lu equation (from Lu et al. PRL 2016)
+        def ode_Lu(kz, kr):
+            return kr[1], -2*kr[1]**2/kr[0] - 1/kr[0] - 2*k_p(n0)**3*dN_dkzFcn(kz)/(np.pi*n0*kr[0]**3)
+        
         # numerical integration with a stiff solver (BDF or Radau)
         kr0 = [krbs[-1], dpsi_dkz[-1]/np.sqrt(psi[-1])]
         dkz_beam = np.median(np.diff(kzs_beam0))
         kzs_eval = np.arange(max(kzs), max(-kzs_beam0)+0.5, dkz_beam)
-        sol_beam = sciint.solve_ivp(ode_Lu, [min(kzs_eval), max(kzs_eval)], kr0, \
-                                    args=(dN_dkzFcn, n0), method='Radau', vectorized=True, t_eval=kzs_eval)
+        sol_beam = sciint.solve_ivp(ode_Lu, [min(kzs_eval), max(kzs_eval)], kr0, method='Radau', vectorized=True, t_eval=kzs_eval)
         kzs_beam = sol_beam.t[1:]
         krbs_beam = sol_beam.y[0,1:]
         dkrb_dkzs_beam = sol_beam.y[1,1:]
@@ -86,6 +81,5 @@ def wakefield1D(n0, driver, beam=None):
     
     # unflip the z direction
     return np.flip(Ezs), -np.flip(kzs/k_p(n0)), np.flip(krbs/k_p(n0))
-    
     
     
