@@ -128,14 +128,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# tracking files
-example/trackdata/
-
 # Mac files
 .DS_Store
 
+# Jupyter files
+*.jupyter/
 
 # OPAL specific
-*/rundata
+*rundata/
 .temp/
-.jupyter/desktop-workspaces/default-37a8.jupyterlab-workspace
