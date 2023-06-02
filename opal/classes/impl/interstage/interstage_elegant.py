@@ -3,22 +3,25 @@ from opal.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D
 from opal.utilities.beamphysics import evolveBetaFunction, evolveDispersion, evolveSecondOrderDispersion
 from opal.utilities import SI
 from string import Template
-from scipy.optimize import minimize
-import numpy as np
+import scipy
 import uuid, os
+import numpy as np
 import matplotlib.pyplot as plt
 
 class InterstageELEGANT(Interstage):
     
-    def __init__(self, E0 = None, beta0 = None, Ldip = None, Bdip = 1, enableISR = True, enableCSR = True):
+    def __init__(self, E0 = None, beta0 = None, Ldip = None, Bdip = 1, Bdip2 = None, enableISR = True, enableCSR = True):
         self.E0 = E0
         self.beta0 = beta0
         self.Ldip = Ldip
         self.Bdip = Bdip
+        self.Bdip2 = Bdip2
         self.g_max = 1000 # [T/m] 
         self.enableISR = enableISR
         self.enableCSR = enableCSR
         self.disableNonlinearity = False
+        
+        self.default_Bdip2_Bdip_ratio = 0.8
     
     # evaluate beta function 
     def initialBetaFunction(self):
@@ -51,48 +54,54 @@ class InterstageELEGANT(Interstage):
         k = self.g_max*SI.c/self.E0
         return 1/(k*f)
     
-    # sextupole length
-    def correctorLength(self):
-        return 0.1 * self.dipoleLength()
+    # chicane dipole length
+    def chicaneDipoleLength(self):
+        return 0.6 * self.dipoleLength()
+    
+    # evaluate dipole field (or use default)
+    def chicaneDipoleField(self):
+        if self.Bdip2 is None:
+            return self.dipoleField() * self.default_Bdip2_Bdip_ratio
+        elif callable(self.Bdip2):
+            return self.Bdip2(self.E0)
+        else:
+            return self.Bdip2
     
     # sextupole length
     def sextupoleLength(self):
-        return 0.2 * self.dipoleLength()
+        return 0.4 * self.dipoleLength()
     
-    # drift length
-    def driftLength(self):
-        return self.dipoleLength() + self.spacerLength() - self.correctorLength()
-       
     # full lattice 
-    def fullLattice(self, g_lens=0, B_corr=0, m_sext=0, tau_lens=0):
+    def fullLattice(self, g_lens=0, Bdip3=0, m_sext=0, tau_lens=0):
         
         # element length array
         dL = self.spacerLength()
         L_dip = self.dipoleLength()
         L_lens = self.lensLength()
-        L_corr = self.correctorLength()
-        L_drift = self.driftLength()
+        L_chic = self.chicaneDipoleLength()
         L_sext = self.sextupoleLength()
-        ls = np.array([dL, L_dip, dL, L_lens, dL, L_corr, L_drift, L_sext, L_drift, L_corr, dL, L_lens, dL, L_dip, dL])
+        ls = np.array([dL, L_dip, dL, L_lens, dL, L_chic, dL, L_chic, dL, L_sext, dL, L_chic, dL, L_chic, dL, L_lens, dL, L_dip, dL])
         
         # bending strength array
-        inv_rhos = np.array([0, self.dipoleField(), 0, 0, 0, B_corr, 0, 0, 0, B_corr, 0, 0, 0, self.dipoleField(), 0]) * SI.c / self.E0
+        Bdip = self.dipoleField()
+        Bdip2 = self.chicaneDipoleField()
+        inv_rhos = np.array([0, Bdip, 0, 0, 0, Bdip2, 0, Bdip3, 0, 0, 0, Bdip3, 0, Bdip2, 0, 0, 0, Bdip, 0]) * SI.c / self.E0
         
         # focusing strength array
-        ks = np.array([0, 0, 0, g_lens, 0, 0, 0, 0, 0, 0, 0, g_lens, 0, 0, 0]) * SI.c / self.E0
+        ks = np.array([0, 0, 0, g_lens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, g_lens, 0, 0, 0]) * SI.c / self.E0
         
         # sextupole strength array
-        ms = np.array([0, 0, 0, 0, 0, 0, 0, m_sext, 0, 0, 0, 0, 0, 0, 0])
+        ms = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, m_sext, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         
         # plasma-lens transverse taper array
-        taus = np.array([0, 0, 0, tau_lens, 0, 0, 0, 0, 0, 0, 0, tau_lens, 0, 0, 0])
+        taus = np.array([0, 0, 0, tau_lens, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tau_lens, 0, 0, 0])
         
         return ls, inv_rhos, ks, ms, taus
     
     
     # first half of the lattice (up to middle of the sextupole)
-    def halfLattice(self, g_lens=0, B_corr=0, m_sext=0, tau_lens=0):
-        ls, inv_rhos, ks, ms, taus = self.fullLattice(g_lens, B_corr, m_sext, tau_lens)
+    def halfLattice(self, g_lens=0, Bdip3=0, m_sext=0, tau_lens=0):
+        ls, inv_rhos, ks, ms, taus = self.fullLattice(g_lens, Bdip3, m_sext, tau_lens)
         inds = range(int(np.ceil(len(ls)/2)))
         ls_half = ls[inds]
         ls_half[-1] = ls_half[-1]/2
@@ -100,9 +109,9 @@ class InterstageELEGANT(Interstage):
     
     
     # first quarter of the lattice (up to middle of first lens)
-    def quarterLattice(self, g_lens=0, B_corr=0, m_sext=0, tau_lens=0):
-        ls, inv_rhos, ks, ms, taus = self.fullLattice(g_lens, B_corr, m_sext, tau_lens)
-        inds = range(int(np.ceil(len(ls)/4)))
+    def quarterLattice(self, g_lens=0, Bdip3=0, m_sext=0, tau_lens=0):
+        ls, inv_rhos, ks, ms, taus = self.fullLattice(g_lens, Bdip3, m_sext, tau_lens)
+        inds = range(4)
         ls_quart = ls[inds]
         ls_quart[-1] = ls_quart[-1]/2
         return ls_quart, inv_rhos[inds], ks[inds], ms[inds], taus[inds]
@@ -122,7 +131,7 @@ class InterstageELEGANT(Interstage):
     def makeLattice(self, beam, output_filename, latticefile, lensfile, dumpBeams=False):
         
         # perform matching to find exact element strengths
-        g_lens, tau_lens, B_corr, m_sext = self.match()
+        g_lens, tau_lens, Bdip3, m_sext = self.match()
         
         if self.disableNonlinearity:
             tau_lens = 0
@@ -132,34 +141,29 @@ class InterstageELEGANT(Interstage):
         elegant_apl_fieldmap2D(tau_lens, lensfile)
         
         # make lattice file from template
-        if not dumpBeams:
-            lattice_template = CONFIG.opal_path + 'opal/apis/elegant/templates/lattice_interstage.lte'
-            Ndumps = 1
-        else:
-            lattice_template = CONFIG.opal_path + 'opal/apis/elegant/templates/lattice_interstage_10dumps.lte'
-            Ndumps = 10
+        lattice_template = CONFIG.opal_path + 'opal/apis/elegant/templates/lattice_interstage.lte'
+        Ndumps = 1
         
         # inputs
         inputs = {'charge': abs(beam.charge()),
                   'dipole_length': self.dipoleLength() / Ndumps,
                   'dipole_angle': self.dipoleLength()*self.dipoleField()*SI.c/self.E0 / Ndumps,
-                  'corrector_length': self.correctorLength() / Ndumps,
-                  'corrector_angle': self.correctorLength()*B_corr*SI.c/self.E0 / Ndumps,
+                  'chicanedipole_length': self.chicaneDipoleLength() / Ndumps,
+                  'chicanedipole_angle1': self.chicaneDipoleLength()*self.chicaneDipoleField() * SI.c/self.E0 / Ndumps,
+                  'chicanedipole_angle2': self.chicaneDipoleLength()*Bdip3*SI.c/self.E0 / Ndumps,
                   'lens_length': self.lensLength() / Ndumps,
                   'lens_filename': lensfile,
                   'lens_strength': g_lens,
-                  'drift_length': self.driftLength() / Ndumps,
                   'spacer_length': self.spacerLength() / Ndumps,
                   'sextupole_length': self.sextupoleLength() / Ndumps,
                   'sextupole_strength': m_sext,
                   'output_filename': output_filename,
                   'enable_ISR': int(self.enableISR),
                   'enable_CSR': int(self.enableCSR)}
-
+        
         with open(lattice_template, 'r') as fin, open(latticefile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
-        
     
     
     # calculate the required size of the 2D lens field map
@@ -170,19 +174,12 @@ class InterstageELEGANT(Interstage):
         beta, _, _ = evolveBetaFunction(ls, ks, self.initialBetaFunction(), fast=True)
         Dx, _, _ = evolveDispersion(ls, inv_rhos, ks, fast=True)
         
-        print(beta)
-        print(Dx)
-        
         # calculate lens dimensions
         nsig = 5
         relEnergySpread_max = 0.05
         offset_max = 50e-6
-        #lensdim_x = abs(Dx*(abs(beam.energy()/self.E0-1)+nsig*beam.relEnergySpread())) + nsig*np.sqrt(beta*beam.geomEmittanceX())
         lensdim_x = abs(Dx*relEnergySpread_max) + nsig*np.sqrt(beta*beam.geomEmittanceX()) + offset_max
         lensdim_y = nsig*np.sqrt(beta*beam.geomEmittanceY()) + offset_max
-        
-        print(lensdim_x)
-        print(lensdim_y)
         
         return lensdim_x, lensdim_y
         
@@ -192,10 +189,12 @@ class InterstageELEGANT(Interstage):
         
         # define half lattice
         ls_half, _, _, _, _ = self.halfLattice()
-        inv_rhos_half = lambda B: np.array([0, self.Bdip, 0, 0, 0, B, 0, 0]) * SI.c/self.E0
-        ks_half = lambda g: np.array([0, 0, 0, g, 0, 0, 0, 0]) * SI.c/self.E0
-        ms_half = lambda m: np.array([0, 0, 0, 0, 0, 0, 0, m])
-        taus_half = lambda tau: np.array([0, 0, 0, tau, 0, 0, 0, 0])
+        Bdip = self.dipoleField()
+        Bdip2 = self.chicaneDipoleField()
+        inv_rhos_half = lambda B3: np.array([0, Bdip, 0, 0, 0, Bdip2, 0, B3, 0, 0]) * SI.c/self.E0
+        ks_half = lambda g: np.array([0, 0, 0, g, 0, 0, 0, 0, 0, 0]) * SI.c/self.E0
+        ms_half = lambda m: np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, m])
+        taus_half = lambda tau: np.array([0, 0, 0, tau, 0, 0, 0, 0, 0, 0])
         
         # minimizer function for beta matching (central alpha function is zero)
         def minfun_beta(params):
@@ -203,7 +202,7 @@ class InterstageELEGANT(Interstage):
             return alpha**2
         
         # match the beta function
-        result_beta = minimize(minfun_beta, self.g_max, tol=1e-20)
+        result_beta = scipy.optimize.minimize(minfun_beta, self.g_max, tol=1e-20)
         g_lens = result_beta.x[0]
         
         # minimizer function for first-order dispersion (central dispersion prime is zero)
@@ -212,29 +211,30 @@ class InterstageELEGANT(Interstage):
             return Dpx**2
         
         # match the first-order dispersion
-        result_Dx = minimize(minfun_Dx, 0, tol=1e-20)
-        B_corr = result_Dx.x[0]
+        Bdip3_guess = -Bdip2;
+        result_Dx = scipy.optimize.minimize(minfun_Dx, Bdip3_guess, tol=1e-20)
+        Bdip3 = result_Dx.x[0]
         
         # calculate the required transverse-taper gradient
         ls_quart, _, _, _, _ = self.quarterLattice()
-        inv_rhos_quart = np.array([0, self.Bdip, 0, 0]) * SI.c/self.E0
+        inv_rhos_quart = np.array([0, Bdip, 0, 0]) * SI.c/self.E0
         ks_quart = np.array([0, 0, 0, g_lens]) * SI.c/self.E0
         Dx_lens, _, _ = evolveDispersion(ls_quart, inv_rhos_quart, ks_quart, fast=True)
         tau_lens = 1/Dx_lens
         
         # minimizer function for second-order dispersion (central second-order dispersion prime is zero)
         def minfun_DDx(p):
-            _, DDpx, _ = evolveSecondOrderDispersion(ls_half, inv_rhos_half(B_corr), ks_half(g_lens), ms_half(p[0]), taus_half(tau_lens), fast=True)
+            _, DDpx, _ = evolveSecondOrderDispersion(ls_half, inv_rhos_half(Bdip3), ks_half(g_lens), ms_half(p[0]), taus_half(tau_lens), fast=True)
             return DDpx**2
         
         # match the second-order dispersion
         m_guess = 4*tau_lens/self.sextupoleLength()
-        result_DDx = minimize(minfun_DDx, m_guess, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
+        result_DDx = scipy.optimize.minimize(minfun_DDx, m_guess, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
         m_sext = result_DDx.x[0]
         
         # plot results
         if False:
-            ls, inv_rhos, ks, ms, taus = self.fullLattice(g_lens, B_corr, m_sext, tau_lens)
+            ls, inv_rhos, ks, ms, taus = self.fullLattice(g_lens, Bdip3, m_sext, tau_lens)
             _, _, evolution_beta = evolveBetaFunction(ls, ks, self.initialBetaFunction())
             _, _, evolution_Dx = evolveDispersion(ls, inv_rhos, ks)
             _, _, evolution_DDx = evolveSecondOrderDispersion(ls, inv_rhos, ks, ms, taus)
@@ -248,7 +248,7 @@ class InterstageELEGANT(Interstage):
             axs[1].plot(evolution_DDx[0,:], evolution_DDx[1,:])
             axs[2].plot(evolution_DDx[0,:], evolution_DDx[2,:])
         
-        return g_lens, tau_lens, B_corr, m_sext
+        return g_lens, tau_lens, Bdip3, m_sext
         
 
     # track a beam through the lattice using ELEGANT

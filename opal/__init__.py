@@ -26,7 +26,6 @@ from .classes.impl.stage.stage_basic import StageBasic
 from .classes.impl.stage.stage_nonlinear1D import StageNonlinear1D
 from .classes.impl.interstage.interstage_basic import InterstageBasic
 from .classes.impl.interstage.interstage_elegant import InterstageELEGANT
-from .classes.impl.interstage.interstage_chicane_elegant import InterstageChicaneELEGANT
 from .classes.impl.bds.bds_basic import BeamDeliverySystemBasic
 from .classes.impl.bds.bds_FACET2_basic import BeamDeliverySystemFACET2Basic
 from .classes.impl.spectrometer.spectrometer_FACET2_basic import SpectrometerFACET2Basic

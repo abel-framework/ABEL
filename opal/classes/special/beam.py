@@ -378,6 +378,20 @@ class Beam():
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/mrad)')
         
+    def plotTraceSpaceY(self):
+        dQdydyp, ys, yps = self.phaseSpaceDensity(self.ys, self.yps)#, hbins=np.linspace(-5e-6, 5e-6, 50), vbins=np.linspace(-5e-4, 5e-4, 50))
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap='GnBu')
+        ax.set_xlabel('y (um)')
+        ax.set_ylabel('y'' (mrad)')
+        ax.set_title('Vertical trace space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
+        
+        
     
     ## CHANGE BEAM
     

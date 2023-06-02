@@ -25,11 +25,11 @@ def elegant_read_beam(filename):
     os.remove(tmpfile)
     os.rmdir(tmpfolder)
     
-    # make beam
+    # make beam (note: z is flipped)
     beam = Beam()
     beam.setPhaseSpace(xs=phasespace[:,0], 
                        ys=phasespace[:,2], 
-                       zs=phasespace[:,6]*SI.c, 
+                       zs=-1*phasespace[:,6]*SI.c, 
                        xps=phasespace[:,1], 
                        yps=phasespace[:,3], 
                        Es=gamma2energy(phasespace[:,5]),
@@ -48,8 +48,8 @@ def elegant_write_beam(beam, filename):
     os.mkdir(tmpfolder)
     tmpfile = tmpfolder + '/beam.csv'
     
-    # write beam phasespace to CSV
-    M = np.matrix([beam.xs(),beam.xps(),beam.ys(),beam.yps(),beam.ts(),beam.gammas(),beam.ts()])
+    # write beam phasespace to CSV (note: z/t is flipped)
+    M = np.matrix([beam.xs(),beam.xps(),beam.ys(),beam.yps(),-1*beam.ts(),beam.gammas(),beam.ts()])
     with open(tmpfile, 'w') as f:
         csvwriter = csv.writer(f, delimiter=',')
         for i in range(int(beam.Npart())):

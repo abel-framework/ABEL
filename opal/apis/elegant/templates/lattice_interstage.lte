@@ -5,13 +5,13 @@ C: CHARGE, TOTAL = $charge
 
 ! dipoles
 DIPOLE : CSRCSBEND, L = $dipole_length, ANGLE = $dipole_angle, BINS = 100, ISR = $enable_ISR, CSR = $enable_CSR
-CORRECTOR : CSRCSBEND, L = $corrector_length, ANGLE = $corrector_angle, BINS = 100, ISR = $enable_ISR, CSR = $enable_CSR
+CHICDIPOLE1 : CSRCSBEND, L = $chicanedipole_length, ANGLE = $chicanedipole_angle1, BINS = 100, ISR = $enable_ISR, CSR = $enable_CSR
+CHICDIPOLE2 : CSRCSBEND, L = $chicanedipole_length, ANGLE = $chicanedipole_angle2, BINS = 100, ISR = $enable_ISR, CSR = $enable_CSR
 
 ! plasma lens (transversely tapered)
 PLASMALENS : BMAPXY, L = $lens_length, FILENAME="$lens_filename", STRENGTH=$lens_strength, ACCURACY=1E-9, METHOD="runge-kutta"
 
 ! drifts
-DRIFT : DRIF, L = $drift_length
 SPACER : DRIF, L = $spacer_length
 
 ! sextupole
@@ -21,4 +21,4 @@ SEXTUPOLE: KSEXT, L = $sextupole_length, K2 = $sextupole_strength, N_KICKS = 100
 OUTPUT: WATCH, FILENAME = "$output_filename"
 
 ! beam line
-ACHROMAT : LINE = (C, SPACER, DIPOLE, SPACER, PLASMALENS, SPACER, CORRECTOR, DRIFT, SEXTUPOLE, DRIFT, CORRECTOR, SPACER, PLASMALENS, SPACER, DIPOLE, SPACER, OUTPUT)
+ACHROMAT : LINE = (C, SPACER, DIPOLE, SPACER, PLASMALENS, SPACER, CHICDIPOLE1, SPACER, CHICDIPOLE2, SPACER, SEXTUPOLE, SPACER, CHICDIPOLE2, SPACER, CHICDIPOLE1, SPACER, PLASMALENS, SPACER, DIPOLE, SPACER, OUTPUT)
