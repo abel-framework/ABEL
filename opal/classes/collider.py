@@ -43,7 +43,7 @@ class Collider(Runnable):
         for i in range(Nevents):
             event = Event.load(files[i], loadBeams=False)
             lumi_full[i] = event.fullLuminosity()
-        return np.mean(lumi_full)
+        return np.median(lumi_full)
     
     # peak luminosity per crossing [m^-2]
     def peakLuminosityPerCrossing(self):
@@ -53,7 +53,7 @@ class Collider(Runnable):
         for i in range(Nevents):
             event = Event.load(files[i], loadBeams=False)
             lumi_peak[i] = event.peakLuminosity()
-        return np.mean(lumi_peak)
+        return np.median(lumi_peak)
         
     # full luminosity per power [m^-2/J]
     def fullLuminosityPerPower(self):

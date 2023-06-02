@@ -13,7 +13,7 @@ class BeamDeliverySystemBasic(BeamDeliverySystem):
     
     def length(self):
         if self.E0 is not None:
-            return np.sqrt(self.E0/1e12)*2250 # [m] scaled from ILC
+            return np.sqrt(self.E0/500e9)*2250 # [m] scaled from ILC
         else:
             return self.L
     

@@ -1,4 +1,4 @@
-import tempfile, os, subprocess, csv
+import uuid, os, subprocess, csv
 from os.path import exists
 import numpy as np
 from opal import CONFIG, Beam
@@ -6,9 +6,11 @@ from opal.utilities import SI
 from opal.utilities.relativity import gamma2energy, energy2gamma
 
 def elegant_read_beam(filename):
-
-    # create temporary file
-    tmpfile = tempfile.gettempdir() + '/stream.tmp'
+    
+    # create temporary stream file and folder
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+    os.mkdir(tmpfolder)
+    tmpfile =  tmpfolder + '/stream.tmp'
 
     # convert SDDS file to CSV file
     subprocess.call(CONFIG.elegant_path + 'sdds2stream ' + filename + ' -columns=x,xp,y,yp,t,p,dt > ' + tmpfile, shell=True)
@@ -19,8 +21,9 @@ def elegant_read_beam(filename):
     # load phasespace from CSV file
     phasespace = np.loadtxt(open(tmpfile, "rb"), delimiter=' ')
     
-    # delete CSV file
+    # delete CSV file and temporary folder
     os.remove(tmpfile)
+    os.rmdir(tmpfolder)
     
     # make beam
     beam = Beam()
@@ -33,13 +36,17 @@ def elegant_read_beam(filename):
                        Q=Q)
     beam.location = np.mean(phasespace[:,4])*SI.c
     
+    # TODO: understand the sign of the longitudinal (Z) direction
+    
     return beam
 
 
-def elegant_write_beam(beam, filename=None):
+def elegant_write_beam(beam, filename):
     
-    # create temporary CSV file
-    tmpfile = tempfile.gettempdir() + '/beam.csv'
+    # create temporary CSV file and folder
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+    os.mkdir(tmpfolder)
+    tmpfile = tmpfolder + '/beam.csv'
     
     # write beam phasespace to CSV
     M = np.matrix([beam.xs(),beam.xps(),beam.ys(),beam.yps(),beam.ts(),beam.gammas(),beam.ts()])
@@ -47,10 +54,6 @@ def elegant_write_beam(beam, filename=None):
         csvwriter = csv.writer(f, delimiter=',')
         for i in range(int(beam.Npart())):
             csvwriter.writerow([M[0,i], M[1,i], M[2,i], M[3,i], M[4,i], M[5,i], M[6,i], int(i+1)])
-    
-    # create temporary SDDS file
-    if filename is None:
-        filename = tempfile.gettempdir() + '/beam.bun'
     
     # convert CSV to SDDS (ascii for now)
     subprocess.call(CONFIG.elegant_path + 'csv2sdds ' + tmpfile + ' ' + filename + ' -asciiOutput -columnData=name=x,type=double,units=m' +
@@ -88,17 +91,21 @@ def elegant_write_beam(beam, filename=None):
     # convert SDDS to binary
     subprocess.call(CONFIG.elegant_path + 'sddsconvert -binary ' + filename + ' -noWarnings', shell=True)
     
-    # delete CSV file
+    # delete CSV file and temporary folder
     os.remove(tmpfile)
+    os.rmdir(tmpfolder)
     
     return filename
     
     
 def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
-
-    # convert beam object to SDDS
-    beamfile0 = elegant_write_beam(beam0)
-    envars['BEAM'] = beamfile0
+    
+    # convert incoping beam object to temporary SDDS file
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+    os.mkdir(tmpfolder)
+    tmpfile = tmpfolder + '/beam.bun'
+    elegant_write_beam(beam0, tmpfile)
+    envars['BEAM'] = tmpfile
     
     # set environment variables
     for key in envars:
@@ -122,6 +129,13 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
     # reset previous macroparticle charge
     beam.copyParticleCharge(beam0)
     
+    # delete temporary bunch files and temporary folder
+    os.remove(tmpfile)
+    tmpfile_backup = tmpfile + '~'
+    if os.path.exists(tmpfile_backup):
+        os.remove(tmpfile_backup)
+    os.rmdir(tmpfolder)
+    
     # get all dumped beams
     # get files in dumped beams folder
     # for all dumped beams, make beam object
@@ -129,14 +143,16 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
     return beam
 
 
-def elegant_apl_fieldmap2D(tau_lens, lensdim_x=5e-3, lensdim_y=1e-3, filename = None):
+def elegant_apl_fieldmap2D(tau_lens, filename, lensdim_x=5e-3, lensdim_y=1e-3):
     
     # transverse dimensions
     xs = np.linspace(-lensdim_x, lensdim_x, 1001)
     ys = np.linspace(-lensdim_y, lensdim_y, 201)
     
-    # create temporary CSV file
-    tmpfile = tempfile.gettempdir() + '/map.csv'
+    # create temporary CSV file and folder
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+    os.mkdir(tmpfolder)
+    tmpfile = tmpfolder + '/map.csv'
     
     # create map
     Bmap = np.zeros((len(xs)*len(ys), 4));
@@ -154,17 +170,14 @@ def elegant_apl_fieldmap2D(tau_lens, lensdim_x=5e-3, lensdim_y=1e-3, filename = 
     # filename
     np.savetxt(tmpfile, Bmap, delimiter=',')
     
-    # create temporary SDDS file
-    if filename is None:
-        filename = tempfile.gettempdir() + '/map.sdds'
-    
     # convert SDDS to binary
     subprocess.call(CONFIG.elegant_path + 'csv2sdds ' + tmpfile + ' ' + filename + ' -columnData=name=x,type=double,unit=m' +
                                                                         ' -columnData=name=y,type=double,unit=m' +
                                                                         ' -columnData=name=Bx,type=double,unit=T' +
                                                                         ' -columnData=name=By,type=double,unit=T', shell=True)
     
-    # delete CSV file
+    # delete temporary CSV file and folder
     os.remove(tmpfile)
+    os.rmdir(tmpfolder)
     
     return filename

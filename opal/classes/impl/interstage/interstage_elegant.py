@@ -4,8 +4,8 @@ from opal.utilities.beamphysics import evolveBetaFunction, evolveDispersion, evo
 from opal.utilities import SI
 from string import Template
 from scipy.optimize import minimize
-import tempfile
 import numpy as np
+import uuid, os
 import matplotlib.pyplot as plt
 
 class InterstageELEGANT(Interstage):
@@ -119,7 +119,7 @@ class InterstageELEGANT(Interstage):
         return CONFIG.opal_path + 'opal/apis/elegant/templates/runscript_interstage.ele'
     
     
-    def makeLattice(self, beam, output_filename, dumpBeams=False):
+    def makeLattice(self, beam, output_filename, latticefile, lensfile, dumpBeams=False):
         
         # perform matching to find exact element strengths
         g_lens, tau_lens, B_corr, m_sext = self.match()
@@ -129,7 +129,7 @@ class InterstageELEGANT(Interstage):
             m_sext = 0
         
         # make lens field
-        lensfile = elegant_apl_fieldmap2D(tau_lens)
+        elegant_apl_fieldmap2D(tau_lens, lensfile)
         
         # make lattice file from template
         if not dumpBeams:
@@ -156,15 +156,10 @@ class InterstageELEGANT(Interstage):
                   'enable_ISR': int(self.enableISR),
                   'enable_CSR': int(self.enableCSR)}
 
-        latticefile = tempfile.gettempdir() + '/interstage.lte'
         with open(lattice_template, 'r') as fin, open(latticefile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
-
-            
-                
         
-        return latticefile
     
     
     # calculate the required size of the 2D lens field map
@@ -259,17 +254,33 @@ class InterstageELEGANT(Interstage):
     # track a beam through the lattice using ELEGANT
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
+        # make temporary folder and files
+        tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+        os.mkdir(tmpfolder)
+        beamfile = tmpfolder + '/beam.bun'
+        latticefile = tmpfolder + '/interstage.lte'
+        lensfile = tmpfolder + '/map.csv'
+        
+        # make lattice file
+        self.makeLattice(beam0, beamfile, latticefile, lensfile)
+        
         # environment variables
         envars = {}
         envars['ENERGY'] = self.E0 / 1e6 # [MeV]
-        
-        # make lattice
-        beamfile = tempfile.gettempdir() + '/beam.bun'
-        envars['LATTICE'] = self.makeLattice(beam0, beamfile)
+        envars['LATTICE'] = latticefile
         
         # run ELEGANT
         runfile = self.makeRunScript()
         beam = elegant_run(runfile, beam0, beamfile, envars, quiet=True)
         
+        # remove temporary files
+        os.remove(beamfile)
+        os.remove(latticefile)
+        os.remove(lensfile)
+        beamfile_backup = beamfile + '~'
+        if os.path.exists(beamfile_backup):
+            os.remove(beamfile_backup)
+        os.rmdir(tmpfolder)
+
         return super().track(beam, savedepth, runnable, verbose)
     

@@ -1,5 +1,5 @@
 from opal.physicsmodels.plasmawake1D import wakefield1D
-from opal import Stage
+from opal import Stage, CONFIG
 from matplotlib import pyplot as plt
 import numpy as np
 from opal.utilities.plasmaphysics import *
@@ -176,16 +176,18 @@ class StageNonlinear1D(Stage):
         zs0 = ts*SI.c
         
         # plot it
-        fig, axs = plt.subplots(2+int(includeWakeRadius),1)
-        fig.set_figwidth(5.5)
-        fig.set_figheight(11*(2+int(includeWakeRadius))/3)
-        col0 = "tab:gray"
+        fig, axs = plt.subplots(1, 2+int(includeWakeRadius))
+        fig.set_figwidth(CONFIG.plot_fullwidth_default*(2+int(includeWakeRadius))/3)
+        fig.set_figheight(4)
+        col0 = "xkcd:light gray"
         col1 = "tab:blue"
         col2 = "tab:orange"
         af = 0.1
         zlims = [min(zs)*1e6, max(zs)*1e6]
         
-        axs[0].plot(zs*1e6, np.zeros(zs.shape), ':', color=col0)
+        axs[0].plot(zs*1e6, np.zeros(zs.shape), '-', color=col0)
+        if self.deltaE is not None:
+            axs[0].plot(zs*1e6, -self.deltaE/self.L*np.ones(zs.shape)/1e9, ':', color=col0)
         axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1)
         axs[0].set_xlabel('z (um)')
         axs[0].set_ylabel('Longitudinal electric field (GV/m)')

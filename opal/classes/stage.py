@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from matplotlib import patches
-from opal.classes.trackable import Trackable
+from opal import Trackable
 
 class Stage(Trackable):
     

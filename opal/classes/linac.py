@@ -9,7 +9,7 @@ import numpy as np
 
 class Linac(Beamline):
     
-    def __init__(self, source=None, stage=None, interstage=None, bds=None, Nstages=0, alternatingInterstagePolarity=False):
+    def __init__(self, source=None, stage=None, interstage=None, bds=None, Nstages=0, alternatingInterstagePolarity=False, firstStage=None):
         
         # check element classes, then assemble
         assert(isinstance(source, Source))
@@ -19,12 +19,15 @@ class Linac(Beamline):
             assert(isinstance(interstage, Interstage))
         if bds is not None:
             assert(isinstance(bds, BeamDeliverySystem))
+        if firstStage is not None:
+            assert(isinstance(firstStage, Stage))
         
         # save as variables
         self.source = source
         self.bds = bds
         self.stages = [None]*Nstages
         self.interstages = [None]*max(0,Nstages-1)
+        self.firstStage = firstStage
         
         # declare list of trackables
         trackables = [None] * (1 + Nstages + max(0,Nstages-1) + int(bds is not None))
@@ -37,14 +40,17 @@ class Linac(Beamline):
             for i in range(Nstages):
 
                 # add stages
-                stage_instance = deepcopy(stage)
+                if i == 0 and firstStage is not None:
+                    stage_instance = deepcopy(firstStage)
+                else:
+                    stage_instance = deepcopy(stage)
                 trackables[1+2*i] = stage_instance
                 self.stages[i] = stage_instance
 
                 # add interstages
                 if i < Nstages-1:
                     interstage_instance = deepcopy(interstage)
-                    interstage_instance.E0 = source.energy() + (i+1) * stage.energyGain()
+                    interstage_instance.E0 = source.energy() + np.sum([stg.energyGain() for stg in self.stages[:(i+1)]])
                     if alternatingInterstagePolarity:
                         interstage_instance.Bdip = (2*(i%2)-1)*interstage_instance.Bdip
                     trackables[2+2*i] = interstage_instance
@@ -54,7 +60,7 @@ class Linac(Beamline):
         if bds is not None:
             bds.E0 = source.energy()
             if stage is not None:
-                bds.E0 += Nstages * stage.energyGain()
+                bds.E0 += np.sum([stg.energyGain() for stg in self.stages])
             assert(isinstance(bds, BeamDeliverySystem))
             trackables[max(1,2*Nstages)] = bds
         

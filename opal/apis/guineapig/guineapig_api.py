@@ -1,24 +1,20 @@
-import tempfile, shlex, subprocess, csv
-from os.path import exists
-from os import mkdir, remove
+import time, os, uuid, shlex, subprocess, csv
 import numpy as np
 from opal import CONFIG, Event
-import time
 
 def guineapig_run(inputfile, beam1, beam2):
     
-    # make beam files
-    beamfile1 = guineapig_write_beam(beam1, 'inputbeam1')
-    beamfile2 = guineapig_write_beam(beam2, 'inputbeam2')
-
-    # make temp folder
-    tmpfolder = tempfile.gettempdir()
-    if not exists(tmpfolder):
-        mkdir(tmpfolder)
-    
-    # temporary output file
+    # make temporary output file
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+    os.mkdir(tmpfolder)
     outputfile = tmpfolder + "/output.ref"
     
+    # make temporary beam files
+    beamfile1 = tmpfolder + "/inputbeam1.ini"
+    beamfile2 = tmpfolder + "/inputbeam2.ini"
+    guineapig_write_beam(beam1, beamfile1)
+    guineapig_write_beam(beam2, beamfile2)
+
     # run GUINEA-PIG
     cmd = CONFIG.guineapig_path + 'guinea default default ' + outputfile + ' --el_file=' + beamfile1 + ' --pos_file=' + beamfile2 + ' --acc_file=' + inputfile
     subprocess.run(cmd, shell=True, check=True, capture_output=True)
@@ -26,10 +22,11 @@ def guineapig_run(inputfile, beam1, beam2):
     # parse outputs
     lumi_ee_full, lumi_ee_peak, lumi_ee_geom = guineapig_read_output(outputfile)
     
-    # remove files
-    remove(outputfile)
-    remove(beamfile1)
-    remove(beamfile2)
+    # remove temporary files and folders
+    os.remove(outputfile)
+    os.remove(beamfile1)
+    os.remove(beamfile2)
+    os.rmdir(tmpfolder)
     
     # make event object
     event = Event(beam1, beam2)
@@ -41,20 +38,15 @@ def guineapig_run(inputfile, beam1, beam2):
     return event
     
 
-def guineapig_write_beam(beam, name):
-    
-    # create temporary CSV file
-    tmpfile = tempfile.gettempdir() + '/' + name + '.ini'
+def guineapig_write_beam(beam, filename):
     
      # write beam phasespace to CSV
     M = np.matrix([beam.Es()/1e9, beam.xps(), beam.yps(), beam.xs()*1e9, beam.ys()*1e9, (beam.offsetZ()-beam.zs())*1e6])
-    with open(tmpfile, 'w') as f:
+    with open(filename, 'w') as f:
         csvwriter = csv.writer(f, delimiter=',')
         for i in range(int(beam.Npart())):
             csvwriter.writerow([M[0,i], M[1,i], M[2,i], M[3,i], M[4,i], M[5,i]])
     
-    return tmpfile
-
 
 def guineapig_read_output(outputfile):
     
