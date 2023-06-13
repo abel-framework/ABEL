@@ -13,12 +13,12 @@ class Quadrupole(Trackable):
         return super().track(beam, savedepth, runnable, verbose)
     
     @abstractmethod
-    def length(self):
+    def get_length(self):
         pass
     
     @abstractmethod
-    def strength(self):
+    def get_strength(self):
         pass
     
     def plotObject(self):
-        return patches.Rectangle((0, 0), self.length(), float(np.sign(self.strength())))
+        return patches.Rectangle((0, 0), self.get_length(), float(np.sign(self.get_strength())))

@@ -2,7 +2,7 @@ from abc import abstractmethod
 from matplotlib import patches
 from opal import Trackable
 
-class Dipole(Trackable):
+class Interstage(Trackable):
     
     @abstractmethod
     def __init__(self):
@@ -15,11 +15,8 @@ class Dipole(Trackable):
     def get_length(self):
         pass
     
-    @abstractmethod
-    def get_field(self):
-        pass
-    
     def survey_object(self):
-        rect = patches.Rectangle((0, -1), self.get_length(), 2)
-        rect.set_facecolor = 'r'
+        rect = patches.Rectangle((0, -0.05), self.get_length(), 0.1)
+        rect.set_facecolor = 'k'
         return rect
+        

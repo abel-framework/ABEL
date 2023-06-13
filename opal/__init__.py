@@ -1,33 +1,41 @@
 from .CONFIG import CONFIG
-from .classes.special.beam import Beam
-from .classes.special.event import Event
-from .classes.special.trackable import Trackable
-from .classes.special.runnable import Runnable
-from .classes.ip import InteractionPoint
-from .classes.beamline import Beamline
-from .classes.beamline_elements.drift import Drift
-from .classes.beamline_elements.dipole import Dipole
-from .classes.beamline_elements.quadrupole import Quadrupole
-from .classes.impl.beamline_elements.drift_basic import DriftBasic
-from .classes.impl.beamline_elements.quadrupole_basic import QuadrupoleBasic
-from .classes.impl.beamline_elements.dipole_spectrometer_basic import DipoleSpectrometerBasic
-from .classes.source import Source
-from .classes.stage import Stage
-from .classes.interstage import Interstage
-from .classes.bds import BeamDeliverySystem
-from .classes.spectrometer import Spectrometer
-from .classes.linac import Linac
-from .classes.experiment import Experiment
-from .classes.collider import Collider
-from .classes.impl.source.source_basic import SourceBasic
-from .classes.impl.source.source_trapezoid import SourceTrapezoid
-from .classes.impl.source.source_combiner import SourceCombiner
-from .classes.impl.stage.stage_basic import StageBasic
-from .classes.impl.stage.stage_nonlinear1D import StageNonlinear1D
-from .classes.impl.interstage.interstage_basic import InterstageBasic
-from .classes.impl.interstage.interstage_elegant import InterstageELEGANT
-from .classes.impl.bds.bds_basic import BeamDeliverySystemBasic
-from .classes.impl.bds.bds_FACET2_basic import BeamDeliverySystemFACET2Basic
-from .classes.impl.spectrometer.spectrometer_FACET2_basic import SpectrometerFACET2Basic
-from .classes.impl.ip.ip_basic import InteractionPointBasic
-from .classes.impl.ip.ip_guineapig import InteractionPointGUINEAPIG
+
+from .classes.beam import *
+from .classes.event import *
+from .classes.trackable import *
+from .classes.runnable import *
+
+from .classes.ip.ip import *
+from .classes.beamline.beamline import *
+
+from .classes.beamline_elements.drift import *
+from .classes.beamline_elements.dipole import *
+from .classes.beamline_elements.quadrupole import *
+
+from .classes.source.source import *
+from .classes.stage.stage import *
+from .classes.interstage.interstage import *
+from .classes.bds.bds import *
+from .classes.spectrometer.spectrometer import *
+
+from .classes.beamline.impl.linac import *
+from .classes.beamline.impl.experiment import *
+
+from .classes.collider.collider import *
+
+from .classes.beamline_elements.impl.drift_basic import *
+from .classes.beamline_elements.impl.quadrupole_basic import *
+from .classes.beamline_elements.impl.dipole_spectrometer_basic import *
+from .classes.source.impl.source_basic import *
+from .classes.source.impl.source_trapezoid import *
+from .classes.source.impl.source_combiner import *
+from .classes.stage.impl.stage_basic import *
+from .classes.stage.impl.stage_nonlinear_1d import *
+from .classes.stage.impl.stage_hipace import *
+from .classes.interstage.impl.interstage_basic import *
+from .classes.interstage.impl.interstage_elegant import *
+from .classes.bds.impl.bds_basic import *
+from .classes.bds.impl.bds_FACET2_basic import *
+from .classes.spectrometer.impl.spectrometer_FACET2_basic import *
+from .classes.ip.impl.ip_basic import *
+from .classes.ip.impl.ip_guineapig import *

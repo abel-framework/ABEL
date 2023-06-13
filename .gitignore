@@ -136,4 +136,5 @@ dmypy.json
 
 # OPAL specific
 *rundata/
+*run_data/
 .temp/

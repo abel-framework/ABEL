@@ -1,8 +1,7 @@
 import uuid, os, subprocess, csv
-from os.path import exists
 import numpy as np
 from opal import CONFIG, Beam
-from opal.utilities import SI
+import scipy.constants as SI
 from opal.utilities.relativity import gamma2energy, energy2gamma
 
 def elegant_read_beam(filename):
@@ -27,7 +26,7 @@ def elegant_read_beam(filename):
     
     # make beam (note: z is flipped)
     beam = Beam()
-    beam.setPhaseSpace(xs=phasespace[:,0], 
+    beam.set_phase_space(xs=phasespace[:,0], 
                        ys=phasespace[:,2], 
                        zs=-1*phasespace[:,6]*SI.c, 
                        xps=phasespace[:,1], 
@@ -35,8 +34,6 @@ def elegant_read_beam(filename):
                        Es=gamma2energy(phasespace[:,5]),
                        Q=Q)
     beam.location = np.mean(phasespace[:,4])*SI.c
-    
-    # TODO: understand the sign of the longitudinal (Z) direction
     
     return beam
 
@@ -52,7 +49,7 @@ def elegant_write_beam(beam, filename):
     M = np.matrix([beam.xs(),beam.xps(),beam.ys(),beam.yps(),-1*beam.ts(),beam.gammas(),beam.ts()])
     with open(tmpfile, 'w') as f:
         csvwriter = csv.writer(f, delimiter=',')
-        for i in range(int(beam.Npart())):
+        for i in range(int(len(beam))):
             csvwriter.writerow([M[0,i], M[1,i], M[2,i], M[3,i], M[4,i], M[5,i], M[6,i], int(i+1)])
     
     # convert CSV to SDDS (ascii for now)
@@ -79,8 +76,8 @@ def elegant_write_beam(beam, filename):
 
     line2 = 18
     lines.insert(line2, '28584M'+'\n')
-    lines.insert(line2, str(int(beam.Npart()))+'\n')
-    lines.insert(line2, str(int(beam.Npart()))+'\n')
+    lines.insert(line2, str(int(len(beam)))+'\n')
+    lines.insert(line2, str(int(len(beam)))+'\n')
     lines.insert(line2, ' '+str(beam.charge())+'\n')
     lines.insert(line2, ' '+str(energy2gamma(beam.energy()))+'\n')
     lines.insert(line2, str(1)+'\n')
@@ -123,11 +120,11 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
         
     # copy previous beam metadata
     beam.location = beam0.location
-    beam.trackableNumber = beam0.trackableNumber
-    beam.stageNumber = beam0.stageNumber
+    beam.trackable_number = beam0.trackable_number
+    beam.stage_number = beam0.stage_number
     
     # reset previous macroparticle charge
-    beam.copyParticleCharge(beam0)
+    beam.copy_particle_charge(beam0)
     
     # delete temporary bunch files and temporary folder
     os.remove(tmpfile)
@@ -135,10 +132,6 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
     if os.path.exists(tmpfile_backup):
         os.remove(tmpfile_backup)
     os.rmdir(tmpfolder)
-    
-    # get all dumped beams
-    # get files in dumped beams folder
-    # for all dumped beams, make beam object
     
     return beam
 

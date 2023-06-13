@@ -2,12 +2,8 @@ from abc import abstractmethod
 from matplotlib import patches
 from opal import Trackable
 
-class Dipole(Trackable):
+class BeamDeliverySystem(Trackable):
     
-    @abstractmethod
-    def __init__(self):
-        pass
-        
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
     
@@ -15,11 +11,7 @@ class Dipole(Trackable):
     def get_length(self):
         pass
     
-    @abstractmethod
-    def get_field(self):
-        pass
-    
     def survey_object(self):
-        rect = patches.Rectangle((0, -1), self.get_length(), 2)
+        rect = patches.Rectangle((0, -0.1), self.get_length(), 0.2)
         rect.set_facecolor = 'r'
         return rect

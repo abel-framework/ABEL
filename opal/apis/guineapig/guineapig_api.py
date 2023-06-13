@@ -41,10 +41,10 @@ def guineapig_run(inputfile, beam1, beam2):
 def guineapig_write_beam(beam, filename):
     
      # write beam phasespace to CSV
-    M = np.matrix([beam.Es()/1e9, beam.xps(), beam.yps(), beam.xs()*1e9, beam.ys()*1e9, (beam.offsetZ()-beam.zs())*1e6])
+    M = np.matrix([beam.Es()/1e9, beam.xps(), beam.yps(), beam.xs()*1e9, beam.ys()*1e9, (beam.z_offset()-beam.zs())*1e6])
     with open(filename, 'w') as f:
         csvwriter = csv.writer(f, delimiter=',')
-        for i in range(int(beam.Npart())):
+        for i in range(int(len(beam))):
             csvwriter.writerow([M[0,i], M[1,i], M[2,i], M[3,i], M[4,i], M[5,i]])
     
 

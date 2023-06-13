@@ -16,7 +16,7 @@ class CONFIG:
     opal_path = str.replace(os.path.abspath(__file__), 'opal/' + os.path.basename(__file__), '')
     
     # path to tracking data directory
-    rundata_path = 'rundata/'
+    run_data_path = 'run_data/'
     
     # temporary directory
     temp_path = opal_path + '.temp/'
@@ -25,11 +25,11 @@ class CONFIG:
     ## EXTERNAL CODE DIRECTORIES
     
     # path to ELEGANT directory
-    elegant_path = opal_path + 'elegant/bin/'
+    elegant_path = opal_path + '../elegant/bin/'
     
     # path to HiPACE++ directory
-    hipace_path = opal_path + 'hipace/'
+    hipace_path = opal_path + '../hipace/'
     
     # path to GUINEA-PIG directory
-    guineapig_path = opal_path + 'guinea-pig/bin/'
+    guineapig_path = opal_path + '../guinea-pig/bin/'
     

@@ -1,9 +1,8 @@
-from opal.utilities import SI
+import scipy.constants as SI
 import numpy as np
 
 defaultUnitE = 'eV'
 defaultUnitP = 'eV/c'
-defaultMass = SI.me
 
 
 # convert Lorentz beta to Lorentz gamma
@@ -15,8 +14,8 @@ def beta2velocity(beta):
     return beta * SI.c
 
 # convert Lorentz beta to kinetic energy [eV]
-def beta2energy(beta, m = defaultMass, unitE = defaultUnitE):
-    return gamma2energy(beta2gamma(beta), m, unitE)
+def beta2energy(beta, unitE=defaultUnitE):
+    return gamma2energy(beta2gamma(beta), unitE)
 
 
 # convert Lorentz gamma to Lorentz beta
@@ -28,19 +27,19 @@ def gamma2velocity(gamma):
     return beta2velocity(gamma2beta(gamma))
 
 # convert Lorentz gamma to proper velocity
-def gamma2properVelocity(gamma):
+def gamma2proper_velocity(gamma):
     return gamma * gamma2velocity(gamma)
 
 # convert Lorentz gamma to momentum [eV/c]
-def gamma2momentum(gamma, m = defaultMass, unit = defaultUnitP):
-    p = m * gamma2properVelocity(gamma)
+def gamma2momentum(gamma, unit=defaultUnitP):
+    p = SI.m_e * gamma2proper_velocity(gamma)
     if unit == defaultUnitP:
         p = p / (SI.e / SI.c)
     return p
 
 # convert Lorentz gamma to kinetic energy
-def gamma2energy(gamma, m = defaultMass, unit = defaultUnitE):
-    E = gamma * (m * SI.c**2)
+def gamma2energy(gamma, unit = defaultUnitE):
+    E = gamma * (SI.m_e * SI.c**2)
     if unit == defaultUnitE:
         E =  E / SI.e
     return E
@@ -56,38 +55,38 @@ def velocity2gamma(v):
 
 
 # convert proper velocity to Lorentz gamma
-def properVelocity2gamma(w):
+def proper_velocity2gamma(w):
     return np.sqrt(1+(w/SI.c)**2)
 
 # convert proper velocity to energy
-def properVelocity2momentum(w, m = defaultMass, unit = defaultUnitP):
-    return gamma2momentum(properVelocity2gamma(w), m, unit)
+def proper_velocity2momentum(w, unit=defaultUnitP):
+    return gamma2momentum(proper_velocity2gamma(w), unit)
 
 # convert proper velocity to energy
-def properVelocity2energy(w, m = defaultMass, unit = defaultUnitE):
-    return gamma2energy(properVelocity2gamma(w), m, unit)
+def proper_velocity2energy(w, unit=defaultUnitE):
+    return gamma2energy(proper_velocity2gamma(w), unit)
 
 
 # convert momentum [eV/c] to Lorentz gamma
-def momentum2gamma(p, m = defaultMass):
-    return np.sqrt(1+(p / (m * SI.c))**2)
+def momentum2gamma(p):
+    return np.sqrt(1+(p / (SI.m_e * SI.c))**2)
 
 # convert momentum to energy [eV/c]
-def momentum2energy(p, m = defaultMass):
-    return gamma2energy(momentum2gamma(p, m), m)
+def momentum2energy(p):
+    return gamma2energy(momentum2gamma(p))
 
 
 # convert kinetic energy [eV] to Lorentz beta
-def energy2beta(E, m = defaultMass, unit = defaultUnitE):
-    return gamma2beta(energy2gamma(E, m, unit))
+def energy2beta(E, unit=defaultUnitE):
+    return gamma2beta(energy2gamma(E, unit))
 
 # convert kinetic energy [eV] to Lorentz gamma
-def energy2gamma(E, m = defaultMass, unit = defaultUnitE):
+def energy2gamma(E, unit=defaultUnitE):
     if unit == defaultUnitE:
         E = E * SI.e
-    return E / (m * SI.c**2)
+    return E / (SI.m_e * SI.c**2)
 
 # convert energy to proper velocity
-def energy2properVelocity(E, m = defaultMass, unit = defaultUnitE):
-    return gamma2properVelocity(energy2gamma(E, m, unit))
+def energy2proper_velocity(E, unit=defaultUnitE):
+    return gamma2proper_velocity(energy2gamma(E, unit))
 

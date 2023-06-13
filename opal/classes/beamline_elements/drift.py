@@ -12,10 +12,10 @@ class Drift(Trackable):
         return super().track(beam, savedepth, runnable, verbose)
     
     @abstractmethod
-    def length(self):
+    def get_length(self):
         pass
     
-    def plotObject(self):
-        rect = patches.Rectangle((0, -0), self.length(), 0)
+    def survey_object(self):
+        rect = patches.Rectangle((0, -0), self.get_length(), 0)
         rect.set_facecolor = 'k'
         return rect
