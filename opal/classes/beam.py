@@ -481,7 +481,6 @@ class Beam():
     def filename(self, runnable, beam_name):
         return runnable.shot_path() + "/" + beam_name + "_" + str(self.trackable_number).zfill(3) + "_{:012.6F}".format(self.location) + ".h5"
     
-    # TODO: make compatible with HiPACE++
     # save beam (to OpenPMD format)
     def save(self, runnable=None, beam_name="beam", series=None):
         
@@ -512,43 +511,61 @@ class Beam():
         for key, value in self.__dict__.items():
             if not "__phasespace" in key:
                 iteration.set_attribute(key, value)
-        
+                
         # make beam record
-        b = iteration.particles[beam_name]
+        particles = iteration.particles[beam_name]
         
-        # declare dataset structure
-        dset = io.Dataset(self.ids().dtype, self.ids().shape)
-        b["id"][io.Record_Component.SCALAR].reset_dataset(dset)
-        b["weighting"][io.Record_Component.SCALAR].reset_dataset(dset)
-        b["position"]["z"].reset_dataset(dset)
-        b["position"]["x"].reset_dataset(dset)
-        b["position"]["y"].reset_dataset(dset)
-        b["momentum"]["z"].reset_dataset(dset)
-        b["momentum"]["x"].reset_dataset(dset)
-        b["momentum"]["y"].reset_dataset(dset)
+        # generate datasets
+        dset_z = io.Dataset(self.zs().dtype, extent=self.zs().shape)
+        dset_x = io.Dataset(self.xs().dtype, extent=self.xs().shape)
+        dset_y = io.Dataset(self.ys().dtype, extent=self.ys().shape)
+        dset_zoff = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_xoff = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_yoff = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_uz = io.Dataset(self.uzs().dtype, extent=self.uzs().shape)
+        dset_ux = io.Dataset(self.uxs().dtype, extent=self.uxs().shape)
+        dset_uy = io.Dataset(self.uys().dtype, extent=self.uys().shape)
+        dset_w = io.Dataset(self.weightings().dtype, extent=self.weightings().shape)
+        dset_id = io.Dataset(self.ids().dtype, extent=self.ids().shape)
+        dset_q = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_m = io.Dataset(np.dtype('float64'), extent=[1])
         
-        # save dataset structure to file
-        series.flush()
-        
-        # add beam attributes
-        b["charge"][io.Record_Component.SCALAR].set_attribute("value", self.charge_sign()*SI.e)
-        b["mass"][io.Record_Component.SCALAR].set_attribute("value", SI.m_e)
+        # prepare for writing
+        particles['position']['z'].reset_dataset(dset_z)
+        particles['position']['x'].reset_dataset(dset_x)
+        particles['position']['y'].reset_dataset(dset_y)
+        particles['positionOffset']['z'].reset_dataset(dset_zoff)
+        particles['positionOffset']['x'].reset_dataset(dset_xoff)
+        particles['positionOffset']['y'].reset_dataset(dset_yoff)
+        particles['momentum']['z'].reset_dataset(dset_uz)
+        particles['momentum']['x'].reset_dataset(dset_ux)
+        particles['momentum']['y'].reset_dataset(dset_uy)
+        particles['weighting'][io.Record_Component.SCALAR].reset_dataset(dset_w)
+        particles['id'][io.Record_Component.SCALAR].reset_dataset(dset_id)        
+        particles['charge'][io.Record_Component.SCALAR].reset_dataset(dset_q)
+        particles['mass'][io.Record_Component.SCALAR].reset_dataset(dset_m)
         
         # store data
-        b["id"][io.Record_Component.SCALAR].store_chunk(self.ids())
-        b["weighting"][io.Record_Component.SCALAR].store_chunk(self.weightings())
-        b["position"]["z"].store_chunk(self.zs())
-        b["position"]["x"].store_chunk(self.xs())
-        b["position"]["y"].store_chunk(self.ys())
-        b["momentum"]["z"].store_chunk(self.uzs())
-        b["momentum"]["x"].store_chunk(self.uxs())
-        b["momentum"]["y"].store_chunk(self.uys())
+        particles['position']['z'].store_chunk(self.zs())
+        particles['position']['x'].store_chunk(self.xs())
+        particles['position']['y'].store_chunk(self.ys())
+        particles['positionOffset']['x'].make_constant(0.)
+        particles['positionOffset']['y'].make_constant(0.)
+        particles['positionOffset']['z'].make_constant(0.)
+        particles['momentum']['z'].store_chunk(self.uzs())
+        particles['momentum']['x'].store_chunk(self.uxs())
+        particles['momentum']['y'].store_chunk(self.uys())
+        particles['weighting'][io.Record_Component.SCALAR].store_chunk(self.weightings())
+        particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
+        particles["charge"][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
+        particles["mass"][io.Record_Component.SCALAR].make_constant(SI.m_e)
         
-        # Set units.
-        b['position'].unit_dimension = {io.Unit_Dimension.L: 1}
-        b['momentum'].unit_dimension = {io.Unit_Dimension.L: 1, io.Unit_Dimension.M: 1, io.Unit_Dimension.T: -1}
-        b['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
-        b['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
+        # set units
+        particles['position'].unit_dimension = {io.Unit_Dimension.L: 1}
+        particles['positionOffset'].unit_dimension = {io.Unit_Dimension.L: 1}
+        particles['momentum'].unit_dimension = {io.Unit_Dimension.L: 1, io.Unit_Dimension.M: 1, io.Unit_Dimension.T: -1}
+        particles['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
+        particles['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
         
         # save data to file
         series.flush()
