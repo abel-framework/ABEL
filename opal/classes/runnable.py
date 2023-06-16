@@ -1,6 +1,6 @@
 from abc import ABC
 from opal import CONFIG, Beam
-import os
+import os, shutil
 from datetime import datetime
 
 class Runnable(ABC):
@@ -95,20 +95,8 @@ class Runnable(ABC):
     
     # clear tracking data
     def clear_run_data(self, shot_name=None):
-        if shot_name is not None:
-            files = self.run_data(shot_name)
-            for shot_files in files:
-                for file in shot_files:
-                    os.remove(file)
-        else:
-            for folder in os.listdir(self.run_path()):
-                path = self.run_path() + "/" + folder
-                if os.path.isdir(path):
-                    for file in os.listdir(path):
-                        os.remove(path + "/" + file)
-                    os.rmdir(path)
-                else:
-                    os.remove(path)
+        shutil.rmtree(self.run_path())
+        os.mkdir(self.run_path())
     
     # number of beam outputs for shot
     def num_outputs(self, shot=0):
