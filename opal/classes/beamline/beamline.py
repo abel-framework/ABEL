@@ -1,11 +1,11 @@
-from opal import CONFIG, Beam, Trackable, Runnable
+from opal import CONFIG, Beam, Trackable, Scannable
 import scipy.constants as SI
 import copy
 from matplotlib import pyplot as plt
 from datetime import datetime
 import numpy as np
 
-class Beamline(Trackable, Runnable):
+class Beamline(Trackable, Scannable):
     
     def __init__(self, trackables):
         self.trackables = trackables
@@ -34,18 +34,6 @@ class Beamline(Trackable, Runnable):
         for trackable in self.trackables:
             objs.append(trackable.survey_object())
         return objs
-    
-    # initial beam
-    def initial_beam(self, shot=0):
-        files = self.run_data()
-        files = files[shot-1]
-        return Beam.load(files[0])
-    
-    # final beam
-    def final_beam(self, shot=0):
-        files = self.run_data()
-        files = files[shot-1]
-        return Beam.load(files[-1])
     
     # plot survey    
     def plot_survey(self):

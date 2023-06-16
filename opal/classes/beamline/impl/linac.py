@@ -1,4 +1,4 @@
-from opal import Runnable, Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem
+from opal import Scannable, Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem
 import scipy.constants as SI
 import copy, os
 from datetime import datetime
@@ -100,23 +100,20 @@ class Linac(Beamline):
     # apply function to all beam files
     def __evolution_fcn(self, fcns):
         
-        # find tracking data
-        files = self.run_data()
-        
         # declare data structure
-        num_steps = len(files[0])
-        stage_numbers = np.empty(num_steps)
-        ss = np.empty(num_steps)
-        vals_mean = np.empty((num_steps, len(fcns)))
-        vals_std = np.empty((num_steps, len(fcns)))
+        num_outputs = self.num_outputs()
+        stage_numbers = np.empty(num_outputs)
+        ss = np.empty(num_outputs)
+        vals_mean = np.empty((num_outputs, len(fcns)))
+        vals_std = np.empty((num_outputs, len(fcns)))
         
         # go through files
-        for i in range(num_steps):
+        for i in range(num_outputs):
             
             # load beams and apply functions
-            vals = np.empty((len(files), len(fcns)))
-            for j in range(len(files)):
-                beam = Beam.load(files[j][i])
+            vals = np.empty((num_outputs, len(fcns)))
+            for j in range(num_outputs):
+                beam = self[i,j]
                 for k in range(len(fcns)):
                     vals[j,k] = fcns[k](beam)
             
@@ -133,26 +130,25 @@ class Linac(Beamline):
  
 
     # apply waterfall function to all beam files
-    def __waterfall_fcn(self, fcns, edges, args=None):
+    def __waterfall_fcn(self, fcns, edges, args=None, shot=0):
         
-        # find tracking data
-        files = self.run_data()
-        files = files[-1]
+        # find number of beam outputs to plot
+        num_outputs = self.num_outputs(shot)
         
         # declare data structure
-        waterfalls = [None] * len(fcns)
         bins = [None] * len(fcns)
+        waterfalls = [None] * len(fcns)
         for j in range(len(fcns)):
-            waterfalls[j] = np.empty((len(edges[j])-1, len(files)))
-        trackable_numbers = np.empty(len(files))
+            waterfalls[j] = np.empty((len(edges[j])-1, num_outputs))
+        trackable_numbers = np.empty(num_outputs)
         
         # go through files
-        for i in range(len(files)):
+        for i in range(num_outputs):
 
             # load phase space
-            beam = Beam.load(files[i])
+            beam = self[i,shot]
 
-            # find stage number
+            # find trackable number
             trackable_numbers[i] = beam.trackable_number
             
             # get all waterfalls (apply argument is it exists)
@@ -166,6 +162,8 @@ class Linac(Beamline):
              
         
     def plot_evolution(self, use_stage_nums=False):
+        
+        # TODO: filter shots by step
         
         # calculate values
         ss, vals_mean, vals_std, stage_nums = self.__evolution_fcn([Beam.abs_charge, \
@@ -294,10 +292,10 @@ class Linac(Beamline):
     
     
     # density plots
-    def plot_waterfalls(self):
+    def plot_waterfalls(self, shot=0):
         
         # calculate values
-        beam0 = self.initial_beam()
+        beam0 = self.initial_beam(shot=shot)
         num_bins = int(np.sqrt(len(beam0)*2))
         nsig = 5
         tedges = np.arange(-100e-6, 0e-6, 1e-6) / SI.c
@@ -305,9 +303,7 @@ class Linac(Beamline):
         xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
         _, E0s = self.get_target_energy()
-        waterfalls, trackable_numbers, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], \
-                                                        [tedges, deltaedges, xedges, yedges], \
-                                                        [None, E0s, None, None])
+        waterfalls, trackable_numbers, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], [None, E0s, None, None], shot)
         
         # prepare figure
         fig, axs = plt.subplots(4,1)
