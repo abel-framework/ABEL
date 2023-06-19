@@ -8,12 +8,14 @@ import os, shutil, uuid
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
         self.driver_source = driver_source
         self.add_driver_to_beam = add_driver_to_beam
+        
+        self.keep_data = keep_data
 
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
@@ -64,11 +66,13 @@ class StageHipace(Stage):
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
+        # remove nan particles
+        beam.remove_nans()
+        
         # delete temp files 
-        if True: #savedepth > 0 and runnable is not None:
+        if self.keep_data or (savedepth > 0 and runnable is not None):
             source_folder = tmpfolder + 'diags/hdf5/'
             destination_folder = runnable.shot_path() + '/stage_' + str(beam0.stage_number)
-            #os.mkdir(destination_folder)
             shutil.move(source_folder, destination_folder)
         
         if os.path.exists(tmpfolder):

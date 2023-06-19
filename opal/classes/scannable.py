@@ -83,7 +83,7 @@ class Scannable(Runnable):
     
     # indexing operator (get beams out)
     def __getitem__(self, index):
-        if isinstance(index, tuple) and len(index)==3:
+        if isinstance(index, tuple) and len(index)==3 and hasattr(self, 'num_shots_per_step'):
             beam_index = index[0]
             shot = index[2]*self.num_shots_per_step + index[1]
             files = self.run_data()

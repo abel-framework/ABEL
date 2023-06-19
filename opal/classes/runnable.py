@@ -6,7 +6,7 @@ from datetime import datetime
 class Runnable(ABC):
     
     # run simulation
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=True):
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=True): # TODO: implement overwrite_from=(trackable)
         
         # define run name (generate if not given)
         if run_name is None:
@@ -43,7 +43,7 @@ class Runnable(ABC):
                 if overwrite:
                     self.clear_run_data(i)
                 else:
-                    print('>> SHOT' + str(i+1) + ' already exists and will not be overwritten.')
+                    print('>> SHOT ' + str(i+1) + ' already exists and will not be overwritten.')
                     files = self.run_data(self.shot_name)
                     beam = Beam.load(files[0][-1])
                     continue

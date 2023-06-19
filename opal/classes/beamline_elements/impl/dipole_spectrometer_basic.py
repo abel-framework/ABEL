@@ -1,6 +1,7 @@
 from opal import Dipole
 import scipy.constants as SI
 import numpy as np
+
 class DipoleSpectrometerBasic(Dipole):
     
     def __init__(self, length, field, is_vertical=False):
@@ -11,7 +12,7 @@ class DipoleSpectrometerBasic(Dipole):
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
         # get phase space
-        pzs = beam.pzs() # [eV/c]
+        pzs = beam.pzs()
         qSigns = np.sign(beam.qs())
         X0 = beam.transverse_vector()
         
@@ -19,13 +20,13 @@ class DipoleSpectrometerBasic(Dipole):
         X = np.zeros((4,len(beam)))
         for i in range(len(beam)):
             if not self.is_vertical:
-                dxp = float(qSigns[i])*SI.c*self.field*self.length/pzs[i]
+                dxp = float(qSigns[i])*self.field*SI.e*self.length/pzs[i]
                 X[0,i] = dxp*self.length/2 + X0[1,i]*self.length + X0[0,i] 
                 X[1,i] = dxp + X0[1,i] 
                 X[2,i] = X0[3,i]*self.length + X0[2,i] 
                 X[3,i] = X0[3,i] 
             else:
-                dyp = float(qSigns[i])*SI.c*self.field*self.length/pzs[i]
+                dyp = float(qSigns[i])*self.field*SI.e*self.length/pzs[i]
                 X[0,i] = X0[1,i]*self.length + X0[0,i] 
                 X[1,i] = X0[1,i] 
                 X[2,i] = dyp*self.length/2 + X0[3,i]*self.length + X0[2,i]

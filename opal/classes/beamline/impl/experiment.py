@@ -28,8 +28,6 @@ class Experiment(Beamline):
     def plot_spectrometer_screen(self):
         
         # load phase space
-        #files = self.runData()
-        #beam = Beam.load(files[-1][-1])
         beam = self.final_beam()
 
         # make screen projection
@@ -41,7 +39,7 @@ class Experiment(Beamline):
         fig.set_figheight(5)
         
         # current profile
-        c0 = ax.pcolor(xedges*1e3, yedges*1e3, abs(dQdxdy.T)*1e3, cmap='GnBu')
+        c0 = ax.pcolor(xedges*1e3, yedges*1e3, abs(dQdxdy.T)*1e3, cmap='GnBu', shading='auto')
         cbar0 = fig.colorbar(c0, ax=ax)
         ax.set_xlabel('x (mm)')
         ax.set_ylabel('y (mm)')

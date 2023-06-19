@@ -80,8 +80,8 @@ class StageNonlinear1d(Stage):
         # add energy gain
         beam.accelerate(deltaEs)
         
-        # remove particles with nan energies
-        del beam[np.isnan(beam.Es())]
+        # remove particles with nans
+        beam.remove_nans()
         
         # simulate the driver
         driver = copy.deepcopy(driver0)
@@ -92,7 +92,7 @@ class StageNonlinear1d(Stage):
         driver.apply_betatron_damping(deltaEs_driver)
         driver.flip_transverse_phase_spaces()
         driver.accelerate(deltaEs_driver)
-        del driver[np.isnan(driver.Es())]
+        driver.remove_nans()
         
         # calculate efficiency
         Etot_beam = beam.total_energy()

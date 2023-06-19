@@ -34,6 +34,10 @@ class Beam():
             if len(indices) == len(self):
                 indices = np.where(indices)
         self.__phasespace = np.ascontiguousarray(np.delete(self.__phasespace, indices, 1))
+    
+    # filter out nans
+    def remove_nans(self):
+        del self[np.isnan(self).any(axis=1)]
         
     # set phase space
     def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None):
@@ -333,6 +337,7 @@ class Beam():
     ## phase spaces
     
     def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
+        self.remove_nans()
         if hbins is None:
             hbins = int(np.sqrt(len(self))/2)
         if vbins is None:
@@ -367,7 +372,7 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu')
+        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu', shading='auto')
         ax.set_xlabel('z (um)')
         ax.set_ylabel('E (GeV)')
         ax.set_title('Longitudinal phase space')
@@ -380,7 +385,7 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap='GnBu')
+        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap='GnBu', shading='auto')
         ax.set_xlabel('x (um)')
         ax.set_ylabel('x'' (mrad)')
         ax.set_title('Horizontal trace space')
@@ -393,7 +398,7 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap='GnBu')
+        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap='GnBu', shading='auto')
         ax.set_xlabel('y (um)')
         ax.set_ylabel('y'' (mrad)')
         ax.set_title('Vertical trace space')
