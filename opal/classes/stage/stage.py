@@ -19,19 +19,19 @@ class Stage(Trackable):
         pass
     
     @abstractmethod
-    def get_energy_gain(self):
+    def get_nom_energy_gain(self):
         pass
     
     @abstractmethod
-    def get_matched_beta_function(self, energy):
+    def matched_beta_function(self, energy):
         pass
     
     @abstractmethod
-    def get_energy_efficiency(self):
+    def energy_efficiency(self):
         pass
     
     @abstractmethod
-    def get_energy_usage(self):
+    def energy_usage(self):
         pass
     
     @abstractmethod

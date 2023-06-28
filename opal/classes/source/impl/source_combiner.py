@@ -27,9 +27,9 @@ class SourceCombiner(Source):
     def get_energy(self):
         return (self.source1.get_energy()*self.source1.get_charge() + self.source2.get_energy()*self.source2.get_charge())/self.get_charge()
     
-    def get_energy_efficiency(self):
+    def energy_efficiency(self):
         Etot1 = self.source1.get_energy()*self.source1.get_charge()
         Etot2 = self.source2.get_energy()*self.source2.get_charge()
-        return (self.source1.get_energy_efficiency()*Etot1 + self.source2.get_energy_efficiency()*Etot2)/(Etot1+Etot2)
+        return (self.source1.energy_efficiency()*Etot1 + self.source2.energy_efficiency()*Etot2)/(Etot1+Etot2)
     
     

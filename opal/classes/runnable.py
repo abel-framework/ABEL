@@ -1,12 +1,19 @@
 from abc import ABC
 from opal import CONFIG, Beam
-import os, shutil
+import os, shutil, time, sys
 from datetime import datetime
+from joblib import Parallel, delayed
+from joblib_progress import joblib_progress
+import joblib.parallel
+import collections
+import numpy as np
+from matplotlib import pyplot as plt
+import dill as pickle
 
 class Runnable(ABC):
     
     # run simulation
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=True): # TODO: implement overwrite_from=(trackable)
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=True, parallel=False, max_cores=16): # TODO: implement overwrite_from=(trackable)
         
         # define run name (generate if not given)
         if run_name is None:
@@ -14,112 +21,244 @@ class Runnable(ABC):
         else:
             self.run_name = run_name
         
-        # save number of shots
+        # save variables
         self.num_shots = num_shots
-        
-        # declare shots list
-        self.shot_names = []
+        self.savedepth = savedepth
+        self.verbose = verbose
+        self.overwrite = overwrite
         
         # make base folder and clear tracking directory
-        if not os.path.exists(self.run_path()):
-            os.makedirs(self.run_path(), exist_ok=True)
-        else:
-            if overwrite:
-                self.clear_run_data()
+        if self.overwrite or not os.path.exists(self.run_path()):
+            self.clear_run_data()
         
-        # perform tracking
-        for i in range(num_shots):
+        # perform shots (in parallel or series)
+        if parallel:
             
-            # make shot folder
-            self.shot_name = '/shot_' + str(i)
+            # recalculate number of cores used
+            num_cores = min(max_cores, num_shots)
             
-            # add to shots list
-            self.shot_names.append(self.shot_name)
+            # perform parallel tracking
+            with joblib_progress('Tracking shots ('+str(num_cores)+' in parallel)', num_shots):
+                Parallel(n_jobs=num_cores)(delayed(self.perform_shot)(shot) for shot in range(num_shots))
+                time.sleep(0.1) # hack to allow 
             
-            # make and clear tracking directory
-            if not os.path.exists(self.shot_path()):
-                os.mkdir(self.shot_path())
-            else:
-                if overwrite:
-                    self.clear_run_data(i)
-                else:
-                    print('>> SHOT ' + str(i+1) + ' already exists and will not be overwritten.')
-                    files = self.run_data(self.shot_name)
-                    beam = Beam.load(files[0][-1])
-                    continue
+        else:   
+            
+            # perform in-series tracking
+            for shot in range(num_shots):
+                self.perform_shot(shot)
+        
+        # return final beam from first shot
+        return self[0].final_beam()
+    
+    
+    # shot tracking function (to be repeated)
+    def perform_shot(self, shot):
+        
+        # set current shot
+        self.shot = shot
+        
+        # apply scan function if it exists
+        if self.is_scan():
+            self.step = self.steps[shot]
+            self.scan_fcn(self, self.vals_full[shot])
+            #self.scan_fcn = None
+        
+        # check if object exists
+        if not self.overwrite and os.path.exists(self.object_path(shot)):
+            print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
+            
+        else:
+
+            # clear the shot folder
+            self.clear_run_data(shot)
 
             # run tracking
-            if num_shots > 1 and verbose:
-                print('>> SHOT ' + str(i+1) + '/' + str(num_shots))
-            beam = self.track(beam=None, savedepth=savedepth, runnable=self, verbose=verbose)
-                
+            if self.num_shots > 1 and self.verbose:
+                print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
 
-        # return beam from last shot
-        return beam
+            #if overwrite_from is None: # TODO
+            beam = self.track(beam=None, savedepth=self.savedepth, runnable=self, verbose=self.verbose)
+
+            # save object to file
+            self.save()
     
     
-    # generate run path(s)
+    # generate run folder
     def run_path(self):
-        return CONFIG.run_data_path + self.run_name
-    
-    # generate track path(s)
-    def shot_path(self):
-        return self.run_path() + self.shot_name
-    
-    # generate track path(s)
-    def shot_paths_all(self):
-        paths = []
-        for shot_name in self.shot_names:
-            paths.append(self.run_path() + shot_name)
-        return paths
+        return CONFIG.run_data_path + self.run_name + '/'
     
     
-    # get tracking data
-    def run_data(self, shot_name=None):
-        
-        # collect shots
-        if shot_name is None:
-            shot_paths = self.shot_paths_all()
+    # generate object path
+    def object_path(self, shot=None):
+        if shot is None:
+            shot = self.shot
+        return self.shot_path(shot) + 'runnable' + '.obj'
+    
+    # save object to file
+    def save(self):
+        with open(self.object_path(), 'wb') as savefile:
+            pickle.dump(self, savefile, pickle.HIGHEST_PROTOCOL)
+            
+    # load object from file
+    def load(self, shot=None):
+        with open(self.object_path(shot), 'rb') as loadfile:
+            obj = pickle.load(loadfile)
+            return obj
+    
+    
+    # generate track path
+    def shot_path(self, shot=None):
+        if shot is None:
+            shot = self.shot
+        if hasattr(self, 'steps'):
+            step = self.steps[shot]
+            shot_in_step = np.mod(shot, self.num_shots_per_step)
+            return self.run_path() + 'step_' + str(step).zfill(3) + '_shot_' + str(shot_in_step).zfill(3) + '/'
         else:
-            shot_paths = [self.shot_paths_all()[self.shot_names.index(shot_name)]]
-        
-        # find filenames
-        filenames = []
-        for i in range(len(shot_paths)):
-            shot_filenames = [shot_paths[i] + '/' + f for f in os.listdir(shot_paths[i]) if os.path.isfile(os.path.join(shot_paths[i], f))]
-            shot_filenames.sort()
-            filenames.append(shot_filenames)
-        
-        return filenames
+            return self.run_path() + 'shot_' + str(shot).zfill(3) + '/'
+    
+    
+    # get tracking data filenames
+    def run_data(self, shot=None):
+        shot_path = self.shot_path(shot)
+        if os.path.exists(shot_path):
+            filenames = [shot_path + f for f in os.listdir(shot_path) if (os.path.isfile(os.path.join(shot_path, f)) and not f.endswith('.obj'))]
+            filenames.sort()
+            return filenames
+        else:
+            return []
     
     
     # clear tracking data
-    def clear_run_data(self, shot_name=None):
-        shutil.rmtree(self.run_path())
-        os.mkdir(self.run_path())
+    def clear_run_data(self, shot=None):
+        
+        # determine folder based on shot
+        if shot is not None:
+            clear_path = self.shot_path(shot)
+        else:
+            clear_path = self.run_path()
+            
+        # delete and remake folder
+        if os.path.exists(clear_path):
+            shutil.rmtree(clear_path)
+        os.mkdir(clear_path)
+        
     
     # number of beam outputs for shot
     def num_outputs(self, shot=0):
-        files = self.run_data()
-        return len(files[shot])
+        files = self.run_data(shot)
+        return len(files)
         
     
     # indexing operator (get beams out)
     def __getitem__(self, index):
         if isinstance(index, int):
-            beam_index = index
-            shot = 0
-        elif isinstance(index, tuple):
-            beam_index = index[0]
-            shot = index[1]
-        files = self.run_data()
-        return Beam.load(files[shot][beam_index])
+            shot = index
+            if shot < 0:
+                shot = self.num_shots+shot
+            return self.load(shot)
+        elif isinstance(index, tuple) and len(index)==2:
+            if self.is_scan():
+                step = index[0]
+                if step < 0:
+                    step = self.num_steps+step
+                shot_in_step = index[1]
+                if shot_in_step < 0:
+                    shot_in_step = self.num_shots_per_step+shot_in_step
+                shot = step*self.num_shots_per_step + shot_in_step
+                return self.load(shot)
+            else:
+                raise Exception('Not a scan')
+        else:
+            raise Exception('No shots')
+    
+    
+    # load beam 
+    def get_beam(self, index, shot=None):
+        if shot is None:
+            if hasattr(self, 'shot') and self.shot is not None:
+                shot = self.shot
+            else:
+                shot = 0
+        filenames = self.run_data(shot)
+        return Beam.load(filenames[index])
+        
     
     # initial beam
-    def initial_beam(self, shot=0):
-        return self[0,shot]
+    def initial_beam(self, shot=None):
+        return self.get_beam(0,shot)
     
     # final beam
-    def final_beam(self, shot=0):
-        return self[-1,shot]
+    def final_beam(self, shot=None):
+        return self.get_beam(-1,shot)
     
+    
+    ## SCAN FUNCTIONALITY
+    
+    def is_scan(self):
+        return hasattr(self, 'scan_fcn')
+        
+    # scan function
+    def scan(self, run_name=None, fcn=None, vals=None, label=None, scale=1, num_shots_per_step=1, savedepth=2, verbose=True, overwrite=True, parallel=False, max_cores=16):
+        
+        # define run name (generate if not given)
+        if run_name is None:
+            self.run_name = "scan_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+        else:
+            self.run_name = run_name
+        
+        # set scan values
+        self.scan_fcn = fcn
+        self.vals = vals
+        self.vals_full = np.repeat(vals,num_shots_per_step)
+        self.steps = np.repeat(range(len(vals)),num_shots_per_step)
+        self.num_steps = len(vals)
+        self.num_shots_per_step = num_shots_per_step
+        self.num_shots = self.num_steps*self.num_shots_per_step
+        self.label = label
+        self.scale = scale
+        
+        # perform run
+        beam = self.run(run_name=self.run_name, num_shots=self.num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
+        
+        return beam
+    
+    
+    # plot value of beam parameters across a scan
+    def plot_beam_function(self, beam_fcn, label=None, scale=1, xscale='linear', yscale='linear'):
+        self.plot_function(lambda obj : beam_fcn(obj.final_beam()), label=label, scale=scale, xscale=xscale, yscale=yscale)
+        
+        
+    # plot value of beam parameters across a scan
+    def plot_function(self, fcn, label=None, scale=1, xscale='linear', yscale='linear'):
+        
+        # extract values
+        val_mean = np.empty(self.num_steps)
+        val_std = np.empty(self.num_steps)
+        for step in range(self.num_steps):
+            
+            # get values for this step
+            val_output = np.empty(self.num_shots_per_step)
+            for shot_in_step in range(self.num_shots_per_step):
+                val_output[shot_in_step] = fcn(self[step,shot_in_step])
+                
+            # get step mean and error
+            val_mean[step] = np.mean(val_output)
+            val_std[step] = np.std(val_output)
+        
+        # plot evolution
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.6)
+        
+        if not hasattr(self, 'scale'):
+            self.scale = 1
+        if not hasattr(self, 'label'):
+            self.label = ''
+            
+        ax.errorbar(self.vals/self.scale, val_mean/scale, val_std/scale, ls=':', capsize=5)
+        ax.set_xlabel(self.label)
+        ax.set_ylabel(label)
+        ax.set_xscale(xscale)
+        ax.set_yscale(yscale)

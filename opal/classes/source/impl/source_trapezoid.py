@@ -101,6 +101,6 @@ class SourceTrapezoid(Source):
     def get_energy(self):
         return self.energy
     
-    def get_energy_efficiency(self):
+    def energy_efficiency(self):
         return self.wallplug_efficiency
     

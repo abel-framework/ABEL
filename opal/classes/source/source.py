@@ -18,20 +18,17 @@ class Source(Trackable):
     @abstractmethod
     def get_energy(self):
         pass
-    
-    def get_energy_gain(self):
-        return self.get_energy()
         
     @abstractmethod
-    def get_energy_efficiency(self):
+    def energy_efficiency(self):
         pass
     
     @abstractmethod
     def get_charge(self):
         pass
     
-    def get_energy_usage(self):
-        return self.get_energy_gain()*abs(self.get_charge())/self.get_energy_efficiency()
+    def energy_usage(self):
+        return self.get_energy()*abs(self.get_charge())/self.energy_efficiency()
     
     def survey_object(self):
         rect = patches.Rectangle((0, -0.5), self.get_length(), 1)

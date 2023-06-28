@@ -1,18 +1,24 @@
-from opal import CONFIG, Beam, Trackable, Scannable
+from opal import CONFIG, Beam, Trackable, Runnable
 import scipy.constants as SI
 import copy
 from matplotlib import pyplot as plt
 from datetime import datetime
 import numpy as np
 
-class Beamline(Trackable, Scannable):
+class Beamline(Trackable, Runnable):
     
-    def __init__(self, trackables):
+    def __init__(self, trackables=None):
         self.trackables = trackables
         
     
+    def assemble_trackables(self):
+        pass
+    
+    
     # get cumulative length
     def get_length(self):
+        if self.trackables is None:
+            self.assemble_trackables()
         L = 0
         for trackable in self.trackables:
             L += trackable.get_length()
@@ -21,15 +27,24 @@ class Beamline(Trackable, Scannable):
     
     # perform tracking
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        
+        # assemble the trackables
+        self.assemble_trackables()
+        
+        # perform element-wise tracking
         for trackable in self.trackables:
             beam = trackable.track(beam, savedepth-1, runnable, verbose)
+        
         return beam
+    
     
     
     ## SURVEY
     
     # make survey rectangles
     def survey_object(self):
+        if self.trackables is None:
+            self.assemble_trackables()
         objs = []
         for trackable in self.trackables:
             objs.append(trackable.survey_object())

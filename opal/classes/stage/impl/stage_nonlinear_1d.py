@@ -43,7 +43,7 @@ class StageNonlinear1d(Stage):
     
     
     # matched beta function of the stage (for a given energy)
-    def get_matched_beta_function(self, energy):
+    def matched_beta_function(self, energy):
         return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
     
     # track the particles through
@@ -191,7 +191,7 @@ class StageNonlinear1d(Stage):
             axs[2].set_ylabel('Plasma-wake radius (um)')
             axs[2].set_xlim(zlims)
             axs[2].set_ylim(bottom=0, top=max(rs*1.2)*1e6)
-
+        
         # save to file
         if saveToFile is not None:
             plt.savefig(saveToFile, format="pdf", bbox_inches="tight")
@@ -201,15 +201,15 @@ class StageNonlinear1d(Stage):
     def get_length(self):
         return self.length
     
-    def get_energy_gain(self):
+    def get_nom_energy_gain(self):
         return self.nom_energy_gain
     
-    def get_energy_efficiency(self):
+    def energy_efficiency(self):
         return self.driver_to_beam_efficiency, self.driver_to_wake_efficiency, self.wake_to_beam_efficiency
     
-    def get_wallplug_efficiency(self):
-        return self.driver_to_beam_efficiency*self.driver_source.get_energy_efficiency()
+    #def get_wallplug_efficiency(self):
+    #    return self.driver_to_beam_efficiency*self.driver_source.get_energy_efficiency()
     
-    def get_energy_usage(self):
-        return self.driver_source.get_energy_usage()
+    def energy_usage(self):
+        return self.driver_source.energy_usage()
     

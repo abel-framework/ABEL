@@ -4,7 +4,7 @@ from opal import BeamDeliverySystem, DriftBasic
 
 class BeamDeliverySystemBasic(BeamDeliverySystem):
     
-    def __init__(self, beta_x = None, beta_y = None, bunch_length = None, length = 0, nom_energy = None):
+    def __init__(self, beta_x=None, beta_y=None, bunch_length=None, length=0, nom_energy=None):
         self.beta_x = beta_x
         self.beta_y = beta_y
         self.bunch_length = bunch_length
@@ -16,6 +16,9 @@ class BeamDeliverySystemBasic(BeamDeliverySystem):
             return np.sqrt(self.nom_energy/500e9)*2250 # [m] scaled from ILC
         else:
             return self.length
+    
+    def get_nom_energy(self):
+        return self.nom_energy
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         

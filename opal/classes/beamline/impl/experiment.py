@@ -1,27 +1,29 @@
-from opal import Runnable, Beam, Beamline, Source, BeamDeliverySystem, Stage, Spectrometer
+from opal import Beamline, Source, BeamDeliverySystem, Stage, Spectrometer
 from matplotlib import pyplot as plt
 import numpy as np
 
 class Experiment(Beamline):
     
-    # constructor
     def __init__(self, source=None, bds=None, stage=None, spectrometer=None):
-        
-        # check element classes, then assemble
-        assert(isinstance(source, Source))
-        assert(isinstance(bds, BeamDeliverySystem))
-        assert(isinstance(stage, Stage))
-        assert(isinstance(spectrometer, Spectrometer))
-        
-        # save as variables
         self.source = source
         self.bds = bds
         self.stage = stage
         self.spectrometer = spectrometer
         
-        # run linac constructor
-        trackables = [source, bds, stage, spectrometer]
-        super().__init__(trackables)
+        super().__init__()
+    
+    
+    # assemble the trackables
+    def assemble_trackables(self):
+        
+        # check element classes, then assemble
+        assert(isinstance(self.source, Source))
+        assert(isinstance(self.bds, BeamDeliverySystem))
+        assert(isinstance(self.stage, Stage))
+        assert(isinstance(self.spectrometer, Spectrometer))
+        
+        # run beamline constructor
+        self.trackables = [self.source, self.bds, self.stage, self.spectrometer]
     
     
     # density plots

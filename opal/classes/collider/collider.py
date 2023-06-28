@@ -10,21 +10,10 @@ from datetime import datetime
 class Collider(Runnable):
     
     # constructor
-    def __init__(self, linac1, ip, linac2=None):
-        
-        # check element classes, then assign
-        assert(isinstance(linac1, Linac))
-        assert(isinstance(ip, InteractionPoint))
-        assert(isinstance(linac2, InteractionPoint) or linac2 is None)
+    def __init__(self, linac1=None, linac2=None, ip=None):
         self.linac1 = linac1
         self.linac2 = linac2
         self.ip = ip
-        
-        # extract driver linac
-        if len(linac1.stages):
-            self.driver_linac = linac1.stages[0].driver_source
-        else:
-            self.driver_linac = None
         
         self.cost_per_length = 2e5 # [LCU/m]
         self.cost_per_energy = 0.15/3.6e6 # [LCU/J]
@@ -32,8 +21,8 @@ class Collider(Runnable):
     
     
     # calculate energy usage (per bunch crossing)
-    def get_energy_usage(self):
-        return self.linac1.get_energy_usage() + self.linac2.get_energy_usage()
+    def energy_usage(self):
+        return self.linac1.energy_usage() + self.linac2.energy_usage()
     
     # full luminosity per crossing [m^-2]
     def full_luminosity_per_crossing(self):
@@ -57,11 +46,11 @@ class Collider(Runnable):
         
     # full luminosity per power [m^-2/J]
     def full_luminosity_per_power(self):
-        return self.full_luminosity_per_crossing() / self.get_energy_usage()
+        return self.full_luminosity_per_crossing() / self.energy_usage()
     
     # peak luminosity per power [m^-2/J]
     def peak_luminosity_per_power(self):
-        return self.peak_luminosity_per_crossing() / self.get_energy_usage()
+        return self.peak_luminosity_per_crossing() / self.energy_usage()
     
     # integrated energy usage (to reach target integrated luminosity)
     def integrated_energy_usage(self):
@@ -74,8 +63,8 @@ class Collider(Runnable):
     # total length of linacs (TODO: add driver production length)
     def total_length(self):
         Ltot = self.linac1.get_length() + self.linac2.get_length()
-        if self.driver_linac is not None:
-            Ltot += self.driver_linac.get_length()
+        if hasattr(self.linac1.stage, 'driver_source'):
+            Ltot += self.linac1.stage.driver_source.get_length()
         return Ltot
       
     # cost of construction
@@ -86,21 +75,27 @@ class Collider(Runnable):
     def total_cost(self):
         return self.construction_cost() + self.running_cost()
     
-    # run simulation
-    def run(self, run_name=None, shots=1, savedepth=2, verbose=True, overwrite=False, overwrite_ip=False):
+    
+    # overwrite run function
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=False, overwrite_ip=False, parallel=False, max_cores=16):
+        
+        # check element classes, then assign
+        if hasattr(self, 'linac') and self.linac1 is None:
+            self.linac1 = self.linac
         
         # copy second arm if undefined
         if self.linac2 is None:
             self.linac2 = deepcopy(self.linac1)
+            
+        assert(isinstance(self.linac1, Linac))
+        assert(isinstance(self.linac2, Linac))
+        assert(isinstance(self.ip, InteractionPoint))
         
         # define run name (generate if not given)
         if run_name is None:
             self.run_name = "collider_" + datetime.now().strftime("%Y%m%d_%H%M%S")
         else:
             self.run_name = run_name
-        
-        # declare shots list
-        self.shots = []
         
         # make base folder and clear tracking directory
         if not exists(self.run_path()):
@@ -109,12 +104,12 @@ class Collider(Runnable):
         # run first linac arm
         if verbose:
             print(">> LINAC #1")
-        beam1 = self.linac1.run(self.run_name + "/linac1", shots, savedepth, verbose, overwrite)
+        beam1 = self.linac1.run(self.run_name + "/linac1", num_shots=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
         
         # run second linac arm
         if verbose:
             print(">> LINAC #2")
-        beam2 = self.linac2.run(self.run_name + "/linac2", shots, savedepth, verbose, overwrite)
+        beam2 = self.linac2.run(self.run_name + "/linac2", num_shots=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite)
         
         # simulate collisions
         if verbose:
@@ -134,7 +129,7 @@ class Collider(Runnable):
     def plot_luminosity(self, per_power=False):
         
         if per_power:
-            norm = 1e4 * self.get_energy_usage()/1e6 # [100 J]
+            norm = 1e4 * self.energy_usage()/1e6 # [100 J]
             normLabel = 'per power (cm$^{-2}$ s$^{-1}$ MW$^{-1}$)'
         else:
             norm = 1

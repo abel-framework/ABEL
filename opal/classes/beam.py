@@ -300,6 +300,10 @@ class Beam():
     def peak_density(self):
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
+    def peak_current(self):
+        Is, _ = self.current_profile()
+        return max(abs(Is))
+    
     
     ## BEAM PROJECTIONS
     
@@ -488,7 +492,7 @@ class Beam():
     
     
     # save beam (to OpenPMD format)
-    def save(self, runnable=None, filename=None, beam_name="beam", series=None, hipace_units=False):
+    def save(self, runnable=None, filename=None, beam_name="beam", series=None):
         
         if len(self) == 0:
             return

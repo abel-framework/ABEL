@@ -36,7 +36,7 @@ class Event():
     
     # filename generator
     def filename(self, runnable):
-        return runnable.shot_path() + ".h5"
+        return runnable.shot_path() + 'event.h5'
     
     # save event (to OpenPMD format)
     def save(self, runnable):

@@ -11,6 +11,10 @@ class BeamDeliverySystem(Trackable):
     def get_length(self):
         pass
     
+    @abstractmethod
+    def get_nom_energy(self):
+        pass
+    
     def survey_object(self):
         rect = patches.Rectangle((0, -0.1), self.get_length(), 0.2)
         rect.set_facecolor = 'r'

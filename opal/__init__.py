@@ -4,7 +4,6 @@ from .classes.beam import *
 from .classes.event import *
 from .classes.trackable import *
 from .classes.runnable import *
-from .classes.scannable import *
 
 from .classes.ip.ip import *
 from .classes.beamline.beamline import *

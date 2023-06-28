@@ -7,29 +7,22 @@ from opal.utilities.plasma_physics import k_p
 
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_min_z, box_max_z, box_size_x=None, box_size_y=None, n_cell_x=255, n_cell_y=255, n_cell_z=256):
-    
-    # create temporary stream file and folder
-    box_size_default = 10/k_p(plasma_density) # TODO: calculate blowout radius based on beam outside here
-    if box_size_x is None:
-        box_size_x = box_size_default    
-    if box_size_y is None:
-        box_size_y = box_size_default
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, n_cell_xy=255, n_cell_z=256):
     
     # locate template file
     filename_input_template = CONFIG.opal_path + 'opal/apis/hipace/input_template'
     
     # define inputs
-    inputs = {'n_cell_x': int(n_cell_x), 
-              'n_cell_y': int(n_cell_y), 
+    inputs = {'n_cell_x': int(n_cell_xy), 
+              'n_cell_y': int(n_cell_xy), 
               'n_cell_z': int(n_cell_z),
               'plasma_density': plasma_density,
-              'grid_low_x': -box_size_x/2,
-              'grid_high_x': box_size_x/2,
-              'grid_low_y': -box_size_y/2,
-              'grid_high_y': box_size_y/2,
-              'grid_low_z': box_min_z,
-              'grid_high_z': box_max_z,
+              'grid_low_x': -box_size/2,
+              'grid_high_x': box_size/2,
+              'grid_low_y': -box_size/2,
+              'grid_high_y': box_size/2,
+              'grid_low_z': min(box_range_z),
+              'grid_high_z': max(box_range_z),
               'time_step': time_step,
               'max_step': int(num_steps),
               'output_period': int(num_steps),

@@ -11,7 +11,7 @@ class StageBasic(Stage):
     def get_length(self):
         return self.length
     
-    def get_energy_gain(self):
+    def get_nom_energy_gain(self):
         return self.nom_energy_gain
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):

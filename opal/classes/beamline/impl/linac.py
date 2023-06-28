@@ -1,4 +1,4 @@
-from opal import Scannable, Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem
+from opal import Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem
 import scipy.constants as SI
 import copy, os
 from datetime import datetime
@@ -7,92 +7,103 @@ import numpy as np
 
 class Linac(Beamline):
     
-    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=0, alternatingInterstagePolarity=False, first_stage=None):
+    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=1, first_stage=None, alternate_interstage_polarity=False):
         
-        # check element classes, then assemble
-        assert(isinstance(source, Source))
-        if stage is not None:
-            assert(isinstance(stage, Stage))
-        if interstage is not None:
-            assert(isinstance(interstage, Interstage))
-        if bds is not None:
-            assert(isinstance(bds, BeamDeliverySystem))
-        if first_stage is not None:
-            assert(isinstance(first_stage, Stage))
-        
-        # save as variables
         self.source = source
+        self.stage = stage
+        self.interstage = interstage
         self.bds = bds
-        self.stages = [None]*num_stages
-        self.interstages = [None]*max(0,num_stages-1)
         self.first_stage = first_stage
+        self.num_stages = num_stages
+        self.alternate_interstage_polarity = alternate_interstage_polarity
+        
+        super().__init__()
+        
+    
+    # assemble the trackables
+    def assemble_trackables(self):
+        
+        # check element classes
+        assert(isinstance(self.source, Source))
+        if self.stage is not None:
+            assert(isinstance(self.stage, Stage))
+        if self.interstage is not None:
+            assert(isinstance(self.interstage, Interstage))
+        if self.bds is not None:
+            assert(isinstance(self.bds, BeamDeliverySystem))
+        if self.first_stage is not None:
+            assert(isinstance(self.first_stage, Stage))
+        
+        # prepare for multiplication of stages and interstages
+        self.stages = [None]*self.num_stages
+        self.interstages = [None]*max(0,self.num_stages-1)
         
         # declare list of trackables
-        trackables = [None] * (1 + num_stages + max(0,num_stages-1) + int(bds is not None))
+        self.trackables = [None] * (1 + self.num_stages + max(0,self.num_stages-1) + int(self.bds is not None))
         
         # add source
-        trackables[0] = source
+        self.trackables[0] = self.source
         
-        # add stages
-        if (stage is not None) and (interstage is not None):
-            for i in range(num_stages):
+        # add stages and interstages
+        if (self.stage is not None) and (self.interstage is not None):
+            for i in range(self.num_stages):
 
                 # add stages
-                if i == 0 and first_stage is not None:
-                    stage_instance = copy.deepcopy(first_stage)
+                if i == 0 and self.first_stage is not None:
+                    stage_instance = self.first_stage
                 else:
-                    stage_instance = copy.deepcopy(stage)
-                trackables[1+2*i] = stage_instance
+                    stage_instance = copy.deepcopy(self.stage)
+                self.trackables[1+2*i] = stage_instance
                 self.stages[i] = stage_instance
 
                 # add interstages
-                if i < num_stages-1:
-                    interstage_instance = copy.deepcopy(interstage)
-                    interstage_instance.nom_energy = source.get_energy() + np.sum([stg.get_energy_gain() for stg in self.stages[:(i+1)]])
-                    if alternatingInterstagePolarity:
-                        interstage_instance.Bdip = (2*(i%2)-1)*interstage_instance.Bdip
-                    trackables[2+2*i] = interstage_instance
+                if i < self.num_stages-1:
+                    interstage_instance = copy.deepcopy(self.interstage)
+                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                    if self.alternate_interstage_polarity:
+                        interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
+                    self.trackables[2+2*i] = interstage_instance
                     self.interstages[i] = interstage_instance
             
         # add beam delivery system
-        if bds is not None:
-            bds.nom_energy = source.get_energy()
-            if stage is not None:
-                bds.nom_energy += np.sum([stg.get_energy_gain() for stg in self.stages])
-            assert(isinstance(bds, BeamDeliverySystem))
-            trackables[max(1,2*num_stages)] = bds
-        
-        # run linac constructor
-        super().__init__(trackables)
+        if self.bds is not None:
+            self.bds.nom_energy = self.source.get_energy()
+            self.bds.nom_energy += np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+            self.trackables[max(1,2*self.num_stages)] = self.bds
         
     
     ## ENERGY CONSIDERATIONS
     
-    def get_target_energy(self):
+    def nom_energy(self):
+        return max(self.nom_stage_energies())
+    
+    def nom_stage_energies(self):
         E = 0
         Es = np.array([]);
         for trackable in self.trackables:
             if isinstance(trackable, Source):
                 E += trackable.get_energy()
             elif isinstance(trackable, Stage):
-                E += trackable.get_energy_gain()
+                E += trackable.get_nom_energy_gain()
             Es = np.append(Es, E)
-        return E, Es
+        return Es
     
     
-    def get_effective_gradient(self):
-        return self.get_target_energy()/self.get_length()
+    def effective_gradient(self):
+        return self.nom_energy()/self.get_length()
     
     
-    def get_energy_usage(self):
-        Etot = self.source.get_energy_usage()
+    def energy_usage(self):
+        if self.trackables is None:
+            self.assemble_trackables()
+        Etot = self.source.energy_usage()
         for stage in self.stages:
-            Etot += stage.get_energy_usage()
+            Etot += stage.energy_usage()
         return Etot
     
-    def get_energy_efficiency(self):
-        Etot_beam = self.final_beam().get_total_energy()
-        return Etot_beam/self.get_energy_usage()
+    def energy_efficiency(self):
+        Etot_beam = self.final_beam().total_energy()
+        return Etot_beam/self.energy_usage()
     
     
     ## PLOT EVOLUTION
@@ -108,23 +119,23 @@ class Linac(Beamline):
         vals_std = np.empty((num_outputs, len(fcns)))
         
         # go through files
-        for i in range(num_outputs):
+        for index in range(num_outputs):
             
             # load beams and apply functions
-            vals = np.empty((num_outputs, len(fcns)))
-            for j in range(num_outputs):
-                beam = self[i,j]
+            vals = np.empty((self.num_shots, len(fcns)))
+            for shot in range(self.num_shots):
+                beam = self.get_beam(index=index, shot=shot)
                 for k in range(len(fcns)):
-                    vals[j,k] = fcns[k](beam)
+                    vals[shot,k] = fcns[k](beam)
             
             # calculate mean and standard dev
             for k in range(len(fcns)):
-                vals_mean[i,k] = np.mean(vals[:,k])
-                vals_std[i,k] = np.std(vals[:,k])
+                vals_mean[index,k] = np.mean(vals[:,k])
+                vals_std[index,k] = np.std(vals[:,k])
             
             # find stage number
-            stage_numbers[i] = beam.stage_number
-            ss[i] = beam.location
+            stage_numbers[index] = beam.stage_number
+            ss[index] = beam.location
         
         return ss, vals_mean, vals_std, stage_numbers
  
@@ -143,26 +154,29 @@ class Linac(Beamline):
         trackable_numbers = np.empty(num_outputs)
         
         # go through files
-        for i in range(num_outputs):
+        for index in range(num_outputs):
 
             # load phase space
-            beam = self[i,shot]
+            beam = self.get_beam(index=index, shot=shot)
 
             # find trackable number
-            trackable_numbers[i] = beam.trackable_number
+            trackable_numbers[index] = beam.trackable_number
             
             # get all waterfalls (apply argument is it exists)
             for j in range(len(fcns)):
                 if args[j] is None:
-                    waterfalls[j][:,i], bins[j] = fcns[j](beam, bins=edges[j])
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, bins=edges[j])
                 else:
-                    waterfalls[j][:,i], bins[j] = fcns[j](beam, args[j][i], bins=edges[j])
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, args[j][index], bins=edges[j])
                 
         return waterfalls, trackable_numbers, bins
              
         
     def plot_evolution(self, use_stage_nums=False):
         
+        if self.trackables is None:
+            self.assemble_trackables()
+            
         # TODO: filter shots by step
         
         # calculate values
@@ -206,10 +220,10 @@ class Linac(Beamline):
         x0s_error = vals_std[:,9]
         y0s_error = vals_std[:,10]
         
-        # target energies
-        _, Es_target = self.get_target_energy()
-        deltas = Es/Es_target - 1
-        deltas_error = Es_error/Es_target
+        # nominal energies
+        Es_nom = self.nom_stage_energies()
+        deltas = Es/Es_nom - 1
+        deltas_error = Es_error/Es_nom
         
         # initial charge
         Q0 = Qs[0]
@@ -226,7 +240,7 @@ class Linac(Beamline):
         fig.set_figwidth(20)
         fig.set_figheight(12)
         
-        axs[0,0].plot(long_axis, Es_target / 1e9, ':', color=col0)
+        axs[0,0].plot(long_axis, Es_nom / 1e9, ':', color=col0)
         axs[0,0].plot(long_axis, Es / 1e9, color=col1)
         axs[0,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Es+Es_error, np.flip(Es-Es_error))) / 1e9, color=col1, alpha=af)
         axs[0,0].set_xlabel(long_label)
@@ -270,7 +284,7 @@ class Linac(Beamline):
         axs[0,2].set_ylabel('Emittance, rms (mm mrad)')
         axs[0,2].set_yscale('log')
         
-        axs[1,2].plot(long_axis, np.sqrt(Es_target/Es_target[0])*betaxs[0]*1e3, ':', color=col0)
+        axs[1,2].plot(long_axis, np.sqrt(Es_nom/Es_nom[0])*betaxs[0]*1e3, ':', color=col0)
         axs[1,2].plot(long_axis, betaxs*1e3, color=col1)
         axs[1,2].plot(long_axis, betays*1e3, color=col2)
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((betaxs+betaxs_error, np.flip(betaxs-betaxs_error))) * 1e3, color=col1, alpha=af)
@@ -292,7 +306,17 @@ class Linac(Beamline):
     
     
     # density plots
-    def plot_waterfalls(self, shot=0):
+    def plot_waterfalls(self, shot=None):
+        
+        if self.trackables is None:
+            self.assemble_trackables()
+            
+        # select shot
+        if shot is None:
+            if hasattr(self, 'shot') and self.shot is not None:
+                shot = self.shot
+            else:
+                shot = 0
         
         # calculate values
         beam0 = self.initial_beam(shot=shot)
@@ -302,7 +326,7 @@ class Linac(Beamline):
         deltaedges = np.linspace(-0.05, 0.05, num_bins)
         xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
-        _, E0s = self.get_target_energy()
+        E0s = self.nom_stage_energies()
         waterfalls, trackable_numbers, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], [None, E0s, None, None], shot)
         
         # prepare figure
@@ -313,29 +337,30 @@ class Linac(Beamline):
         # current profile
         Is = waterfalls[0]
         ts = bins[0]
-        c0 = axs[0].pcolor(trackable_numbers, ts*SI.c*1e6, -Is/1e3, cmap='GnBu')
+        c0 = axs[0].pcolor(trackable_numbers, ts*SI.c*1e6, -Is/1e3, cmap='GnBu', shading='auto')
         cbar0 = fig.colorbar(c0, ax=axs[0])
         axs[0].set_ylabel('Longitudinal position (um)')
         cbar0.ax.set_ylabel('Beam current (kA)')
+        axs[0].set_title('Shot ' + str(shot+1))
         
         # energy profile
         dQddeltas = waterfalls[1]
         deltas = bins[1]
-        c1 = axs[1].pcolor(trackable_numbers, deltas*1e2, -dQddeltas*1e7, cmap='GnBu')
+        c1 = axs[1].pcolor(trackable_numbers, deltas*1e2, -dQddeltas*1e7, cmap='GnBu', shading='auto')
         cbar1 = fig.colorbar(c1, ax=axs[1])
         axs[1].set_ylabel('Energy offset (%)')
         cbar1.ax.set_ylabel('Spectral density (nC/%)')
         
         densityX = waterfalls[2]
         xs = bins[2]
-        c2 = axs[2].pcolor(trackable_numbers, xs*1e6, -densityX*1e3, cmap='GnBu')
+        c2 = axs[2].pcolor(trackable_numbers, xs*1e6, -densityX*1e3, cmap='GnBu', shading='auto')
         cbar2 = fig.colorbar(c2, ax=axs[2])
         axs[2].set_ylabel('Horizontal position (um)')
         cbar2.ax.set_ylabel('Charge density (nC/um)')
         
         densityY = waterfalls[3]
         ys = bins[3]
-        c3 = axs[3].pcolor(trackable_numbers, ys*1e6, -densityY*1e3, cmap='GnBu')
+        c3 = axs[3].pcolor(trackable_numbers, ys*1e6, -densityY*1e3, cmap='GnBu', shading='auto')
         cbar3 = fig.colorbar(c3, ax=axs[3])
         axs[3].set_xlabel('Trackable element number')
         axs[3].set_ylabel('Vertical position (um)')

@@ -5,6 +5,9 @@ class Trackable(ABC):
     # tracking function
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
+        # remove nan particles
+        beam.remove_nans()
+        
         # advance beam location
         beam.location += self.get_length()
         
