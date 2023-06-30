@@ -46,13 +46,11 @@ class SpectrometerFacetOcelot(Spectrometer):
         drift4 = ocelot.Drift(l=8.831)
         screen = ocelot.Monitor()
 
-        # use second-order tracking
-        method = ocelot.MethodTM()
-        method.global_method = ocelot.SecondTM
-        
-        # define lattice
+        # assemble element sequence
         sequence = (drift0, quad_Q0, drift1, quad_Q1, drift2, quad_Q2, drift3, dipole, drift4, screen)
-        lattice = ocelot.MagneticLattice(sequence, method=method)
+        
+        # define lattice (use second-order tracking)
+        lattice = ocelot.MagneticLattice(sequence, method={'global': ocelot.SecondTM})
         
         return lattice
 

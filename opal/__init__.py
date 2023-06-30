@@ -1,5 +1,13 @@
+# suppress numba warnings from Ocelot
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+import warnings
+warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
+warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+
+# import configuration class
 from .CONFIG import CONFIG
 
+# import all other classes
 from .classes.beam import *
 from .classes.event import *
 from .classes.trackable import *
