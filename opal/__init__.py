@@ -35,7 +35,7 @@ from .classes.stage.impl.stage_hipace import *
 from .classes.interstage.impl.interstage_basic import *
 from .classes.interstage.impl.interstage_elegant import *
 from .classes.bds.impl.bds_basic import *
-from .classes.bds.impl.bds_FACET2_basic import *
-from .classes.spectrometer.impl.spectrometer_FACET2_basic import *
+from .classes.spectrometer.impl.spectrometer_facet_basic import *
+from .classes.spectrometer.impl.spectrometer_facet_ocelot import *
 from .classes.ip.impl.ip_basic import *
 from .classes.ip.impl.ip_guineapig import *

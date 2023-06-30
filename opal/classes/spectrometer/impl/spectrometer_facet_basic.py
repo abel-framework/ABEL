@@ -3,10 +3,11 @@ import numpy as np
 from numpy.linalg import multi_dot
 import scipy.optimize as sciopt
 
-class SpectrometerFACET2Basic(Spectrometer):
+class SpectrometerFacetBasic(Spectrometer):
     
-    def __init__(self, dipole_field = None, img_energy = None, obj_plane = 0, mag_x = -8, img_energy_y = None, obj_plane_y = None):
-        self.dipole_field = dipole_field        
+    def __init__(self, bend_angle=-0.03, img_energy=None, obj_plane=0, mag_x=-8, img_energy_y=None, obj_plane_y=None):
+        
+        self.bend_angle = bend_angle        
         self.img_energy = img_energy
         self.obj_plane = obj_plane
         self.mag_x = mag_x
@@ -31,7 +32,7 @@ class SpectrometerFACET2Basic(Spectrometer):
         drift2 = DriftBasic(0.286595 + 0.754657 + 0.183182)
         quad_Q2 = QuadrupoleBasic(1, ks[2], self.img_energy)
         drift3 = DriftBasic(0.286595 + 0.056305 + 3.177152733425373)
-        dipole = DipoleSpectrometerBasic(0.9779, self.dipole_field, True)
+        dipole = DipoleSpectrometerBasic(0.9779, self.bend_angle, True)
         drift4 = DriftBasic(0.357498 + 1.22355893395943 + 1.36 + 1.13 + 0.5 + 4.26)
         
         return Beamline([drift0, quad_Q0, drift1, quad_Q1, drift2, quad_Q2, drift3, dipole, drift4])
@@ -73,7 +74,7 @@ class SpectrometerFACET2Basic(Spectrometer):
         
         # calculate transfer matrices
         Rx = self.transferMatrix(ks, self.obj_plane)
-        Ry = self.transferMatrix(ks*self.img_energy/self.img_energy_y, self.obj_plane_y)
+        Ry = self.transferMatrix(ks*self.img_energy_y/self.img_energy, self.obj_plane_y)
         
         # return object function
         return (Rx[0,1])**2 + (Ry[2,3])**2 + (Rx[0,0]-self.mag_x)**2

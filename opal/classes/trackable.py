@@ -19,7 +19,7 @@ class Trackable(ABC):
             
             # describe tracking
             if verbose:
-                print(f"Tracking element #{beam.trackable_number} (s = {beam.location:.1f} m, {beam.charge()*1e9:.2f} nC, {beam.energy()/1e9:.1f} GeV, {type(self).__name__}, stage {beam.stage_number})")
+                print(f"Tracking element {beam.trackable_number+1} (s = {beam.location:.1f} m, {beam.charge()*1e9:.2f} nC, {beam.energy()/1e9:.1f} GeV, {type(self).__name__}, stage {beam.stage_number})")
                 
             # save to file
             if runnable is not None:

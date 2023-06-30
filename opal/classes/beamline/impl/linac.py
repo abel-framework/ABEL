@@ -4,6 +4,7 @@ import copy, os
 from datetime import datetime
 from matplotlib import pyplot as plt
 import numpy as np
+import matplotlib.animation as animation
 
 class Linac(Beamline):
     
@@ -367,3 +368,4 @@ class Linac(Beamline):
         cbar3.ax.set_ylabel('Charge density (nC/um)')
         
         plt.show()
+        

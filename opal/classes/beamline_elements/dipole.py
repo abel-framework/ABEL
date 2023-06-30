@@ -16,7 +16,7 @@ class Dipole(Trackable):
         pass
     
     @abstractmethod
-    def get_field(self):
+    def get_angle(self):
         pass
     
     def survey_object(self):

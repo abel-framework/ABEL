@@ -19,7 +19,7 @@ class Beam():
         else:
             self.__phasespace = self.reset_phase_space(num_particles)
             
-        self.trackable_number = 0
+        self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
         self.location = 0        
     
@@ -58,12 +58,14 @@ class Beam():
             elif Es is not None:
                 uzs = energy2proper_velocity(Es)
         self.__phasespace[5,:] = uzs
+        
         if uxs is None:
             if pxs is not None:
                 uxs = momentum2proper_velocity(pxs)
             elif xps is not None:
                 uxs = xps * uzs
         self.__phasespace[3,:] = uxs
+        
         if uys is None:
             if pys is not None:
                 uys = momentum2proper_velocity(pys)
@@ -376,6 +378,7 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
+            
         p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu', shading='auto')
         ax.set_xlabel('z (um)')
         ax.set_ylabel('E (GeV)')

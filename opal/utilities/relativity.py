@@ -4,10 +4,9 @@ import numpy as np
 defaultUnitE = 'eV'
 
 
-
 # convert Lorentz beta to Lorentz gamma
 def beta2gamma(beta):
-    return 1/np.sqrt(1-beta**2)
+    return np.sign(beta)/np.sqrt(1-beta**2)
 
 # convert Lorentz beta to velocity
 def beta2velocity(beta):
@@ -20,7 +19,7 @@ def beta2energy(beta, unitE=defaultUnitE):
 
 # convert Lorentz gamma to Lorentz beta
 def gamma2beta(gamma):
-    return np.sqrt(1-1/gamma**2)
+    return np.sign(gamma) * np.sqrt(1-1/gamma**2)
 
 # convert Lorentz gamma to velocity
 def gamma2velocity(gamma):
@@ -28,7 +27,7 @@ def gamma2velocity(gamma):
 
 # convert Lorentz gamma to proper velocity
 def gamma2proper_velocity(gamma):
-    return gamma * gamma2velocity(gamma)
+    return abs(gamma) * gamma2velocity(gamma)
 
 # convert Lorentz gamma to momentum [eV/c]
 def gamma2momentum(gamma):
@@ -53,7 +52,7 @@ def velocity2gamma(v):
 
 # convert proper velocity to Lorentz gamma
 def proper_velocity2gamma(u):
-    return np.sqrt(1+(u/SI.c)**2)
+    return np.sign(u) * np.sqrt(1+(u/SI.c)**2)
 
 # convert proper velocity to energy
 def proper_velocity2momentum(u):
@@ -66,11 +65,12 @@ def proper_velocity2energy(u, unit=defaultUnitE):
 
 # convert momentum [eV/c] to Lorentz gamma
 def momentum2gamma(p):
-    return np.sqrt(1+(p / (SI.m_e * SI.c))**2)
+    return np.sign(p) * np.sqrt((p / (SI.m_e * SI.c))**2 + 1) 
+    #np.sign(p) * np.sqrt(1+(p / (SI.m_e * SI.c))**2)
 
 # convert momentum [eV/c] to proper velocity
 def momentum2proper_velocity(p):
-    return gamma2proper_velocity(momentum2gamma(p))
+    return p / SI.m_e
 
 # convert momentum to energy [eV/c]
 def momentum2energy(p):
