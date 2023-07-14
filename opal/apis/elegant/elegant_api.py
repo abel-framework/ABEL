@@ -10,7 +10,7 @@ def elegant_read_beam(filename):
     tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
     os.mkdir(tmpfolder)
     tmpfile =  tmpfolder + '/stream.tmp'
-
+    
     # convert SDDS file to CSV file
     subprocess.call(CONFIG.elegant_path + 'sdds2stream ' + filename + ' -columns=x,xp,y,yp,t,p,dt > ' + tmpfile, shell=True)
     
@@ -41,9 +41,9 @@ def elegant_read_beam(filename):
 def elegant_write_beam(beam, filename):
     
     # create temporary CSV file and folder
-    tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
     os.mkdir(tmpfolder)
-    tmpfile = tmpfolder + '/beam.csv'
+    tmpfile = tmpfolder + 'beam.csv'
     
     # write beam phasespace to CSV (note: z/t is flipped)
     M = np.matrix([beam.xs(),beam.xps(),beam.ys(),beam.yps(),-1*beam.ts(),beam.gammas(),beam.ts()])

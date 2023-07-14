@@ -40,6 +40,7 @@ from .classes.source.impl.source_combiner import *
 from .classes.stage.impl.stage_basic import *
 from .classes.stage.impl.stage_nonlinear_1d import *
 from .classes.stage.impl.stage_hipace import *
+from .classes.stage.impl.stage_wake_t import *
 from .classes.interstage.impl.interstage_basic import *
 from .classes.interstage.impl.interstage_elegant import *
 from .classes.bds.impl.bds_basic import *
