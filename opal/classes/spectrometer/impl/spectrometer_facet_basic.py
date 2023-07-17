@@ -14,7 +14,7 @@ class SpectrometerFacetBasic(Spectrometer):
         self.img_energy_y = img_energy_y
         self.obj_plane_y = obj_plane_y
         
-        self.ks = [0, 0, 0] # [m^-2]
+        self.ks = [-0.3, 0, 0.3] # [m^-2]
 
     def beamline(self, ks=None, obj_plane=None):
         
@@ -43,6 +43,7 @@ class SpectrometerFacetBasic(Spectrometer):
     
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        self.set_imaging()
         return self.beamline(obj_plane=0).track(beam, savedepth, runnable, verbose)
     
     
@@ -83,8 +84,7 @@ class SpectrometerFacetBasic(Spectrometer):
     def set_imaging(self):
         
         # perform minization (find k-values)
-        ks0 = [-0.3, 0, 0.3]
-        result = sciopt.minimize(self.__calculate_imaging_condition, ks0, tol=1e-5, options={'maxiter': 1000})
+        result = sciopt.minimize(self.__calculate_imaging_condition, self.ks, tol=1e-5, options={'maxiter': 1000})
         
         # set solution to quads
         if result.fun < 1e-5:

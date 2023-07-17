@@ -55,19 +55,19 @@ class StageHipace(Stage):
         # MAKE INPUT FILE
         
         # make longitudinal box range
-        num_sigmas = 5
+        num_sigmas = 6
         box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
         box_max_z = driver.z_offset() + num_sigmas * driver.bunch_length()
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_xy = 6 * blowout_radius(self.plasma_density, driver.peak_current())
+        box_size_xy = 5 * blowout_radius(self.plasma_density, driver.peak_current())
         
         # calculate the time step
         gamma_min = min(beam0.gamma(),driver.gamma()/2)
         k_beta = k_p(self.plasma_density)/np.sqrt(2*gamma_min)
         T_betatron = (2*np.pi/k_beta)/SI.c
-        time_step0 = T_betatron/40
+        time_step0 = T_betatron/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)
         self.num_steps = np.ceil(self.length/(time_step0*SI.c))

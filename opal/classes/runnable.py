@@ -142,7 +142,7 @@ class Runnable(ABC):
         # delete and remake folder
         if os.path.exists(clear_path):
             shutil.rmtree(clear_path)
-        os.mkdir(clear_path)
+        os.makedirs(clear_path)
         
     
     # number of beam outputs for shot
@@ -228,7 +228,18 @@ class Runnable(ABC):
     # plot value of beam parameters across a scan
     def plot_beam_function(self, beam_fcn, label=None, scale=1, xscale='linear', yscale='linear'):
         self.plot_function(lambda obj : beam_fcn(obj.final_beam()), label=label, scale=scale, xscale=xscale, yscale=yscale)
-        
+
+    def plot_energy(self):
+        self.plot_beam_function(Beam.energy, scale=1e9, label='Energy (GeV)')
+
+    def plot_charge(self):
+        self.plot_beam_function(Beam.charge, scale=1e-9, label='Charge (nC)')
+
+    def plot_beam_size_x(self):
+        self.plot_beam_function(Beam.beam_size_x, scale=1e-3, label='Beam size, x (mm rms)')
+
+    def plot_beam_size_y(self):
+        self.plot_beam_function(Beam.beam_size_y, scale=1e-3, label='Beam size, y (mm rms)')
         
     # plot value of beam parameters across a scan
     def plot_function(self, fcn, label=None, scale=1, xscale='linear', yscale='linear'):
@@ -247,18 +258,68 @@ class Runnable(ABC):
             val_mean[step] = np.mean(val_output)
             val_std[step] = np.std(val_output)
         
-        # plot evolution
-        fig, ax = plt.subplots(1)
-        fig.set_figwidth(CONFIG.plot_width_default)
-        fig.set_figheight(CONFIG.plot_width_default*0.6)
-        
         if not hasattr(self, 'scale'):
             self.scale = 1
         if not hasattr(self, 'label'):
             self.label = ''
             
+        # plot evolution
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.6)
+        
         ax.errorbar(self.vals/self.scale, val_mean/scale, val_std/scale, ls=':', capsize=5)
         ax.set_xlabel(self.label)
         ax.set_ylabel(label)
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
+
+    
+    def plot_waterfall(self, proj_fcn, label=None, scale=1):
+
+        # determine size of projection
+        _, ctrs_initial = proj_fcn(self.final_beam(shot=0))
+        _, ctrs_final = proj_fcn(self.final_beam(shot=-1))
+        ctrs = np.linspace(min(min(ctrs_initial), min(ctrs_final)), max(max(ctrs_initial), max(ctrs_final)), len(ctrs_final))
+        bins = np.append(ctrs, ctrs[-1]+(ctrs[1]-ctrs[0])) - (ctrs[1]-ctrs[0])/2
+        
+        # extract values
+        waterfall = np.empty((self.num_shots, len(ctrs)))
+        shots = range(self.num_shots)
+        for shot in shots:
+            proj, _ = proj_fcn(self.final_beam(shot=shot), bins=bins)
+            waterfall[shot,:] = proj
+        
+        if not hasattr(self, 'scale'):
+            self.scale = 1
+        if not hasattr(self, 'label'):
+            self.label = ''
+          
+        # plot evolution
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.6)
+
+        p = ax.pcolor(shots, ctrs/scale, abs(waterfall.T/self.scale), cmap='GnBu', shading='auto')
+        ax.set_xlabel('Shots')
+        ax.set_ylabel(label)
+        ax.set_title('Waterfall')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (a.u.)')
+        #ax.set_xscale(xscale)
+        #ax.set_yscale(yscale)
+
+
+    def plot_waterfall_energy(self):
+        self.plot_waterfall(Beam.energy_spectrum, scale=1e9, label='Energy (GeV)')
+
+    def plot_waterfall_current(self):
+        self.plot_waterfall(Beam.current_profile, scale=1e-15, label='Time (fs)')
+
+    def plot_waterfall_x(self):
+        self.plot_waterfall(Beam.transverse_profile_x, scale=1e-3, label='x (mm)')
+
+    def plot_waterfall_y(self):
+        self.plot_waterfall(Beam.transverse_profile_y, scale=1e-3, label='y (mm)')
+        
+    

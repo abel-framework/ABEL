@@ -7,7 +7,7 @@ from opal.utilities.plasma_physics import k_p
 
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, n_cell_xy=255, n_cell_z=256):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, n_cell_xy=511, n_cell_z=256):
     
     # locate template file
     filename_input_template = CONFIG.opal_path + 'opal/apis/hipace/input_template'

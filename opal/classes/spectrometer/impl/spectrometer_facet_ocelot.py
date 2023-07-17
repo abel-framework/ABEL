@@ -8,7 +8,7 @@ from opal.apis.ocelot.ocelot_api import ocelot_particle_array2beam, beam2ocelot_
 
 class SpectrometerFacetOcelot(Spectrometer):
     
-    def __init__(self, bend_angle=-0.03, img_energy=None, obj_plane=0, mag_x=-4, img_energy_y=None, obj_plane_y=None):   
+    def __init__(self, bend_angle=-0.03, img_energy=None, obj_plane=0, mag_x=-4, img_energy_y=None, obj_plane_y=None, exact_tracking=True):   
         
         self.bend_angle = bend_angle # [rad]
         self.img_energy = img_energy
@@ -16,6 +16,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         self.mag_x = mag_x
         self.img_energy_y = img_energy_y
         self.obj_plane_y = obj_plane_y
+        self.exact_tracking = exact_tracking
         
         # initial guess for quadrupole strengths
         self.ks = [-0.41076614, 0.57339363, -0.36132452] # [m^-2]
@@ -28,7 +29,8 @@ class SpectrometerFacetOcelot(Spectrometer):
     
     # get the Ocelot lattice
     def get_lattice(self, ks=None, obj_plane=None):
-        
+
+        # default values if not defined
         if ks is None:
             ks = self.ks
         if obj_plane is None:
@@ -44,19 +46,26 @@ class SpectrometerFacetOcelot(Spectrometer):
         drift3 = ocelot.Drift(l=3.520)
         dipole = ocelot.RBend(l=0.978, angle=self.bend_angle, tilt=-np.pi/2)
         drift4 = ocelot.Drift(l=8.831)
-        screen = ocelot.Monitor()
 
         # assemble element sequence
-        sequence = (drift0, quad_Q0, drift1, quad_Q1, drift2, quad_Q2, drift3, dipole, drift4, screen)
+        sequence = (drift0, quad_Q0, drift1, quad_Q1, drift2, quad_Q2, drift3, dipole, drift4)
+
+        # select tracking method (second-order matrices or exact kicks)
+        if self.exact_tracking:
+            tracking_method = ocelot.KickTM
+        else:
+            tracking_method = ocelot.SecondTM
         
-        # define lattice (use second-order tracking)
-        lattice = ocelot.MagneticLattice(sequence, method={'global': ocelot.SecondTM})
+        # define lattice
+        lattice = ocelot.MagneticLattice(sequence, method={'global': tracking_method})
         
         return lattice
 
     
     # set the quad strengths for imaging
-    def set_imaging(self, nom_energy=None):
+    def set_imaging(self, nom_energy=None): 
+        
+        # TODO: check if the object plane is set correctly
         
         def img_condition_fcn(ks):
             
@@ -100,8 +109,8 @@ class SpectrometerFacetOcelot(Spectrometer):
         # convert beam to Ocelot particle array
         p_array0 = beam2ocelot_particle_array(beam0)
         
-        # get lattice
-        lattice = self.get_lattice()
+        # get lattice (
+        lattice = self.get_lattice(obj_plane=0)
         
         # perform tracking
         _, p_array = ocelot.track(lattice, p_array0, navi=ocelot.Navigator(lattice), print_progress=False)
@@ -125,13 +134,15 @@ class SpectrometerFacetOcelot(Spectrometer):
         
     
     # plot the evolution of beta functions and dispersion
-    def plot_twiss(self, energy=None):
+    def plot_twiss(self, energy=None, waist_plane=None):
         
         # set the imaging
         self.set_imaging(nom_energy=energy)
         
         # get lattice
-        lattice = self.get_lattice()
+        if waist_plane is None:
+            waist_plane = 0
+        lattice = self.get_lattice(obj_plane=waist_plane)
 
         # example Twiss (small beta functions)
         twiss0 = ocelot.Twiss()

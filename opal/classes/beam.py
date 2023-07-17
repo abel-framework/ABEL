@@ -234,10 +234,10 @@ class Beam():
     def bunch_length(self, clean=False):
         return np.std(prct_clean(self.zs(), clean))
     
-    def x_offset(self, clean=True):
+    def x_offset(self, clean=False):
         return np.mean(prct_clean(self.xs(), clean))
     
-    def y_offset(self, clean=True):
+    def y_offset(self, clean=False):
         return np.mean(prct_clean(self.ys(), clean))
     
     def beam_size_x(self, clean=False):
@@ -345,9 +345,9 @@ class Beam():
     def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
         self.remove_nans()
         if hbins is None:
-            hbins = int(np.sqrt(len(self))/2)
+            hbins = round(np.sqrt(len(self))/2)
         if vbins is None:
-            vbins = int(np.sqrt(len(self))/2)
+            vbins = round(np.sqrt(len(self))/2)
         counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
@@ -358,7 +358,7 @@ class Beam():
         return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
     
     def density_transverse(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.ys, self.xs, hbins=hbins, vbins=vbins)    
+        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)    
         
     
     ## PLOTTING

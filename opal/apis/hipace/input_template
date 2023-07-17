@@ -1,22 +1,20 @@
 amr.n_cell = $n_cell_x $n_cell_y $n_cell_z
 
-hipace.normalized_units=0
-hipace.bxby_solver=explicit
+hipace.normalized_units = 0
+hipace.bxby_solver = explicit
 
-hipace.dt= $time_step
+hipace.dt = $time_step
 amr.blocking_factor = 1
 amr.max_level = 0
 
-hipace.do_device_synchronize=1
-
-hipace.verbose=1
+hipace.verbose = 1
 max_step = $max_step
 hipace.output_period = $output_period
 
 hipace.depos_order_xy = 1
 
 geometry.coord_sys   = 0                  # 0: Cartesian
-geometry.is_periodic = true  true  false  # Is periodic?
+geometry.is_periodic = 1 1 0  # Is periodic?
 geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
 geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z
 
@@ -25,8 +23,6 @@ beam.injection_type = from_file
 beam.input_file = $filename_beam
 beam.iteration = 0
 
-
-
 driver.injection_type = from_file
 driver.input_file = $filename_driver
 driver.iteration = 0
@@ -34,7 +30,8 @@ driver.iteration = 0
 plasmas.names = plasma
 plasma.density(x,y,z) = $plasma_density
 plasma.ppc = 1 1
-plasma.u_mean = 0.0 0.0 0.
+plasma.u_mean = 0.0 0.0 0.0
 plasma.element = electron
+plasma.do_symmetrize = 1
 
 diagnostic.diag_type = xz

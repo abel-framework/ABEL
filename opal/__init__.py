@@ -43,6 +43,7 @@ from .classes.stage.impl.stage_hipace import *
 from .classes.stage.impl.stage_wake_t import *
 from .classes.interstage.impl.interstage_basic import *
 from .classes.interstage.impl.interstage_elegant import *
+from .classes.interstage.impl.interstage_ocelot import *
 from .classes.bds.impl.bds_basic import *
 from .classes.spectrometer.impl.spectrometer_facet_basic import *
 from .classes.spectrometer.impl.spectrometer_facet_ocelot import *
