@@ -9,7 +9,7 @@ from opal.utilities.beam_physics import evolve_beta_function, evolve_dispersion,
 
 class InterstageElegant(Interstage):
     
-    def __init__(self, nom_energy = None, beta0 = None, dipole_length = None, dipole_field = 1, Bdip2 = None, enable_isr = True, enable_csr = True):
+    def __init__(self, nom_energy=None, beta0=None, dipole_length=None, dipole_field=1, Bdip2=None, enable_isr=True, enable_csr=True):
         self.nom_energy = nom_energy
         self.beta0 = beta0
         self.dipole_length = dipole_length

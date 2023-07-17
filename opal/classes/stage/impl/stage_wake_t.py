@@ -10,11 +10,12 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 class StageWakeT(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
         self.driver_source = driver_source
+        self.ramp_beta_mag = ramp_beta_mag
 
         self._beam_evolution = None
         self._driver_evolution = None
@@ -25,9 +26,14 @@ class StageWakeT(Stage):
         
         # make driver (and convert to WakeT bunch)
         driver0 = self.driver_source.track()
-        driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         
-        # convert beam to WakeT bunch
+        # apply plasma-density down ramp (demagnify beta function)
+        if self.ramp_beta_mag is not None:
+            beam0.magnify_beta_function(1/self.ramp_beta_mag)
+            driver0.magnify_beta_function(1/self.ramp_beta_mag)
+        
+        # convert beams to WakeT bunches
+        driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
 
         # create plasma stage
@@ -53,6 +59,16 @@ class StageWakeT(Stage):
         # convert back to OPAL beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         
+        # copy meta data from input beam (will be iterated by super)
+        beam.trackable_number = beam0.trackable_number
+        beam.stage_number = beam0.stage_number
+        beam.location = beam0.location
+        
+        # apply plasma-density up ramp (magnify beta function)
+        if self.ramp_beta_mag is not None:
+            beam.magnify_beta_function(self.ramp_beta_mag)
+            #driver.magnify_beta_function(self.ramp_beta_mag)
+            
         return super().track(beam, savedepth, runnable, verbose)
     
     
@@ -61,31 +77,63 @@ class StageWakeT(Stage):
         if self._beam_evolution is not None and self._driver_evolution is not None:
             
             # prepare the figure
-            fig, axs = plt.subplots(2, 6)
-            fig.set_figwidth(CONFIG.plot_width_default)
-            fig.set_figheight(9)
+            fig, axs = plt.subplots(5, 2)
+            fig.set_figwidth(CONFIG.plot_fullwidth_default)
+            fig.set_figheight(CONFIG.plot_fullwidth_default*0.8)
 
             # beam plots
-            axs[0,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['beta_x'])
-            axs[0,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['beta_y'])
+            axs[0,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['avg_ene']*SI.m_e*SI.c**2/SI.e/1e9)
             axs[0,0].set_xlabel('s (m)')
-            axs[0,0].set_ylabel('Beta function (m)')
-            axs[0,0].set_yscale('log')
+            axs[0,0].set_ylabel('Energy, mean (GeV)')
             axs[0,0].set_title('Beam')
+            
+            axs[1,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['rel_ene_spread']*1e2)
+            axs[1,0].set_xlabel('s (m)')
+            axs[1,0].set_ylabel('Rel. energy spread, rms (%)')
+            
+            axs[2,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['beta_x']*1e3)
+            axs[2,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['beta_y']*1e3)
+            axs[2,0].set_xlabel('s (m)')
+            axs[2,0].set_ylabel('Beta function (mm)')
+            axs[2,0].set_yscale('log')
+            
+            axs[3,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['emitt_x']*1e6)
+            axs[3,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['emitt_y']*1e6)
+            axs[3,0].set_xlabel('s (m)')
+            axs[3,0].set_ylabel('Norm. emittance (mm mrad)')
+            axs[3,0].set_yscale('log')
 
-            axs[0,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['emit_nx'])
-            axs[0,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['emit_ny'])
-            axs[0,0].set_xlabel('s (m)')
-            axs[0,0].set_ylabel('Beta function (m)')
-            axs[0,0].set_yscale('log')
-            axs[0,0].set_title('Beam')
-
+            axs[4,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['x_avg']*1e6)
+            axs[4,0].plot(self._beam_evolution['prop_dist'], self._beam_evolution['y_avg']*1e6)
+            axs[4,0].set_xlabel('s (m)')
+            axs[4,0].set_ylabel('Offset, mean (um)')
+            
             # driver plots
-            axs[1].plot(self._beam_evolution['prop_dist'], self._beam_evolution['avg_ene']*SI.m_e*SI.c**2/SI.e/1e9)
-            axs[1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['avg_ene']*SI.m_e*SI.c**2/SI.e/1e9)
-            axs[1].set_xlabel('s (m)')
-            axs[1].set_ylabel('Mean energy (GeV)')
-            axs[1].set_title('Driver')
+            axs[0,1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['avg_ene']*SI.m_e*SI.c**2/SI.e/1e9)
+            axs[0,1].set_xlabel('s (m)')
+            axs[0,1].set_ylabel('Energy, mean (GeV)')
+            axs[0,1].set_title('Driver')
+            
+            axs[1,1].plot(self._beam_evolution['prop_dist'], self._beam_evolution['rel_ene_spread']*1e2)
+            axs[1,1].set_xlabel('s (m)')
+            axs[1,1].set_ylabel('Rel. energy spread, rms (%)')
+            
+            axs[2,1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['beta_x'])
+            axs[2,1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['beta_y'])
+            axs[2,1].set_xlabel('s (m)')
+            axs[2,1].set_ylabel('Beta function (m)')
+            axs[2,1].set_yscale('log')
+            
+            axs[3,1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['emitt_x']*1e6)
+            axs[3,1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['emitt_y']*1e6)
+            axs[3,1].set_xlabel('s (m)')
+            axs[3,1].set_ylabel('Norm. emittance (mm mrad)')
+            axs[3,1].set_yscale('log')
+            
+            axs[4,1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['x_avg']*1e6)
+            axs[4,1].plot(self._driver_evolution['prop_dist'], self._driver_evolution['y_avg']*1e6)
+            axs[4,1].set_xlabel('s (m)')
+            axs[4,1].set_ylabel('Offset, mean (um)')
 
         
     def get_length(self):
@@ -101,7 +149,7 @@ class StageWakeT(Stage):
         return None # TODO
     
     def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy)
+        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
         
     def plot_wakefield(self, beam=None):
         pass
