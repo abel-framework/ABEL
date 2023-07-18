@@ -1,9 +1,7 @@
 from opal import Runnable, Linac, BeamDeliverySystem, InteractionPoint, Event
 from matplotlib import pyplot as plt
 import numpy as np
-from os import listdir, remove, mkdir
-from os.path import isfile, join, exists
-from copy import deepcopy
+import os, copy
 from matplotlib import lines
 from datetime import datetime
 
@@ -30,17 +28,17 @@ class Collider(Runnable):
         num_events = len(files)
         lumi_full = np.empty(num_events)
         for i in range(num_events):
-            event = Event.load(files[i], loadBeams=False)
+            event = Event.load(files[i], load_beams=False)
             lumi_full[i] = event.full_luminosity()
         return np.median(lumi_full)
     
     # peak luminosity per crossing [m^-2]
-    def peakLuminosity_per_crossing(self):
+    def peak_luminosity_per_crossing(self):
         files = self.ip.run_data()
         num_events = len(files)
         lumi_peak = np.empty(num_events)
         for i in range(num_events):
-            event = Event.load(files[i], loadBeams=False)
+            event = Event.load(files[i], load_beams=False)
             lumi_peak[i] = event.peak_luminosity()
         return np.median(lumi_peak)
         
@@ -85,7 +83,7 @@ class Collider(Runnable):
         
         # copy second arm if undefined
         if self.linac2 is None:
-            self.linac2 = deepcopy(self.linac1)
+            self.linac2 = copy.deepcopy(self.linac1)
             
         assert(isinstance(self.linac1, Linac))
         assert(isinstance(self.linac2, Linac))
@@ -98,8 +96,8 @@ class Collider(Runnable):
             self.run_name = run_name
         
         # make base folder and clear tracking directory
-        if not exists(self.run_path()):
-            mkdir(self.run_path())
+        if not os.path.exists(self.run_path()):
+            os.makedirs(self.run_path())
         
         # run first linac arm
         if verbose:

@@ -8,7 +8,7 @@ import matplotlib.animation as animation
 
 class Linac(Beamline):
     
-    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=1, first_stage=None, alternate_interstage_polarity=False):
+    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=0, first_stage=None, alternate_interstage_polarity=False):
         
         self.source = source
         self.stage = stage
@@ -65,7 +65,7 @@ class Linac(Beamline):
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
                     self.trackables[2+2*i] = interstage_instance
                     self.interstages[i] = interstage_instance
-            
+        
         # add beam delivery system
         if self.bds is not None:
             self.bds.nom_energy = self.source.get_energy()
