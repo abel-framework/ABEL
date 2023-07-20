@@ -10,7 +10,7 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False, full_output=False):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
@@ -18,6 +18,7 @@ class StageHipace(Stage):
         self.add_driver_to_beam = add_driver_to_beam
         
         self.keep_data = keep_data
+        self.full_output = full_output
         
         self.__initial_wakefield = None
         self.__final_wakefield = None
@@ -72,10 +73,16 @@ class StageHipace(Stage):
         # convert to number of steps (and re-adjust timestep to be divisible)
         self.num_steps = np.ceil(self.length/(time_step0*SI.c))
         time_step = self.length/(self.num_steps*SI.c)
+
+        # overwrite output period
+        if self.full_output:
+            output_period = 1
+        else:
+            output_period = None
         
         # input file
         filename_input = tmpfolder + 'input_file'
-        hipace_write_inputs(filename_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy)
+        hipace_write_inputs(filename_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, output_period=output_period)
         
         
         ## RUN SIMULATION
