@@ -60,8 +60,12 @@ class SourceBasic(Source):
                 raise Exception("Both absolute and relative energy spread defined.")
         
         # longitudinal phase space
-        zs = np.random.normal(loc = self.z_offset, scale = self.bunch_length, size=self.num_particles)
-        Es = np.random.normal(loc = self.energy, scale = self.energy_spread, size=self.num_particles)
+        if self.symmetrize:
+            zs = np.tile(np.random.normal(loc = self.z_offset, scale = self.bunch_length, size=round(self.num_particles/4)), 4)
+            Es = np.tile(np.random.normal(loc = self.energy, scale = self.energy_spread, size=round(self.num_particles/4)), 4)
+        else:
+            zs = np.random.normal(loc = self.z_offset, scale = self.bunch_length, size=self.num_particles)
+            Es = np.random.normal(loc = self.energy, scale = self.energy_spread, size=self.num_particles)
 
         # add longitudinal jitters
         if self.jitter.t == 0:
