@@ -1,3 +1,3 @@
-# OPAL: the Optimizable Plasma-Accelerator Linac code
+# ABEL: the Advanced Beams and Extreme Linacs code
 
-The OPAL code is a particle tracking code for plasma-accelerator linacs, implemented at varying levels complexity, for fast optimization.
+The ABEL code is a particle tracking code for plasma-accelerator linacs, implemented at varying levels complexity, for fast optimization.
