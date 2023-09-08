@@ -76,7 +76,7 @@ class StageQuasistatic2d(Stage):
         with suppress_stdout():
             bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
         
-        # convert back to OPAL beams
+        # convert back to ABEL beams
         beam = wake_t_bunch2beam(bunches[1][-1])
         driver = wake_t_bunch2beam(bunches[0][-1])
         
