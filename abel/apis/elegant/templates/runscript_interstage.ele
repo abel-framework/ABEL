@@ -1,0 +1,19 @@
+! RUN SCRIPT for STAGING OF PLASMA ACCELERATORS
+! by Carl A. Lindstrom (University of Oslo), 13.08.2022
+
+&run_setup
+    lattice             = "{printenv LATTICE}",
+    use_beamline        = "ACHROMAT",
+    p_central_mev       = "({printenv ENERGY})",
+    random_number_seed  = 0,
+&end
+
+&run_control
+&end
+
+&sdds_beam
+    input               = "{printenv BEAM}",
+&end
+
+&track
+&end
