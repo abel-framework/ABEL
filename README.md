@@ -1,3 +1,3 @@
-# ABEL: the Advanced Beams and Extreme Linacs code
+# ABEL: the Advanced Beginning-to-End Linac simulation framework
 
-The ABEL code is a particle tracking code for plasma-accelerator linacs, implemented at varying levels complexity, for fast optimization.
+The ABEL simulation framework is a particle-tracking framework for plasma-accelerator linacs, implemented at varying levels complexity, for fast optimization.
