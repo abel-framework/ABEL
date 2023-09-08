@@ -110,7 +110,7 @@ class Linac(Beamline):
     ## PLOT EVOLUTION
     
     # apply function to all beam files
-    def __evolution_fcn(self, fcns):
+    def __evolution_fcn(self, fcns, shot=None):
         
         # declare data structure
         num_outputs = self.num_outputs()
@@ -118,13 +118,18 @@ class Linac(Beamline):
         ss = np.empty(num_outputs)
         vals_mean = np.empty((num_outputs, len(fcns)))
         vals_std = np.empty((num_outputs, len(fcns)))
+
+        if shot is None:
+            shots = range(self.num_shots)
+        else:
+            shots = shot
         
         # go through files
         for index in range(num_outputs):
             
             # load beams and apply functions
             vals = np.empty((self.num_shots, len(fcns)))
-            for shot in range(self.num_shots):
+            for shot in shots:
                 beam = self.get_beam(index=index, shot=shot)
                 for k in range(len(fcns)):
                     vals[shot,k] = fcns[k](beam)
@@ -173,7 +178,7 @@ class Linac(Beamline):
         return waterfalls, trackable_numbers, bins
              
         
-    def plot_evolution(self, use_stage_nums=False):
+    def plot_evolution(self, use_stage_nums=False, shot=None):
         
         if self.trackables is None:
             self.assemble_trackables()
@@ -186,7 +191,7 @@ class Linac(Beamline):
                                              Beam.bunch_length, Beam.z_offset, \
                                              Beam.norm_emittance_x, Beam.norm_emittance_y, \
                                              Beam.beta_x, Beam.beta_y, \
-                                             Beam.x_offset, Beam.y_offset])
+                                             Beam.x_offset, Beam.y_offset], shot)
         
         if use_stage_nums:
             long_axis = stage_nums

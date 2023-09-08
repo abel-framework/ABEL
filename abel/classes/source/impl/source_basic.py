@@ -59,20 +59,19 @@ class SourceBasic(Source):
             elif abs(self.energy_spread - self.energy * self.rel_energy_spread) > 0:
                 raise Exception("Both absolute and relative energy spread defined.")
         
+        # add longitudinal jitter
+        if abs(self.jitter.t) > 0:
+            z_jitter = np.random.normal(scale = self.jitter.t*SI.c)
+        else:
+            z_jitter = np.random.normal(scale = self.jitter.z)
+        
         # longitudinal phase space
         if self.symmetrize:
-            zs = np.tile(np.random.normal(loc = self.z_offset, scale = self.bunch_length, size=round(self.num_particles/4)), 4)
+            zs = np.tile(np.random.normal(loc = self.z_offset + z_jitter, scale = self.bunch_length, size=round(self.num_particles/4)), 4)
             Es = np.tile(np.random.normal(loc = self.energy, scale = self.energy_spread, size=round(self.num_particles/4)), 4)
         else:
-            zs = np.random.normal(loc = self.z_offset, scale = self.bunch_length, size=self.num_particles)
+            zs = np.random.normal(loc = self.z_offset + z_jitter, scale = self.bunch_length, size=self.num_particles)
             Es = np.random.normal(loc = self.energy, scale = self.energy_spread, size=self.num_particles)
-
-        # add longitudinal jitters
-        if self.jitter.t == 0:
-            self.jitter.t = self.jitter.z/SI.c
-        if self.jitter.z == 0:
-            self.jitter.z = self.jitter.t*SI.c
-        zs += np.random.normal(scale = self.jitter.z)
         
         # create phase space
         beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge)

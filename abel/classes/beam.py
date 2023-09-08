@@ -3,7 +3,7 @@ import openpmd_api as io
 from datetime import datetime
 from pytz import timezone
 import scipy.constants as SI
-from abel.utilities.relativity import *
+from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma
 from abel.utilities.statistics import prct_clean, prct_clean2d
 from abel.utilities.plasma_physics import k_p
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
@@ -143,6 +143,8 @@ class Beam():
         self.set_uxs(xps*self.uzs())
     def set_yps(self, yps):
         self.set_uys(yps*self.uzs())
+    def set_Es(self, Es):
+        self.set_uzs(energy2proper_velocity(Es))
         
     def set_qs(self, qs):
         self.__phasespace[6,:] = qs
@@ -239,6 +241,18 @@ class Beam():
     
     def y_offset(self, clean=False):
         return np.mean(prct_clean(self.ys(), clean))
+
+    def x_angle(self, clean=False):
+        return np.mean(prct_clean(self.xps(), clean))
+    
+    def y_angle(self, clean=False):
+        return np.mean(prct_clean(self.yps(), clean))
+        
+    def ux_offset(self, clean=False):
+        return np.mean(prct_clean(self.uxs(), clean))
+    
+    def uy_offset(self, clean=False):
+        return np.mean(prct_clean(self.uys(), clean))
     
     def beam_size_x(self, clean=False):
         return np.std(prct_clean(self.xs(), clean))
@@ -260,20 +274,20 @@ class Beam():
         ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
         return np.sqrt(np.linalg.det(np.cov(ys, yps)))
     
-    def norm_emittance_x(self, clean=True):
+    def norm_emittance_x(self, clean=False):
         xs, uxs = prct_clean2d(self.xs(), self.uxs(), clean)
         return np.sqrt(np.linalg.det(np.cov(xs, uxs/SI.c)))
     
-    def norm_emittance_y(self, clean=True):
+    def norm_emittance_y(self, clean=False):
         ys, uys = prct_clean2d(self.ys(), self.uys(), clean)
         return np.sqrt(np.linalg.det(np.cov(ys, uys/SI.c)))
     
-    def beta_x(self, clean=True):
+    def beta_x(self, clean=False):
         xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
         covx = np.cov(xs, xps)
         return covx[0,0]/np.sqrt(np.linalg.det(covx))
     
-    def beta_y(self, clean=True):
+    def beta_y(self, clean=False):
         ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
         covy = np.cov(ys, yps)
         return covy[0,0]/np.sqrt(np.linalg.det(covy))
@@ -425,7 +439,6 @@ class Beam():
         
         # remove particles with subzero energy
         del self[Es < 0]
-        del self[np.isnan(Es)]
         
     def compress(self, R_56, nom_energy):
         zs = self.zs() + (1-self.Es()/nom_energy) * R_56
@@ -449,9 +462,19 @@ class Beam():
         
     
     # magnify beta function (increase beam size, decrease divergence)
-    def magnify_beta_function(self, beta_mag):
+    def magnify_beta_function(self, beta_mag, axis_defining_beam=None):
+        
+        # calculate beam (not beta) magnification
         mag = np.sqrt(beta_mag)
-        self.set_xs(self.xs() * mag)
+
+        if axis_defining_beam is None:
+            x_offset, y_offset = 0, 0
+            ux_offset, uy_offset = 0, 0
+        else:
+            x_offset, y_offset = axis_defining_beam.x_offset(), axis_defining_beam.y_offset()
+            ux_offset, uy_offset = axis_defining_beam.ux_offset(), axis_defining_beam.ux_offset()
+        
+        self.set_xs((self.xs()-x_offset) * mag + x_offset)
         self.set_ys(self.ys() * mag)
         self.set_uxs(self.uxs() / mag)
         self.set_uys(self.uys() / mag)

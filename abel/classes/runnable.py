@@ -13,7 +13,8 @@ import dill as pickle
 class Runnable(ABC):
     
     # run simulation
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=True, parallel=False, max_cores=16): # TODO: implement overwrite_from=(trackable)
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=True, parallel=False, max_cores=16): 
+        # TODO: implement overwrite_from=(trackable)
         
         # define run name (generate if not given)
         if run_name is None:
@@ -40,7 +41,7 @@ class Runnable(ABC):
             # perform parallel tracking
             with joblib_progress('Tracking shots ('+str(num_cores)+' in parallel)', num_shots):
                 Parallel(n_jobs=num_cores)(delayed(self.perform_shot)(shot) for shot in range(num_shots))
-                time.sleep(0.1) # hack to allow 
+                time.sleep(0.1) # hack to allow printing progress
             
         else:   
             
@@ -49,7 +50,8 @@ class Runnable(ABC):
                 self.perform_shot(shot)
         
         # return final beam from first shot
-        return self[0].final_beam()
+        self.__dict__.update(self[0].__dict__)
+        return self.final_beam()
     
     
     # shot tracking function (to be repeated)
@@ -226,20 +228,20 @@ class Runnable(ABC):
     
     
     # plot value of beam parameters across a scan
-    def plot_beam_function(self, beam_fcn, label=None, scale=1, xscale='linear', yscale='linear'):
-        self.plot_function(lambda obj : beam_fcn(obj.final_beam()), label=label, scale=scale, xscale=xscale, yscale=yscale)
+    def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear'):
+        self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale)
 
-    def plot_energy(self):
-        self.plot_beam_function(Beam.energy, scale=1e9, label='Energy (GeV)')
+    def plot_energy(self, index=-1):
+        self.plot_beam_function(Beam.energy, scale=1e9, label='Energy (GeV)', index=index)
 
-    def plot_charge(self):
-        self.plot_beam_function(Beam.charge, scale=1e-9, label='Charge (nC)')
+    def plot_charge(self, index=-1):
+        self.plot_beam_function(Beam.charge, scale=1e-9, label='Charge (nC)', index=index)
 
-    def plot_beam_size_x(self):
-        self.plot_beam_function(Beam.beam_size_x, scale=1e-3, label='Beam size, x (mm rms)')
+    def plot_beam_size_x(self, index=-1):
+        self.plot_beam_function(Beam.beam_size_x, scale=1e-3, label='Beam size, x (mm rms)', index=index)
 
-    def plot_beam_size_y(self):
-        self.plot_beam_function(Beam.beam_size_y, scale=1e-3, label='Beam size, y (mm rms)')
+    def plot_beam_size_y(self, index=-1):
+        self.plot_beam_function(Beam.beam_size_y, scale=1e-3, label='Beam size, y (mm rms)', index=index)
         
     # plot value of beam parameters across a scan
     def plot_function(self, fcn, label=None, scale=1, xscale='linear', yscale='linear'):
@@ -275,11 +277,11 @@ class Runnable(ABC):
         ax.set_yscale(yscale)
 
     
-    def plot_waterfall(self, proj_fcn, label=None, scale=1):
+    def plot_waterfall(self, proj_fcn, label=None, scale=1, index=-1):
 
         # determine size of projection
-        _, ctrs_initial = proj_fcn(self.final_beam(shot=0))
-        _, ctrs_final = proj_fcn(self.final_beam(shot=-1))
+        _, ctrs_initial = proj_fcn(self.get_beam(shot=0, index=index))
+        _, ctrs_final = proj_fcn(self.get_beam(shot=-1, index=index))
         ctrs = np.linspace(min(min(ctrs_initial), min(ctrs_final)), max(max(ctrs_initial), max(ctrs_final)), len(ctrs_final))
         bins = np.append(ctrs, ctrs[-1]+(ctrs[1]-ctrs[0])) - (ctrs[1]-ctrs[0])/2
         
@@ -287,7 +289,7 @@ class Runnable(ABC):
         waterfall = np.empty((self.num_shots, len(ctrs)))
         shots = range(self.num_shots)
         for shot in shots:
-            proj, _ = proj_fcn(self.final_beam(shot=shot), bins=bins)
+            proj, _ = proj_fcn(self.get_beam(shot=shot, index=index), bins=bins)
             waterfall[shot,:] = proj
         
         if not hasattr(self, 'scale'):
@@ -306,20 +308,18 @@ class Runnable(ABC):
         ax.set_title('Waterfall')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (a.u.)')
-        #ax.set_xscale(xscale)
-        #ax.set_yscale(yscale)
 
 
-    def plot_waterfall_energy(self):
-        self.plot_waterfall(Beam.energy_spectrum, scale=1e9, label='Energy (GeV)')
+    def plot_waterfall_energy(self, index=-1):
+        self.plot_waterfall(Beam.energy_spectrum, scale=1e9, label='Energy (GeV)', index=index)
 
-    def plot_waterfall_current(self):
-        self.plot_waterfall(Beam.current_profile, scale=1e-15, label='Time (fs)')
+    def plot_waterfall_current(self, index=-1):
+        self.plot_waterfall(Beam.current_profile, scale=1e-15, label='Time (fs)', index=index)
 
-    def plot_waterfall_x(self):
-        self.plot_waterfall(Beam.transverse_profile_x, scale=1e-3, label='x (mm)')
+    def plot_waterfall_x(self, index=-1):
+        self.plot_waterfall(Beam.transverse_profile_x, scale=1e-3, label='x (mm)', index=index)
 
-    def plot_waterfall_y(self):
-        self.plot_waterfall(Beam.transverse_profile_y, scale=1e-3, label='y (mm)')
+    def plot_waterfall_y(self, index=-1):
+        self.plot_waterfall(Beam.transverse_profile_y, scale=1e-3, label='y (mm)', index=index)
         
     

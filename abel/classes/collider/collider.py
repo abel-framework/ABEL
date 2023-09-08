@@ -114,7 +114,7 @@ class Collider(Runnable):
             print(">> INTERACTION POINT")
         event = self.ip.run(self.linac1, self.linac2, self.run_name + "/ip", all_by_all=True, overwrite=(overwrite or overwrite_ip))
         
-        # return beams from last shot
+        # return beams from first shot
         return beam1, beam2
     
     

@@ -19,9 +19,8 @@ class StageWakeT(Stage):
 
         self._beam_evolution = None
         self._driver_evolution = None
-
-
         
+    
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
         # make driver (and convert to WakeT bunch)
@@ -67,7 +66,7 @@ class StageWakeT(Stage):
         # apply plasma-density up ramp (magnify beta function)
         if self.ramp_beta_mag is not None:
             beam.magnify_beta_function(self.ramp_beta_mag)
-            #driver.magnify_beta_function(self.ramp_beta_mag)
+            driver.magnify_beta_function(self.ramp_beta_mag)
             
         return super().track(beam, savedepth, runnable, verbose)
     

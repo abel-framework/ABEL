@@ -7,12 +7,12 @@ import scipy.special as scispec
 
 # damped Hill's equation: x''(s) + gamma'(s)/gamma(s)*x'(s) + k_p^2/(2*gamma(s))*x(s) = 0
 def ode_Hills(u, s, gamma, kp):
-    x, wx = u
-    return wx/(gamma(s)*SI.c), -x*(SI.c/2)*kp(s)**2
+    x, ux = u
+    return ux/(gamma(s)*SI.c), -x*(SI.c/2)*kp(s)**2
 
 
 # solve Hill's equation
-def evolve_hills_equation_ode(x0, wx0, L, gamma, kp):
+def evolve_hills_equation_ode(x0, ux0, L, gamma, kp):
     
     # find longitudinal steps
     gamma_min = min(gamma(0), gamma(L))
@@ -24,19 +24,19 @@ def evolve_hills_equation_ode(x0, wx0, L, gamma, kp):
     evolution = np.empty([3, len(ss)])
     
     # numerical integration
-    u0 = np.array([x0, wx0])
+    u0 = np.array([x0, ux0])
     sol = odeint(ode_Hills, u0, ss, args=(gamma, kp))
     x = sol[-1,0]
-    wx = sol[-1,1]
+    ux = sol[-1,1]
     
-    return x, wx
+    return x, ux
 
 
 # solve Hill's equation
-def evolve_hills_equation_analytic(x0, wx0, L, gamma0, dgamma_ds, kp):
+def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp):
     
     # convert initial proper velocities to angles
-    xp0 = wx0 / gamma2proper_velocity(gamma0)
+    xp0 = ux0 / gamma2proper_velocity(gamma0)
     
     # find final gamma factor
     gamma = gamma0 + dgamma_ds*L
@@ -56,6 +56,6 @@ def evolve_hills_equation_analytic(x0, wx0, L, gamma0, dgamma_ds, kp):
     xp = np.real((dgamma_ds*C**2/(2*A*E))*(Dk*scispec.iv(1,A*1j) - Di*scispec.kv(1,A*1j)))
     
     # convert angles back to proper velocoties
-    wx = xp * gamma2proper_velocity(gamma)
+    ux = xp * gamma2proper_velocity(gamma)
     
-    return x, wx
+    return x, ux
