@@ -4,7 +4,8 @@ import copy, os
 from datetime import datetime
 from matplotlib import pyplot as plt
 import numpy as np
-import matplotlib.animation as animation
+#import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
 
 class Linac(Beamline):
     
@@ -373,4 +374,105 @@ class Linac(Beamline):
         cbar3.ax.set_ylabel('Charge density (nC/um)')
         
         plt.show()
+
+    
+    # animate the longitudinal phase space
+    def animate_lps(self, rel_energy_window=0.06):
+        
+        # set up figure
+        fig, axs = plt.subplots(2, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [2, 1]})
+
+        # get initial beam
+        beam_init = self.get_beam(0)
+        dQdzdE0, zs0, Es0 = beam_init.density_lps()
+        Is0, ts_ = beam_init.current_profile(bins=zs0/SI.c)
+        dQdE0, Es_ = beam_init.energy_spectrum(bins=Es0)
+
+        # get final beam
+        beam_final = self.get_beam(-1)
+        Is_final, _ = beam_final.current_profile(bins=zs0/SI.c)
+        dQdE_final, _ = beam_final.energy_spectrum(bins=Es0)
+
+        # nominal energies
+        Es_nom = self.nom_stage_energies()
+        
+        # prepare centroid arrays
+        z0s = []
+        deltas = []
+
+        # set the colors and transparency
+        col0 = "#cedeeb"
+        col1 = "tab:blue"
+        
+        # frame function
+        def frameFcn(i):
+
+            # get beam for this frame
+            beam = self.get_beam(i)
+            
+            # plot LPS
+            axs[0,0].cla()
+            Ebins = Es_nom[i]*np.linspace(1-rel_energy_window, 1+rel_energy_window, 2*Es0.size)
+            dQdzdE, zs, Es = beam.phase_space_density(beam.zs, beam.Es, hbins=zs0, vbins=Ebins)
+            cax = axs[0,0].pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu', shading='auto', clim=[0, abs(dQdzdE0).max()*1e15])
+            axs[0,0].set_ylabel('Energy (GeV)')
+            axs[0,0].set_title(f"Longitudinal phase space\nShot #{self.shot}, s = {beam.location:.2f} m")
+            
+            # plot current profile
+            axs[1,0].cla()
+            af = 0.15
+            Is, ts = beam.current_profile(bins=zs0/SI.c)
+            axs[1,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
+            axs[1,0].plot(ts*SI.c*1e6, -Is/1e3)
+            axs[1,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
+            axs[1,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.2e-3])
+            axs[1,0].set_xlabel('z (um)')
+            axs[1,0].set_ylabel('I (kA)')
+            
+            # plot energy spectrum
+            axs[0,1].cla()
+            dQdE, Es2 = beam.energy_spectrum(bins=Ebins)
+            deltas2 = Es2/Es_nom[i]-1
+            axs[0,1].fill(-np.concatenate((dQdE, np.zeros(dQdE.size)))*1e18, np.concatenate((deltas2, np.flip(deltas2)))*100, alpha=af, color=col1)
+            axs[0,1].plot(-dQdE*1e18, deltas2*100)
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].set_ylabel('Rel. energy (%)')
+            axs[0,1].set_ylim([-rel_energy_window*100, rel_energy_window*100])
+            axs[0,1].set_xlim([0, max([max(-dQdE0), max(-dQdE_final)])*1.1e18])
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].set_xlabel('dQ/dE (nC/GeV)')
+            
+            # plot E and z centroid evolution
+            axs[1,1].cla()
+            z0 = beam.z_offset()
+            delta = (beam.energy()/Es_nom[i]-1)
+            z0s.append(z0)
+            deltas.append(delta)
+            axs[1,1].plot(np.array(z0s)*1e6, np.array(deltas)*100, '-', color=col0)
+            axs[1,1].plot(z0*1e6, delta*100, 'o', color=col1)
+            axs[1,1].set_ylim([-2, 2])
+            axs[1,1].set_xlim([(zs.mean()-(zs.max()-zs.min())/6)*1e6, (zs.mean()+(zs.max()-zs.min())/6)*1e6])
+            axs[1,1].set_xlabel('z offset (um)')
+            axs[1,1].set_ylabel('Energy offset (%)')
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+
+            return cax
+
+        # make all frames
+        animation = FuncAnimation(fig, frameFcn, frames=range(self.num_outputs()), repeat=False, interval=100)
+
+        # save the animation as a GIF
+        plot_path = self.run_path() + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'lps_shot' + str(self.shot) + '.gif'
+        animation.save(filename, writer="pillow", fps=10)
+
+        # hide the figure
+        plt.close()
+
+        return filename
         
