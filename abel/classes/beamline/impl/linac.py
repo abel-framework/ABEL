@@ -1,11 +1,11 @@
-from abel import Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem
+from abel import Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem, CONFIG
 import scipy.constants as SI
 import copy, os
 from datetime import datetime
 from matplotlib import pyplot as plt
 import numpy as np
-#import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation
+from matplotlib import ticker as mticker
 
 class Linac(Beamline):
     
@@ -380,7 +380,9 @@ class Linac(Beamline):
     def animate_lps(self, rel_energy_window=0.06):
         
         # set up figure
-        fig, axs = plt.subplots(2, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [2, 1]})
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
 
         # get initial beam
         beam_init = self.get_beam(0)
@@ -399,6 +401,10 @@ class Linac(Beamline):
         # prepare centroid arrays
         z0s = []
         deltas = []
+        sigzs = []
+        sigdeltas = []
+        ss = []
+        Emeans = []
 
         # set the colors and transparency
         col0 = "#cedeeb"
@@ -410,54 +416,81 @@ class Linac(Beamline):
             # get beam for this frame
             beam = self.get_beam(i)
             
-            # plot LPS
+            # plot mean energy evolution
+            ss.append(beam.location)
+            Emeans.append(beam.energy())
             axs[0,0].cla()
-            Ebins = Es_nom[i]*np.linspace(1-rel_energy_window, 1+rel_energy_window, 2*Es0.size)
-            dQdzdE, zs, Es = beam.phase_space_density(beam.zs, beam.Es, hbins=zs0, vbins=Ebins)
-            cax = axs[0,0].pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu', shading='auto', clim=[0, abs(dQdzdE0).max()*1e15])
-            axs[0,0].set_ylabel('Energy (GeV)')
-            axs[0,0].set_title(f"Longitudinal phase space\nShot #{self.shot}, s = {beam.location:.2f} m")
+            axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
+            axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
+            axs[0,0].set_xlabel('Position in linac (m)')
+            axs[0,0].set_ylabel('Mean energy (GeV)')
+            axs[0,0].set_xlim(beam_init.location,beam_final.location)
+            axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
             
-            # plot current profile
-            axs[1,0].cla()
-            af = 0.15
-            Is, ts = beam.current_profile(bins=zs0/SI.c)
-            axs[1,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
-            axs[1,0].plot(ts*SI.c*1e6, -Is/1e3)
-            axs[1,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
-            axs[1,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.2e-3])
-            axs[1,0].set_xlabel('z (um)')
-            axs[1,0].set_ylabel('I (kA)')
-            
-            # plot energy spectrum
+            # plot energy spread and bunch length evolution
+            sigzs.append(beam.bunch_length())
+            sigdeltas.append(beam.rel_energy_spread())
             axs[0,1].cla()
-            dQdE, Es2 = beam.energy_spectrum(bins=Ebins)
-            deltas2 = Es2/Es_nom[i]-1
-            axs[0,1].fill(-np.concatenate((dQdE, np.zeros(dQdE.size)))*1e18, np.concatenate((deltas2, np.flip(deltas2)))*100, alpha=af, color=col1)
-            axs[0,1].plot(-dQdE*1e18, deltas2*100)
+            axs[0,1].plot(np.array(sigzs)*1e6, np.array(sigdeltas)*1e2, '-', color=col0)
+            axs[0,1].plot(sigzs[-1]*1e6, sigdeltas[-1]*1e2, 'o', color=col1)
+            axs[0,1].set_ylim(min([min(sigdeltas)*0.8e2, 1e-1]), max([max(sigdeltas)*1.2e2, 10]))
+            axs[0,1].set_xlim(min([min(sigzs)*0.9e6, sigzs[0]*0.7e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.3e6]))
+            axs[0,1].set_xlabel('Bunch length (um)')
+            axs[0,1].set_ylabel('Energy spread (%)')
+            axs[0,1].set_yscale('log')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
-            axs[0,1].set_ylabel('Rel. energy (%)')
-            axs[0,1].set_ylim([-rel_energy_window*100, rel_energy_window*100])
-            axs[0,1].set_xlim([0, max([max(-dQdE0), max(-dQdE_final)])*1.1e18])
             axs[0,1].xaxis.tick_top()
             axs[0,1].xaxis.set_label_position('top')
-            axs[0,1].set_xlabel('dQ/dE (nC/GeV)')
             
-            # plot E and z centroid evolution
+            # plot LPS
+            axs[1,0].cla()
+            Ebins = Es_nom[i]*np.linspace(1-rel_energy_window, 1+rel_energy_window, 2*Es0.size)
+            dQdzdE, zs, Es = beam.phase_space_density(beam.zs, beam.Es, hbins=zs0, vbins=Ebins)
+            cax = axs[1,0].pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu', shading='auto', clim=[0, abs(dQdzdE).max()*1e15])
+            axs[1,0].set_ylabel('Energy (GeV)')
+            axs[1,0].set_title('Longitudinal phase space')
+            
+            # plot current profile
+            axs[2,0].cla()
+            af = 0.15
+            Is, ts = beam.current_profile(bins=zs0/SI.c)
+            axs[2,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
+            axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
+            axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
+            axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
+            axs[2,0].set_xlabel('z (um)')
+            axs[2,0].set_ylabel('I (kA)')
+            
+            # plot energy spectrum
+            dQdE, Es2 = beam.energy_spectrum(bins=Ebins)
+            deltas2 = Es2/Es_nom[i]-1
             axs[1,1].cla()
-            z0 = beam.z_offset()
-            delta = (beam.energy()/Es_nom[i]-1)
-            z0s.append(z0)
-            deltas.append(delta)
-            axs[1,1].plot(np.array(z0s)*1e6, np.array(deltas)*100, '-', color=col0)
-            axs[1,1].plot(z0*1e6, delta*100, 'o', color=col1)
-            axs[1,1].set_ylim([-2, 2])
-            axs[1,1].set_xlim([(zs.mean()-(zs.max()-zs.min())/6)*1e6, (zs.mean()+(zs.max()-zs.min())/6)*1e6])
-            axs[1,1].set_xlabel('z offset (um)')
-            axs[1,1].set_ylabel('Energy offset (%)')
+            axs[1,1].fill(-np.concatenate((dQdE, np.zeros(dQdE.size)))*1e18, np.concatenate((deltas2, np.flip(deltas2)))*100, alpha=af, color=col1)
+            axs[1,1].plot(-dQdE*1e18, deltas2*100)
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].set_ylabel('Rel. energy (%)')
+            axs[1,1].set_ylim([-rel_energy_window*100, rel_energy_window*100])
+            axs[1,1].set_xlim([0, max(-dQdE)*1.1e18])
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel('dQ/dE (nC/GeV)')
+            
+            # plot E and z centroid evolution
+            z0s.append(beam.z_offset())
+            deltas.append(beam.energy()/Es_nom[i]-1)
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(z0s)*1e6, np.array(deltas)*100, '-', color=col0)
+            axs[2,1].plot(z0s[-1]*1e6, deltas[-1]*100, 'o', color=col1)
+            axs[2,1].set_ylim([-rel_energy_window*0.5e2, rel_energy_window*0.5e2])
+            axs[2,1].set_xlim([(z0s[0]-sigzs[0]/2)*1e6, (z0s[0]+sigzs[0]/2)*1e6])
+            axs[2,1].set_xlabel('z offset (um)')
+            axs[2,1].set_ylabel('Energy offset (%)')
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+
 
             return cax
 
@@ -469,6 +502,281 @@ class Linac(Beamline):
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
         filename = plot_path + 'lps_shot' + str(self.shot) + '.gif'
+        animation.save(filename, writer="pillow", fps=10)
+
+        # hide the figure
+        plt.close()
+
+        return filename
+
+
+    # animate the horizontal phase space
+    def animate_phasespace_x(self):
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        # get initial beam
+        beam_init = self.get_beam(0)
+        dQdxdpx0, xs0, pxs0 = beam_init.phase_space_density(beam_init.xs, beam_init.pxs)
+        dQdx0, xs_ = beam_init.projected_density(beam_init.xs, bins=xs0)
+        dQdpx0, pxs_ = beam_init.projected_density(beam_init.pxs, bins=pxs0)
+
+        # get final beam
+        beam_final = self.get_beam(-1)
+        dQdxdpx_final, xs_final, pxs_final = beam_final.phase_space_density(beam_final.xs, beam_final.pxs)
+        dQdx_final, _ = beam_final.projected_density(beam_final.xs, bins=xs0)
+        dQdpx_final, _ = beam_final.projected_density(beam_final.pxs, bins=pxs0)
+
+        # calculate limits
+        pxlim = max(max(-pxs0.min(), pxs0.max()), max(-pxs_final.min(), pxs_final.max()))
+        
+        # prepare centroid arrays
+        x0s = []
+        xp0s = []
+        sigxs = []
+        sigxps = []
+        ss = []
+        emitns = []
+
+        # set the colors and transparency
+        col0 = "#cedeeb"
+        col1 = "tab:blue"
+        
+        # frame function
+        def frameFcn(i):
+
+            # get beam for this frame
+            beam = self.get_beam(i)
+            
+            # plot emittance evolution
+            ss.append(beam.location)
+            emitns.append(beam.norm_emittance_x())
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(emitns)*1e6, '-', color=col0)
+            axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
+            axs[0,0].set_xlabel('Position in linac (m)')
+            axs[0,0].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,0].set_xlim(beam_init.location,beam_final.location)
+            axs[0,0].set_ylim(beam_init.norm_emittance_x()*0.5e6,beam_final.norm_emittance_x()*2e6)
+            axs[0,0].set_yscale('log')
+            axs[0,0].yaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot beam size and divergence evolution
+            sigxs.append(beam.beam_size_x())
+            sigxps.append(beam.divergence_x())
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigxs)*1e6, np.array(sigxps)*1e3, '-', color=col0)
+            axs[0,1].plot(sigxs[-1]*1e6, sigxps[-1]*1e3, 'o', color=col1)
+            axs[0,1].set_ylim(min([min(sigxps)*0.9e3, beam_final.divergence_x()*0.8e3]), max([max(sigxps)*1.1e3, sigxs[0]*1.2e3]))
+            axs[0,1].set_xlim(min([min(sigxs)*0.9e6, beam_final.beam_size_x()*0.8e6]), max([max(sigxs)*1.1e6, sigxs[0]*1.2e6]))
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel('Beam size (um)')
+            axs[0,1].set_ylabel('Divergence (mrad)')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdxdpx, xs, pxs = beam.phase_space_density(beam.xs, beam.pxs, hbins=xs0, vbins=pxs_final)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(xs*1e6, pxs*1e-6*SI.c/SI.e, -dQdxdpx, cmap='GnBu', shading='auto')
+            axs[1,0].set_ylabel("Momentum, $p_x$ (MeV/c)")
+            axs[1,0].set_title('Horizontal phase space')
+            
+            # plot position projection
+            af = 0.15
+            dQdx, xs2 = beam.projected_density(beam.xs, bins=xs0)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((xs2, np.flip(xs2)))*1e6, -np.concatenate((dQdx, np.zeros(dQdx.size)))*1e3, alpha=af, color=col1)
+            axs[2,0].plot(xs2*1e6, -dQdx*1e3, color=col1)
+            axs[2,0].set_xlim([min(xs0)*1e6, max(xs0)*1e6])
+            axs[2,0].set_ylim([0, max([max(-dQdx0), max(-dQdx_final)])*1.2e3])
+            axs[2,0].set_xlabel('Transverse position, $x$ (um)')
+            axs[2,0].set_ylabel('$dQ/dy$ (nC/um)')
+            
+            # plot angular projection
+            dQdpx, pxs2 = beam.projected_density(beam.pxs, bins=pxs_final)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdpx, np.zeros(dQdpx.size)))*1e9/(1e-6*SI.c/SI.e), np.concatenate((pxs2, np.flip(pxs2)))*1e-6*SI.c/SI.e, alpha=af, color=col1)
+            axs[1,1].plot(-dQdpx*1e9/(1e-6*SI.c/SI.e), pxs2*1e-6*SI.c/SI.e, color=col1)
+            axs[1,1].set_ylim([-pxlim*1e-6*SI.c/SI.e, pxlim*1e-6*SI.c/SI.e])
+            axs[1,1].set_xlim([0, max([max(-dQdpx0), max(-dQdpx_final)])*1e9/(1e-6*SI.c/SI.e)])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel("$dQ/dp_x$ (nC c/MeV)")
+            axs[1,1].set_ylabel("Momentum, $p_x$ (MeV/c)")
+            
+            # plot centroid evolution
+            x0s.append(beam.x_offset())
+            xp0s.append(beam.x_angle())
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(x0s)*1e6, np.array(xp0s)*1e6, '-', color=col0)
+            axs[2,1].plot(x0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel('Centroid offset (um)')
+            axs[2,1].set_ylabel('Centroid angle (urad)')
+            axs[2,1].set_xlim(min(-max(x0s)*1.1,-0.1*sigxs[0])*1e6, max(max(x0s)*1.1,0.1*sigxs[0])*1e6)
+            axs[2,1].set_ylim(min(-max(xp0s)*1.1,-0.1*sigxps[0])*1e6, max(max(xp0s)*1.1,0.1*sigxps[0])*1e6)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+
+            return cax
+
+        # make all frames
+        animation = FuncAnimation(fig, frameFcn, frames=range(self.num_outputs()), repeat=False, interval=100)
+
+        # save the animation as a GIF
+        plot_path = self.run_path() + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'phasespace_x_shot' + str(self.shot) + '.gif'
+        animation.save(filename, writer="pillow", fps=10)
+
+        # hide the figure
+        plt.close()
+
+        return filename
+
+
+
+    # animate the vertical phase space
+    def animate_phasespace_y(self):
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        # get initial beam
+        beam_init = self.get_beam(0)
+        dQdydpy0, ys0, pys0 = beam_init.phase_space_density(beam_init.ys, beam_init.pys)
+        dQdy0, ys_ = beam_init.projected_density(beam_init.ys, bins=ys0)
+        dQdpy0, pys_ = beam_init.projected_density(beam_init.pys, bins=pys0)
+
+        # get final beam
+        beam_final = self.get_beam(-1)
+        dQdydpy_final, ys_final, pys_final = beam_final.phase_space_density(beam_final.ys, beam_final.pys)
+        dQdy_final, _ = beam_final.projected_density(beam_final.ys, bins=ys0)
+        dQdpy_final, _ = beam_final.projected_density(beam_final.pys, bins=pys0)
+
+        # calculate limits
+        pylim = max(max(-pys0.min(), pys0.max()), max(-pys_final.min(), pys_final.max()))
+        
+        # prepare centroid arrays
+        y0s = []
+        yp0s = []
+        sigys = []
+        sigyps = []
+        ss = []
+        emitns = []
+
+        # set the colors and transparency
+        col0 = "#f5d9c1"
+        col1 = "tab:orange"
+        
+        # frame function
+        def frameFcn(i):
+
+            # get beam for this frame
+            beam = self.get_beam(i)
+            
+            # plot emittance evolution
+            ss.append(beam.location)
+            emitns.append(beam.norm_emittance_y())
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(emitns)*1e6, '-', color=col0)
+            axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
+            axs[0,0].set_xlabel('Position in linac (m)')
+            axs[0,0].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,0].set_xlim(beam_init.location,beam_final.location)
+            axs[0,0].set_ylim(beam_init.norm_emittance_y()*0.5e6,beam_final.norm_emittance_y()*2e6)
+            axs[0,0].set_yscale('log')
+            axs[0,0].yaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot beam size and divergence evolution
+            sigys.append(beam.beam_size_y())
+            sigyps.append(beam.divergence_y())
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigys)*1e6, np.array(sigyps)*1e3, '-', color=col0)
+            axs[0,1].plot(sigys[-1]*1e6, sigyps[-1]*1e3, 'o', color=col1)
+            axs[0,1].set_ylim(min([min(sigyps)*0.9e3, beam_final.divergence_y()*0.8e3]), max([max(sigyps)*1.1e3, sigys[0]*1.2e3]))
+            axs[0,1].set_xlim(min([min(sigys)*0.9e6, beam_final.beam_size_y()*0.8e6]), max([max(sigys)*1.1e6, sigys[0]*1.2e6]))
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel('Beam size (um)')
+            axs[0,1].set_ylabel('Divergence (mrad)')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdydpy, ys, pys = beam.phase_space_density(beam.ys, beam.pys, hbins=ys0, vbins=pys_final)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(ys*1e6, pys*1e-6*SI.c/SI.e, -dQdydpy, cmap='GnBu', shading='auto')
+            axs[1,0].set_ylabel("Momentum, $p_y$ (MeV/c)")
+            axs[1,0].set_title('Vertical phase space')
+            
+            # plot position projection
+            af = 0.15
+            dQdy, ys2 = beam.projected_density(beam.ys, bins=ys0)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((ys2, np.flip(ys2)))*1e6, -np.concatenate((dQdy, np.zeros(dQdy.size)))*1e3, alpha=af, color=col1)
+            axs[2,0].plot(ys2*1e6, -dQdy*1e3, color=col1)
+            axs[2,0].set_xlim([min(ys0)*1e6, max(ys0)*1e6])
+            axs[2,0].set_ylim([0, max([max(-dQdy0), max(-dQdy_final)])*1.2e3])
+            axs[2,0].set_xlabel('Transverse position, $y$ (um)')
+            axs[2,0].set_ylabel('$dQ/dy$ (nC/um)')
+            
+            # plot angular projection
+            dQdpy, pys2 = beam.projected_density(beam.pys, bins=pys_final)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdpy, np.zeros(dQdpy.size)))*1e9/(1e-6*SI.c/SI.e), np.concatenate((pys2, np.flip(pys2)))*1e-6*SI.c/SI.e, alpha=af, color=col1)
+            axs[1,1].plot(-dQdpy*1e9/(1e-6*SI.c/SI.e), pys2*1e-6*SI.c/SI.e, color=col1)
+            axs[1,1].set_ylim([-pylim*1e-6*SI.c/SI.e, pylim*1e-6*SI.c/SI.e])
+            axs[1,1].set_xlim([0, max([max(-dQdpy0), max(-dQdpy_final)])*1e9/(1e-6*SI.c/SI.e)])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel("$dQ/dp_y$ (nC c/MeV)")
+            axs[1,1].set_ylabel("Momentum, $p_y$ (MeV/c)")
+            
+            # plot centroid evolution
+            y0s.append(beam.y_offset())
+            yp0s.append(beam.y_angle())
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(y0s)*1e6, np.array(yp0s)*1e6, '-', color=col0)
+            axs[2,1].plot(y0s[-1]*1e6, yp0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel('Centroid offset (um)')
+            axs[2,1].set_ylabel('Centroid angle (urad)')
+            axs[2,1].set_xlim(min(-max(y0s)*1.1,-0.1*sigys[0])*1e6, max(max(y0s)*1.1,0.1*sigys[0])*1e6)
+            axs[2,1].set_ylim(min(-max(yp0s)*1.1,-0.1*sigyps[0])*1e6, max(max(yp0s)*1.1,0.1*sigyps[0])*1e6)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+
+            return cax
+
+        # make all frames
+        animation = FuncAnimation(fig, frameFcn, frames=range(self.num_outputs()), repeat=False, interval=100)
+
+        # save the animation as a GIF
+        plot_path = self.run_path() + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'phasespace_y_shot' + str(self.shot) + '.gif'
         animation.save(filename, writer="pillow", fps=10)
 
         # hide the figure
