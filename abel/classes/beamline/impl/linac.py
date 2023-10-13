@@ -783,4 +783,274 @@ class Linac(Beamline):
         plt.close()
 
         return filename
+
+    
+    # animate the horizontal sideview (top view)
+    def animate_sideview_x(self):
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        # get initial beam
+        beam_init = self.get_beam(0)
+        dQdzdx0, zs0, xs0 = beam_init.phase_space_density(beam_init.zs, beam_init.xs)
+        dQdx0, xs_ = beam_init.projected_density(beam_init.xs, bins=xs0)
+        Is0, _ = beam_init.current_profile(bins=zs0/SI.c)
+
+        # get final beam
+        beam_final = self.get_beam(-1)
+        dQdzdx_final, zs_final, xs_final = beam_final.phase_space_density(beam_final.zs, beam_final.xs)
+        dQdx_final, _ = beam_final.projected_density(beam_final.xs, bins=xs0)
+        Is_final, _ = beam_final.current_profile(bins=zs0/SI.c)
+        
+        # prepare centroid arrays
+        x0s = []
+        z0s = []
+        Emeans = []
+        sigzs = []
+        sigxs = []
+        ss = []
+        emitns = []
+
+        # set the colors and transparency
+        col0 = "#cedeeb"
+        col1 = "tab:blue"
+        
+        # frame function
+        def frameFcn(i):
+
+            # get beam for this frame
+            beam = self.get_beam(i)
+            
+            # plot emittance evolution
+            ss.append(beam.location)
+            Emeans.append(beam.energy())
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
+            axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
+            axs[0,0].set_xlabel('Position in linac (m)')
+            axs[0,0].set_ylabel('Mean energy (GeV)')
+            axs[0,0].set_xlim(beam_init.location,beam_final.location)
+            axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot emittance and bunch length evolution
+            emitns.append(beam.norm_emittance_x()) # TODO: update to normalized amplitude
+            sigzs.append(beam.bunch_length())
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigzs)*1e6, np.array(emitns)*1e6, '-', color=col0)
+            axs[0,1].plot(sigzs[-1]*1e6, emitns[-1]*1e6, 'o', color=col1)
+            axs[0,1].set_ylim(min([min(emitns)*0.9e6, beam_final.norm_emittance_x()*0.8e6]), max([max(emitns)*1.1e6, emitns[0]*1.2e6]))
+            axs[0,1].set_xlim(min([min(sigzs)*0.9e6, beam_final.bunch_length()*0.8e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.2e6]))
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel('Bunch length (um)')
+            axs[0,1].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdzdx, zs, xs = beam.phase_space_density(beam.zs, beam.xs, hbins=zs0, vbins=xs0)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(zs*1e6, xs*1e6, -dQdzdx, cmap='GnBu', shading='auto')
+            axs[1,0].set_ylabel("Transverse offset, $x$ (um)")
+            axs[1,0].set_title('Horizontal sideview (top view)')
+
+            # plot current profile
+            af = 0.15
+            Is, ts = beam.current_profile(bins=zs0/SI.c)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
+            axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
+            axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
+            axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
+            axs[2,0].set_xlabel('z (um)')
+            axs[2,0].set_ylabel('I (kA)')
+            
+            # plot position projection
+            dQdx, xs2 = beam.projected_density(beam.xs, bins=xs0)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdx, np.zeros(dQdx.size)))*1e3, np.concatenate((xs2, np.flip(xs2)))*1e6, alpha=af, color=col1)
+            axs[1,1].plot(-dQdx*1e3, xs2*1e6, color=col1)
+            axs[1,1].set_ylim([min(xs0)*1e6, max(xs0)*1e6])
+            axs[1,1].set_xlim([0, max([max(-dQdx), max(-dQdx_final)])*1.1e3])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel("$dQ/dx$ (nC/um)")
+            axs[1,1].set_ylabel("$x$ (um)")
+            
+            # plot centroid evolution
+            z0s.append(beam.z_offset())
+            sigxs.append(beam.beam_size_x())
+            x0s.append(beam.x_offset())
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(z0s)*1e6, np.array(x0s)*1e6, '-', color=col0)
+            axs[2,1].plot(z0s[-1]*1e6, x0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel('z offset (um)')
+            axs[2,1].set_ylabel('x offset (um)')
+            axs[2,1].set_xlim(min([min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, max([max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
+            axs[2,1].set_ylim(min(-max(x0s)*1.1,-0.1*sigxs[0])*1e6, max(max(x0s)*1.1,0.1*sigxs[0])*1e6)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+
+            return cax
+
+        # make all frames
+        animation = FuncAnimation(fig, frameFcn, frames=range(self.num_outputs()), repeat=False, interval=100)
+
+        # save the animation as a GIF
+        plot_path = self.run_path() + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'sideview_x_shot' + str(self.shot) + '.gif'
+        animation.save(filename, writer="pillow", fps=10)
+
+        # hide the figure
+        plt.close()
+
+        return filename
+
+
+    
+    # animate the vertical sideview
+    def animate_sideview_y(self):
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        # get initial beam
+        beam_init = self.get_beam(0)
+        dQdzdy0, zs0, ys0 = beam_init.phase_space_density(beam_init.zs, beam_init.ys)
+        dQdy0, ys_ = beam_init.projected_density(beam_init.ys, bins=ys0)
+        Is0, _ = beam_init.current_profile(bins=zs0/SI.c)
+
+        # get final beam
+        beam_final = self.get_beam(-1)
+        dQdzdy_final, zs_final, ys_final = beam_final.phase_space_density(beam_final.zs, beam_final.ys)
+        dQdy_final, _ = beam_final.projected_density(beam_final.ys, bins=ys0)
+        Is_final, _ = beam_final.current_profile(bins=zs0/SI.c)
+        
+        # prepare centroid arrays
+        y0s = []
+        z0s = []
+        Emeans = []
+        sigzs = []
+        sigys = []
+        ss = []
+        emitns = []
+
+        # set the colors and transparency
+        col0 = "#f5d9c1"
+        col1 = "tab:orange"
+        
+        # frame function
+        def frameFcn(i):
+
+            # get beam for this frame
+            beam = self.get_beam(i)
+            
+            # plot emittance evolution
+            ss.append(beam.location)
+            Emeans.append(beam.energy())
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
+            axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
+            axs[0,0].set_xlabel('Position in linac (m)')
+            axs[0,0].set_ylabel('Mean energy (GeV)')
+            axs[0,0].set_xlim(beam_init.location,beam_final.location)
+            axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot emittance and bunch length evolution
+            emitns.append(beam.norm_emittance_x()) # TODO: update to normalized amplitude
+            sigzs.append(beam.bunch_length())
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigzs)*1e6, np.array(emitns)*1e6, '-', color=col0)
+            axs[0,1].plot(sigzs[-1]*1e6, emitns[-1]*1e6, 'o', color=col1)
+            axs[0,1].set_ylim(min([min(emitns)*0.9e6, beam_final.norm_emittance_x()*0.8e6]), max([max(emitns)*1.1e6, emitns[0]*1.2e6]))
+            axs[0,1].set_xlim(min([min(sigzs)*0.9e6, beam_final.bunch_length()*0.8e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.2e6]))
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel('Bunch length (um)')
+            axs[0,1].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdzdy, zs, ys = beam.phase_space_density(beam.zs, beam.ys, hbins=zs0, vbins=ys0)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(zs*1e6, ys*1e6, -dQdzdy, cmap='GnBu', shading='auto')
+            axs[1,0].set_ylabel("Transverse offset, $y$ (um)")
+            axs[1,0].set_title('Vertical sideview')
+
+            # plot current profile
+            af = 0.15
+            Is, ts = beam.current_profile(bins=zs0/SI.c)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
+            axs[2,0].plot(ts*SI.c*1e6, -Is/1e3, color=col1)
+            axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
+            axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
+            axs[2,0].set_xlabel('z (um)')
+            axs[2,0].set_ylabel('I (kA)')
+            
+            # plot position projection
+            dQdy, ys2 = beam.projected_density(beam.ys, bins=ys0)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdy, np.zeros(dQdy.size)))*1e3, np.concatenate((ys2, np.flip(ys2)))*1e6, alpha=af, color=col1)
+            axs[1,1].plot(-dQdy*1e3, ys2*1e6, color=col1)
+            axs[1,1].set_ylim([min(ys0)*1e6, max(ys0)*1e6])
+            axs[1,1].set_xlim([0, max([max(-dQdy), max(-dQdy_final)])*1.1e3])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel("$dQ/dy$ (nC/um)")
+            axs[1,1].set_ylabel("$y$ (um)")
+            
+            # plot centroid evolution
+            z0s.append(beam.z_offset())
+            sigys.append(beam.beam_size_y())
+            y0s.append(beam.y_offset())
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(z0s)*1e6, np.array(y0s)*1e6, '-', color=col0)
+            axs[2,1].plot(z0s[-1]*1e6, y0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel('z offset (um)')
+            axs[2,1].set_ylabel('y offset (um)')
+            axs[2,1].set_xlim(min([min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, max([max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
+            axs[2,1].set_ylim(min(-max(y0s)*1.1,-0.1*sigys[0])*1e6, max(max(y0s)*1.1,0.1*sigys[0])*1e6)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+
+            return cax
+
+        # make all frames
+        animation = FuncAnimation(fig, frameFcn, frames=range(self.num_outputs()), repeat=False, interval=100)
+
+        # save the animation as a GIF
+        plot_path = self.run_path() + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'sideview_y_shot' + str(self.shot) + '.gif'
+        animation.save(filename, writer="pillow", fps=10)
+
+        # hide the figure
+        plt.close()
+
+        return filename
+
         
