@@ -19,13 +19,13 @@ class CONFIG:
     run_data_path = 'run_data/'
     
     # temporary directory
-    temp_path = abel_path + '.temp/'
+    temp_path = run_data_path + '.temp/'
     
     
     ## EXTERNAL CODE DIRECTORIES
     
     # common software path
-    software_path = '/project/project_465000445/software/'
+    software_path = '/mn/fys-server1/a8/carlal/software/'
     
     # path to ELEGANT directory
     elegant_path = software_path + 'elegant/usr/bin/'

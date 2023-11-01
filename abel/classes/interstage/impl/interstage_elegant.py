@@ -252,6 +252,9 @@ class InterstageElegant(Interstage):
         # run ELEGANT
         runfile = self.__make_run_script()
         beam = elegant_run(runfile, beam0, beamfile, envars, quiet=True)
+
+        # clean extreme outliers
+        beam.remove_halo_particles()
         
         # remove temporary files
         os.remove(beamfile)

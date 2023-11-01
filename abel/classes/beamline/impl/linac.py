@@ -329,7 +329,7 @@ class Linac(Beamline):
         beam0 = self.initial_beam(shot=shot)
         num_bins = int(np.sqrt(len(beam0)*2))
         nsig = 5
-        tedges = np.arange(-100e-6, 0e-6, 1e-6) / SI.c
+        tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
         deltaedges = np.linspace(-0.05, 0.05, num_bins)
         xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
