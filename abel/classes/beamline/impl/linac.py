@@ -66,7 +66,7 @@ class Linac(Beamline):
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
                     self.trackables[2+2*i] = interstage_instance
                     self.interstages[i] = interstage_instance
-        
+            
         # add beam delivery system
         if self.bds is not None:
             self.bds.nom_energy = self.source.get_energy()
@@ -111,7 +111,7 @@ class Linac(Beamline):
     ## PLOT EVOLUTION
     
     # apply function to all beam files
-    def __evolution_fcn(self, fcns, shot=None):
+    def evolution_fcn(self, fcns):
         
         # declare data structure
         num_outputs = self.num_outputs()
@@ -130,7 +130,7 @@ class Linac(Beamline):
             
             # load beams and apply functions
             vals = np.empty((self.num_shots, len(fcns)))
-            for shot in shots:
+            for shot in range(self.num_shots):
                 beam = self.get_beam(index=index, shot=shot)
                 for k in range(len(fcns)):
                     vals[shot,k] = fcns[k](beam)
@@ -179,7 +179,7 @@ class Linac(Beamline):
         return waterfalls, trackable_numbers, bins
              
         
-    def plot_evolution(self, use_stage_nums=False, shot=None):
+    def plot_evolution(self, use_stage_nums=False):
         
         if self.trackables is None:
             self.assemble_trackables()
@@ -187,7 +187,7 @@ class Linac(Beamline):
         # TODO: filter shots by step
         
         # calculate values
-        ss, vals_mean, vals_std, stage_nums = self.__evolution_fcn([Beam.abs_charge, \
+        ss, vals_mean, vals_std, stage_nums = self.evolution_fcn([Beam.abs_charge, \
                                              Beam.energy, Beam.rel_energy_spread, \
                                              Beam.bunch_length, Beam.z_offset, \
                                              Beam.norm_emittance_x, Beam.norm_emittance_y, \
