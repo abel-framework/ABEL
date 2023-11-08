@@ -43,9 +43,6 @@ class StageWakeT(Stage):
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
 
         # create plasma stage
-        box_min_z = beam0.z_offset() - 5 * beam0.bunch_length()
-        box_max_z = driver0.z_offset() + 5 * driver0.bunch_length()
-        box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
         if self.box_min_z is None:
             box_min_z = beam0.z_offset() - 5 * beam0.bunch_length()
         else:
@@ -70,16 +67,12 @@ class StageWakeT(Stage):
         else:
             dz = self.dz  # Determines how often the plasma wakefields should be updated.
         
-        k_beta = k_p(self.plasma_density)/np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))
-        lambda_betatron = (2*np.pi/k_beta)
-        dz = lambda_betatron/20
         n_out = round(self.length/dz/2)
         plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=256, n_xi=256, dz_fields=dz, ppc=4)
         
         # do tracking
-        bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=False)
         bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=self.opmd_diag, diag_dir=self.diag_dir)
         
         # save evolution of the beam and driver
