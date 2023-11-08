@@ -36,14 +36,14 @@ import matplotlib.colors as colors  # For logarithmic colour scales
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
 from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
 
-from opal.physics_models.transverse_wake_instability import *
-from opal.physics_models.plasma_wake_1d import wakefield_1d
-from opal.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
-from opal.utilities.relativity import energy2gamma
-from opal.utilities.statistics import prct_clean, prct_clean2d
-from opal.utilities.other import find_closest_value_in_arr
-import opal.utilities.colors as cmaps
-from opal.classes.stage.impl.stage_wake_t import StageWakeT
+from abel.physics_models.transverse_wake_instability import *
+from abel.physics_models.plasma_wake_1d import wakefield_1d
+from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
+from abel.utilities.relativity import energy2gamma
+from abel.utilities.statistics import prct_clean, prct_clean2d
+from abel.utilities.other import find_closest_value_in_arr
+import abel.utilities.colors as cmaps
+from abel.classes.stage.impl.stage_wake_t import StageWakeT
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import interp1d
@@ -52,8 +52,8 @@ import scipy.signal as signal
 import concurrent.futures  # Parallel execution
 
 from types import SimpleNamespace
-from opal import Stage, CONFIG
-from opal import Beam
+from abel import Stage, CONFIG
+from abel import Beam
 import warnings, copy
 import os
 import pickle
@@ -361,7 +361,7 @@ class StageTransWakeInstability(Stage):
     # ==================================================
     def slices2beam_interpolate(self, s_slices_start, x_slices_start, xp_slices_start, y_slices_start, yp_slices_start, energy_gains, s_slices_new, x_slices_new, xp_slices_new, y_slices_new, yp_slices_new, beam0):
         """
-        Converts beam slices from transverse_wake_instability() to an OPAL beam object by applying the beam offsets in each slice to all particles in the slices.
+        Converts beam slices from transverse_wake_instability() to an ABEL beam object by applying the beam offsets in each slice to all particles in the slices.
         ...
         """
         
@@ -395,7 +395,7 @@ class StageTransWakeInstability(Stage):
         beam0.set_xs(xs)
         beam0.set_ys(ys)
         
-        #from opal.utilities.relativity import energy2proper_velocity
+        #from abel.utilities.relativity import energy2proper_velocity
         #beam0.set_uzs(energy2proper_velocity(Es))
 
         beam0.set_xps(xps)

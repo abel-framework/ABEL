@@ -53,16 +53,16 @@ Ben Chen, 5 October 2023, University of Oslo
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-#from opal.classes.stage.impl.stage_particle_transverse_wake_instability import particles2slices
-from opal.classes.beam import *
-#from opal.utilities.other import find_closest_value_in_arr
-from opal.utilities.relativity import energy2gamma
+#from abel.classes.stage.impl.stage_particle_transverse_wake_instability import particles2slices
+from abel.classes.beam import *
+#from abel.utilities.other import find_closest_value_in_arr
+from abel.utilities.relativity import energy2gamma
 from tqdm import tqdm
 import time
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
 
-from opal.utilities.plasma_physics import k_p
+from abel.utilities.plasma_physics import k_p
 
 
 #def wakefunc_Stupakov(xi_lead, xi_ref, a):
@@ -385,10 +385,10 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit, rb_fit, 
         #beam.set_uzs(uzs)
         #beam.set_qs(-e*weights_sorted)
 
-        # Initialise OPAL Beam object
+        # Initialise ABEL Beam object
         beam_out = Beam()
         
-        # set the phase space of the OPAL beam
+        # set the phase space of the ABEL beam
         beam_out.set_phase_space(Q=np.sum(weights_sorted)*-e,
                              xs=xs_sorted,
                              ys=ys_sorted,

@@ -36,15 +36,15 @@ import matplotlib.colors as colors  # For logarithmic colour scales
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
 from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
 
-from opal.physics_models.particles_transverse_wake_instability import *
-from opal.physics_models.twoD_particles_transverse_wake_instability import *
-from opal.physics_models.plasma_wake_1d import wakefield_1d
-from opal.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
-from opal.utilities.relativity import energy2gamma
-from opal.utilities.statistics import prct_clean, prct_clean2d
-from opal.utilities.other import find_closest_value_in_arr
-import opal.utilities.colors as cmaps  # Standardised colour maps
-from opal.classes.stage.impl.stage_wake_t import StageWakeT
+from abel.physics_models.particles_transverse_wake_instability import *
+from abel.physics_models.twoD_particles_transverse_wake_instability import *
+from abel.physics_models.plasma_wake_1d import wakefield_1d
+from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
+from abel.utilities.relativity import energy2gamma
+from abel.utilities.statistics import prct_clean, prct_clean2d
+from abel.utilities.other import find_closest_value_in_arr
+import abel.utilities.colors as cmaps  # Standardised colour maps
+from abel.classes.stage.impl.stage_wake_t import StageWakeT
 from openpmd_viewer import OpenPMDTimeSeries
 #from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import interp1d
@@ -55,8 +55,8 @@ from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
 
 from types import SimpleNamespace
-from opal import Stage, CONFIG
-from opal import Beam
+from abel import Stage, CONFIG
+from abel import Beam
 import warnings, copy
 import os
 import pickle
@@ -247,10 +247,10 @@ class StagePrtclTransWakeInstability(Stage):
             xs_sorted, pxs_sorted, zs_sorted, pzs_sorted, weights_sorted, s_slices_table, offset_slices_table, angle_slices_table = results[0]
             ys_sorted, pys_sorted, _, _, _, _, _, _ = results[1]
 
-            # Initialise OPAL Beam object
+            # Initialise ABEL Beam object
             beam = Beam()
             
-            # Set the phase space of the OPAL beam
+            # Set the phase space of the ABEL beam
             beam.set_phase_space(Q=np.sum(weights_sorted)*-e,
                                  xs=xs_sorted,
                                  ys=ys_sorted,

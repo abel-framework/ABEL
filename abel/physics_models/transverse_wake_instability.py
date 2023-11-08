@@ -45,12 +45,12 @@ Ben Chen, 5 July 2023, University of Oslo
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-from opal.utilities.other import find_closest_value_in_arr
-from opal.utilities.relativity import energy2gamma
+from abel.utilities.other import find_closest_value_in_arr
+from abel.utilities.relativity import energy2gamma
 from tqdm import tqdm
 import time
 
-from opal.utilities.plasma_physics import k_p
+from abel.utilities.plasma_physics import k_p
 
 
 def wakefunc_Stupakov(xi_lead, xi_ref, a):
