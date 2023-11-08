@@ -35,6 +35,9 @@ from .classes.stage.impl.stage_nonlinear_1d import *
 from .classes.stage.impl.stage_hipace import *
 from .classes.stage.impl.stage_wake_t import *
 from .classes.stage.impl.stage_quasistatic_2d import *
+from .classes.stage.impl.stage_transverse_wake_instability import *
+from .classes.stage.impl.stage_particle_transverse_wake_instability import *
+from .classes.interstage.impl.interstage_null import *
 from .classes.interstage.impl.interstage_basic import *
 from .classes.interstage.impl.interstage_elegant import *
 from .classes.interstage.impl.interstage_ocelot import *
@@ -42,3 +45,4 @@ from .classes.bds.impl.bds_basic import *
 from .classes.spectrometer.impl.spectrometer_facet_ocelot import *
 from .classes.ip.impl.ip_basic import *
 from .classes.ip.impl.ip_guineapig import *
+from .classes.stage.impl.stage_quasistatic_2d import blabla
