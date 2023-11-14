@@ -111,7 +111,7 @@ class Linac(Beamline):
     ## PLOT EVOLUTION
     
     # apply function to all beam files
-    def evolution_fcn(self, fcns):
+    def evolution_fcn(self, fcns, shot=None):
         
         # declare data structure
         num_outputs = self.num_outputs()
@@ -179,7 +179,7 @@ class Linac(Beamline):
         return waterfalls, trackable_numbers, bins
              
         
-    def plot_evolution(self, use_stage_nums=False):
+    def plot_evolution(self, use_stage_nums=False, shot=None):
         
         if self.trackables is None:
             self.assemble_trackables()
