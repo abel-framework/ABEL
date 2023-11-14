@@ -65,7 +65,7 @@ import pickle
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, drive_source=None, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, main_beam_roi=6.0, beam_length_roi=None, num_beam_slice=None, Ez_roi=None, bubble_radius_roi=None):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, drive_source=None, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, main_beam_roi=6.0, beam_length_roi=None, num_beam_slice=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None):
         
         super().__init__(length, nom_energy_gain, plasma_density)
 
@@ -83,10 +83,12 @@ class StagePrtclTransWakeInstability(Stage):
         #self.num_uniform_beam_slice = None
         self.num_beam_slice = None
 
-        self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest.
-        self.bubble_radius_roi = bubble_radius_roi  # [m]  bubble radius in the region of interest.
+        self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
+        self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
         self.Ez_axial = None
         self.zs_Ez_axial = None
+        self.rb_fit_obj = rb_fit_obj  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
+        self.bubble_radius_roi = bubble_radius_roi  # [m]  bubble radius in the region of interest.
         self.bubble_radius_axial = None
         self.zs_bubble_radius_axial = None
         self.main_num_profile = None
@@ -130,6 +132,7 @@ class StagePrtclTransWakeInstability(Stage):
         stage_length = self.length
         gamma0 = beam0.gamma()
         time_step_mod = self.time_step_mod
+        print(self.drive_beam.z_offset())
 
         # ========== Shift the main beam trasversely according to drive beam offset ==========
         if self.driver_source.jitter.x is 0:
@@ -199,6 +202,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Cut out axial Ez over the ROI
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, xi_slices, beam0)
+        self.Ez_fit_obj = Ez_fit
         self.Ez_roi = Ez
         self.Ez_axial = Ez_axis_wakeT
         self.zs_Ez_axial = zs_Ez_wakeT
@@ -218,6 +222,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Cut out bubble radius over the ROI
         bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, xi_slices, beam0) # Actually same as Ez_shift_fit. Consider making just one function instead... 
+        self.rb_fit_obj = rb_fit
         self.bubble_radius_roi = bubble_radius
         self.bubble_radius_axial = bubble_radius_wakeT
         self.zs_bubble_radius_axial = zs_rho
@@ -389,7 +394,7 @@ class StagePrtclTransWakeInstability(Stage):
             beam_quant_bins = self.fill_nan_with_mean(beam_quant_bins)  # Replace the nan values with the mean.
            
         beam_quant_slices = np.interp(z_slices, zs_bins, beam_quant_bins)
-        beam_quant_slices= self.fill_nan_with_mean(beam_quant_slices)  # Replace the nan values with the mean.
+        beam_quant_slices = self.fill_nan_with_mean(beam_quant_slices)  # Replace the nan values with the mean.
         if np.any(np.isnan(beam_quant_slices)):
             plt.figure()
             plt.scatter(zs*1e6, beam_quant)
@@ -425,11 +430,11 @@ class StagePrtclTransWakeInstability(Stage):
             
         Returns
         ----------
-        Ez_fit: [V/m] 1D array
+        Ez_fit(z_slices): [V/m] 1D array
             Axial Ez for the region of interest shifted to the location of the beam.
 
-        sse_Ez: [V^2/m^2] float 
-            Sum of squared errors (sse) of Ez_fit vs. the corresponding part of Ez.
+        Ez_fit: [V/m] 1D interpolation object 
+            Interpolated axial longitudinal Ez from beam head to tail.
         """
         
         zs = beam.zs()
@@ -1193,7 +1198,7 @@ class StagePrtclTransWakeInstability(Stage):
 
     
     # ==================================================
-    def plot_Ez_rb_cut(self, z_slices=None, main_num_profile=None, zs_Ez=None, Ez=None, Ez_cut=None, zs_rho=None, bubble_radius=None, bubble_radius_cut=None, zlab='$z$ [$\mathrm{\mu}$m]'):
+    def plot_Ez_rb_cut(self, z_slices=None, main_num_profile=None, zs_Ez=None, Ez=None, Ez_cut=None, zs_rho=None, bubble_radius=None, zlab='$z$ [$\mathrm{\mu}$m]'):
 
         if z_slices is None:
             z_slices = self.z_slices
@@ -1204,13 +1209,18 @@ class StagePrtclTransWakeInstability(Stage):
         if Ez is None:
             Ez = self.Ez_axial
         if Ez_cut is None:
-            Ez_cut = self.Ez_roi
+            #Ez_cut = self.Ez_roi
+            zs = self.main_beam.zs()
+            indices = np.argsort(zs)
+            zs_sorted = zs[indices]
+            Ez_cut = self.Ez_fit_obj(zs_sorted)
+            bubble_radius_cut = self.rb_fit_obj(zs_sorted)
         if zs_rho is None:
             zs_rho =  self.zs_bubble_radius_axial
         if bubble_radius is None:
             bubble_radius = self.bubble_radius_axial
-        if bubble_radius_cut is None:
-            bubble_radius_cut = self.bubble_radius_roi
+        #if bubble_radius_cut is None:
+            #bubble_radius_cut = self.bubble_radius_roi
         
         # Set up a figure with axes
         fig_wakeT_cut, axs_wakeT_cut = plt.subplots(nrows=1, ncols=2, layout='constrained', figsize=(10, 4))
@@ -1223,7 +1233,7 @@ class StagePrtclTransWakeInstability(Stage):
         axs_wakeT_cut[0].set_ylabel('Main beam number profile $N(z)$')
         ax_Ez_cut_wakeT2 = axs_wakeT_cut[0].twinx()
         ax_Ez_cut_wakeT2.plot(zs_Ez*1e6, Ez/1e9, label='Wake-T $E_z$')
-        ax_Ez_cut_wakeT2.plot(z_slices*1e6, Ez_cut/1e9, 'r', label='Cut-out Wake-T $E_z$')
+        ax_Ez_cut_wakeT2.plot(zs_sorted*1e6, Ez_cut/1e9, 'r', label='Cut-out Wake-T $E_z$')
         ax_Ez_cut_wakeT2.set_ylabel('$E_z$ [GV/m]')
         ax_Ez_cut_wakeT2.legend(loc='lower right')
         
@@ -1234,7 +1244,7 @@ class StagePrtclTransWakeInstability(Stage):
         axs_wakeT_cut[1].set_ylabel('Main beam number profile $N(z)$')
         ax_rb_cut_wakeT2 = axs_wakeT_cut[1].twinx()
         ax_rb_cut_wakeT2.plot(zs_rho*1e6, bubble_radius*1e6, label='Wake-T $r_\mathrm{b}$')
-        ax_rb_cut_wakeT2.plot(z_slices*1e6, bubble_radius_cut*1e6, 'r', label='Cut-out Wake-T $r_\mathrm{b}$')
+        ax_rb_cut_wakeT2.plot(zs_sorted*1e6, bubble_radius_cut*1e6, 'r', label='Cut-out Wake-T $r_\mathrm{b}$')
         ax_rb_cut_wakeT2.set_ylabel('Bubble radius [$\mathrm{\mu}$m]')
         ax_rb_cut_wakeT2.legend(loc='upper right')
 
@@ -1458,45 +1468,6 @@ class StagePrtclTransWakeInstability(Stage):
     
     # ==================================================
     def print_initial_summary(self, drive_beam, main_beam):
-       # print('======================================================================')
-       # print(f"Number of macro particles:\t\t\t\t {len(main_beam.xs()) :d}")
-       # print(f"Time step [betatron wavelength/c]:\t\t\t {self.time_step_mod :.3f}")
-       # print(f"Symmetrised main beam:\t\t\t\t\t {str(self.main_source.symmetrize) :s}")
-       # print(f"Symmetrised drive beam:\t\t\t\t\t {str(self.driver_source.symmetrize) :s}\n")
-#
-       # print(f"Stage length [m]:\t\t\t\t\t {self.length :.3f}")
-       # print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}\n")
-       # 
-       # #print(f"Beam region of interest [sigma_z]:\t\t\t {self.main_beam_roi :.3f}")
-       # #print(f"Number of beam slices:\t\t\t\t\t {len(self.z_slices) :d}\n")
-#
-       # print(f"Main beam population:\t\t\t\t\t {(np.sum(main_beam.weightings())) :.3e}")
-       # print(f"Mean initial gamma:\t\t\t\t\t {np.mean(main_beam.gamma()) :.3f}")
-       # print(f"Mean initial energy [GeV]:\t\t\t\t {np.mean(main_beam.Es())/1e9 :.3f}")
-       # print(f"Initial rms energy spread [%]:\t\t\t\t {main_beam.rel_energy_spread()*1e2 :.3f}\n")        
-       # 
-       # print(f"Initial main beam x offset [um]:\t\t\t {main_beam.x_offset()*1e6 :.3f}")
-       # print(f"Initial main beam y offset [um]:\t\t\t {main_beam.y_offset()*1e6 :.3f}")
-       # print(f"Initial main beam z offset [um]:\t\t\t {main_beam.z_offset()*1e6 :.3f}\n")
-       # 
-       # print(f"Initial normalised x emittance [mm mrad]:\t\t {main_beam.norm_emittance_x()*1e6 :.3f}")
-       # print(f"Initial normalised y emittance [mm mrad]:\t\t {main_beam.norm_emittance_y()*1e6 :.3f}\n")
-       # 
-       # print(f"Initial matched beta function [mm]:\t\t\t {beta_matched(self.plasma_density, np.mean(main_beam.Es()))*1e3 :.3f}")
-       # print(f"Initial x beta function [mm]:\t\t\t\t {main_beam.beta_x()*1e3 :.3f}")
-       # print(f"Initial y beta function [mm]:\t\t\t\t {main_beam.beta_y()*1e3 :.3f}\n")
-       # 
-       # print(f"Initial x beam size [um]:\t\t\t\t {main_beam.beam_size_x()*1e6 :.3f}")
-       # print(f"Initial y beam size [um]:\t\t\t\t {main_beam.beam_size_y()*1e6 :.3f}")
-       # print(f"rms beam length [um]:\t\t\t\t\t {main_beam.bunch_length()*1e6 :.3f}\n")
-#
-       # print(f"Initial drive beam x offset [um]:\t\t\t {drive_beam.x_offset()*1e6 :.3f}")
-       # print(f"Initial drive beam y offset [um]:\t\t\t {drive_beam.y_offset()*1e6 :.3f}")
-       # print(f"Initial drive beam z offset [um]:\t\t\t {drive_beam.z_offset()*1e6 :.3f}")
-#
-       # print(f"Drive beam x jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.x*1e6 :.3f}")
-       # print(f"Drive beam y jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.y*1e6 :.3f}")
-       # print('----------------------------------------------------------------------')
         
         print('======================================================================')
         print(f"Time step [betatron wavelength/c]:\t\t\t {self.time_step_mod :.3f}")
@@ -1506,7 +1477,6 @@ class StagePrtclTransWakeInstability(Stage):
         print(f"Symmetrised drive beam:\t\t\t\t\t {str(self.driver_source.symmetrize) :s}\n")
         
         print(f"Stage length [m]:\t\t\t\t\t {self.length :.3f}")
-        #print(f"Propagation length [m]:\t\t\t\t\t {beam_out.location :.3f}", file=f)
         print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}")
         print(f"Drive beam x jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.x*1e6 :.3f}")
         print(f"Drive beam y jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.y*1e6 :.3f}")
@@ -1516,9 +1486,10 @@ class StagePrtclTransWakeInstability(Stage):
         print('Quantity \t\t\t\t\t Drive beam \t\t Main beam')
         print('-------------------------------------------------------------------------------------')
         print(f"Number of macro particles:\t\t\t {len(drive_beam.xs()) :d}\t\t\t {len(main_beam.xs()) :d}")
-        #print(f"Current number of macro particles:\t\t\t {len(beam_out.xs()) :d}", file=f)
-        #print(f"Initial beam population:\t\t\t {(np.sum(drive_beam.weightings())) :.3e} \t\t\t {(np.sum(initial_main_beam.weightings())) :.3e}", file=f)
-        print(f"Initial beam population:\t\t\t {(np.sum(drive_beam.weightings())) :.3e} \t\t {(np.sum(main_beam.weightings())) :.3e}")
+        print(f"Initial beam population:\t\t\t {(np.sum(drive_beam.weightings())) :.3e} \t\t {(np.sum(main_beam.weightings())) :.3e}\n")
+
+        _, z_centre = find_closest_value_in_arr(arr=main_beam.zs(), val=self.main_source.z_offset)  # Centre z of beam.
+        print(f"Beam centre gradient [GV/m]:\t\t\t\t  \t\t {self.Ez_fit_obj(z_centre)/1e9 :.3f}")
         print(f"Initial mean gamma:\t\t\t\t {np.mean(drive_beam.gamma()) :.3f} \t\t {np.mean(main_beam.gamma()) :.3f}")
         print(f"Initial mean energy [GeV]:\t\t\t {np.mean(drive_beam.Es())/1e9 :.3f} \t\t {np.mean(main_beam.Es())/1e9 :.3f}")
         print(f"Initial rms energy spread [%]:\t\t\t {drive_beam.rel_energy_spread()*1e2 :.3f} \t\t\t {main_beam.rel_energy_spread()*1e2 :.3f}\n")
@@ -1542,70 +1513,6 @@ class StagePrtclTransWakeInstability(Stage):
     
     # ==================================================
     def print_current_summary(self, drive_beam, initial_main_beam, beam_out):
-        #with open(self.diag_path + 'output.txt', 'w') as f:
-        #    print('======================================================================', file=f)
-        #    print(f"Initial number of macro particles:\t\t\t {len(initial_main_beam.xs()) :d}", file=f)
-        #    print(f"Current number of macro particles:\t\t\t {len(beam_out.xs()) :d}", file=f)
-        #    print(f"Time step [betatron wavelength/c]:\t\t\t {self.time_step_mod :.3f}", file=f)
-        #    print(f"Interstages enabled:\t\t\t\t\t {str(self.interstages_enabled) :s}", file=f)
-        #    print(f"Symmetrised main beam:\t\t\t\t\t {str(self.main_source.symmetrize) :s}", file=f)
-        #    print(f"Symmetrised drive beam:\t\t\t\t\t {str(self.driver_source.symmetrize) :s}\n", file=f)
-        #    
-        #    print(f"Stage length [m]:\t\t\t\t\t {self.length :.3f}", file=f)
-        #    print(f"Propagation length [m]:\t\t\t\t\t {beam_out.location :.3f}", file=f)
-        #    print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}\n", file=f)
-    #
-        #    print(f"Initial main beam population:\t\t\t\t {(np.sum(initial_main_beam.weightings())) :.3e}", file=f)
-        #    print(f"Current mean gamma:\t\t\t\t\t {np.mean(beam_out.gamma()) :.3f}", file=f)
-        #    print(f"Current mean energy [GeV]:\t\t\t\t {np.mean(beam_out.Es())/1e9 :.3f}", file=f)
-        #    print(f"Initial rms energy spread [%]:\t\t\t\t {initial_main_beam.rel_energy_spread()*1e2 :.3f}", file=f)
-        #    print(f"Current rms energy spread [%]:\t\t\t\t {beam_out.rel_energy_spread()*1e2 :.3f}\n", file=f)        
-        #    
-        #    print(f"Initial main beam x offset [um]:\t\t\t {initial_main_beam.x_offset()*1e6 :.3f}", file=f)
-        #    print(f"Initial main beam y offset [um]:\t\t\t {initial_main_beam.y_offset()*1e6 :.3f}", file=f)
-        #    print(f"Initial main beam z offset [um]:\t\t\t {initial_main_beam.z_offset()*1e6 :.3f}\n", file=f)
-        #    
-        #    print(f"Initial normalised x emittance [mm mrad]:\t\t {initial_main_beam.norm_emittance_x()*1e6 :.3f}", file=f)
-        #    print(f"Current normalised x emittance [mm mrad]:\t\t {beam_out.norm_emittance_x()*1e6 :.3f}", file=f)
-        #    print(f"Initial normalised y emittance [mm mrad]:\t\t {initial_main_beam.norm_emittance_y()*1e6 :.3f}", file=f)
-        #    print(f"Current normalised y emittance [mm mrad]:\t\t {beam_out.norm_emittance_y()*1e6 :.3f}\n", file=f)
-    #
-        #    print(f"Initial matched beta function [mm]:\t\t\t {beta_matched(self.plasma_density, np.mean(initial_main_beam.Es()))*1e3 :.3f}", file=f)
-        #    print(f"Initial x beta function [mm]:\t\t\t\t {initial_main_beam.beta_x()*1e3 :.3f}", file=f)
-        #    print(f"Current x beta function [mm]:\t\t\t\t {beam_out.beta_x()*1e3 :.3f}", file=f)
-        #    print(f"Initial y beta function [mm]:\t\t\t\t {initial_main_beam.beta_y()*1e3 :.3f}", file=f)
-        #    print(f"Current y beta function [mm]:\t\t\t\t {beam_out.beta_y()*1e3 :.3f}\n", file=f)
-        #    
-        #    print(f"Initial x beam size [um]:\t\t\t\t {initial_main_beam.beam_size_x()*1e6 :.3f}", file=f)
-        #    print(f"Current x beam size [um]:\t\t\t\t {beam_out.beam_size_x()*1e6 :.3f}", file=f)
-        #    print(f"Initial y beam size [um]:\t\t\t\t {initial_main_beam.beam_size_y()*1e6 :.3f}", file=f)
-        #    print(f"Current y beam size [um]:\t\t\t\t {beam_out.beam_size_y()*1e6 :.3f}", file=f)
-        #    print(f"Initial rms main beam length [um]:\t\t\t {initial_main_beam.bunch_length()*1e6 :.3f}", file=f)
-        #    print(f"Current rms main beam length [um]:\t\t\t {beam_out.bunch_length()*1e6 :.3f}\n", file=f)
-        #    
-        #    #initial_norm_amp_x = self.calc_norm_amp(particle_offsets=initial_main_beam.xs(), particle_angles=initial_main_beam.xps())
-        #    #current_norm_amp_x = self.calc_norm_amp(particle_offsets=beam_out.xs(), particle_angles=beam_out.xps())
-        #    #initial_norm_amp_y = self.calc_norm_amp(particle_offsets=initial_main_beam.ys(), particle_angles=initial_main_beam.yps())
-        #    #current_norm_amp_y = self.calc_norm_amp(particle_offsets=beam_out.ys(), particle_angles=beam_out.yps())
-        #    #
-        #    #print(f"Initial normalised amplitude in x:\t\t\t {initial_norm_amp_x :.3f}")
-        #    #print(f"Normalised amplitude in x after current stage:\t\t {current_norm_amp_x :.3f}")
-        #    #print(f"Normalised amplitude factor in x after current stage:\t {current_norm_amp_x/initial_norm_amp_x :.3f}")
-        #    #print(f"Initial normalised amplitude in y:\t\t\t {initial_norm_amp_y :.3f}")
-        #    #print(f"Normalised amplitude in y after current stage:\t\t {current_norm_amp_y :.3f}")
-        #    #print(f"Normalised amplitude factor in y after current stage:\t {current_norm_amp_y/initial_norm_amp_y :.3f}\n")
-    #
-        #    print(f"Beam region of interest [sigma_z]:\t\t\t {self.main_beam_roi :.3f}", file=f)
-        #    print(f"Number of beam slices:\t\t\t\t\t {len(self.z_slices) :d}\n", file=f)
-    #
-        #    print(f"Initial drive beam x offset [um]:\t\t\t {drive_beam.x_offset()*1e6 :.3f}", file=f)
-        #    print(f"Initial drive beam y offset [um]:\t\t\t {drive_beam.y_offset()*1e6 :.3f}", file=f)
-        #    print(f"Initial drive beam z offset [um]:\t\t\t {drive_beam.z_offset()*1e6 :.3f}\n", file=f)
-    #
-        #    print(f"Drive beam x jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.x*1e6 :.3f}", file=f)
-        #    print(f"Drive beam y jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.y*1e6 :.3f}", file=f)
-        #    print('----------------------------------------------------------------------', file=f)
-        #f.close() # Close the file
 
         with open(self.diag_path + 'output.txt', 'w') as f:
             print('===================================================', file=f)
@@ -1629,7 +1536,9 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Current number of macro particles:\t\t  \t\t\t {len(beam_out.xs()) :d}", file=f)
             print(f"Initial beam population:\t\t\t {(np.sum(drive_beam.weightings())) :.3e} \t\t {(np.sum(initial_main_beam.weightings())) :.3e}", file=f)
             print(f"Current beam population:\t\t\t \t \t\t {(np.sum(beam_out.weightings())) :.3e}\n", file=f)
-            
+
+            _, z_centre = find_closest_value_in_arr(arr=beam_out.zs(), val=self.main_source.z_offset)  # Centre z of beam.
+            print(f"Beam centre gradient [GV/m]:\t\t\t\t  \t\t {self.Ez_fit_obj(z_centre)/1e9 :.3f}", file=f)
             print(f"Current mean gamma:\t\t\t\t \t \t\t {np.mean(beam_out.gamma()) :.3f}", file=f)
             print(f"Initial mean energy [GeV]:\t\t\t {np.mean(drive_beam.Es())/1e9 :.3f} \t\t {np.mean(initial_main_beam.Es())/1e9 :.3f}", file=f)
             print(f"Current mean energy [GeV]:\t\t\t \t \t\t {np.mean(beam_out.Es())/1e9 :.3f}", file=f)
@@ -1663,7 +1572,3 @@ class StagePrtclTransWakeInstability(Stage):
         with open(self.diag_path + 'output.txt', 'r') as f:
             print(f.read())
         f.close()
-
-
-
-
