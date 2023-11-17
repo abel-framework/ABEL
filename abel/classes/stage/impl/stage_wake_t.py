@@ -47,17 +47,19 @@ class StageWakeT(Stage):
 
         # create plasma stage
         if self.box_min_z is None:
-            box_min_z = beam0.z_offset() - 5 * beam0.bunch_length()
+            #box_min_z = beam0.z_offset() - 5 * beam0.bunch_length()
+            box_min_z = driver0.z_offset() - 2.7 * blowout_radius(self.plasma_density, driver0.peak_current())
         else:
             box_min_z = self.box_min_z
 
         if self.box_max_z is None:
-            box_max_z = driver0.z_offset() + 5 * driver0.bunch_length()
+            #box_max_z = driver0.z_offset() + 5 * driver0.bunch_length()
+            box_max_z = driver0.z_offset() + blowout_radius(self.plasma_density, driver0.peak_current())
         else:
             box_max_z = self.box_max_z
 
         if self.box_size_r is None:
-            box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
+            box_size_r = 2 * blowout_radius(self.plasma_density, driver0.peak_current())
         else:
             box_size_r = self.box_size_r
         

@@ -92,6 +92,22 @@ def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble
 
 
 # ==================================================
+# Single pass integration option
+def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
+    
+    a = bubble_radius + 0.75*skin_depth
+
+    # Assemble an array f used for the dot product (Based on Stupakov's wake function)
+    dF_dz = -e*2/(np.pi*eps0*a**4)*weights_sorted*offsets
+    
+    # Calculate the wakefield on each macro particle
+    wakefield = np.zeros(len(zs_sorted))
+    for idx_particle in range(len(zs_sorted)):
+    
+    return tr_momenta
+
+
+# ==================================================
 #def doffset_dt(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta, Ez, pzs_sorted):
 #    tr_force = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
 #    for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macro particles
