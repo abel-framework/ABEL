@@ -37,7 +37,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colo
 from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
 
 from abel.physics_models.slices_transverse_wake_instability import *
-from abel.physics_models.plasma_wake_1d import wakefield_1d
 from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
 from abel.utilities.relativity import energy2gamma
 from abel.utilities.statistics import prct_clean, prct_clean2d
@@ -73,8 +72,8 @@ class StageSlicesTransWakeInstability(Stage):
 
         self.main_beam_roi = main_beam_roi
         self.beam_length_roi = beam_length_roi
-        self.num_uniform_beam_slice = None
-        self.num_beam_slice = None
+        self.num_uniform_beam_slice = None  # Number of beam slices if the beam was sliced uniformly.
+        self.num_beam_slice = None  # Number of beam slices.
         #self.ref_slice_sigma_z = ref_slice_sigma_z  # Obsolete
 
         #self.s_init = None  # [m] slice propagation coordinates. Beam head initially at s=0. s[0] corresponds to beam tail. s[-1] corresponds to beam head.
@@ -88,16 +87,16 @@ class StageSlicesTransWakeInstability(Stage):
         self.main_num_profile = main_num_profile
         self.main_slices_edges = None
         self.zs_main_cut = zs_main_cut
-        #self.prop_dist = prop_dist # Obsolote
+        #self.prop_dist = prop_dist # Obsolete
         self.driver_num_profile = None
         self.zs_driver_cut = None
-        self.x_slices_main = None
+        self.x_slices_main = None  # [m], 1D array. x-coordinates of all beam slices.
         self.xp_slices_main = None
         self.y_slices_main = None
         self.yp_slices_main = None
         self.energy_slices_main = None
         
-        self.s_slices_table_main = None
+        self.s_slices_table_main = None  # Contains arrays of s for all the time steps in the stage.
         self.x_slices_table_main = None
         self.xp_slices_table_main = None
         self.y_slices_table_main = None
@@ -464,7 +463,14 @@ class StageSlicesTransWakeInstability(Stage):
         z_slices: [m] 1D float array
             z-coordinates of the beam slices.
 
-        ...
+        bin_number: float
+            Number of beam slices.
+
+        cut_off: float
+            Determines the longitudinal coordinates inside the region of interest
+
+        make_plot: boolean
+            Flag for making plots.
 
             
         Returns
@@ -926,38 +932,21 @@ class StageSlicesTransWakeInstability(Stage):
             self.__n = self.plasma_density * np.random.normal(loc = 1, scale = self.reljitter.plasma_density)
         return self.__n
         
-
-    # ==================================================
-    # wakefield (Lu equation)
-    def wakefield(self, beam=None, driver=None, density=None):
         
-        # get density
-        if density is None:
-            density = self.__get_plasma_density()
-            
-        # get driver
-        if driver is None:
-            driver = self.__get_initial_driver()
-        
-        # try several times in case of solver issues (new driver every time)
-        Ntries = 5
-        for n in range(Ntries):
-            #try:
-            Ezs, zs, rs = wakefield_1d(density, driver, beam)
-            
-        return Ezs, zs, rs
-        
-
     # ==================================================
     def plot_wakefield(self, beam=None, saveToFile=None, includeWakeRadius=True):
         
-        # get wakefield
-        Ezs, zs, rs = self.wakefield(beam)
+        # Get wakefield
+        Ezs = self.Ez_axial
+        zs_Ez = self.zs_Ez_axial
+        zs_rho =  self.zs_bubble_radius_axial
+        bubble_radius = self.bubble_radius_axial
+        
         
         # get current profile
         driver = copy.deepcopy(self.__get_initial_driver())
         driver += beam  # Add beam to drive beam.
-        Is, ts = driver.current_profile(bins=np.linspace(min(zs/c), max(zs/c), int(np.sqrt(len(driver))/2)))
+        Is, ts = driver.current_profile(bins=np.linspace(min(zs_Ez/c), max(zs_Ez/c), int(np.sqrt(len(driver))/2)))
         zs0 = ts*c
         
         # plot it
@@ -968,12 +957,12 @@ class StageSlicesTransWakeInstability(Stage):
         col1 = "tab:blue"
         col2 = "tab:orange"
         af = 0.1
-        zlims = [min(zs)*1e6*1.9, max(zs)*1e6*1.1]
+        zlims = [min(zs_Ez)*1e6*1.9, max(zs_Ez)*1e6*1.1]
         
-        axs[0].plot(zs*1e6, np.zeros(zs.shape), '-', color=col0)
+        axs[0].plot(zs_Ez*1e6, np.zeros(zs_Ez.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
-            axs[0].plot(zs*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col0)
-        axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1)
+            axs[0].plot(zs_Ez*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs_Ez.shape)/1e9, ':', color=col0)
+        axs[0].plot(zs_Ez*1e6, Ezs/1e9, '-', color=col1)
         axs[0].set_xlabel('z (um)')
         axs[0].set_ylabel('Longitudinal electric field (GV/m)')
         axs[0].set_xlim(zlims)
@@ -987,12 +976,12 @@ class StageSlicesTransWakeInstability(Stage):
         axs[1].set_ylim(bottom=0, top=1.2*max(-Is)/1e3)
         
         if includeWakeRadius:
-            axs[2].fill(np.concatenate((zs, np.flip(zs)))*1e6, np.concatenate((rs, np.ones(zs.shape)))*1e6, color=col2, alpha=af)
-            axs[2].plot(zs*1e6, rs*1e6, '-', color=col2)
+            axs[2].fill(np.concatenate((zs_rho, np.flip(zs_rho)))*1e6, np.concatenate((bubble_radius, np.ones(zs_rho.shape)))*1e6, color=col2, alpha=af)
+            axs[2].plot(zs_rho*1e6, bubble_radius*1e6, '-', color=col2)
             axs[2].set_xlabel('z (um)')
             axs[2].set_ylabel('Plasma-wake radius (um)')
             axs[2].set_xlim(zlims)
-            axs[2].set_ylim(bottom=0, top=max(rs*1.2)*1e6)
+            axs[2].set_ylim(bottom=0, top=max(bubble_radius*1.2)*1e6)
         
         # save to file
         if saveToFile is not None:

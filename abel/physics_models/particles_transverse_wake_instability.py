@@ -67,26 +67,6 @@ from abel.utilities.plasma_physics import k_p
 
 #def wakefunc_Stupakov(xi_lead, xi_ref, a):
 #    return 2/(np.pi*eps0*a**4)*np.abs(xi_lead - xi_ref)  # [V/Cm^2]
-#
-#
-## ==================================================
-#def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
-#    tr_force = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
-#    for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macro particles
-#
-#        a = bubble_radius[-1:idx_particle:-1] + 0.75*skin_depth
-#        z_preceding_particles = zs_sorted[-1:idx_particle:-1]
-#        z_ref_particle = zs_sorted[idx_particle]
-#        weights_preceding_particles = weights_sorted[-1:idx_particle:-1]
-#        
-#        offsets_preceding_particles = offsets[-1:idx_particle:-1]
-#        contributions = -e * wakefunc_Stupakov(z_preceding_particles, z_ref_particle, a) * weights_preceding_particles * offsets_preceding_particles
-#        E_field = np.sum(contributions, axis=0)  # Sum the contributions from all preceding slices.
-#        tr_force[idx_particle] = -e*(E_field + plasma_density*e*offsets[idx_particle]/(2*eps0))  # Total transverse force on beam particle at zs_sorted[idx_particle].
-#        
-#    # Update momenta
-#    tr_momenta = tr_momenta + tr_force*time_step
-#    return tr_momenta
 
 
 # ==================================================
@@ -109,33 +89,6 @@ def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble
     # Update momenta
     tr_momenta = tr_momenta + tr_force*time_step
     return tr_momenta
-    
-
-# ==================================================
-# Using matrix multiplication
-#def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
-#    
-#    # Create a two-dimensional array where each element (i, j) represents (z[j] - z[i])
-#    z_diff_mat = (zs_sorted - zs_sorted[:, None])
-#    
-#    # Create an upper triangular matrix to ensure that only the elements where j > i are included
-#    z_diff_mat_filtered = np.triu(z_diff_mat)  # Does not require a sorted z-array.
-#
-#    # Assemble an array f used for the dot product (Based on Stupakov's wake function)
-#    a = bubble_radius + 0.75*skin_depth
-#    f = -e*2/(np.pi*eps0*a**4)*weights_sorted*offsets
-#
-#    # Calculate the wakefield on each macro particle
-#    wakefield = np.dot(z_diff_mat_filtered, f)
-#    ##wakefield = z_diff_mat_filtered @ f
-#    # Since z_diff_mat_filtered[i][j]=z[j]-z[i] then wakefield=np.dot(z_diff_mat_filtered, f) => wakefield[i]=sum_j((z[j]-z[i])*f[j]).
-#
-#    # Calculate the total transverse force on macro particles
-#    tr_force = -e*(wakefield + plasma_density*e*offsets/(2*eps0))
-#
-#    # Update momenta
-#    tr_momenta = tr_momenta + tr_force*time_step
-#    return tr_momenta
 
 
 # ==================================================
@@ -302,28 +255,6 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit, rb_fit, 
 
         
         # ============= Integrate the wake function =============
-        #for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macro particles
-#
-        #    a = bubble_radius[-1:idx_particle:-1] + 0.75*skin_depth
-        #    z_preceding_particles = zs_sorted[-1:idx_particle:-1]
-        #    z_ref_particle = zs_sorted[idx_particle]
-        #    weights_preceding_particles = weights_sorted[-1:idx_particle:-1]
-        #    
-        #    x_preceding_particles = xs_sorted[-1:idx_particle:-1]
-        #    contributions = -e * wakefunc_Stupakov(z_preceding_particles, z_ref_particle, a) * weights_preceding_particles * x_preceding_particles
-        #    Ex = np.sum(contributions, axis=0)  # Sum the contributions from all preceding slices.
-        #    Fx[idx_particle] = -e*(Ex + plasma_density*e*xs_sorted[idx_particle]/(2*eps0))  # Total transverse force on beam particle at zs_sorted[idx_particle].
-#
-        #    y_preceding_particles = ys_sorted[-1:idx_particle:-1]
-        #    contributions = -e * wakefunc_Stupakov(z_preceding_particles, z_ref_particle, a) * weights_preceding_particles * y_preceding_particles
-        #    Ey = np.sum(contributions, axis=0)  # Sum the contributions from all preceding slices.
-        #    Fy[idx_particle] = -e*(Ey + plasma_density*e*ys_sorted[idx_particle]/(2*eps0))  # Total transverse force on beam particle at zs_sorted[idx_particle].
-#
-        ## Update momenta
-        #pxs_sorted = pxs_sorted + Fx*time_step
-        #pys_sorted = pys_sorted + Fy*time_step
-
-
         # Parallel tracking
         results = Parallel(n_jobs=2)([
             delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
