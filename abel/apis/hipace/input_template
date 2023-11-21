@@ -13,6 +13,7 @@ hipace.output_period = $output_period
 
 hipace.depos_order_xy = 1
 
+
 geometry.coord_sys   = 0                  # 0: Cartesian
 geometry.is_periodic = 1 1 0  # Is periodic?
 geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
@@ -35,3 +36,4 @@ plasma.element = electron
 plasma.do_symmetrize = 1
 
 diagnostic.diag_type = xz
+diagnostic.field_data = Ez ExmBy rho jz_beam

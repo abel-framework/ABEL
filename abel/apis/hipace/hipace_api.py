@@ -7,7 +7,7 @@ from abel.utilities.plasma_physics import k_p
 
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, n_cell_xy=511, n_cell_z=256):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, n_cell_xy=511, n_cell_z=424):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -45,7 +45,7 @@ def hipace_write_jobscript(filename_job_script, filename_input):
     filename_job_script_template = CONFIG.abel_path + 'abel/apis/hipace/job_script_template'
     
     # define inputs
-    inputs = {'nodes': 1,
+    inputs = {'nodes': 13,
               'filename_input': filename_input}
     
     # fill in template file

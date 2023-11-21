@@ -8,7 +8,9 @@ import joblib.parallel
 import collections
 import numpy as np
 from matplotlib import pyplot as plt
-import dill as pickle
+import cloudpickle
+import pyspark.serializers
+pyspark.serializers.cloudpickle = cloudpickle
 
 class Runnable(ABC):
     
@@ -100,12 +102,12 @@ class Runnable(ABC):
     # save object to file
     def save(self):
         with open(self.object_path(), 'wb') as savefile:
-            pickle.dump(self, savefile, pickle.HIGHEST_PROTOCOL)
+            cloudpickle.dump(self, savefile)
             
     # load object from file
     def load(self, shot=None):
         with open(self.object_path(shot), 'rb') as loadfile:
-            obj = pickle.load(loadfile)
+            obj = cloudpickle.load(loadfile)
             return obj
     
     

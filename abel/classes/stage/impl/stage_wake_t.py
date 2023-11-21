@@ -55,7 +55,7 @@ class StageWakeT(Stage):
         self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
         self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
         
-        # convert back to OPAL beam
+        # convert back to ABEL beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         
         # copy meta data from input beam (will be iterated by super)
@@ -66,7 +66,7 @@ class StageWakeT(Stage):
         # apply plasma-density up ramp (magnify beta function)
         if self.ramp_beta_mag is not None:
             beam.magnify_beta_function(self.ramp_beta_mag)
-            driver.magnify_beta_function(self.ramp_beta_mag)
+            #driver.magnify_beta_function(self.ramp_beta_mag)
             
         return super().track(beam, savedepth, runnable, verbose)
     
