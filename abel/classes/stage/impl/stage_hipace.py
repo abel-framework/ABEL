@@ -7,9 +7,7 @@ import numpy as np
 import os, shutil, uuid, copy
 from openpmd_viewer import OpenPMDTimeSeries
 from abel.utilities.plasma_physics import k_p
-from matplotlib.colors import TwoSlopeNorm
 from matplotlib.colors import LogNorm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 class StageHipace(Stage):
     
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False, output=None, analytical = False):
