@@ -8,29 +8,17 @@ beam: Beam object
 plasma_density: [m^-3] float
     Plasma density.
     
-Ez_fit: [V/m] interpolation object?
-    Contains the gradient/longitudinal electric field ...
+Ez_fit_obj: [V/m] interpolation object
+    1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
     
-rb_fit: [m] interpolation object?
-    Contains the bubble radius ...
-    
-#num_profile: [1/m] 1D float array
-    Contains the longitudinal number profile of the bunch.
-    
-#initial_offsets: [m] 1D float array
-    Contains the transverse (x/y) center position of each slice.
-
-#initial_angles: [rad] 1D float array
-    Contains the angles (x'/y') of each slice.
-
-#initial_energies: [eV] 1D float array
-    Contains the energies of each slice.
+rb_fit_obj: [m] interpolation object?
+    1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
     
 stage_length: [m] float
     Length of the plasma stage.
 
 time_ste_mod: float
-    Time step modifier in units of beta_wave_length/c.
+    Determines the time step of the instability tracking in units of beta_wave_length/c.
 
 get_centroids: bool
     TODO
@@ -53,7 +41,7 @@ Ben Chen, 5 October 2023, University of Oslo
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-#from abel.classes.stage.impl.stage_particle_transverse_wake_instability import particles2slices
+#from abel.classes.stage.impl.stage_slice_transverse_wake_instability import particles2slices
 from abel.classes.beam import *
 #from abel.utilities.other import find_closest_value_in_arr
 from abel.utilities.relativity import energy2gamma
@@ -70,7 +58,7 @@ from abel.utilities.plasma_physics import k_p
 
 
 # ==================================================
-# Simplified loop
+# Simplified loop integration option
 def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
     
     a = bubble_radius + 0.75*skin_depth
@@ -92,18 +80,34 @@ def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble
 
 
 # ==================================================
-# Single pass integration option
+# Single pass integration option (Stupakov's wake function)
 def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
     
     a = bubble_radius + 0.75*skin_depth
+    #dwakefields_dz = 0
+    dzs = np.diff(zs_sorted)
 
-    # Assemble an array f used for the dot product (Based on Stupakov's wake function)
-    dF_dz = -e*2/(np.pi*eps0*a**4)*weights_sorted*offsets
+    # Calculate the derivative of the wakefield (Stupakov's wake function)
+    temp = np.flip(2 / (np.pi * eps0 * a**4) * -e * weights_sorted * offsets)
+    temp[0] = 0
+    dwakefields_dz = np.cumsum(temp)  # Cumulative sum from 1st to last element.
+    dwakefields_dz = np.flip(dwakefields_dz)
     
     # Calculate the wakefield on each macro particle
-    wakefield = np.zeros(len(zs_sorted))
-    for idx_particle in range(len(zs_sorted)):
+    wakefields = np.zeros(len(zs_sorted))
     
+    for idx_particle in range(len(zs_sorted)-2, -1, -1):
+        wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
+        #wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz
+
+        # Update the derivative of the wakefield (Stupakov's wake function) using a, weights and offsets for the current particle
+        #dwakefields_dz = dwakefields_dz + 2/(np.pi*eps0*a[idx_particle]**4) * -e * weights_sorted[idx_particle] * offsets[idx_particle]
+
+    # Calculate the total transverse force on macro particles
+    tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
+    
+    # Update momenta
+    tr_momenta = tr_momenta + tr_force*time_step
     return tr_momenta
 
 
@@ -152,7 +156,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 
 # ==================================================
-def transverse_wake_instability_particles(beam, plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod=0.05, get_centroids=False, s_slices=None, z_slices=None):
+def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, get_centroids=False, s_slices=None, z_slices=None):
     
     energies = beam.Es()
     xs = beam.xs()
@@ -186,8 +190,8 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit, rb_fit, 
     weights_sorted = weights_sorted[bool_indices]
 
     # Calculate Ez and rb based on interpolations of Ez and rb vs z
-    Ez = Ez_fit(zs_sorted)
-    bubble_radius = rb_fit(zs_sorted)
+    Ez = Ez_fit_obj(zs_sorted)
+    bubble_radius = rb_fit_obj(zs_sorted)
     
     skin_depth = 1/k_p(plasma_density)  # [m] 1/kp, plasma skin depth.
 
@@ -275,6 +279,8 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit, rb_fit, 
         results = Parallel(n_jobs=2)([
             delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
             delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
+            #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
+            #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
         ])
         # Update momenta
         pxs_sorted = results[0]
@@ -340,7 +346,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit, rb_fit, 
                              xs=xs_sorted,
                              ys=ys_sorted,
                              zs=zs_sorted, 
-                             pxs=pxs_sorted,
+                             pxs=pxs_sorted,  # Always use single particle momenta?
                              pys=pys_sorted,
                              pzs=pzs_sorted)
         

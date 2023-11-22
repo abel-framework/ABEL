@@ -73,15 +73,19 @@ class StagePrtclTransWakeInstability(Stage):
         
         num_beam_slice: int. Number of beam slices.
             
-        Ez_fit_obj: [V/m] 1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam.
+        Ez_fit: [V/m] interpolation object
+            1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
 
         Ez_roi: [V/m] 1D array
-            Longitudinal E-field in the region of interest (main beam head to tail).
+            Longitudinal E-field in the region of interest fitted to a selection of zs along the main beam (main beam head to tail).
 
-        rb_fit_obj: [V/m] 1D interpolation object of bubble radius fitted to axial bubble radius using a selection of zs along the main beam.
+        rb_fit: [m] interpolation object?
+            1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
         
         bubble_radius_roi: [m] 1D array
-            The bubble radius in the region of interest.
+            The bubble radius in the region of interest fitted to a selection of zs along the main beam.
+
+        ...
         """
         
         super().__init__(length, nom_energy_gain, plasma_density)
@@ -149,10 +153,9 @@ class StagePrtclTransWakeInstability(Stage):
         stage_length = self.length
         gamma0 = beam0.gamma()
         time_step_mod = self.time_step_mod
-        print(self.drive_beam.z_offset())
 
         # ========== Shift the main beam trasversely according to drive beam offset ==========
-        if self.driver_source.jitter.x is 0:
+        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0:
             drive_beam = self.drive_beam  # This guarantees zero drive beam jitter between stages, as the same drive beam is used in every stage adn not re-sampled.
         else:
             drive_beam = self.driver_source.track()
@@ -160,9 +163,6 @@ class StagePrtclTransWakeInstability(Stage):
         driver_x_offset = drive_beam.x_offset()
         driver_y_offset = drive_beam.y_offset()
         x_offset = beam0.x_offset()
-        #eff_x_offset = x_offset - driver_x_offset
-        #y_offset = beam0.y_offset()
-        #eff_y_offset = y_offset - driver_y_offset
         
         xs = beam0.xs()
         beam0.set_xs(xs - driver_x_offset)
@@ -170,8 +170,8 @@ class StagePrtclTransWakeInstability(Stage):
         beam0.set_ys(ys - driver_y_offset)
 
         #print('Driver x/y offsets:', driver_x_offset, driver_y_offset)
-        #print('Effective x-offset, beam0.x_offset:', eff_x_offset, beam0.x_offset())
-        #print('Effective y-offset, beam0.y_offset:', eff_y_offset, beam0.y_offset())
+        #print('Effective x-offset, beam0.x_offset:', x_offset - driver_x_offset, beam0.x_offset())
+        #print('Effective y-offset, beam0.y_offset:', y_offset - driver_y_offset, beam0.y_offset())
 
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
         main_num_profile, xi_slices = self.longitudinal_number_distribution(beam=beam0)
@@ -281,7 +281,7 @@ class StagePrtclTransWakeInstability(Stage):
                                  pys=pys_sorted,
                                  pzs=pzs_sorted)
         else:
-            beam, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table = transverse_wake_instability_particles(beam0, plasma_density=plasma_density, Ez_fit=Ez_fit, rb_fit=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
+            beam, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table = transverse_wake_instability_particles(beam0, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
 
         
         #s_slices = s_slices_table[-1,:]

@@ -59,7 +59,7 @@ class StageWakeT(Stage):
             box_max_z = self.box_max_z
 
         if self.box_size_r is None:
-            box_size_r = 2 * blowout_radius(self.plasma_density, driver0.peak_current())
+            box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
         else:
             box_size_r = self.box_size_r
         
