@@ -1065,7 +1065,7 @@ class StageSlicesTransWakeInstability(Stage):
         if beam is None:
             beam = self.main_beam
 
-        # Macro particles data
+        # Macroparticles data
         zs = beam.zs()
         #xis = zs
         xs = beam.xs()
@@ -1232,7 +1232,7 @@ class StageSlicesTransWakeInstability(Stage):
         if beam is None:
             beam = self.main_beam
 
-        # Macro particles data
+        # Macroparticles data
         zs = beam.zs()
         xs = beam.xs()
         xps = beam.xps()

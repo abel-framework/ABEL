@@ -66,12 +66,12 @@ def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble
     # Assemble an array f used for the dot product (Based on Stupakov's wake function)
     f = -e*2/(np.pi*eps0*a**4)*weights_sorted*offsets
     
-    # Calculate the wakefield on each macro particle
+    # Calculate the wakefield on each macroparticle
     wakefield = np.zeros(len(zs_sorted))
     for idx_particle in range(len(zs_sorted)):
         wakefield[idx_particle] = np.sum((zs_sorted[idx_particle+1:] - zs_sorted[idx_particle]) * f[idx_particle+1:])
     
-    # Calculate the total transverse force on macro particles
+    # Calculate the total transverse force on macroparticles
     tr_force = -e*(wakefield + plasma_density*e*offsets/(2*eps0))
     
     # Update momenta
@@ -93,7 +93,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
     dwakefields_dz = np.cumsum(temp)  # Cumulative sum from 1st to last element.
     dwakefields_dz = np.flip(dwakefields_dz)
     
-    # Calculate the wakefield on each macro particle
+    # Calculate the wakefield on each macroparticle
     wakefields = np.zeros(len(zs_sorted))
     
     for idx_particle in range(len(zs_sorted)-2, -1, -1):
@@ -103,7 +103,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
         # Update the derivative of the wakefield (Stupakov's wake function) using a, weights and offsets for the current particle
         #dwakefields_dz = dwakefields_dz + 2/(np.pi*eps0*a[idx_particle]**4) * -e * weights_sorted[idx_particle] * offsets[idx_particle]
 
-    # Calculate the total transverse force on macro particles
+    # Calculate the total transverse force on macroparticles
     tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
     
     # Update momenta
@@ -114,7 +114,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 # ==================================================
 #def doffset_dt(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta, Ez, pzs_sorted):
 #    tr_force = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
-#    for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macro particles
+#    for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macroparticles
 #
 #        a = bubble_radius[-1:idx_particle:-1] + 0.75*skin_depth
 #        z_preceding_particles = zs_sorted[-1:idx_particle:-1]
@@ -277,10 +277,10 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         # ============= Integrate the wake function =============
         # Parallel tracking
         results = Parallel(n_jobs=2)([
-            delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
-            delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
-            #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
-            #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
+            #delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
+            #delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
+            delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
+            delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
         ])
         # Update momenta
         pxs_sorted = results[0]
@@ -305,7 +305,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
 
         
         # ============= Filter out particles that collide into bubble =============
-        bool_indices = (np.abs(xs_sorted) - bubble_radius < 0)
+        bool_indices = (np.sqrt(xs_sorted**2 + ys_sorted**2) - bubble_radius <= 0)
         zs_sorted = zs_sorted[bool_indices]
         xs_sorted = xs_sorted[bool_indices]
         ys_sorted = ys_sorted[bool_indices]
@@ -316,28 +316,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         Ez = Ez[bool_indices]
         bubble_radius = bubble_radius[bool_indices]
 
-        bool_indices = (np.abs(ys_sorted) - bubble_radius < 0)
-        zs_sorted = zs_sorted[bool_indices]
-        xs_sorted = xs_sorted[bool_indices]
-        ys_sorted = ys_sorted[bool_indices]
-        pxs_sorted = pxs_sorted[bool_indices]
-        pys_sorted = pys_sorted[bool_indices]
-        pzs_sorted = pzs_sorted[bool_indices]
-        weights_sorted = weights_sorted[bool_indices]
-        Ez = Ez[bool_indices]
-        bubble_radius = bubble_radius[bool_indices] 
-
-        #beam.set_xs(xs_sorted)
-        #beam.set_ys(ys_sorted)
-        #beam.set_zs(zs_sorted)
-        #uxs = momentum2proper_velocity(pxs_sorted)
-        #beam.set_uxs(uxs)
-        #uys = momentum2proper_velocity(pys_sorted)
-        #beam.set_uys(uys)
-        #uzs = momentum2proper_velocity(pzs_sorted)
-        #beam.set_uzs(uzs)
-        #beam.set_qs(-e*weights_sorted)
-
+        
         # Initialise ABEL Beam object
         beam_out = Beam()
         

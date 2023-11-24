@@ -875,7 +875,7 @@ class StagePrtclTransWakeInstability(Stage):
         if beam is None:
             beam = self.main_beam
 
-        # Macro particles data
+        # Macroparticles data
         zs = beam.zs()
         #xis = zs
         xs = beam.xs()
@@ -1052,7 +1052,7 @@ class StagePrtclTransWakeInstability(Stage):
         if beam is None:
             beam = self.main_beam
 
-        # Macro particles data
+        # Macroparticles data
         zs = beam.zs()
         xs = beam.xs()
         xps = beam.xps()
@@ -1486,7 +1486,7 @@ class StagePrtclTransWakeInstability(Stage):
         print('-------------------------------------------------------------------------------------')
         print('Quantity \t\t\t\t\t Drive beam \t\t Main beam')
         print('-------------------------------------------------------------------------------------')
-        print(f"Number of macro particles:\t\t\t {len(drive_beam.xs()) :d}\t\t\t {len(main_beam.xs()) :d}")
+        print(f"Number of macroparticles:\t\t\t {len(drive_beam.xs()) :d}\t\t\t {len(main_beam.xs()) :d}")
         print(f"Initial beam population:\t\t\t {(np.sum(drive_beam.weightings())) :.3e} \t\t {(np.sum(main_beam.weightings())) :.3e}\n")
 
         _, z_centre = find_closest_value_in_arr(arr=main_beam.zs(), val=self.main_source.z_offset)  # Centre z of beam.
@@ -1510,6 +1510,8 @@ class StagePrtclTransWakeInstability(Stage):
         print(f"Initial y beam size [um]:\t\t\t {drive_beam.beam_size_y()*1e6 :.3f} \t\t\t {main_beam.beam_size_y()*1e6 :.3f}")
         print(f"Initial rms beam length [um]:\t\t\t {drive_beam.bunch_length()*1e6 :.3f} \t\t {main_beam.bunch_length()*1e6 :.3f}")
         print(f"Initial peak current [kA]:\t\t\t {np.mean(drive_beam.peak_current())/1e3 :.3f} \t\t {np.mean(main_beam.peak_current())/1e3 :.3f}")
+        print(f"Bubble radius at beam head [um]:\t\t \t\t\t {self.rb_fit_obj(np.max(main_beam.zs()))*1e6 :.3f}")
+        print(f"Bubble radius at beam tail [um]:\t\t \t\t\t {self.rb_fit_obj(np.min(main_beam.zs()))*1e6 :.3f}")
         print('-------------------------------------------------------------------------------------')
         
     
@@ -1534,8 +1536,8 @@ class StagePrtclTransWakeInstability(Stage):
             print('-------------------------------------------------------------------------------------', file=f)
             print('Quantity \t\t\t\t\t Drive beam \t\t Main beam', file=f)
             print('-------------------------------------------------------------------------------------', file=f)
-            print(f"Initial number of macro particles:\t\t {len(drive_beam.xs()) :d}\t\t\t {len(initial_main_beam.xs()) :d}", file=f)
-            print(f"Current number of macro particles:\t\t  \t\t\t {len(beam_out.xs()) :d}", file=f)
+            print(f"Initial number of macroparticles:\t\t {len(drive_beam.xs()) :d}\t\t\t {len(initial_main_beam.xs()) :d}", file=f)
+            print(f"Current number of macroparticles:\t\t  \t\t\t {len(beam_out.xs()) :d}", file=f)
             print(f"Initial beam population:\t\t\t {(np.sum(drive_beam.weightings())) :.3e} \t\t {(np.sum(initial_main_beam.weightings())) :.3e}", file=f)
             print(f"Current beam population:\t\t\t \t \t\t {(np.sum(beam_out.weightings())) :.3e}\n", file=f)
 
@@ -1570,6 +1572,8 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Current rms beam length [um]:\t\t\t \t \t\t {beam_out.bunch_length()*1e6 :.3f}", file=f)
             print(f"Initial peak current [kA]:\t\t\t {np.mean(drive_beam.peak_current())/1e3 :.3f} \t\t {np.mean(initial_main_beam.peak_current())/1e3 :.3f}", file=f)
             print(f"Current peak current [kA]:\t\t\t  \t\t\t {np.mean(beam_out.peak_current())/1e3 :.3f}", file=f)
+            print(f"Bubble radius at beam head [um]:\t\t \t\t\t {self.rb_fit_obj(np.max(beam_out.zs()))*1e6 :.3f}", file=f)
+            print(f"Bubble radius at beam tail [um]:\t\t \t\t\t {self.rb_fit_obj(np.min(beam_out.zs()))*1e6 :.3f}", file=f)
             print('-------------------------------------------------------------------------------------', file=f)
         f.close() # Close the file
 

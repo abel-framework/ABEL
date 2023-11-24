@@ -125,7 +125,7 @@ def twoD_transverse_wake_instability_particles(beam, offsets, tr_momenta, plasma
         
         # ============= Integrate the wake function =============
         # Loop option 1
-        #for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macro particles
+        #for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macroparticles
  #
         #    a = bubble_radius[-1:idx_particle:-1] + 0.75*skin_depth
         #    z_preceding_particles = zs_sorted[-1:idx_particle:-1]
@@ -145,11 +145,11 @@ def twoD_transverse_wake_instability_particles(beam, offsets, tr_momenta, plasma
         a = bubble_radius + 0.75*skin_depth
         # Assemble an array f used for the dot product (Based on Stupakov's wake function)
         f = -e*2/(np.pi*eps0*a**4)*weights_sorted*offsets
-        # Calculate the wakefield on each macro particle
+        # Calculate the wakefield on each macroparticle
         wakefield = np.zeros(len(zs_sorted))
         for idx_particle in range(len(zs_sorted)):
             wakefield[idx_particle] = np.sum((zs_sorted[idx_particle+1:] - zs_sorted[idx_particle]) * f[idx_particle+1:])
-        # Calculate the total transverse force on macro particles
+        # Calculate the total transverse force on macroparticles
         tr_force = -e*(wakefield + plasma_density*e*offsets/(2*eps0))
         # Update momenta
         tr_momenta = tr_momenta + tr_force*time_step
@@ -166,12 +166,12 @@ def twoD_transverse_wake_instability_particles(beam, offsets, tr_momenta, plasma
         #a = bubble_radius + 0.75*skin_depth
         #f = -e*2/(np.pi*eps0*a**4)*weights_sorted*offsets
     #
-        ## Calculate the wakefield on each macro particle
+        ## Calculate the wakefield on each macroparticle
         #wakefield = np.dot(z_diff_mat_filtered, f)
         ##wakefield = z_diff_mat_filtered @ f
         ## Since z_diff_mat_filtered[i][j]=z[j]-z[i] then wakefield=np.dot(z_diff_mat_filtered, f) => wakefield[i]=sum_j((z[j]-z[i])*f[j]).
     #
-        ## Calculate the total transverse force on macro particles
+        ## Calculate the total transverse force on macroparticles
         #tr_force = -e*(wakefield + plasma_density*e*offsets/(2*eps0))
     #
         ## Update momenta
