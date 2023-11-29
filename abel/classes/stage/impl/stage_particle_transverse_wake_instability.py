@@ -97,7 +97,6 @@ class StagePrtclTransWakeInstability(Stage):
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
         self.interstages_enabled = False
-        self.show_prog_bar = True
         self.interstage_dipole_field = None
         
         self.main_beam_roi = main_beam_roi
@@ -282,7 +281,7 @@ class StagePrtclTransWakeInstability(Stage):
                                  pys=pys_sorted,
                                  pzs=pzs_sorted)
         else:
-            beam, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table = transverse_wake_instability_particles(beam0, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, get_centroids=False, s_slices=None, z_slices=None, show_prog_bar=self.show_prog_bar)
+            beam, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table = transverse_wake_instability_particles(beam0, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
 
         
         #s_slices = s_slices_table[-1,:]

@@ -7,7 +7,6 @@ import numpy as np
 import wake_t
 from openpmd_viewer import OpenPMDTimeSeries
 
-
 class StageWakeT(Stage):
     
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1):
@@ -19,8 +18,19 @@ class StageWakeT(Stage):
 
         self._beam_evolution = None
         self._driver_evolution = None
+
+        self.box_min_z = None
+        self.box_max_z = None
+        self.box_size_r = None
+        self.dz = None
+        self.opmd_diag = False
+
+        #path_sep = os.sep
+        #self.diag_dir = os.getcwd() + path_sep + 'run_data' + path_sep + 'stage_instability_tests' + path_sep + 'wake_t'
+        self.diag_dir = None
+
+
         
-    
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
         # make driver (and convert to WakeT bunch)
@@ -36,26 +46,44 @@ class StageWakeT(Stage):
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
 
         # create plasma stage
-        box_min_z = beam0.z_offset() - 5 * beam0.bunch_length()
-        box_max_z = driver0.z_offset() + 5 * driver0.bunch_length()
-        box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
+        if self.box_min_z is None:
+            #box_min_z = beam0.z_offset() - 5 * beam0.bunch_length()
+            box_min_z = driver0.z_offset() - 2.7 * blowout_radius(self.plasma_density, driver0.peak_current())
+        else:
+            box_min_z = self.box_min_z
+
+        if self.box_max_z is None:
+            #box_max_z = driver0.z_offset() + 5 * driver0.bunch_length()
+            box_max_z = driver0.z_offset() + blowout_radius(self.plasma_density, driver0.peak_current())
+        else:
+            box_max_z = self.box_max_z
+
+        if self.box_size_r is None:
+            box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
+        else:
+            box_size_r = self.box_size_r
         
-        k_beta = k_p(self.plasma_density)/np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))
-        lambda_betatron = (2*np.pi/k_beta)
-        dz = lambda_betatron/20
+        
+
+        if self.dz is None:
+            k_beta = k_p(self.plasma_density)/np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))
+            lambda_betatron = (2*np.pi/k_beta)
+            dz = lambda_betatron/20
+        else:
+            dz = self.dz  # Determines how often the plasma wakefields should be updated.
+        
         n_out = round(self.length/dz/2)
         plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=256, n_xi=256, dz_fields=dz, ppc=4)
         
         # do tracking
-        bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=False)
+        bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=self.opmd_diag, diag_dir=self.diag_dir)
         
         # save evolution of the beam and driver
         self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
         self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
         
-        # convert back to ABEL beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         
         # copy meta data from input beam (will be iterated by super)
@@ -66,7 +94,6 @@ class StageWakeT(Stage):
         # apply plasma-density up ramp (magnify beta function)
         if self.ramp_beta_mag is not None:
             beam.magnify_beta_function(self.ramp_beta_mag)
-            #driver.magnify_beta_function(self.ramp_beta_mag)
             
         return super().track(beam, savedepth, runnable, verbose)
     
