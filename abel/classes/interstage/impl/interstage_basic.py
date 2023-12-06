@@ -42,10 +42,19 @@ class InterstageBasic(Interstage):
             return self.dipole_length(self.nom_energy)
         else:
             return self.dipole_length
+
+    
+    # evaluate dipole field (if it is a function)
+    def __eval_dipole_field(self):
+        if callable(self.dipole_field):
+            return self.dipole_field(self.nom_energy)
+        else:
+            return self.dipole_field
+
     
     # evaluate longitudinal dispersion (R56)
     def R_56(self):
-        return -self.dipole_field**2*SI.c**2*self.__eval_dipole_length()**3/(3*self.nom_energy**2)
+        return -self.__eval_dipole_field()**2*SI.c**2*self.__eval_dipole_length()**3/(3*self.nom_energy**2)
     
     
     # lattice length
