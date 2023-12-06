@@ -84,7 +84,6 @@ def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble
 def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
     
     a = bubble_radius + 0.75*skin_depth
-    #dwakefields_dz = 0
     dzs = np.diff(zs_sorted)
 
     # Calculate the derivative of the wakefield (Stupakov's wake function)
@@ -98,10 +97,6 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
     
     for idx_particle in range(len(zs_sorted)-2, -1, -1):
         wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
-        #wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz
-
-        # Update the derivative of the wakefield (Stupakov's wake function) using a, weights and offsets for the current particle
-        #dwakefields_dz = dwakefields_dz + 2/(np.pi*eps0*a[idx_particle]**4) * -e * weights_sorted[idx_particle] * offsets[idx_particle]
 
     # Calculate the total transverse force on macroparticles
     tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
@@ -156,7 +151,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 
 # ==================================================
-def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, get_centroids=False, s_slices=None, z_slices=None):
+def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, get_centroids=False, s_slices=None, z_slices=None, show_prog_bar=True):
     
     energies = beam.Es()
     xs = beam.xs()
@@ -226,8 +221,9 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     prop_length = 0.0
 
     # Progress bar
-    pbar = tqdm(total=100)
-    pbar.set_description('0%')
+    if show_prog_bar is True:
+        pbar = tqdm(total=100)
+        pbar.set_description('0%')
 
     while prop_length < stage_length:
 
@@ -348,12 +344,13 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         
 
         # Progress bar
-        pbar.update(prop_length/stage_length*100 - pbar.n)        
-        pbar.set_description(f"Instability tracking {round(prop_length/stage_length*100,2)}%")
+        if show_prog_bar is True:
+            pbar.update(prop_length/stage_length*100 - pbar.n)        
+            pbar.set_description(f"Instability tracking {round(prop_length/stage_length*100,2)}%")
         
         
     #=============  =============
-    
-    pbar.close()
+    if show_prog_bar is True:
+        pbar.close()
     
     return beam_out, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table
