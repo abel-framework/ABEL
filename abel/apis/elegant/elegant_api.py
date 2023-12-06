@@ -1,4 +1,4 @@
-import uuid, os, subprocess, csv
+import uuid, os, subprocess, csv, shutil
 import numpy as np
 from abel import CONFIG, Beam
 import scipy.constants as SI
@@ -12,17 +12,16 @@ def elegant_read_beam(filename):
     tmpfile =  tmpfolder + '/stream.tmp'
     
     # convert SDDS file to CSV file
-    subprocess.call(CONFIG.elegant_path + 'sdds2stream ' + filename + ' -columns=x,xp,y,yp,t,p,dt > ' + tmpfile, shell=True)
+    subprocess.call(CONFIG.elegant_exec + 'sdds2stream ' + filename + ' -columns=x,xp,y,yp,t,p,dt > ' + tmpfile, shell=True)
     
     # extract charge
-    Q = float(subprocess.check_output([CONFIG.elegant_path + 'sdds2stream ' + filename + ' -parameter=Charge'], shell=True))
+    Q = float(subprocess.check_output([CONFIG.elegant_exec + 'sdds2stream ' + filename + ' -parameter=Charge'], shell=True))
     
     # load phasespace from CSV file
     phasespace = np.loadtxt(open(tmpfile, "rb"), delimiter=' ')
     
     # delete CSV file and temporary folder
-    os.remove(tmpfile)
-    os.rmdir(tmpfolder)
+    shutil.rmtree(tmpfolder)
     
     # make beam (note: z is flipped)
     beam = Beam()
@@ -53,7 +52,7 @@ def elegant_write_beam(beam, filename):
             csvwriter.writerow([M[0,i], M[1,i], M[2,i], M[3,i], M[4,i], M[5,i], M[6,i], int(i+1)])
     
     # convert CSV to SDDS (ascii for now)
-    subprocess.call(CONFIG.elegant_path + 'csv2sdds ' + tmpfile + ' ' + filename + ' -asciiOutput -columnData=name=x,type=double,units=m' +
+    subprocess.call(CONFIG.elegant_exec + 'csv2sdds ' + tmpfile + ' ' + filename + ' -asciiOutput -columnData=name=x,type=double,units=m' +
                                                                         ' -columnData=name=xp,type=double' + 
                                                                         ' -columnData=name=y,type=double,units=m' + 
                                                                         ' -columnData=name=yp,type=double' + 
@@ -86,16 +85,15 @@ def elegant_write_beam(beam, filename):
         f.write("".join(lines))
         
     # convert SDDS to binary
-    subprocess.call(CONFIG.elegant_path + 'sddsconvert -binary ' + filename + ' -noWarnings', shell=True)
+    subprocess.call(CONFIG.elegant_exec + 'sddsconvert -binary ' + filename + ' -noWarnings', shell=True)
     
     # delete CSV file and temporary folder
-    os.remove(tmpfile)
-    os.rmdir(tmpfolder)
+    shutil.rmtree(tmpfolder)
     
     return filename
     
     
-def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
+def elegant_run(filename, beam0, beamfile, envars={}, quiet=False, run_from_container=False):
     
     # convert incoping beam object to temporary SDDS file
     tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
@@ -109,7 +107,8 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
         os.environ[key] = str(envars[key])
 
     # run system command
-    cmd = CONFIG.elegant_path + 'elegant ' + filename + ' -rpnDefns=' + CONFIG.elegant_path + 'defns.rpn'
+    cmd = CONFIG.elegant_exec + 'elegant ' + filename + CONFIG.elegant_rpnflag
+        
     if quiet:
         subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
     else:
@@ -127,11 +126,7 @@ def elegant_run(filename, beam0, beamfile, envars={}, quiet=False):
     beam.copy_particle_charge(beam0)
     
     # delete temporary bunch files and temporary folder
-    os.remove(tmpfile)
-    tmpfile_backup = tmpfile + '~'
-    if os.path.exists(tmpfile_backup):
-        os.remove(tmpfile_backup)
-    os.rmdir(tmpfolder)
+    shutil.rmtree(tmpfolder)
     
     return beam
 
@@ -164,13 +159,12 @@ def elegant_apl_fieldmap2D(tau_lens, filename, lensdim_x=5e-3, lensdim_y=1e-3):
     np.savetxt(tmpfile, Bmap, delimiter=',')
     
     # convert SDDS to binary
-    subprocess.call(CONFIG.elegant_path + 'csv2sdds ' + tmpfile + ' ' + filename + ' -columnData=name=x,type=double,unit=m' +
+    subprocess.call(CONFIG.elegant_exec + 'csv2sdds ' + tmpfile + ' ' + filename + ' -columnData=name=x,type=double,unit=m' +
                                                                         ' -columnData=name=y,type=double,unit=m' +
                                                                         ' -columnData=name=Bx,type=double,unit=T' +
                                                                         ' -columnData=name=By,type=double,unit=T', shell=True)
     
     # delete temporary CSV file and folder
-    os.remove(tmpfile)
-    os.rmdir(tmpfolder)
+    shutil.rmtree(tmpfolder)
     
     return filename

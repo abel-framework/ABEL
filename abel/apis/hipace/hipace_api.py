@@ -5,15 +5,20 @@ from pathlib import Path
 from abel import CONFIG, Beam
 from abel.utilities.plasma_physics import k_p
 
-
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, n_cell_xy=511, n_cell_z=424):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, n_cell_xy=511, n_cell_z=424):
 
     if output_period is None:
         output_period = int(num_steps)
         
     # locate template file
     filename_input_template = CONFIG.abel_path + 'abel/apis/hipace/input_template'
+
+    # prepare plasma components (based on ion motion)
+    if ion_motion:
+        plasma_components = 'electrons ions'
+    else:
+        plasma_components = 'plasma'
     
     # define inputs
     inputs = {'n_cell_x': int(n_cell_xy), 
@@ -29,6 +34,9 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'time_step': time_step,
               'max_step': int(num_steps),
               'output_period': output_period,
+              'radiation_reaction': int(radiation_reaction),
+              'plasma_components': plasma_components,
+              'ion_species': ion_species,
               'filename_beam': filename_beam,
               'filename_driver': filename_driver}
 
@@ -45,7 +53,7 @@ def hipace_write_jobscript(filename_job_script, filename_input):
     filename_job_script_template = CONFIG.abel_path + 'abel/apis/hipace/job_script_template'
     
     # define inputs
-    inputs = {'nodes': 13,
+    inputs = {'nodes': 1,
               'filename_input': filename_input}
     
     # fill in template file
@@ -63,6 +71,7 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     # make run folder automatically from job script folder
     if runfolder is None:
         runfolder = str.replace(filename_job_script, os.path.basename(filename_job_script), '')
+        filename_job_script = os.path.basename(filename_job_script)
     
     # run system command
     cmd = 'cd ' + runfolder + ' && sbatch ' + filename_job_script
@@ -101,7 +110,8 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
             break
         
         # wait for some time
-        time.sleep(5)
+        wait_time = 10 # [s]
+        time.sleep(wait_time)
     
     # when finished, load the beam
     filename = runfolder + "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps))

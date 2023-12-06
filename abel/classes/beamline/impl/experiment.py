@@ -1,4 +1,4 @@
-from abel import Beamline, Source, BeamDeliverySystem, Stage, Spectrometer
+from abel import CONFIG, Beamline, Source, BeamDeliverySystem, Stage, Spectrometer
 from matplotlib import pyplot as plt
 import numpy as np
 import warnings
@@ -6,6 +6,7 @@ from abel.utilities.plasma_physics import wave_breaking_field, k_p, beta_matched
 import scipy.constants as SI
 from scipy.stats import linregress
 import ocelot
+
 class Experiment(Beamline):
     
     def __init__(self, source=None, bds=None, stage=None, spectrometer=None):
@@ -50,7 +51,7 @@ class Experiment(Beamline):
         fig.set_figheight(8)
         
         # current profile
-        c0 = ax[0].pcolor(xedges*1e3, yedges * 1e3, abs(dQdxdy) * 1e3, cmap='GnBu', shading='auto')
+        c0 = ax[0].pcolor(xedges*1e3, yedges * 1e3, abs(dQdxdy) * 1e3, cmap=CONFIG.default_cmap, shading='auto')
         
         # make plot
         ax[0].set_xlabel('x (mm)')

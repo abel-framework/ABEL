@@ -1,4 +1,4 @@
-import uuid, os, scipy
+import uuid, os, scipy, shutil
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as SI
@@ -252,18 +252,12 @@ class InterstageElegant(Interstage):
         # run ELEGANT
         runfile = self.__make_run_script()
         beam = elegant_run(runfile, beam0, beamfile, envars, quiet=True)
-
+        
         # clean extreme outliers
         beam.remove_halo_particles()
         
         # remove temporary files
-        os.remove(beamfile)
-        os.remove(latticefile)
-        os.remove(lensfile)
-        beamfile_backup = beamfile + '~'
-        if os.path.exists(beamfile_backup):
-            os.remove(beamfile_backup)
-        os.rmdir(tmpfolder)
+        shutil.rmtree(tmpfolder)
 
         return super().track(beam, savedepth, runnable, verbose)
     

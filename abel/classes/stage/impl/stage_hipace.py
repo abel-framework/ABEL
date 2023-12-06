@@ -8,9 +8,10 @@ import os, shutil, uuid, copy
 from openpmd_viewer import OpenPMDTimeSeries
 from abel.utilities.plasma_physics import k_p
 from matplotlib.colors import LogNorm
+
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False, output=None, analytical = False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False, output=None, radiation_reaction=False, ion_motion=True, ion_species='H', analytical = False):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
@@ -19,6 +20,10 @@ class StageHipace(Stage):
         
         self.keep_data = keep_data
         self.output = output
+        
+        self.radiation_reaction = radiation_reaction
+        self.ion_motion = ion_motion
+        self.ion_species = ion_species
         
         self.analytical = analytical
         
@@ -66,13 +71,15 @@ class StageHipace(Stage):
         # SAVE BEAMS
         
         # saving beam to temporary folder
-        filename_beam = tmpfolder + 'beam.h5'
-        beam0.save(filename = filename_beam)
+        filename_beam = 'beam.h5'
+        path_beam = tmpfolder + filename_beam
+        beam0.save(filename = path_beam)
         
         # produce and save drive beam
-        filename_driver = tmpfolder + 'driver.h5'
+        filename_driver = 'driver.h5'
+        path_driver = tmpfolder + filename_driver
         driver = self.__get_initial_driver()
-        driver.save(filename = filename_driver, beam_name = 'driver')
+        driver.save(filename = path_driver, beam_name = 'driver')
         
         
         # MAKE INPUT FILE
@@ -113,8 +120,9 @@ class StageHipace(Stage):
             output_period = None
         
         # input file
-        filename_input = tmpfolder + 'input_file'
-        hipace_write_inputs(filename_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, output_period=output_period)
+        filename_input = 'input_file'
+        path_input = tmpfolder + filename_input
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, radiation_reaction=self.radiation_reaction, ion_motion=self.ion_motion, ion_species=self.ion_species, output_period=output_period)
         
         
         ## RUN SIMULATION
@@ -136,6 +144,9 @@ class StageHipace(Stage):
         
         # remove nan particles
         beam.remove_nans()
+        
+        # clean extreme outliers
+        beam.remove_halo_particles()
         
         # extract wakefield data
         source_folder = tmpfolder + 'diags/hdf5/'
@@ -161,7 +172,7 @@ class StageHipace(Stage):
         
         if os.path.exists(tmpfolder):
             shutil.rmtree(tmpfolder)
-
+        
         return super().track(beam, savedepth, runnable, verbose)
     
         

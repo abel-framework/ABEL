@@ -2,6 +2,7 @@ import numpy as np
 import openpmd_api as io
 from datetime import datetime
 from pytz import timezone
+from abel import CONFIG
 import scipy.constants as SI
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma
 from abel.utilities.statistics import prct_clean, prct_clean2d
@@ -403,7 +404,7 @@ class Beam():
         fig.set_figwidth(8)
         fig.set_figheight(5)  
             
-        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap='GnBu', shading='auto')
+        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
         ax.set_xlabel('z (um)')
         ax.set_ylabel('E (GeV)')
         ax.set_title('Longitudinal phase space')
@@ -416,7 +417,7 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap='GnBu', shading='auto')
+        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         ax.set_xlabel('x (um)')
         ax.set_ylabel('x'' (mrad)')
         ax.set_title('Horizontal trace space')
@@ -429,7 +430,7 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap='GnBu', shading='auto')
+        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         ax.set_xlabel('y (um)')
         ax.set_ylabel('y'' (mrad)')
         ax.set_title('Vertical trace space')

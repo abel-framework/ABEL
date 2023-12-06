@@ -3,16 +3,15 @@ amr.n_cell = $n_cell_x $n_cell_y $n_cell_z
 hipace.normalized_units = 0
 hipace.bxby_solver = explicit
 
-hipace.dt = $time_step
+hipace.dt = $time_step # TODO: set automatic timestep
 amr.blocking_factor = 1
 amr.max_level = 0
 
 hipace.verbose = 1
-max_step = $max_step
+max_step = $max_step # TODO: set automatic timestep
 hipace.output_period = $output_period
 
 hipace.depos_order_xy = 1
-
 
 geometry.coord_sys   = 0                  # 0: Cartesian
 geometry.is_periodic = 1 1 0  # Is periodic?
@@ -23,17 +22,31 @@ beams.names = driver beam
 beam.injection_type = from_file
 beam.input_file = $filename_beam
 beam.iteration = 0
+beam.do_radiation_reaction = $radiation_reaction
 
 driver.injection_type = from_file
 driver.input_file = $filename_driver
 driver.iteration = 0
 
-plasmas.names = plasma
+plasmas.names = $plasma_components # 'plasma' or 'electrons ions'
+
+# if ion motion disabled
 plasma.density(x,y,z) = $plasma_density
 plasma.ppc = 1 1
-plasma.u_mean = 0.0 0.0 0.0
 plasma.element = electron
 plasma.do_symmetrize = 1
+
+# if ion motion enabled
+electrons.element = electron
+electrons.density(x,y,z) = $plasma_density
+electrons.do_symmetrize = 1
+electrons.ppc = 1 1
+electrons.neutralize_background = 0 
+ions.element = $ion_species
+ions.density(x,y,z) = $plasma_density
+ions.do_symmetrize = 1
+ions.ppc = 1 1
+ions.neutralize_background = 0
 
 diagnostic.diag_type = xz
 diagnostic.field_data = Ez ExmBy rho jz_beam
