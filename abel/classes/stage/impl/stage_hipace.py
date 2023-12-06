@@ -1,6 +1,7 @@
 from abel import Stage, CONFIG
 from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_write_jobscript
 from abel.utilities.plasma_physics import *
+from abel.utilities.relativity import energy2gamma
 import scipy.constants as SI
 from matplotlib import pyplot as plt
 import numpy as np
@@ -8,10 +9,15 @@ import os, shutil, uuid, copy
 from openpmd_viewer import OpenPMDTimeSeries
 from abel.utilities.plasma_physics import k_p
 from matplotlib.colors import LogNorm
+from types import SimpleNamespace
+
+import sys
+sys.path.append(CONFIG.hipace_path + '/tools')
+import read_insitu_diagnostics
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False, output=None, radiation_reaction=False, ion_motion=True, ion_species='H', analytical = False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, analytical = False):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
@@ -21,42 +27,35 @@ class StageHipace(Stage):
         self.keep_data = keep_data
         self.output = output
         
-        self.radiation_reaction = radiation_reaction
         self.ion_motion = ion_motion
         self.ion_species = ion_species
+        self.beam_ionization = beam_ionization
+        self.radiation_reaction = radiation_reaction
+
+        self.evolution = SimpleNamespace()
         
         self.analytical = analytical
         
         self.__initial_wakefield = None
         self.__final_wakefield = None
-        
         self.__initial_driver = None
         self.__final_driver = None
-        
         self.__initial_transverse = None
         self.__final_transverse = None
-        
         self.__bubble_size = None
-
         self.__initial_witness = None
         self.__final_witness = None
-        
         self.__initial_rho = None
-        
         self.__final_rho = None
-        
         self.__final_focusing = None
-        
         self.__initial_focusing = None
-
         self.__amplitude_evol = None
-        
         self.__phase_advances = None
+        
 
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
         ## PREPARE TEMPORARY FOLDER
-        
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
@@ -110,7 +109,6 @@ class StageHipace(Stage):
             else:  # If remainder is less than 10, round down
                 self.num_steps = self.num_steps - remainder
         
-        
         time_step = self.length/(self.num_steps*SI.c)
 
         # overwrite output period
@@ -122,7 +120,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, radiation_reaction=self.radiation_reaction, ion_motion=self.ion_motion, ion_species=self.ion_species, output_period=output_period)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period)
         
         
         ## RUN SIMULATION
@@ -147,6 +145,29 @@ class StageHipace(Stage):
         
         # clean extreme outliers
         beam.remove_halo_particles()
+
+        # extract insitu diagnostics (beam)
+        insitu_files = tmpfolder + 'diags/insitu/reduced_beam.*.txt'
+        all_data = read_insitu_diagnostics.read_file(insitu_files)
+        average_data = all_data['average']
+        self.evolution.location = beam0.location + all_data['time']*SI.c
+        self.evolution.charge = read_insitu_diagnostics.total_charge(all_data)
+        self.evolution.energy = read_insitu_diagnostics.energy_mean_eV(all_data)
+        self.evolution.x = average_data['[x]']
+        self.evolution.y = average_data['[y]']
+        self.evolution.xp = average_data['[ux]']/average_data['[uz]']
+        self.evolution.yp = average_data['[uy]']/average_data['[uz]']
+        self.evolution.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
+        self.evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
+        self.evolution.beam_size_x = read_insitu_diagnostics.position_std(average_data, direction='x')
+        self.evolution.beam_size_y = read_insitu_diagnostics.position_std(average_data, direction='y')
+        self.evolution.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
+        self.evolution.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
+        self.evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
+        self.evolution.beta_x = np.sqrt(self.evolution.beam_size_x)/(self.evolution.emit_nx*energy2gamma(self.evolution.energy))
+        self.evolution.beta_y = np.sqrt(self.evolution.beam_size_y)/(self.evolution.emit_ny*energy2gamma(self.evolution.energy))
+        
+        
         
         # extract wakefield data
         source_folder = tmpfolder + 'diags/hdf5/'
@@ -158,7 +179,7 @@ class StageHipace(Stage):
         self.__extract_rho(source_folder)
         if self.output is not None:
             self.__extract_amplitude_evol(source_folder)
-            
+        
         # save drivers
         self.__initial_driver = driver
         
@@ -169,6 +190,9 @@ class StageHipace(Stage):
         if self.keep_data or (savedepth > 0 and runnable is not None):
             destination_folder = runnable.shot_path() + '/stage_' + str(beam0.stage_number)
             shutil.move(source_folder, destination_folder)
+            source_folder2 = tmpfolder + 'diags/insitu/'
+            destination_folder2 = runnable.shot_path() + '/stage_' + str(beam0.stage_number) + '_insitu'
+            shutil.move(source_folder2, destination_folder2)
         
         if os.path.exists(tmpfolder):
             shutil.rmtree(tmpfolder)
@@ -194,7 +218,57 @@ class StageHipace(Stage):
     def analytical_focusing(self):
         focusing = self.plasma_density * SI.e /(2 * SI.epsilon_0)
         return focusing
-    
+
+    def plot_evolution(self):
+        
+        # line format
+        fmt = "-"
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        
+        # plot evolution
+        fig, axs = plt.subplots(3,2)
+        fig.set_figwidth(CONFIG.plot_width_default*1.2)
+        fig.set_figheight(CONFIG.plot_width_default*1.1)
+        long_label = 'Location (m)'
+        long_axis = self.evolution.location
+
+        # plot energy
+        axs[0,0].plot(long_axis, self.evolution.energy / 1e9, color=col1)
+        axs[0,0].set_ylabel('Energy (GeV)')
+
+        # plot energy spread
+        axs[1,0].plot(long_axis, self.evolution.rel_energy_spread * 100, color=col1)
+        axs[1,0].set_ylabel('Energy spread (%)')
+
+        # plot charge
+        axs[2,0].plot(long_axis, self.evolution.charge[0] * np.ones(long_axis.shape) * 1e9, ':', color=col0)
+        axs[2,0].plot(long_axis, self.evolution.charge * 1e9, color=col1)
+        axs[2,0].set_xlabel(long_label)
+        axs[2,0].set_ylabel('Charge (nC)')
+
+        # plot transverse offset
+        axs[0,1].plot(long_axis, np.zeros(long_axis.shape), ':', color=col0)
+        axs[0,1].plot(long_axis, self.evolution.x*1e6, color=col1)
+        axs[0,1].plot(long_axis, self.evolution.y*1e6, color=col2)
+        axs[0,1].set_ylabel('Transverse offset (um)')
+
+        # plot beta function
+        axs[1,1].plot(long_axis, self.evolution.beta_x*1e3, color=col1)
+        axs[1,1].plot(long_axis, self.evolution.beta_y*1e3, color=col2)
+        axs[1,1].set_ylabel('Beta function (mm)')
+
+        # plot normalized emittance
+        axs[2,1].plot(long_axis, self.evolution.emit_nx*1e6, color=col1)
+        axs[2,1].plot(long_axis, self.evolution.emit_ny*1e6, color=col2)
+        axs[2,1].set_xlabel(long_label)
+        axs[2,1].set_ylabel('Emittance, rms (mm mrad)')
+        
+        
+        plt.show()
+        
+        
     def __extract_wakefield(self, path):
         
         # prepare to read simulation data
