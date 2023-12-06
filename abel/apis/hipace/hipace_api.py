@@ -6,7 +6,7 @@ from abel import CONFIG, Beam
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, n_cell_xy=511, n_cell_z=424):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, n_cell_xy=511, n_cell_z=424):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -37,6 +37,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'radiation_reaction': int(radiation_reaction),
               'plasma_components': plasma_components,
               'ion_species': ion_species,
+              'beam_ionization': int(beam_ionization),
               'filename_beam': filename_beam,
               'filename_driver': filename_driver}
 
@@ -104,6 +105,7 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
                 print('>> Running (' + time_spent + ')')
             elif status == 'CG':
                 print('>> Ending (' + time_spent + ')')
+                break
         else:
             print('>> Done!')
             # the simulation is done

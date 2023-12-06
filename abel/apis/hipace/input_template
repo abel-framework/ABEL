@@ -19,6 +19,8 @@ geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
 geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z
 
 beams.names = driver beam
+beams.insitu_period = 1
+
 beam.injection_type = from_file
 beam.input_file = $filename_beam
 beam.iteration = 0
@@ -47,6 +49,9 @@ ions.density(x,y,z) = $plasma_density
 ions.do_symmetrize = 1
 ions.ppc = 1 1
 ions.neutralize_background = 0
+ions.can_ionize = $beam_ionization
+ions.initial_ion_level = 1
+ions.ionization_product = electrons
 
 diagnostic.diag_type = xz
 diagnostic.field_data = Ez ExmBy rho jz_beam
