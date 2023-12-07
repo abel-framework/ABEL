@@ -17,12 +17,13 @@ import read_insitu_diagnostics
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, analytical = False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, analytical=False):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
         self.driver_source = driver_source
         self.add_driver_to_beam = add_driver_to_beam
+        self.ramp_beta_mag = ramp_beta_mag
         
         self.keep_data = keep_data
         self.output = output
@@ -31,7 +32,7 @@ class StageHipace(Stage):
         self.ion_species = ion_species
         self.beam_ionization = beam_ionization
         self.radiation_reaction = radiation_reaction
-
+        
         self.evolution = SimpleNamespace()
         
         self.analytical = analytical
@@ -65,6 +66,16 @@ class StageHipace(Stage):
         # make directory
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
+
+        
+        # generate driver
+        driver = self.__get_initial_driver()
+
+        
+        # !! QUICK FIX: TODO to make this a real ramp
+        # apply plasma-density down ramp (demagnify beta function)
+        driver.magnify_beta_function(1/self.ramp_beta_mag)
+        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver)
         
         
         # SAVE BEAMS
@@ -77,7 +88,7 @@ class StageHipace(Stage):
         # produce and save drive beam
         filename_driver = 'driver.h5'
         path_driver = tmpfolder + filename_driver
-        driver = self.__get_initial_driver()
+        
         driver.save(filename = path_driver, beam_name = 'driver')
         
         
@@ -86,7 +97,7 @@ class StageHipace(Stage):
         # make longitudinal box range
         num_sigmas = 6
         box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        box_max_z = driver.z_offset() + num_sigmas * driver.bunch_length()
+        box_max_z = min(driver.z_offset() + num_sigmas * driver.bunch_length(), np.max(driver.zs())+0.5/k_p(self.plasma_density))
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
@@ -131,6 +142,11 @@ class StageHipace(Stage):
         
         # run HiPACE++
         beam = hipace_run(filename_job_script, self.num_steps)
+
+        
+        # !! QUICK FIX: TODO to make this a real ramp
+        # apply plasma-density up ramp (magnify beta function)
+        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
         
         
         ## ADD METADATA
@@ -140,10 +156,9 @@ class StageHipace(Stage):
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
-        # remove nan particles
-        beam.remove_nans()
         
-        # clean extreme outliers
+        # clean nan particles and extreme outliers
+        beam.remove_nans()
         beam.remove_halo_particles()
 
         # extract insitu diagnostics (beam)
@@ -164,10 +179,8 @@ class StageHipace(Stage):
         self.evolution.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
         self.evolution.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
         self.evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
-        self.evolution.beta_x = np.sqrt(self.evolution.beam_size_x)/(self.evolution.emit_nx*energy2gamma(self.evolution.energy))
-        self.evolution.beta_y = np.sqrt(self.evolution.beam_size_y)/(self.evolution.emit_ny*energy2gamma(self.evolution.energy))
-        
-        
+        self.evolution.beta_x = np.sqrt(self.evolution.beam_size_x)/(self.evolution.emit_nx*energy2gamma(self.evolution.energy)) # TODO: fix
+        self.evolution.beta_y = np.sqrt(self.evolution.beam_size_y)/(self.evolution.emit_ny*energy2gamma(self.evolution.energy)) # TODO: fix
         
         # extract wakefield data
         source_folder = tmpfolder + 'diags/hdf5/'
@@ -213,7 +226,7 @@ class StageHipace(Stage):
         return None # TODO
     
     def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy)
+        return beta_matched(self.plasma_density, energy)*self.ramp_beta_mag
     
     def analytical_focusing(self):
         focusing = self.plasma_density * SI.e /(2 * SI.epsilon_0)
@@ -255,9 +268,9 @@ class StageHipace(Stage):
         axs[0,1].set_ylabel('Transverse offset (um)')
 
         # plot beta function
-        axs[1,1].plot(long_axis, self.evolution.beta_x*1e3, color=col1)
-        axs[1,1].plot(long_axis, self.evolution.beta_y*1e3, color=col2)
-        axs[1,1].set_ylabel('Beta function (mm)')
+        axs[1,1].plot(long_axis, self.evolution.beam_size_x*1e6, color=col1)
+        axs[1,1].plot(long_axis, self.evolution.beam_size_y*1e6, color=col2)
+        axs[1,1].set_ylabel('Beam size, rms (um)')
 
         # plot normalized emittance
         axs[2,1].plot(long_axis, self.evolution.emit_nx*1e6, color=col1)
@@ -524,7 +537,8 @@ class StageHipace(Stage):
         
         return 
     
-    def plot_initial_bubble(self, beam=None, savefig = None):
+    def plot_initial_bubble(self, savefig=None):
+        
         # extract density if not already existing
         if (self.__initial_rho is None):
             print('Charge density not extracted')
@@ -548,84 +562,12 @@ class StageHipace(Stage):
         rho0 = -(rho0/(SI.e) -self.plasma_density)
         
         # make figures
-        fig, ax = plt.subplots(figsize = (8,7))
+        fig, ax = plt.subplots(figsize = (6,4))
         ax2 = ax.twinx()
         ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
         ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
-        ax2.set_ylim(bottom=-1.3*max(Ezs0)/1e9, top=1.3*max(Ezs0)/1e9)
-        axpos = ax.get_position()
-        pad_fraction = 0.1  # Fraction of the figure width to use as padding between the ax and colorbar
-        cbar_width_fraction = 0.03  # Fraction of the figure width for the colorbar width
-
-        # Create colorbar axes based on the relative position and size
-        cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
-        cax2 = fig.add_axes([axpos.x1 + pad_fraction + cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
-        clims = np.array([1e-2, 1e3])*self.plasma_density
-        
-        # plasma electrons
-        initial = ax.imshow(rho0.T/1e6, extent=extent, norm=LogNorm(), origin='lower', cmap = 'Blues', alpha = np.array(rho0.T>clims.min()*2, dtype = float))
-        cb = fig.colorbar(initial, cax=cax1)
-        initial.set_clim(clims/1e6)
-        cb.ax.tick_params(axis='y',which='both', direction='in')
-        cb.set_ticklabels([])
-        
-        # beam electrons
-        charge_density_plot0 = ax.imshow(charge_density0.T/1e6, extent=j0extent, norm=LogNorm(), origin='lower', cmap='Oranges', alpha = np.array(charge_density0.T>clims.min()*2, dtype = float))
-        cb2 = fig.colorbar(charge_density_plot0, cax = cax2)
-        cb2.set_label(label=r'Electron density ' + r'$\mathrm{cm^{-3}}$',size=10)
-        cb2.ax.tick_params(axis='y',which='both', direction='in')
-        charge_density_plot0.set_clim(clims/1e6)
-
-        # Set labels
-        ax.set_xlabel('z (um)')
-        ax.set_ylabel('x (um)')
-        
-        ax.grid(False)
-        ax2.grid(False)
-        ylims = np.array([-1, 1])*bubble_radius*1.4
-        ax.set_ylim(ylims*1e6)
-        
-        left = axpos.x0  # Left spacing is the x start of the main axes
-        right = 1 - (cax2.get_position().x1 / fig.get_size_inches()[0])  # Right spacing is the end of the second colorbar axis, adjusted for figure size
-        top = axpos.y1  # Top spacing is the y end of the main axes
-        bottom = axpos.y0  # Bottom spacing is the y start of the main axes
-
-        # Apply the calculated spacings
-        fig.subplots_adjust(left=left, right=right, top=top, bottom=bottom)
-        if savefig is not None:
-            fig.savefig(str(savefig), bbox_inches='tight', dpi = 1000)
-        return 
-    
-    
-    def plot_final_bubble(self, beam=None):
-        # extract density if not already existing
-        if (self.__final_rho is None):
-            print('Charge density not extracted')
-            return
-        
-        # extract wakefield if not already existing
-        if (self.__final_wakefield is None):
-            print('No wakefield available')
-            return 
-
-        # assign to variables
-        zs0, Ezs0 = self.__final_wakefield
-        extent, rho0, jz0, j0extent = self.__final_rho
-        Is0 = self.__initial_driver.peak_current()
-        
-        # calculate densities and extents
-        bubble_radius = blowout_radius(self.plasma_density, Is0)
-        extent = np.array([extent[2], extent[3], extent[0], extent[1]])*1e6
-        j0extent = np.array([j0extent[2], j0extent[3], j0extent[0], j0extent[1]])*1e6
-        charge_density0 = -jz0/(SI.c * SI.e)
-        rho0 = -(rho0/(SI.e) -self.plasma_density)
-        
-        # make figures
-        fig, ax = plt.subplots(figsize = (8,8))
-        ax2 = ax.twinx()
-        ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
-        ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
-        ax2.set_ylim(bottom=-wave_breaking_field(self.plasma_density)/1e9, top=1.3*max(Ezs0)/1e9)
+        Ezmax = 0.8*wave_breaking_field(self.plasma_density)
+        ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
         axpos = ax.get_position()
         pad_fraction = 0.1  # Fraction of the figure width to use as padding between the ax and colorbar
         cbar_width_fraction = 0.03  # Fraction of the figure width for the colorbar width
@@ -655,7 +597,77 @@ class StageHipace(Stage):
         
         ax.grid(False)
         ax2.grid(False)
-        ylims = np.array([-1, 1])*bubble_radius*1.4
+        ylims = np.array([-1, 1])*bubble_radius*1.2
+        ax.set_ylim(ylims*1e6)
+        
+        # save the figure
+        if savefig is not None:
+            fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
+        
+        return 
+    
+    
+    def plot_final_bubble(self):
+        
+        # extract density if not already existing
+        if (self.__final_rho is None):
+            print('Charge density not extracted')
+            return
+        
+        # extract wakefield if not already existing
+        if (self.__final_wakefield is None):
+            print('No wakefield available')
+            return 
+
+        # assign to variables
+        zs0, Ezs0 = self.__final_wakefield
+        extent, rho0, jz0, j0extent = self.__final_rho
+        Is0 = self.__initial_driver.peak_current()
+        
+        # calculate densities and extents
+        bubble_radius = blowout_radius(self.plasma_density, Is0)
+        extent = np.array([extent[2], extent[3], extent[0], extent[1]])*1e6
+        j0extent = np.array([j0extent[2], j0extent[3], j0extent[0], j0extent[1]])*1e6
+        charge_density0 = -jz0/(SI.c * SI.e)
+        rho0 = -(rho0/(SI.e) -self.plasma_density)
+        
+        # make figures
+        fig, ax = plt.subplots(figsize = (6,4))
+        ax2 = ax.twinx()
+        ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
+        ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
+        Ezmax = 0.8*wave_breaking_field(self.plasma_density)
+        ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
+        axpos = ax.get_position()
+        pad_fraction = 0.1  # Fraction of the figure width to use as padding between the ax and colorbar
+        cbar_width_fraction = 0.03  # Fraction of the figure width for the colorbar width
+
+        # Create colorbar axes based on the relative position and size
+        cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
+        cax2 = fig.add_axes([axpos.x1 + pad_fraction + cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
+        clims = np.array([1e-2, 1e3])*self.plasma_density
+        
+        # plasma electrons
+        initial = ax.imshow(rho0.T/1e6, extent=extent, norm=LogNorm(), origin='lower', cmap = 'Blues', alpha = np.array(rho0.T>clims.min()*2, dtype = float))
+        cb = plt.colorbar(initial, cax=cax1)
+        initial.set_clim(clims/1e6)
+        cb.ax.tick_params(axis='y',which='both', direction='in')
+        cb.set_ticklabels([])
+        
+        # beam electrons
+        charge_density_plot0 = ax.imshow(charge_density0.T/1e6, extent=j0extent, norm=LogNorm(), origin='lower', cmap='Oranges', alpha = np.array(charge_density0.T>clims.min()*2, dtype = float))
+        cb2 = plt.colorbar(charge_density_plot0, cax = cax2)
+        cb2.set_label(label=r'Electron density ' + r'$\mathrm{cm^{-3}}$',size=10)
+        cb2.ax.tick_params(axis='y',which='both', direction='in')
+        charge_density_plot0.set_clim(clims/1e6)
+
+        # Set labels
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('x (um)')
+        
+        ax.grid(False)
+        ax2.grid(False)
+        ylims = np.array([-1, 1])*bubble_radius*1.2
         ax.set_ylim(ylims*1e6)
         return 
     
