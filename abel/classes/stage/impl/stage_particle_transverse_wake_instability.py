@@ -6,36 +6,35 @@ Ben Chen, 6 October 2023, University of Oslo
 
 import numpy as np
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-#from tqdm import tqdm
-import time
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors  # For logarithmic colour scales
-from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
-from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
-
-from abel.physics_models.particles_transverse_wake_instability import *
-from abel.physics_models.twoD_particles_transverse_wake_instability import *
-from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
-from abel.utilities.relativity import energy2gamma
-from abel.utilities.statistics import prct_clean, prct_clean2d
-from abel.utilities.other import find_closest_value_in_arr
-import abel.utilities.colors as cmaps  # Standardised colour maps
-from abel.classes.stage.impl.stage_wake_t import StageWakeT
-from openpmd_viewer import OpenPMDTimeSeries
 #from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import interp1d
 #from scipy.stats import linregress
 import scipy.signal as signal
 
+#from tqdm import tqdm
+import time
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors  # For logarithmic colour scales
+from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
+
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
-
 from types import SimpleNamespace
+from openpmd_viewer import OpenPMDTimeSeries
+import os, shutil, uuid, copy
+
+from abel.physics_models.particles_transverse_wake_instability import *
+from abel.physics_models.twoD_particles_transverse_wake_instability import *
+from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
+#from abel.utilities.relativity import energy2gamma
+from abel.utilities.statistics import prct_clean, prct_clean2d
+from abel.utilities.other import find_closest_value_in_arr
+#import abel.utilities.colors as cmaps  # Standardised colour maps
+from abel.classes.stage.impl.stage_wake_t import StageWakeT
 from abel import Stage, CONFIG
 from abel import Beam
-import warnings, copy
-import os
-import pickle
+
 
 
 class StagePrtclTransWakeInstability(Stage):
@@ -167,7 +166,11 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Track the particles through. Note that when called as part of a Linac object, a copy of the original stage (where no changes has been made) is sent to track() every time. All changes done to self here is saved to a separate stage under the Linac object.
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
-        
+
+        # Set the diagnostics directory
+        self.diag_path = runnable.run_path()
+
+        # Extract quantities from the stage
         plasma_density = self.plasma_density
         stage_length = self.length
         gamma0 = beam0.gamma()
@@ -194,7 +197,7 @@ class StagePrtclTransWakeInstability(Stage):
         #print('Effective y-offset, beam0.y_offset:', y_offset - driver_y_offset, beam0.y_offset())
 
         # Apply plasma density down ramp (demagnify beta function)
-        drive_beam.magnify_beta_function(1/self.ramp_beta_mag)
+        drive_beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam)
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam)
 
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
@@ -223,7 +226,15 @@ class StagePrtclTransWakeInstability(Stage):
         #stage_wakeT.box_max_z = np.mean(drive_beam.zs()) + 5 * drive_beam.bunch_length()
         #
         stage_wakeT.opmd_diag = True  # Set to True for saving simulation results.
-        stage_wakeT.diag_dir = self.diag_path + 'wake_t'
+        #stage_wakeT.diag_dir = self.diag_path + 'wake_t'
+
+        # Make temp folder
+        if not os.path.exists(CONFIG.temp_path):
+            os.mkdir(CONFIG.temp_path)
+        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+        if not os.path.exists(tmpfolder):
+            os.mkdir(tmpfolder)
+        stage_wakeT.diag_dir = tmpfolder
         
         # Run the Wake-T stage
         beam_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 to avoid changes on beam0.
@@ -269,12 +280,16 @@ class StagePrtclTransWakeInstability(Stage):
         self.bubble_radius_axial = bubble_radius_wakeT
         self.zs_bubble_radius_axial = zs_rho
 
+        # Remove temporary directory
+        if os.path.exists(tmpfolder):
+            shutil.rmtree(tmpfolder)
+
         # Make plots for control if necessary
         #self.plot_Ez_rb_cut(z_slices, main_num_profile, zs_Ez_wakeT, Ez_axis_wakeT, Ez, zs_rho, bubble_radius_wakeT, bubble_radius, zlab='$z$ [$\mathrm{\mu}$m]')
         
 
         # ========== Instability tracking ==========
-        inputs = [plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, z_slices]
+        inputs = [beam0, plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, z_slices]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
@@ -694,7 +709,7 @@ class StagePrtclTransWakeInstability(Stage):
     
     # ==================================================
     def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy)
+        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
         
 
     # ==================================================
@@ -906,7 +921,7 @@ class StagePrtclTransWakeInstability(Stage):
         #bounds = [0, 0.2, 0.4, 0.8, 1]
         #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
         
-        cmap = cmaps.FLASHForward
+        cmap = CONFIG.default_cmap
 
         if beam is None:
             beam = self.main_beam
@@ -1511,15 +1526,16 @@ class StagePrtclTransWakeInstability(Stage):
         print(f"Interstages enabled:\t\t\t\t\t {str(self.interstages_enabled) :s}")
 
         if self.interstage_dipole_field is None:
-            interstage_dipole_field = float("nan")
+            print(f"Interstage dipole field:\t\t\t\t {'Not registered.' :s}")
         elif callable(self.interstage_dipole_field):
             interstage_dipole_field = self.interstage_dipole_field(main_beam.energy())
+            print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
         else:
             interstage_dipole_field = self.interstage_dipole_field
-        print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
+            print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
 
         if self.main_source is None:
-            main_symmetrise = 'Unknown'
+            main_symmetrise = 'Not registered.'
         else:
             main_symmetrise = str(self.main_source.symmetrize)
         print(f"Symmetrised main beam:\t\t\t\t\t {str(self.main_source.symmetrize) :s}")
@@ -1527,6 +1543,7 @@ class StagePrtclTransWakeInstability(Stage):
         
         print(f"Stage length [m]:\t\t\t\t\t {self.length :.3f}")
         print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}")
+        print(f"Ramp beta magnification:\t\t\t\t {self.ramp_beta_mag :.3f}")
         print(f"Drive beam x jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.x*1e6 :.3f}")
         print(f"Drive beam y jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.y*1e6 :.3f}")
         print('----------------------------------------------------------------------\n')
@@ -1570,17 +1587,18 @@ class StagePrtclTransWakeInstability(Stage):
             print('===================================================', file=f)
             print(f"Time step [betatron wavelength/c]:\t {self.time_step_mod :.3f}", file=f)
             print(f"Interstages enabled:\t\t\t {str(self.interstages_enabled) :s}", file=f)
-
+            
             if self.interstage_dipole_field is None:
-                interstage_dipole_field = float("nan")
+                print(f"Interstage dipole field:\t\t {'Not registered.' :s}", file=f)
             elif callable(self.interstage_dipole_field):
                 interstage_dipole_field = self.interstage_dipole_field(main_beam.energy())
+                print(f"Interstage dipole field:\t\t {interstage_dipole_field :.3f}", file=f)
             else:
                 interstage_dipole_field = self.interstage_dipole_field
-            print(f"Interstage dipole field:\t\t {interstage_dipole_field :.3f}", file=f)
+                print(f"Interstage dipole field:\t\t {interstage_dipole_field :.3f}", file=f)
 
             if self.main_source is None:
-                main_symmetrise = 'Unknown'
+                main_symmetrise = 'Not registered.'
             else:
                 main_symmetrise = str(self.main_source.symmetrize)
             print(f"Symmetrised main beam:\t\t\t {main_symmetrise :s}", file=f)
@@ -1589,6 +1607,7 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Stage length [m]:\t\t\t {self.length :.3f}", file=f)
             print(f"Propagation length [m]:\t\t\t {beam_out.location :.3f}", file=f)
             print(f"Plasma density [m^-3]:\t\t\t {self.plasma_density :.3e}", file=f)
+            print(f"Ramp beta magnification:\t\t {self.ramp_beta_mag :.3f}", file=f)
             print(f"Drive beam x jitter (std) [um]:\t\t {self.driver_source.jitter.x*1e6 :.3f}", file=f)
             print(f"Drive beam y jitter (std) [um]:\t\t {self.driver_source.jitter.y*1e6 :.3f}", file=f)
             print('---------------------------------------------------\n', file=f)
