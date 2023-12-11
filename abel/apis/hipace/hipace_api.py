@@ -54,7 +54,7 @@ def hipace_write_jobscript(filename_job_script, filename_input):
     filename_job_script_template = CONFIG.abel_path + 'abel/apis/hipace/job_script_template'
     
     # define inputs
-    inputs = {'nodes': 1,
+    inputs = {'nodes': 4,
               'filename_input': filename_input}
     
     # fill in template file

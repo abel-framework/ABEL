@@ -4,7 +4,7 @@
 #SBATCH -J hipace 
 #SBATCH -o %x-%j.out
 #SBATCH -t 00:30:00
-#SBATCH --partition=standard-g
+#SBATCH --partition=small-g
 #SBATCH --exclusive
 #SBATCH --mem=480g
 #SBATCH --nodes=$nodes

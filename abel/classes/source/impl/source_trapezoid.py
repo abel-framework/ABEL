@@ -39,18 +39,23 @@ class SourceTrapezoid(Source):
         
         # make empty beam
         beam = Beam()
-        
+
         # Lorentz gamma
         gamma = energy2gamma(self.energy)
 
         # horizontal and vertical phase spaces
-        xs, xps = generate_trace_space(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.num_particles)
-        ys, yps = generate_trace_space(self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles)
-        
+        xs, xps = generate_trace_space(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.num_particles, symmetrize=self.symmetrize)
+        ys, yps = generate_trace_space(self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, symmetrize=self.symmetrize)
+         
         # add transverse jitters and offsets
         xs += np.random.normal(scale = self.jitter.x) + self.x_offset
         ys += np.random.normal(scale = self.jitter.y) + self.y_offset
         
+        if self.symmetrize:
+            num_particles = round(self.num_particles/4)
+        else:
+            num_particles = self.num_particles
+            
         # generate relative/absolute energy spreads
         if self.rel_energy_spread is not None:
             if self.energy_spread is None:
@@ -72,17 +77,22 @@ class SourceTrapezoid(Source):
             Q_uniform = abs(self.charge) - Q_triangle
             zmode = self.z_offset
             
-        index_split = round(self.num_particles*abs(Q_uniform)/abs(self.charge))
-        inds = np.random.permutation(self.num_particles)
+        index_split = round(num_particles*abs(Q_uniform)/abs(self.charge))
+        inds = np.random.permutation(num_particles)
         mask_uniform = inds[0:index_split]
-        mask_triangle = inds[index_split:self.num_particles]
-        zs = np.zeros(self.num_particles)
+        mask_triangle = inds[index_split:num_particles]
+        zs = np.zeros(num_particles)
         zs[mask_uniform] = np.random.uniform(low = self.z_offset - self.bunch_length, high = self.z_offset, size = len(mask_uniform))
         zs[mask_triangle] = np.random.triangular(left = self.z_offset - self.bunch_length, right = self.z_offset, mode = zmode, size = len(mask_triangle))
         
         # energies
-        Es = np.random.normal(loc = self.energy, scale = self.energy_spread, size = self.num_particles)
-
+        Es = np.random.normal(loc = self.energy, scale = self.energy_spread, size=num_particles)
+        
+        # symmetrize
+        if self.symmetrize:
+            zs = np.tile(zs, 4)
+            Es = np.tile(Es, 4)
+        
         # create phase space
         beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge)
         

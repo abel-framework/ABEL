@@ -47,12 +47,16 @@ class StageQuasistatic2d(Stage):
         box_min_z = beam0.z_offset() - 5 * beam0.bunch_length() - 0.25/k_p(self.plasma_density)
         box_max_z = driver0.z_offset() + 4 * driver0.bunch_length()
         box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
-        k_beta = k_p(self.plasma_density)/np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))
-        lambda_betatron = (2*np.pi/k_beta)
-        dz = lambda_betatron/10
+        k_beta_driver = k_p(self.plasma_density)/np.sqrt(2*driver0.gamma())
+        k_beta_beam = k_p(self.plasma_density)/np.sqrt(2*beam0.gamma())
+        lambda_betatron_min = 2*np.pi/max(k_beta_beam, k_beta_driver)
+        lambda_betatron_max = 2*np.pi/min(k_beta_beam, k_beta_driver)
+        dz = lambda_betatron_min/10
+        # need to make sufficiently many steps
+        n_out = max(1, round(lambda_betatron_max/lambda_betatron_min/2))
         plasma = wake_t.PlasmaStage(length=dz, density=self.plasma_density, wakefield_model='quasistatic_2d',
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
-                                    n_out=1, n_r=512, n_xi=512, dz_fields=dz, ppc=4)
+                                    n_out=n_out, n_r=512, n_xi=512, dz_fields=dz, ppc=4)
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
@@ -112,6 +116,9 @@ class StageQuasistatic2d(Stage):
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag)
         
+        # clean extreme outliers
+        beam.remove_halo_particles()
+        
         # calculate efficiency
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
@@ -162,11 +169,13 @@ class StageQuasistatic2d(Stage):
         axs[0].plot(zs*1e6, np.zeros(zs.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
             axs[0].plot(zs*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col2)
+        if self.driver_source.energy is not None:
+            axs[0].plot(zs*1e6, self.driver_source.energy/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col0)
         axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1)
         axs[0].set_xlabel('z (um)')
         axs[0].set_ylabel('Longitudinal electric field (GV/m)')
         axs[0].set_xlim(zlims)
-        axs[0].set_ylim(bottom=-max(1.1*min(Ezs), wave_breaking_field(self.plasma_density))/1e9, top=1.1*max(Ezs)/1e9)
+        axs[0].set_ylim(bottom=-max(1.1*min(Ezs), wave_breaking_field(self.plasma_density))/1e9, top=max(1.1*max(Ezs)/1e9, 1.1*self.driver_source.energy/self.get_length()/1e9))
         
         axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
         axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
