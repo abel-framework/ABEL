@@ -3,12 +3,12 @@ import numpy as np
 import scipy.constants as SI
 from types import SimpleNamespace
 from abel import Source, Beam
-from abel.utilities.beam_physics import generate_trace_space
+from abel.utilities.beam_physics import generate_trace_space, generate_trace_space_xy
 from abel.utilities.relativity import energy2gamma
 
 class SourceBasic(Source):
     
-    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
+    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
         self.energy = energy
         self.charge = charge
         self.rel_energy_spread = rel_energy_spread # [eV]
@@ -24,6 +24,7 @@ class SourceBasic(Source):
         self.beta_y = beta_y # [m]
         self.alpha_x = alpha_x # [m]
         self.alpha_y = alpha_y # [m]
+        self.angular_momentum = angular_momentum
         self.length = length # [m]
         self.wallplug_efficiency = wallplug_efficiency
         self.accel_gradient = accel_gradient
@@ -45,9 +46,8 @@ class SourceBasic(Source):
         gamma = energy2gamma(self.energy)
 
         # horizontal and vertical phase spaces
-        xs, xps = generate_trace_space(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.num_particles, symmetrize=self.symmetrize)
-        ys, yps = generate_trace_space(self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, symmetrize=self.symmetrize)
-        
+        xs, xps, ys, yps = generate_trace_space_xy(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, self.angular_momentum/gamma, symmetrize=self.symmetrize)
+
         # add transverse jitters and offsets
         xs += np.random.normal(scale = self.jitter.x) + self.x_offset
         ys += np.random.normal(scale = self.jitter.y) + self.y_offset

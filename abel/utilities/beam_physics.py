@@ -27,6 +27,53 @@ def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
     return xs, xps
 
 
+# generate trace space from geometric emittance and twiss parameters
+def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, L=0, symmetrize=False):
+
+    # Twiss gamma
+    gamma_x = (1 + alpha_x**2) / beta_x
+    gamma_y = (1 + alpha_y**2) / beta_y
+    
+    sigx = np.sqrt(beta_x * epsilon_x) # rms beam size
+    sigy = np.sqrt(beta_y * epsilon_y) # rms beam size
+    sigxp = np.sqrt(gamma_x * epsilon_x) # rms divergence
+    sigyp = np.sqrt(gamma_y * epsilon_y) # rms divergence
+    rho_x = - alpha_x / np.sqrt(1 + alpha_x**2) # correlation
+    rho_y = - alpha_y / np.sqrt(1 + alpha_y**2) # correlation
+
+    if not symmetrize:
+        us_x = np.random.normal(size = N) # Gaussian random variable 1
+        vs_x = np.random.normal(size = N) # Gaussian random variable 2
+        us_y = np.random.normal(size = N) # Gaussian random variable 1
+        vs_y = np.random.normal(size = N) # Gaussian random variable 2
+    else:
+        us_x = np.random.normal(size = round(N/4)) # Gaussian random variable 1
+        vs_x = np.random.normal(size = round(N/4)) # Gaussian random variable 2
+        us_y = np.random.normal(size = round(N/4)) # Gaussian random variable 1
+        vs_y = np.random.normal(size = round(N/4)) # Gaussian random variable 2
+
+    # angular momentum correlations
+    ratio = L/np.sqrt(epsilon_x*epsilon_y)
+    rho_L = np.sqrt(1 + ratio**2)
+    
+    # particle positions
+    xs = sigx*(us_x + abs(ratio)*vs_y)/np.sqrt(rho_L)
+    ys = sigy*(us_y - ratio*vs_x)/np.sqrt(rho_L)
+    
+    # particle angles
+    xps = (sigxp*us_x*rho_x + sigxp*vs_x*np.sqrt(1 - rho_x**2))*np.sqrt(rho_L)
+    yps = (sigyp*us_y*rho_y + sigyp*vs_y*np.sqrt(1 - rho_y**2))*np.sqrt(rho_L)
+    
+    # complete the symmetrization
+    if symmetrize:
+        xs = np.concatenate((xs, -xs, xs, -xs))
+        xps = np.concatenate((xps, xps, -xps, -xps))
+        ys = np.concatenate((ys, -ys, ys, -ys))
+        yps = np.concatenate((yps, yps, -yps, -yps))
+    
+    return xs, xps, ys, yps
+
+    
 # general focusing transfer matrix (quadrupole and drift)
 def Rmat(l, k=0, plasmalens=True):
     if k == 0:

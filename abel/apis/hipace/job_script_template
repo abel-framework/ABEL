@@ -3,8 +3,8 @@
 #SBATCH -A project_465000445
 #SBATCH -J hipace 
 #SBATCH -o %x-%j.out
-#SBATCH -t 00:30:00
-#SBATCH --partition=small-g
+#SBATCH -t 00:20:00
+#SBATCH --partition=standard-g
 #SBATCH --exclusive
 #SBATCH --mem=480g
 #SBATCH --nodes=$nodes

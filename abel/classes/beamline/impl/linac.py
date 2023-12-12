@@ -47,7 +47,7 @@ class Linac(Beamline):
         self.trackables[0] = self.source
         
         # add stages and interstages
-        if (self.stage is not None) and (self.interstage is not None):
+        if self.stage is not None:
             for i in range(self.num_stages):
 
                 # add stages
@@ -59,7 +59,7 @@ class Linac(Beamline):
                 self.stages[i] = stage_instance
 
                 # add interstages
-                if i < self.num_stages-1:
+                if (self.interstage is not None) and (i < self.num_stages-1):
                     interstage_instance = copy.deepcopy(self.interstage)
                     interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
                     if self.alternate_interstage_polarity:
@@ -69,8 +69,7 @@ class Linac(Beamline):
             
         # add beam delivery system
         if self.bds is not None:
-            self.bds.nom_energy = self.source.get_energy()
-            self.bds.nom_energy += np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+            self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
             self.trackables[max(1,2*self.num_stages)] = self.bds
         
     
@@ -191,8 +190,8 @@ class Linac(Beamline):
                                              Beam.energy, Beam.rel_energy_spread, \
                                              Beam.bunch_length, Beam.z_offset, \
                                              Beam.norm_emittance_x, Beam.norm_emittance_y, \
-                                             Beam.beta_x, Beam.beta_y, \
-                                             Beam.x_offset, Beam.y_offset], shot)
+                                             Beam.beam_size_x, Beam.beam_size_y, \
+                                             Beam.x_offset, Beam.y_offset, Beam.angular_momentum], shot)
         
         if use_stage_nums:
             long_axis = stage_nums
@@ -209,10 +208,11 @@ class Linac(Beamline):
         z0s = vals_mean[:,4]
         emnxs = vals_mean[:,5]
         emnys = vals_mean[:,6]
-        betaxs = vals_mean[:,7]
-        betays = vals_mean[:,8]
+        sigxs = vals_mean[:,7]
+        sigys = vals_mean[:,8]
         x0s = vals_mean[:,9]
         y0s = vals_mean[:,10]
+        Lzs = vals_mean[:,11]
         
         # errors
         Qs_error = vals_std[:,0]
@@ -222,10 +222,11 @@ class Linac(Beamline):
         z0s_error = vals_std[:,4]
         emnxs_error = vals_std[:,5]
         emnys_error = vals_std[:,6]
-        betaxs_error = vals_std[:,7]
-        betays_error = vals_std[:,8]
+        sigxs_error = vals_std[:,7]
+        sigys_error = vals_std[:,8]
         x0s_error = vals_std[:,9]
         y0s_error = vals_std[:,10]
+        Lzs_error = vals_std[:,11]
         
         # nominal energies
         Es_nom = self.nom_stage_energies()
@@ -264,7 +265,7 @@ class Linac(Beamline):
         axs[2,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((deltas+deltas_error, np.flip(deltas-deltas_error))) * 100, color=col1, alpha=af)
         axs[2,0].set_xlabel(long_label)
         axs[2,0].set_ylabel('Energy offset (%)')
-        
+
         axs[0,1].plot(long_axis, Q0 * np.ones(Qs.shape) * 1e9, ':', color=col0)
         axs[0,1].plot(long_axis, Qs * 1e9, color=col1)
         axs[0,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
@@ -285,19 +286,21 @@ class Linac(Beamline):
         axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnys[0]*1e6, ':', color=col0)
         axs[0,2].plot(long_axis, emnxs*1e6, color=col1)
         axs[0,2].plot(long_axis, emnys*1e6, color=col2)
+        axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnxs+emnxs_error, np.flip(emnxs-emnxs_error))) * 1e6, color=col1, alpha=af)
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnys+emnys_error, np.flip(emnys-emnys_error))) * 1e6, color=col2, alpha=af)
+        axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
         axs[0,2].set_xlabel(long_label)
         axs[0,2].set_ylabel('Emittance, rms (mm mrad)')
         axs[0,2].set_yscale('log')
         
-        axs[1,2].plot(long_axis, np.sqrt(Es_nom/Es_nom[0])*betaxs[0]*1e3, ':', color=col0)
-        axs[1,2].plot(long_axis, betaxs*1e3, color=col1)
-        axs[1,2].plot(long_axis, betays*1e3, color=col2)
-        axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((betaxs+betaxs_error, np.flip(betaxs-betaxs_error))) * 1e3, color=col1, alpha=af)
-        axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((betays+betays_error, np.flip(betays-betays_error))) * 1e3, color=col2, alpha=af)
+        #axs[1,2].plot(long_axis, np.sqrt(Es_nom/Es_nom[0])*betaxs[0]*1e3, ':', color=col0)
+        axs[1,2].plot(long_axis, sigxs*1e6, color=col1)
+        axs[1,2].plot(long_axis, sigys*1e6, color=col2)
+        axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigxs+sigxs_error, np.flip(sigxs-sigxs_error))) * 1e6, color=col1, alpha=af)
+        axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigys+sigys_error, np.flip(sigys-sigys_error))) * 1e6, color=col2, alpha=af)
         axs[1,2].set_xlabel(long_label)
-        axs[1,2].set_ylabel('Beta function (mm)')
+        axs[1,2].set_ylabel('Beam size, rms (um)')
         axs[1,2].set_yscale('log')
         
         axs[2,2].plot(long_axis, np.zeros(x0s.shape), ':', color=col0)

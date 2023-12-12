@@ -54,7 +54,7 @@ def hipace_write_jobscript(filename_job_script, filename_input):
     filename_job_script_template = CONFIG.abel_path + 'abel/apis/hipace/job_script_template'
     
     # define inputs
-    inputs = {'nodes': 4,
+    inputs = {'nodes': 1,
               'filename_input': filename_input}
     
     # fill in template file
@@ -115,8 +115,9 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
         wait_time = 10 # [s]
         time.sleep(wait_time)
     
-    # when finished, load the beam
+    # when finished, load the beam and driver
     filename = runfolder + "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps))
-    beam = Beam.load(filename)
+    beam = Beam.load(filename, beam_name='beam')
+    driver = Beam.load(filename, beam_name='driver')
     
-    return beam
+    return beam, driver

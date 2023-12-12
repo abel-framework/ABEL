@@ -18,10 +18,6 @@ class StageQuasistatic2d(Stage):
         self.add_driver_to_beam = add_driver_to_beam
         self.driver_source = driver_source
         
-        self.driver_to_wake_efficiency = None
-        self.wake_to_beam_efficiency = None
-        self.driver_to_beam_efficiency = None
-        
         self.ramp_beta_mag = 1
         
         self._driver_initial = None
@@ -91,11 +87,11 @@ class StageQuasistatic2d(Stage):
         # extract wakefield info
         tseries = OpenPMDTimeSeries(tmpfolder+'hdf5/')
         Ez, metadata = tseries.get_field(field='E', coord='z', iteration=0)
-        self._initial_wakefield = (metadata.z, Ez[round(len(metadata.r)/2),:].flatten())
+        self.initial.plasma.wakefield.onaxis.zs = metadata.z
+        self.initial.plasma.wakefield.onaxis.Ezs = Ez[round(len(metadata.r)/2),:].flatten()
 
         # remove temporary directory
-        if os.path.exists(tmpfolder):
-            shutil.rmtree(tmpfolder)
+        shutil.rmtree(tmpfolder)
         
         # calculate energy gain
         delta_Es = self.length*(beam.Es() - beam0.Es())/dz
@@ -116,93 +112,28 @@ class StageQuasistatic2d(Stage):
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag)
         
-        # clean extreme outliers
-        beam.remove_halo_particles()
-        
-        # calculate efficiency
-        Etot0_beam = beam0.total_energy()
-        Etot_beam = beam.total_energy()
-        Etot0_driver = driver0.total_energy()
-        Etot_driver = driver.total_energy()
-        self.driver_to_wake_efficiency = (Etot0_driver-Etot_driver)/Etot0_driver
-        self.wake_to_beam_efficiency = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
-        self.driver_to_beam_efficiency = self.driver_to_wake_efficiency*self.wake_to_beam_efficiency
-
-        # save drivers
-        self._driver_initial = driver0
-        self._driver_final = driver
-        
-        # save current profile
-        dt = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
-        tbins = np.arange(metadata.z.min(), metadata.z.max(), dt)/SI.c
-        Is, ts = (driver0 + beam0).current_profile(bins=tbins)
-        self._current_profile = (ts*SI.c, Is)
-        
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
+        # clean nan particles and extreme outliers
+        beam.remove_nans()
+        beam.remove_halo_particles()
+        
+        # calculate efficiency
+        self.calculate_efficiency(beam0, driver0, beam, driver)
+        
+        # save current profile
+        self.calculate_beam_current(beam0, driver0, beam, driver)
+        
         return super().track(beam, savedepth, runnable, verbose)
-        
     
-       
-    def plot_wakefield(self, beam=None, save_to_file=None):
-        
-        # check if wakefield exists
-        assert self._initial_wakefield is not None, 'Wakefield not calculated yet'
-        
-        # extract wakefield and current profileif not already existing
-        zs, Ezs = self._initial_wakefield
-        zs_I, Is = self._current_profile
-        
-        # plot it
-        fig, axs = plt.subplots(2, 1)
-        fig.set_figwidth(CONFIG.plot_width_default*0.7)
-        fig.set_figheight(8)
-        col0 = "xkcd:light gray"
-        col1 = "tab:blue"
-        col2 = "tab:orange"
-        af = 0.1
-        zlims = [min(zs)*1e6, max(zs)*1e6]
-        
-        axs[0].plot(zs*1e6, np.zeros(zs.shape), '-', color=col0)
-        if self.nom_energy_gain is not None:
-            axs[0].plot(zs*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col2)
-        if self.driver_source.energy is not None:
-            axs[0].plot(zs*1e6, self.driver_source.energy/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col0)
-        axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1)
-        axs[0].set_xlabel('z (um)')
-        axs[0].set_ylabel('Longitudinal electric field (GV/m)')
-        axs[0].set_xlim(zlims)
-        axs[0].set_ylim(bottom=-max(1.1*min(Ezs), wave_breaking_field(self.plasma_density))/1e9, top=max(1.1*max(Ezs)/1e9, 1.1*self.driver_source.energy/self.get_length()/1e9))
-        
-        axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
-        axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
-        axs[1].set_xlabel('z (um)')
-        axs[1].set_ylabel('Beam current (kA)')
-        axs[1].set_xlim(zlims)
-        axs[1].set_ylim(bottom=0, top=1.2*max(-Is)/1e3)
-        
-        # save to file
-        if save_to_file is not None:
-            plt.savefig(save_to_file, format="pdf", bbox_inches="tight")
-        
-       
     
     # matched beta function of the stage (for a given energy)
     def matched_beta_function(self, energy):
         return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
         
-    def get_length(self):
-        return self.length
-    
-    def get_nom_energy_gain(self):
-        return self.nom_energy_gain
-    
-    def energy_efficiency(self):
-        return self.driver_to_beam_efficiency, self.driver_to_wake_efficiency, self.wake_to_beam_efficiency
-    
     def energy_usage(self):
         return self.driver_source.energy_usage()
     

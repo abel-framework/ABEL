@@ -17,7 +17,7 @@ import read_insitu_diagnostics
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, analytical=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
@@ -33,12 +33,6 @@ class StageHipace(Stage):
         self.beam_ionization = beam_ionization
         self.radiation_reaction = radiation_reaction
         
-        self.evolution = SimpleNamespace()
-        
-        self.analytical = analytical
-        
-        self.__initial_wakefield = None
-        self.__final_wakefield = None
         self.__initial_driver = None
         self.__final_driver = None
         self.__initial_transverse = None
@@ -46,8 +40,6 @@ class StageHipace(Stage):
         self.__bubble_size = None
         self.__initial_witness = None
         self.__final_witness = None
-        self.__initial_rho = None
-        self.__final_rho = None
         self.__final_focusing = None
         self.__initial_focusing = None
         self.__amplitude_evol = None
@@ -66,16 +58,14 @@ class StageHipace(Stage):
         # make directory
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
-
         
         # generate driver
-        driver = self.__get_initial_driver()
-
+        driver0 = self.__get_initial_driver()
         
         # !! QUICK FIX: TODO to make this a real ramp
         # apply plasma-density down ramp (demagnify beta function)
-        driver.magnify_beta_function(1/self.ramp_beta_mag)
-        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver)
+        driver0.magnify_beta_function(1/self.ramp_beta_mag)
+        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
         
         # SAVE BEAMS
@@ -88,8 +78,7 @@ class StageHipace(Stage):
         # produce and save drive beam
         filename_driver = 'driver.h5'
         path_driver = tmpfolder + filename_driver
-        
-        driver.save(filename = path_driver, beam_name = 'driver')
+        driver0.save(filename = path_driver, beam_name = 'driver')
         
         
         # MAKE INPUT FILE
@@ -97,20 +86,19 @@ class StageHipace(Stage):
         # make longitudinal box range
         num_sigmas = 6
         box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        box_max_z = min(driver.z_offset() + num_sigmas * driver.bunch_length(), np.max(driver.zs())+0.5/k_p(self.plasma_density))
+        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_xy = 5 * blowout_radius(self.plasma_density, driver.peak_current())
+        box_size_xy = 5 * blowout_radius(self.plasma_density, driver0.peak_current())
         
         # calculate the time step
-        gamma_min = min(beam0.gamma(),driver.gamma()/2)
+        gamma_min = min(beam0.gamma(),driver0.gamma()/2)
         k_beta = k_p(self.plasma_density)/np.sqrt(2*gamma_min)
         T_betatron = (2*np.pi/k_beta)/SI.c
         time_step0 = T_betatron/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)
-        
         self.num_steps = np.ceil(self.length/(time_step0*SI.c))
         
         if self.output is not None:
@@ -141,13 +129,13 @@ class StageHipace(Stage):
         hipace_write_jobscript(filename_job_script, filename_input)
         
         # run HiPACE++
-        beam = hipace_run(filename_job_script, self.num_steps)
-
+        beam, driver = hipace_run(filename_job_script, self.num_steps)
         
         # !! QUICK FIX: TODO to make this a real ramp
         # apply plasma-density up ramp (magnify beta function)
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-        
+        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+        driver.magnify_beta_function(self.ramp_beta_mag)
+
         
         ## ADD METADATA
         
@@ -156,60 +144,27 @@ class StageHipace(Stage):
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
-        
         # clean nan particles and extreme outliers
         beam.remove_nans()
         beam.remove_halo_particles()
 
         # extract insitu diagnostics (beam)
-        insitu_files = tmpfolder + 'diags/insitu/reduced_beam.*.txt'
-        all_data = read_insitu_diagnostics.read_file(insitu_files)
-        average_data = all_data['average']
-        self.evolution.location = beam0.location + all_data['time']*SI.c
-        self.evolution.charge = read_insitu_diagnostics.total_charge(all_data)
-        self.evolution.energy = read_insitu_diagnostics.energy_mean_eV(all_data)
-        self.evolution.x = average_data['[x]']
-        self.evolution.y = average_data['[y]']
-        self.evolution.xp = average_data['[ux]']/average_data['[uz]']
-        self.evolution.yp = average_data['[uy]']/average_data['[uz]']
-        self.evolution.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
-        self.evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
-        self.evolution.beam_size_x = read_insitu_diagnostics.position_std(average_data, direction='x')
-        self.evolution.beam_size_y = read_insitu_diagnostics.position_std(average_data, direction='y')
-        self.evolution.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
-        self.evolution.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
-        self.evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
-        self.evolution.beta_x = np.sqrt(self.evolution.beam_size_x)/(self.evolution.emit_nx*energy2gamma(self.evolution.energy)) # TODO: fix
-        self.evolution.beta_y = np.sqrt(self.evolution.beam_size_y)/(self.evolution.emit_ny*energy2gamma(self.evolution.energy)) # TODO: fix
+        insitu_path = tmpfolder + 'diags/insitu/reduced_beam.*.txt'
+        self.__extract_evolution(insitu_path, beam0, runnable)
         
         # extract wakefield data
-        source_folder = tmpfolder + 'diags/hdf5/'
-        self.__extract_wakefield(source_folder)
-        self.__extract_witness(source_folder)
-        self.__extract_final_driver(source_folder)
-        self.__extract_transverse(source_folder)
-        self.__extract_focusing(source_folder)
-        self.__extract_rho(source_folder)
-        if self.output is not None:
-            self.__extract_amplitude_evol(source_folder)
+        source_path = tmpfolder + 'diags/hdf5/'
+        self.__extract_initial_and_final_step(source_path, beam0, runnable)
         
-        # save drivers
-        self.__initial_driver = driver
+        # delete temp folder
+        shutil.rmtree(tmpfolder)
         
+        # calculate efficiency
+        self.calculate_efficiency(beam0, driver0, beam, driver)
         
-        ## MOVE AND DELETE TEMPORARY DATA
-        
-        # delete temp files 
-        if self.keep_data or (savedepth > 0 and runnable is not None):
-            destination_folder = runnable.shot_path() + '/stage_' + str(beam0.stage_number)
-            shutil.move(source_folder, destination_folder)
-            source_folder2 = tmpfolder + 'diags/insitu/'
-            destination_folder2 = runnable.shot_path() + '/stage_' + str(beam0.stage_number) + '_insitu'
-            shutil.move(source_folder2, destination_folder2)
-        
-        if os.path.exists(tmpfolder):
-            shutil.rmtree(tmpfolder)
-        
+        # save current profile
+        self.calculate_beam_current(beam0, driver0, beam, driver)
+
         return super().track(beam, savedepth, runnable, verbose)
     
         
@@ -219,8 +174,8 @@ class StageHipace(Stage):
     def get_nom_energy_gain(self):
         return self.nom_energy_gain
     
-    def energy_efficiency(self):
-        return None # TODO
+    #def energy_efficiency(self):
+    #    return self.efficiency
     
     def energy_usage(self):
         return None # TODO
@@ -229,7 +184,7 @@ class StageHipace(Stage):
         return beta_matched(self.plasma_density, energy)*self.ramp_beta_mag
     
     def analytical_focusing(self):
-        focusing = self.plasma_density * SI.e /(2 * SI.epsilon_0)
+        focusing = self.plasma_density * SI.e / (2 * SI.epsilon_0)
         return focusing
 
     def plot_evolution(self):
@@ -280,43 +235,77 @@ class StageHipace(Stage):
         
         
         plt.show()
+
+    
+    def __extract_evolution(self, path, beam0, runnable):
+
+        # extract in-situ data
+        all_data = read_insitu_diagnostics.read_file(path)
+        average_data = all_data['average']
+
+        # store variables
+        self.evolution.location = beam0.location + all_data['time']*SI.c
+        self.evolution.charge = read_insitu_diagnostics.total_charge(all_data)
+        self.evolution.energy = read_insitu_diagnostics.energy_mean_eV(all_data)
+        self.evolution.z = average_data['[z]']
+        self.evolution.x = average_data['[x]']
+        self.evolution.y = average_data['[y]']
+        self.evolution.xp = average_data['[ux]']/average_data['[uz]']
+        self.evolution.yp = average_data['[uy]']/average_data['[uz]']
+        self.evolution.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
+        self.evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
+        self.evolution.beam_size_x = read_insitu_diagnostics.position_std(average_data, direction='x')
+        self.evolution.beam_size_y = read_insitu_diagnostics.position_std(average_data, direction='y')
+        self.evolution.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
+        self.evolution.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
+        self.evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
+        # TODO: add angular momentum and normalized amplitude
+
+        # delete or move data
+        if self.keep_data:
+            destination_path = runnable.shot_path() + '/stage_' + str(beam0.stage_number) + '_insitu'
+            shutil.move(path, destination_path)
         
         
-    def __extract_wakefield(self, path):
+    def __extract_initial_and_final_step(self, path, beam0, runnable):
         
         # prepare to read simulation data
         ts = OpenPMDTimeSeries(path)
 
-        # save initial on-axis wakefield
+        # extract initial on-axis wakefield
         Ez0, metadata0 = ts.get_field(field='Ez', iteration=0)
-        zs0 = metadata0.z
-        Ez0_onaxis = Ez0[:,round(len(metadata0.x)/2)]
-        self.__initial_wakefield = (zs0, Ez0_onaxis)
+        self.initial.plasma.wakefield.onaxis.zs = metadata0.z
+        self.initial.plasma.wakefield.onaxis.Ezs = Ez0[:,round(len(metadata0.x)/2)]
         
-        # save final on-axis wakefield
+        # extract final on-axis wakefield
         Ez, metadata = ts.get_field(field='Ez', iteration=self.num_steps)
-        zs = metadata.z
-        Ez_onaxis = Ez[:,round(len(metadata.x)/2)]
-        self.__final_wakefield = (zs, Ez_onaxis)    
+        self.final.plasma.wakefield.onaxis.zs = metadata.z
+        self.final.plasma.wakefield.onaxis.Ezs = Ez[:,round(len(metadata.x)/2)]
         
-        
-    def __extract_rho(self, path):
-        
-        # prepare to read simulation data
-        ts = OpenPMDTimeSeries(path)
+        # extract initial plasma density
+        rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=0)
+        self.initial.plasma.density.extent = metadata0_plasma.imshow_extent[[2,3,0,1]]
+        self.initial.plasma.density.rho = -(rho0_plasma.T/SI.e-self.plasma_density)
+ 
+        # extract final plasma density
+        jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=0)
+        self.initial.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
+        self.initial.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
 
-        # Extract plasma and beam density
-        Ez0, metadata0 = ts.get_field(field='rho', iteration=0)
-        jz_beam0, metadataj0 = ts.get_field(field='jz_beam', iteration=0)
-        old_extent = metadata0.imshow_extent
-        old_extent_j0 = metadataj0.imshow_extent
-        self.__initial_rho = (old_extent,  Ez0, jz_beam0, old_extent_j0)
+        # extract initial beam density
+        rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=self.num_steps)
+        self.final.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
+        self.final.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)
+
+        # extract final beam density
+        jz_beam, metadata_beam = ts.get_field(field='jz_beam', iteration=self.num_steps)
+        self.final.beam.density.extent = metadata_beam.imshow_extent[[2,3,0,1]]
+        self.final.beam.density.rho = -jz_beam.T/(SI.c*SI.e)
         
-        Ez0, metadata0 = ts.get_field(field='rho', iteration=self.num_steps)
-        jz_beam, metadataj = ts.get_field(field='jz_beam', iteration=self.num_steps)
-        old_extent = metadata0.imshow_extent
-        old_extent_j = metadataj.imshow_extent
-        self.__final_rho = (old_extent,  Ez0, jz_beam, old_extent_j)
+        # delete or move data
+        if self.keep_data:
+            destination_path = runnable.shot_path() + '/stage_' + str(beam0.stage_number)
+            shutil.move(path, destination_path)
 
         
     def __extract_transverse(self, path):
@@ -370,6 +359,7 @@ class StageHipace(Stage):
         zs = zs[index_witness_tail_f:index_witness_head_f]
         E_onaxis = E[index_witness_tail_f:index_witness_head_f, x_index_f]*(1-frac_f) + E[index_witness_tail_f:index_witness_head_f, x_index_f+1]*(frac_f)
         self.__final_transverse = (zs, E_onaxis)
+
         
     def __extract_witness(self, path):
         ts = OpenPMDTimeSeries(path)
@@ -388,6 +378,7 @@ class StageHipace(Stage):
         # get x and z coordinates of final driver beam
         x_f, z_f = ts.get_particle(species='driver', iteration=self.num_steps, var_list=['x', 'z']) 
         self.__final_driver = x_f, z_f
+
         
     def __extract_amplitude_evol(self, path):
         ts = OpenPMDTimeSeries(path)
@@ -429,7 +420,8 @@ class StageHipace(Stage):
             return self.__initial_driver
         else:
             return self.driver_source.track()
-        
+
+    '''
     def plot_wakefield(self, beam=None):
         
         # extract wakefield if not already existing
@@ -440,17 +432,13 @@ class StageHipace(Stage):
         # assign to variables
         zs0, Ezs0 = self.__initial_wakefield
         zs, Ezs = self.__final_wakefield
-        
-        # get current profile
-        driver = copy.deepcopy(self.__get_initial_driver())
-        driver += beam
-        Is, ts = driver.current_profile(bins=np.linspace(min(zs/SI.c), max(zs/SI.c), int(np.sqrt(len(driver))/2)))
-        zs_I = ts*SI.c
+        zs_I = self.initial.beam_current.zs
+        Is = self.initial.beam_current.current
         
         # plot it
         fig, axs = plt.subplots(2, 1)
-        fig.set_figwidth(CONFIG.plot_width_default)
-        fig.set_figheight(9)
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*1)
         col0 = "xkcd:light gray"
         col1 = "tab:blue"
         col2 = "tab:orange"
@@ -459,9 +447,12 @@ class StageHipace(Stage):
         
         axs[0].plot(zs*1e6, np.zeros(zs.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
-            axs[0].plot(zs*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col0)
+            axs[0].plot(zs*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col2)
+        if self.driver_source.energy is not None:
+            Ez_driver_max = self.driver_source.energy/self.get_length()
+            axs[0].plot(zs*1e6, Ez_driver_max*np.ones(zs.shape)/1e9, ':', color=col0)
+        axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
         axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
-        axs[0].plot(zs*1e6, Ezs/1e9, ':', color=col2)
         axs[0].set_xlabel('z (um)')
         axs[0].set_ylabel('Longitudinal electric field (GV/m)')
         axs[0].set_xlim(zlims)
@@ -472,8 +463,8 @@ class StageHipace(Stage):
         axs[1].set_xlabel('z (um)')
         axs[1].set_ylabel('Beam current (kA)')
         axs[1].set_xlim(zlims)
-        axs[1].set_ylim(bottom=0, top=1.2*max(-Is)/1e3)
-        
+        axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
+    '''
     
     def __extract_focusing(self, path):
         # prepare to read simulation data
