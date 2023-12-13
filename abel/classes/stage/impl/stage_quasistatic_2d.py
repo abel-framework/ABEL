@@ -32,7 +32,7 @@ class StageQuasistatic2d(Stage):
         driver0 = self.driver_source.track()
         
         # apply plasma-density down ramp (demagnify beta function)
-        driver0.magnify_beta_function(1/self.ramp_beta_mag)
+        driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # convert beams to WakeT bunches
@@ -89,7 +89,7 @@ class StageQuasistatic2d(Stage):
         Ez, metadata = tseries.get_field(field='E', coord='z', iteration=0)
         self.initial.plasma.wakefield.onaxis.zs = metadata.z
         self.initial.plasma.wakefield.onaxis.Ezs = Ez[round(len(metadata.r)/2),:].flatten()
-
+        
         # remove temporary directory
         shutil.rmtree(tmpfolder)
         
@@ -110,7 +110,7 @@ class StageQuasistatic2d(Stage):
         
         # apply plasma-density up ramp (magnify beta function)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-        driver.magnify_beta_function(self.ramp_beta_mag)
+        driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number

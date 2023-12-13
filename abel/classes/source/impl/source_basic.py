@@ -47,10 +47,10 @@ class SourceBasic(Source):
 
         # horizontal and vertical phase spaces
         xs, xps, ys, yps = generate_trace_space_xy(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, self.angular_momentum/gamma, symmetrize=self.symmetrize)
-
+        
         # add transverse jitters and offsets
-        xs += np.random.normal(scale = self.jitter.x) + self.x_offset
-        ys += np.random.normal(scale = self.jitter.y) + self.y_offset
+        xs += np.random.normal(scale=self.jitter.x) + self.x_offset
+        ys += np.random.normal(scale=self.jitter.y) + self.y_offset
         
         # generate relative/absolute energy spreads
         if self.rel_energy_spread is not None:
