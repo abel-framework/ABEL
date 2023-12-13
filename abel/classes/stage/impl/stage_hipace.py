@@ -150,11 +150,11 @@ class StageHipace(Stage):
 
         # extract insitu diagnostics (beam)
         insitu_path = tmpfolder + 'diags/insitu/reduced_beam.*.txt'
-        self.__extract_evolution(insitu_path, beam0, runnable)
+        self.__extract_evolution(tmpfolder, beam0, runnable)
         
         # extract wakefield data
         source_path = tmpfolder + 'diags/hdf5/'
-        self.__extract_initial_and_final_step(source_path, beam0, runnable)
+        self.__extract_initial_and_final_step(tmpfolder, beam0, runnable)
         
         # delete temp folder
         shutil.rmtree(tmpfolder)
@@ -237,10 +237,13 @@ class StageHipace(Stage):
         plt.show()
 
     
-    def __extract_evolution(self, path, beam0, runnable):
+    def __extract_evolution(self, tmpfolder, beam0, runnable):
+
+        insitu_path = tmpfolder + 'diags/insitu/'
+        insitu_file = insitu_path + 'reduced_beam.*.txt'
 
         # extract in-situ data
-        all_data = read_insitu_diagnostics.read_file(path)
+        all_data = read_insitu_diagnostics.read_file(insitu_file)
         average_data = all_data['average']
 
         # store variables
@@ -263,14 +266,15 @@ class StageHipace(Stage):
 
         # delete or move data
         if self.keep_data:
-            destination_path = runnable.shot_path() + '/stage_' + str(beam0.stage_number) + '_insitu'
-            shutil.move(path, destination_path)
+            destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number) + '/insitu'
+            shutil.move(insitu_path, destination_path)
         
         
-    def __extract_initial_and_final_step(self, path, beam0, runnable):
+    def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
         
         # prepare to read simulation data
-        ts = OpenPMDTimeSeries(path)
+        source_path = tmpfolder + 'diags/hdf5/'
+        ts = OpenPMDTimeSeries(source_path)
 
         # extract initial on-axis wakefield
         Ez0, metadata0 = ts.get_field(field='Ez', iteration=0)
@@ -304,8 +308,8 @@ class StageHipace(Stage):
         
         # delete or move data
         if self.keep_data:
-            destination_path = runnable.shot_path() + '/stage_' + str(beam0.stage_number)
-            shutil.move(path, destination_path)
+            destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number)
+            shutil.move(source_path, destination_path)
 
         
     def __extract_transverse(self, path):
@@ -421,51 +425,6 @@ class StageHipace(Stage):
         else:
             return self.driver_source.track()
 
-    '''
-    def plot_wakefield(self, beam=None):
-        
-        # extract wakefield if not already existing
-        if (self.__initial_wakefield is None) or (self.__final_wakefield is None):
-            print('No wakefield')
-            return
-
-        # assign to variables
-        zs0, Ezs0 = self.__initial_wakefield
-        zs, Ezs = self.__final_wakefield
-        zs_I = self.initial.beam_current.zs
-        Is = self.initial.beam_current.current
-        
-        # plot it
-        fig, axs = plt.subplots(2, 1)
-        fig.set_figwidth(CONFIG.plot_width_default*0.7)
-        fig.set_figheight(CONFIG.plot_width_default*1)
-        col0 = "xkcd:light gray"
-        col1 = "tab:blue"
-        col2 = "tab:orange"
-        af = 0.1
-        zlims = [min(zs)*1e6, max(zs)*1e6]
-        
-        axs[0].plot(zs*1e6, np.zeros(zs.shape), '-', color=col0)
-        if self.nom_energy_gain is not None:
-            axs[0].plot(zs*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs.shape)/1e9, ':', color=col2)
-        if self.driver_source.energy is not None:
-            Ez_driver_max = self.driver_source.energy/self.get_length()
-            axs[0].plot(zs*1e6, Ez_driver_max*np.ones(zs.shape)/1e9, ':', color=col0)
-        axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
-        axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
-        axs[0].set_xlabel('z (um)')
-        axs[0].set_ylabel('Longitudinal electric field (GV/m)')
-        axs[0].set_xlim(zlims)
-        axs[0].set_ylim(bottom=-wave_breaking_field(self.plasma_density)/1e9, top=1.3*max(Ezs)/1e9)
-        
-        axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
-        axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
-        axs[1].set_xlabel('z (um)')
-        axs[1].set_ylabel('Beam current (kA)')
-        axs[1].set_xlim(zlims)
-        axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
-    '''
-    
     def __extract_focusing(self, path):
         # prepare to read simulation data
         ts = OpenPMDTimeSeries(path)
@@ -526,140 +485,6 @@ class StageHipace(Stage):
         
         plt.legend()
         
-        return 
-    
-    def plot_initial_bubble(self, savefig=None):
-        
-        # extract density if not already existing
-        if (self.__initial_rho is None):
-            print('Charge density not extracted')
-            return
-        
-        # extract wakefield if not already existing
-        if (self.__initial_wakefield is None):
-            print('No wakefield available')
-            return 
-
-        # assign to variables
-        zs0, Ezs0 = self.__initial_wakefield
-        extent, rho0, jz0, j0extent = self.__initial_rho
-        Is0 = self.__initial_driver.peak_current()
-        
-        # calculate densities and extents
-        bubble_radius = blowout_radius(self.plasma_density, Is0)
-        extent = np.array([extent[2], extent[3], extent[0], extent[1]])*1e6
-        j0extent = np.array([j0extent[2], j0extent[3], j0extent[0], j0extent[1]])*1e6
-        charge_density0 = -jz0/(SI.c * SI.e)
-        rho0 = -(rho0/(SI.e) -self.plasma_density)
-        
-        # make figures
-        fig, ax = plt.subplots(figsize = (6,4))
-        ax2 = ax.twinx()
-        ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
-        ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
-        Ezmax = 0.8*wave_breaking_field(self.plasma_density)
-        ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
-        axpos = ax.get_position()
-        pad_fraction = 0.1  # Fraction of the figure width to use as padding between the ax and colorbar
-        cbar_width_fraction = 0.03  # Fraction of the figure width for the colorbar width
-
-        # Create colorbar axes based on the relative position and size
-        cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
-        cax2 = fig.add_axes([axpos.x1 + pad_fraction + cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
-        clims = np.array([1e-2, 1e3])*self.plasma_density
-        
-        # plasma electrons
-        initial = ax.imshow(rho0.T/1e6, extent=extent, norm=LogNorm(), origin='lower', cmap = 'Blues', alpha = np.array(rho0.T>clims.min()*2, dtype = float))
-        cb = plt.colorbar(initial, cax=cax1)
-        initial.set_clim(clims/1e6)
-        cb.ax.tick_params(axis='y',which='both', direction='in')
-        cb.set_ticklabels([])
-        
-        # beam electrons
-        charge_density_plot0 = ax.imshow(charge_density0.T/1e6, extent=j0extent, norm=LogNorm(), origin='lower', cmap='Oranges', alpha = np.array(charge_density0.T>clims.min()*2, dtype = float))
-        cb2 = plt.colorbar(charge_density_plot0, cax = cax2)
-        cb2.set_label(label=r'Electron density ' + r'$\mathrm{cm^{-3}}$',size=10)
-        cb2.ax.tick_params(axis='y',which='both', direction='in')
-        charge_density_plot0.set_clim(clims/1e6)
-
-        # Set labels
-        ax.set_xlabel('z (um)')
-        ax.set_ylabel('x (um)')
-        
-        ax.grid(False)
-        ax2.grid(False)
-        ylims = np.array([-1, 1])*bubble_radius*1.2
-        ax.set_ylim(ylims*1e6)
-        
-        # save the figure
-        if savefig is not None:
-            fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
-        
-        return 
-    
-    
-    def plot_final_bubble(self):
-        
-        # extract density if not already existing
-        if (self.__final_rho is None):
-            print('Charge density not extracted')
-            return
-        
-        # extract wakefield if not already existing
-        if (self.__final_wakefield is None):
-            print('No wakefield available')
-            return 
-
-        # assign to variables
-        zs0, Ezs0 = self.__final_wakefield
-        extent, rho0, jz0, j0extent = self.__final_rho
-        Is0 = self.__initial_driver.peak_current()
-        
-        # calculate densities and extents
-        bubble_radius = blowout_radius(self.plasma_density, Is0)
-        extent = np.array([extent[2], extent[3], extent[0], extent[1]])*1e6
-        j0extent = np.array([j0extent[2], j0extent[3], j0extent[0], j0extent[1]])*1e6
-        charge_density0 = -jz0/(SI.c * SI.e)
-        rho0 = -(rho0/(SI.e) -self.plasma_density)
-        
-        # make figures
-        fig, ax = plt.subplots(figsize = (6,4))
-        ax2 = ax.twinx()
-        ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
-        ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
-        Ezmax = 0.8*wave_breaking_field(self.plasma_density)
-        ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
-        axpos = ax.get_position()
-        pad_fraction = 0.1  # Fraction of the figure width to use as padding between the ax and colorbar
-        cbar_width_fraction = 0.03  # Fraction of the figure width for the colorbar width
-
-        # Create colorbar axes based on the relative position and size
-        cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
-        cax2 = fig.add_axes([axpos.x1 + pad_fraction + cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
-        clims = np.array([1e-2, 1e3])*self.plasma_density
-        
-        # plasma electrons
-        initial = ax.imshow(rho0.T/1e6, extent=extent, norm=LogNorm(), origin='lower', cmap = 'Blues', alpha = np.array(rho0.T>clims.min()*2, dtype = float))
-        cb = plt.colorbar(initial, cax=cax1)
-        initial.set_clim(clims/1e6)
-        cb.ax.tick_params(axis='y',which='both', direction='in')
-        cb.set_ticklabels([])
-        
-        # beam electrons
-        charge_density_plot0 = ax.imshow(charge_density0.T/1e6, extent=j0extent, norm=LogNorm(), origin='lower', cmap='Oranges', alpha = np.array(charge_density0.T>clims.min()*2, dtype = float))
-        cb2 = plt.colorbar(charge_density_plot0, cax = cax2)
-        cb2.set_label(label=r'Electron density ' + r'$\mathrm{cm^{-3}}$',size=10)
-        cb2.ax.tick_params(axis='y',which='both', direction='in')
-        charge_density_plot0.set_clim(clims/1e6)
-
-        # Set labels
-        ax.set_xlabel('z (um)')
-        ax.set_ylabel('x (um)')
-        
-        ax.grid(False)
-        ax2.grid(False)
-        ylims = np.array([-1, 1])*bubble_radius*1.2
-        ax.set_ylim(ylims*1e6)
         return 
     
     def get_transverse_sliced(self):
