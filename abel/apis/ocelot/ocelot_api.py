@@ -1,4 +1,3 @@
-from ocelot import ParticleArray
 from abel import Beam
 import scipy.constants as SI
 import numpy as np
@@ -28,6 +27,9 @@ def ocelot_particle_array2beam(particle_array):
     
 # convert from ABEL beam to OCELOT particle array
 def beam2ocelot_particle_array(beam):
+
+    # import from OCELOT
+    from ocelot import ParticleArray
     
     # initalize particle array object
     p_array = ParticleArray(len(beam))
