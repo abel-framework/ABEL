@@ -167,12 +167,6 @@ class StageHipace(Stage):
 
         return super().track(beam, savedepth, runnable, verbose)
     
-        
-    def get_length(self):
-        return self.length
-    
-    def get_nom_energy_gain(self):
-        return self.nom_energy_gain
     
     #def energy_efficiency(self):
     #    return self.efficiency
@@ -186,7 +180,7 @@ class StageHipace(Stage):
     def analytical_focusing(self):
         focusing = self.plasma_density * SI.e / (2 * SI.epsilon_0)
         return focusing
-
+    
     def plot_evolution(self):
         
         # line format
@@ -232,7 +226,6 @@ class StageHipace(Stage):
         axs[2,1].plot(long_axis, self.evolution.emit_ny*1e6, color=col2)
         axs[2,1].set_xlabel(long_label)
         axs[2,1].set_ylabel('Emittance, rms (mm mrad)')
-        
         
         plt.show()
 
