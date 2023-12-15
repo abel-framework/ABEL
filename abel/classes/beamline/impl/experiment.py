@@ -5,7 +5,7 @@ import warnings
 from abel.utilities.plasma_physics import wave_breaking_field, k_p, beta_matched
 import scipy.constants as SI
 from scipy.stats import linregress
-import ocelot
+
 
 class Experiment(Beamline):
     

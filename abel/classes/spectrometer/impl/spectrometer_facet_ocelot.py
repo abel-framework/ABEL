@@ -2,9 +2,8 @@ from abel import Spectrometer
 import numpy as np
 import scipy.constants as SI
 import scipy
-import ocelot
-import ocelot.gui.accelerator as ocelot_gui
 from abel.apis.ocelot.ocelot_api import ocelot_particle_array2beam, beam2ocelot_particle_array
+
 
 class SpectrometerFacetOcelot(Spectrometer):
     
@@ -30,6 +29,9 @@ class SpectrometerFacetOcelot(Spectrometer):
     # get the Ocelot lattice
     def get_lattice(self, ks=None, energy=None, obj_plane=None):
         
+        # import OCELOT
+        from ocelot import Drift, Quadrupole, RBend, KickTM, SecondTM, MagneticLattice
+        
         # dipole length
         dipole_length = 0.978
         
@@ -41,38 +43,40 @@ class SpectrometerFacetOcelot(Spectrometer):
         
         # scale quad and dipole strengths to correct energy
         if ks is None:
-            ks = self.ks_for_img_energy*self.img_energy/energy
-        
+            ks = self.ks_for_img_energy*self.img_energy/energy        
         bend_angle = self.dipole_field*dipole_length*SI.c/energy
-        
+
         # define elements
-        drift0 = ocelot.Drift(l=1.897-obj_plane)
-        quad_Q0 = ocelot.Quadrupole(l=1.0, k1=ks[0])
-        drift1 = ocelot.Drift(l=1.224)
-        quad_Q1 = ocelot.Quadrupole(l=1.0, k1=ks[1])
-        drift2 = ocelot.Drift(l=1.224)
-        quad_Q2 = ocelot.Quadrupole(l=1.0, k1=ks[2])
-        drift3 = ocelot.Drift(l=3.520)
-        dipole = ocelot.RBend(l=dipole_length, angle=bend_angle, tilt=-np.pi/2)
-        drift4 = ocelot.Drift(l=8.831)
+        drift0 = Drift(l=1.897-obj_plane)
+        quad_Q0 = Quadrupole(l=1.0, k1=ks[0])
+        drift1 = Drift(l=1.224)
+        quad_Q1 = Quadrupole(l=1.0, k1=ks[1])
+        drift2 = Drift(l=1.224)
+        quad_Q2 = Quadrupole(l=1.0, k1=ks[2])
+        drift3 = Drift(l=3.520)
+        dipole = RBend(l=dipole_length, angle=bend_angle, tilt=-np.pi/2)
+        drift4 = Drift(l=8.831)
 
         # assemble element sequence
         sequence = (drift0, quad_Q0, drift1, quad_Q1, drift2, quad_Q2, drift3, dipole, drift4)
 
         # select tracking method (second-order matrices or exact kicks)
         if self.exact_tracking:
-            tracking_method = ocelot.KickTM
+            tracking_method = KickTM
         else:
-            tracking_method = ocelot.SecondTM
+            tracking_method = SecondTM
         
         # define lattice
-        lattice = ocelot.MagneticLattice(sequence, method={'global': tracking_method})
+        lattice = MagneticLattice(sequence, method={'global': tracking_method})
         
         return lattice
 
     
     # set the quad strengths for imaging
     def set_imaging(self): 
+        
+        # import OCELOT
+        from  ocelot import lattice_transfer_map
         
         # TODO: check if the object plane is set correctly
         
@@ -87,9 +91,9 @@ class SpectrometerFacetOcelot(Spectrometer):
             # calculate transfer matrices
             
             lattice_x = self.get_lattice(ks, self.img_energy, self.obj_plane)
-            Rx = ocelot.lattice_transfer_map(lattice_x, energy=self.img_energy/1e9)
+            Rx = lattice_transfer_map(lattice_x, energy=self.img_energy/1e9)
             lattice_y = self.get_lattice(ks, self.img_energy_y, self.obj_plane_y)
-            Ry = ocelot.lattice_transfer_map(lattice_y, energy=self.img_energy/1e9)
+            Ry = lattice_transfer_map(lattice_y, energy=self.img_energy/1e9)
 
             # return object function
             return (Rx[0,1])**2 + (Ry[2,3])**2 + (Rx[0,0]-self.mag_x)**2
@@ -110,6 +114,9 @@ class SpectrometerFacetOcelot(Spectrometer):
     # tracking function
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
+        # import OCELOT
+        from ocelot import track, twiss, get_envelope
+        
         # set imaging
         self.set_imaging()
         
@@ -120,11 +127,11 @@ class SpectrometerFacetOcelot(Spectrometer):
         lattice = self.get_lattice(energy=beam0.energy(), obj_plane=0)
         
         # perform tracking
-        _, p_array = ocelot.track(lattice, p_array0, navi=ocelot.Navigator(lattice), print_progress=False)
+        _, p_array = track(lattice, p_array0, navi=ocelot.Navigator(lattice), print_progress=False)
         
         # calculate Twiss evolution
-        twiss0 = ocelot.get_envelope(p_array0)
-        twiss_list = ocelot.twiss(lattice, twiss0)
+        twiss0 = get_envelope(p_array0)
+        twiss_list = twiss(lattice, twiss0)
         
         # convert back from Ocelot particle array
         beam = ocelot_particle_array2beam(p_array)
@@ -143,6 +150,10 @@ class SpectrometerFacetOcelot(Spectrometer):
     # plot the evolution of beta functions and dispersion
     def plot_twiss(self, energy=None, waist_plane=None):
         
+        # import OCELOT
+        from ocelot import Twiss, twiss
+        from ocelot.gui.accelerator import plot_opt_func
+        
         # set the imaging
         self.set_imaging()
         
@@ -154,19 +165,23 @@ class SpectrometerFacetOcelot(Spectrometer):
         lattice = self.get_lattice(energy=energy, obj_plane=waist_plane)
 
         # example Twiss (small beta functions)
-        twiss0 = ocelot.Twiss()
+        twiss0 = Twiss()
         twiss0.beta_x = 0.05
         twiss0.alpha_x = 0
         twiss0.beta_y = 0.05
         twiss0.alpha_y = 0
-
+        
         # calculate Twiss evolution
-        twiss = ocelot.twiss(lattice, twiss0, nPoints=100)
+        twiss_evol = twiss(lattice, twiss0, nPoints=100)
         
         # plot evolution
-        ocelot_gui.plot_opt_func(lattice, twiss, top_plot=['Dy'], legend=False)
-        
+        plot_opt_func(lattice, twiss_evol, top_plot=['Dy'], legend=False)
+
+    
     def get_dispersion(self, energy=None):
+        
+        # import OCELOT
+        from ocelot import Twiss, twiss
         
         # set default energy
         if energy is None:
@@ -177,24 +192,29 @@ class SpectrometerFacetOcelot(Spectrometer):
         lattice = self.get_lattice(energy=energy)
         
         # calculate Twiss evolution
-        twiss0 = ocelot.Twiss()
+        twiss0 = Twiss()
         twiss0.beta_x = 0.05
         twiss0.alpha_x = 0
         twiss0.beta_y = 0.05
         twiss0.alpha_y = 0
-        twiss = ocelot.twiss(lattice, twiss0)
+        twiss_evol = twiss(lattice, twiss0)
         
         # extract dispersion
-        dispersion = twiss[-1].Dy
+        dispersion = twiss_evol[-1].Dy
         
         return dispersion
+
     
     def get_m12(self, energies):
-        m12 = np.zeros(len(energies))
+        
+        # import OCELOT
+        from ocelot import lattice_transfer_map
+        
+        m12s = np.zeros(len(energies))
         for i in range(len(energies)):
-            #print(self.spectrometer.img_energy)
-            lattice_x = self.get_lattice(energy = energies[i], obj_plane = self.obj_plane)
-            Rx = ocelot.lattice_transfer_map(lattice_x, energy=energies[i]/1e9)
-            m12[i] = Rx[0, 1]
-        return m12
+            lattice_x = self.get_lattice(energy=energies[i], obj_plane=self.obj_plane)
+            Rx = lattice_transfer_map(lattice_x, energy=energies[i]/1e9)
+            m12s[i] = Rx[0, 1]
+        
+        return m12s
     

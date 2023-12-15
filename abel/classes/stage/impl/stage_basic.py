@@ -8,20 +8,8 @@ class StageBasic(Stage):
         self.length = length
         self.chirp = chirp
         self.z_offset = z_offset
-       
-    def get_length(self):
-        return self.length
-    
-    def get_nom_energy_gain(self):
-        return self.nom_energy_gain
-
-    def energy_efficiency(self):
-        pass
 
     def energy_usage(self):
-        pass
-
-    def plot_wakefield(self):
         pass
 
     # matched beta function of the stage (for a given energy)

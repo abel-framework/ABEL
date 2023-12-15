@@ -47,10 +47,10 @@ class SourceBasic(Source):
 
         # horizontal and vertical phase spaces
         xs, xps, ys, yps = generate_trace_space_xy(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, self.angular_momentum/gamma, symmetrize=self.symmetrize)
-
+        
         # add transverse jitters and offsets
-        xs += np.random.normal(scale = self.jitter.x) + self.x_offset
-        ys += np.random.normal(scale = self.jitter.y) + self.y_offset
+        xs += np.random.normal(scale=self.jitter.x) + self.x_offset
+        ys += np.random.normal(scale=self.jitter.y) + self.y_offset
         
         # generate relative/absolute energy spreads
         if self.rel_energy_spread is not None:
@@ -61,17 +61,17 @@ class SourceBasic(Source):
         
         # add longitudinal jitter
         if abs(self.jitter.t) > 0:
-            z_jitter = np.random.normal(scale = self.jitter.t*SI.c)
+            z_jitter = np.random.normal(scale=self.jitter.t*SI.c)
         else:
-            z_jitter = np.random.normal(scale = self.jitter.z)
+            z_jitter = np.random.normal(scale=self.jitter.z)
         
         # longitudinal phase space
         if self.symmetrize:
-            zs = np.tile(np.random.normal(loc = self.z_offset + z_jitter, scale = self.bunch_length, size=round(self.num_particles/4)), 4)
-            Es = np.tile(np.random.normal(loc = self.energy, scale = self.energy_spread, size=round(self.num_particles/4)), 4)
+            zs = np.tile(np.random.normal(loc=self.z_offset+z_jitter, scale = self.bunch_length, size=round(self.num_particles/4)), 4)
+            Es = np.tile(np.random.normal(loc=self.energy, scale=self.energy_spread, size=round(self.num_particles/4)), 4)
         else:
-            zs = np.random.normal(loc = self.z_offset + z_jitter, scale = self.bunch_length, size=self.num_particles)
-            Es = np.random.normal(loc = self.energy, scale = self.energy_spread, size=self.num_particles)
+            zs = np.random.normal(loc=self.z_offset+z_jitter, scale=self.bunch_length, size=self.num_particles)
+            Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=self.num_particles)
         
         # create phase space
         beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge)

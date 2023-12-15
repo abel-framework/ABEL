@@ -514,16 +514,20 @@ class Beam():
         mag = np.sqrt(beta_mag)
 
         if axis_defining_beam is None:
-            x_offset, y_offset = 0, 0
-            ux_offset, uy_offset = 0, 0
+            x_offset = 0
+            y_offset = 0
+            ux_offset = 0
+            uy_offset = 0
         else:
-            x_offset, y_offset = axis_defining_beam.x_offset(), axis_defining_beam.y_offset()
-            ux_offset, uy_offset = axis_defining_beam.ux_offset(), axis_defining_beam.ux_offset()
+            x_offset = axis_defining_beam.x_offset()
+            y_offset = axis_defining_beam.y_offset()
+            ux_offset = axis_defining_beam.ux_offset()
+            uy_offset = axis_defining_beam.uy_offset()
         
-        self.set_xs((self.xs()-x_offset) * mag + x_offset)
-        self.set_ys(self.ys() * mag)
-        self.set_uxs(self.uxs() / mag)
-        self.set_uys(self.uys() / mag)
+        self.set_xs((self.xs()-x_offset)*mag + x_offset)
+        self.set_ys((self.ys()-y_offset)*mag + y_offset)
+        self.set_uxs((self.uxs()-ux_offset)/mag + ux_offset)
+        self.set_uys((self.uys()-uy_offset)/mag + uy_offset)
         
         
     def flip_transverse_phase_spaces(self, flip_momenta=True, flip_positions=False):
