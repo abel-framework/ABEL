@@ -68,7 +68,7 @@ class Stage(Trackable):
         self.efficiency.driver_to_beam = self.efficiency.driver_to_wake*self.efficiency.wake_to_beam
 
     
-    def calculate_beam_current(self, beam0, driver0, beam, driver):
+    def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
         
         dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
         num_sigmas = 6
@@ -80,9 +80,10 @@ class Stage(Trackable):
         self.initial.beam.current.zs = ts0*SI.c
         self.initial.beam.current.Is = Is0
 
-        Is, ts = (driver + beam).current_profile(bins=tbins)
-        self.final.beam.current.zs = ts*SI.c
-        self.final.beam.current.Is = Is
+        if beam is not None and driver is not None:
+            Is, ts = (driver + beam).current_profile(bins=tbins)
+            self.final.beam.current.zs = ts*SI.c
+            self.final.beam.current.Is = Is
 
     
     @abstractmethod
@@ -179,9 +180,11 @@ class Stage(Trackable):
             rho0_beam = data_struct.beam.density.rho
 
             # plot on-axis wakefield and axes
+            zlims = [min(zs0)*1e6, max(zs0)*1e6]
             ax2 = ax1.twinx()
             ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
             ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
+            ax2.set_xlim(zlims)
             ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
             axpos = ax1.get_position()
             pad_fraction = 0.15  # Fraction of the figure width to use as padding between the ax and colorbar
@@ -193,14 +196,14 @@ class Stage(Trackable):
             clims = np.array([1e-2, 1e3])*self.plasma_density
             
             # plot plasma electrons
-            initial = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha = np.array(rho0_plasma>clims.min()*2, dtype = float))
+            initial = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float))
             cb = plt.colorbar(initial, cax=cax1)
             initial.set_clim(clims/1e6)
             cb.ax.tick_params(axis='y',which='both', direction='in')
             cb.set_ticklabels([])
             
             # plot beam electrons
-            charge_density_plot0 = ax1.imshow(rho0_beam/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Oranges', alpha = np.array(rho0_beam>clims.min()*2, dtype = float))
+            charge_density_plot0 = ax1.imshow(rho0_beam/1e6, extent=data_struct.beam.density.extent*1e6, norm=LogNorm(), origin='lower', cmap=CONFIG.default_cmap, alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
             cb2 = plt.colorbar(charge_density_plot0, cax = cax2)
             cb2.set_label(label=r'Electron density ' + r'$\mathrm{cm^{-3}}$',size=10)
             cb2.ax.tick_params(axis='y',which='both', direction='in')
