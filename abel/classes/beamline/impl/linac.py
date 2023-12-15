@@ -9,13 +9,15 @@ from matplotlib import ticker as mticker
 
 class Linac(Beamline):
     
-    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=0, first_stage=None, alternate_interstage_polarity=False):
+    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=0, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False):
         
         self.source = source
         self.stage = stage
         self.interstage = interstage
         self.bds = bds
         self.first_stage = first_stage
+        self.last_stage = last_stage
+        self.last_interstage = last_interstage
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
         
@@ -32,9 +34,13 @@ class Linac(Beamline):
         if self.interstage is not None:
             assert(isinstance(self.interstage, Interstage))
         if self.bds is not None:
-            assert(isinstance(self.bds, BeamDeliverySystem))
+            assert(isinstance(self.bds, BeamDeliverySystem) or isinstance(self.bds, Interstage))
         if self.first_stage is not None:
             assert(isinstance(self.first_stage, Stage))
+        if self.last_stage is not None:
+            assert(isinstance(self.last_stage, Stage))
+        if self.last_interstage is not None:
+            assert(isinstance(self.last_interstage, Interstage))
         
         # prepare for multiplication of stages and interstages
         self.stages = [None]*self.num_stages
@@ -53,6 +59,8 @@ class Linac(Beamline):
                 # add stages
                 if i == 0 and self.first_stage is not None:
                     stage_instance = self.first_stage
+                elif i == (self.num_stages-1) and self.last_stage is not None:
+                    stage_instance = self.last_stage
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 self.trackables[1+2*i] = stage_instance
@@ -60,8 +68,12 @@ class Linac(Beamline):
 
                 # add interstages
                 if (self.interstage is not None) and (i < self.num_stages-1):
-                    interstage_instance = copy.deepcopy(self.interstage)
-                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                    if i == self.num_stages-2 and self.last_interstage is not None:
+                        interstage_instance = self.last_interstage
+                    else:
+                        interstage_instance = copy.deepcopy(self.interstage)
+                    if interstage_instance.nom_energy is None:
+                        interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
                     if self.alternate_interstage_polarity:
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
                     self.trackables[2+2*i] = interstage_instance
@@ -69,7 +81,8 @@ class Linac(Beamline):
             
         # add beam delivery system
         if self.bds is not None:
-            self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+            if self.bds.nom_energy is None:
+                self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
             self.trackables[max(1,2*self.num_stages)] = self.bds
         
     

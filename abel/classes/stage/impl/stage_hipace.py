@@ -17,7 +17,7 @@ import read_insitu_diagnostics
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
@@ -26,6 +26,9 @@ class StageHipace(Stage):
         
         self.keep_data = keep_data
         self.output = output
+
+        # simulation specifics
+        self.num_nodes = num_nodes
 
         # physics flags
         self.ion_motion = ion_motion
@@ -63,7 +66,7 @@ class StageHipace(Stage):
         driver0 = self.driver_source.track()
         
         # !! QUICK FIX: TODO to make this a real ramp
-        # apply plasma-density down ramp (demagnify beta function)
+        # apply plasma-density up ramp (demagnify beta function)
         driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
@@ -89,11 +92,11 @@ class StageHipace(Stage):
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_xy = 5 * blowout_radius(self.plasma_density, driver0.peak_current())
+        box_size_r = np.max([5/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
 
         # calculate the time step
         beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
-        dz = beta_matched/25
+        dz = beta_matched/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)
         self.num_steps = np.ceil(self.length/dz)
@@ -116,20 +119,20 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period)
         
         
         ## RUN SIMULATION
         
         # make job script
         filename_job_script = tmpfolder + 'run.sh'
-        hipace_write_jobscript(filename_job_script, filename_input)
+        hipace_write_jobscript(filename_job_script, filename_input, num_nodes=self.num_nodes)
         
         # run HiPACE++
         beam, driver = hipace_run(filename_job_script, self.num_steps)
         
         # !! QUICK FIX: TODO to make this a real ramp
-        # apply plasma-density up ramp (magnify beta function)
+        # apply plasma-density down ramp (magnify beta function)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
 

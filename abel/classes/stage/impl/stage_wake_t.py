@@ -31,7 +31,7 @@ class StageWakeT(Stage):
         # make driver (and convert to WakeT bunch)
         driver0 = self.driver_source.track()
         
-        # apply plasma-density down ramp (demagnify beta function)
+        # apply plasma-density up ramp (demagnify beta function)
         driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
@@ -42,20 +42,20 @@ class StageWakeT(Stage):
         # make longitudinal box range
         num_sigmas = 6
         box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
+        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_r = 5 * blowout_radius(self.plasma_density, driver0.peak_current())
-
+        box_size_r = np.max([5/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
+        
         # find stepsize
         beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
-        dz = beta_matched/25
+        dz = beta_matched/10
         
-        n_out = round(self.length/dz/2)
+        n_out = round(self.length/dz/8)
         plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
-                                    n_out=n_out, n_r=256, n_xi=256, dz_fields=dz, ppc=1)
+                                    n_out=n_out, n_r=128, n_xi=256, dz_fields=dz, ppc=1)
         
         # do tracking
         bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
@@ -76,7 +76,7 @@ class StageWakeT(Stage):
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
-        # apply plasma-density up ramp (magnify beta function)
+        # apply plasma-density down ramp (magnify beta function)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         

@@ -76,17 +76,24 @@ class SourceTrapezoid(Source):
             Q_triangle = Q_uniform - abs(self.charge)
             Q_uniform = abs(self.charge) - Q_triangle
             zmode = self.z_offset
-            
+        
+        # add longitudinal jitter
+        if abs(self.jitter.t) > 0:
+            z_jitter = np.random.normal(scale=self.jitter.t*SI.c)
+        else:
+            z_jitter = np.random.normal(scale=self.jitter.z)
+        
+        # construct shape
         index_split = round(num_particles*abs(Q_uniform)/abs(self.charge))
         inds = np.random.permutation(num_particles)
         mask_uniform = inds[0:index_split]
         mask_triangle = inds[index_split:num_particles]
         zs = np.zeros(num_particles)
-        zs[mask_uniform] = np.random.uniform(low = self.z_offset - self.bunch_length, high = self.z_offset, size = len(mask_uniform))
-        zs[mask_triangle] = np.random.triangular(left = self.z_offset - self.bunch_length, right = self.z_offset, mode = zmode, size = len(mask_triangle))
+        zs[mask_uniform] = np.random.uniform(low=self.z_offset-self.bunch_length+z_jitter, high=self.z_offset+z_jitter, size = len(mask_uniform))
+        zs[mask_triangle] = np.random.triangular(left=self.z_offset-self.bunch_length+z_jitter, right=self.z_offset+z_jitter, mode=zmode+z_jitter, size=len(mask_triangle))
         
         # energies
-        Es = np.random.normal(loc = self.energy, scale = self.energy_spread, size=num_particles)
+        Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles)
         
         # symmetrize
         if self.symmetrize:

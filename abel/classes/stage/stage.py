@@ -92,7 +92,12 @@ class Stage(Trackable):
 
     
     def plot_evolution(self):
-        
+
+        # extract wakefield if not already existing
+        if not hasattr(self.evolution, 'location'):
+            print('No evolution calculated')
+            return
+            
         # preprate plot
         fig, axs = plt.subplots(2,3)
         fig.set_figwidth(CONFIG.plot_fullwidth_default)
@@ -147,8 +152,12 @@ class Stage(Trackable):
     def plot_wakefield(self):
         
         # extract wakefield if not already existing
-        assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield'
-        assert hasattr(self.initial.beam.current, 'Is'), 'No beam current'
+        if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
+            print('No wakefield calculated')
+            return
+        if not hasattr(self.initial.beam.current, 'Is'):
+            print('No beam current calculated')
+            return
 
         # preprate plot
         fig, axs = plt.subplots(2, 1)
@@ -158,14 +167,24 @@ class Stage(Trackable):
         col1 = "tab:blue"
         col2 = "tab:orange"
         af = 0.1
-
-        # extract wakefields
+        
+        # extract wakefields and beam currents
         zs0 = self.initial.plasma.wakefield.onaxis.zs
         Ezs0 = self.initial.plasma.wakefield.onaxis.Ezs
-        has_final = hasattr(self.final.beam.current, 'Ezs')
+        has_final = hasattr(self.final.plasma.wakefield.onaxis, 'Ezs')
         if has_final:
             zs = self.final.plasma.wakefield.onaxis.zs
             Ezs = self.final.plasma.wakefield.onaxis.Ezs
+        zs_I = self.initial.beam.current.zs
+        Is = self.initial.beam.current.Is
+
+        # find field at the driver and beam
+        z_mid = zs_I.min() + (zs_I.max()-zs_I.min())*0.4
+        mask = zs_I < z_mid
+        zs_masked = zs_I[mask]
+        z_beam = zs_masked[np.abs(Is[mask]).argmax()]
+        Ez_driver = Ezs0[zs0 > z_mid].max()
+        Ez_beam = np.interp(z_beam, zs0, Ezs0)
         
         # get wakefield
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
@@ -181,11 +200,9 @@ class Stage(Trackable):
         axs[0].set_ylabel('Longitudinal electric field (GV/m)')
         zlims = [min(zs0)*1e6, max(zs0)*1e6]
         axs[0].set_xlim(zlims)
-        axs[0].set_ylim(bottom=-wave_breaking_field(self.plasma_density)/1e9, top=1.3*max(Ezs0)/1e9)
+        axs[0].set_ylim(bottom=-1.7*np.max([np.abs(Ez_beam), Ez_driver])/1e9, top=1.3*Ez_driver/1e9)
         
         # plot beam current
-        zs_I = self.initial.beam.current.zs
-        Is = self.initial.beam.current.Is
         axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
         axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
         axs[1].set_xlabel('z (um)')
@@ -198,11 +215,12 @@ class Stage(Trackable):
     def plot_wake(self, savefig=None):
         
         # extract density if not already existing
-        assert hasattr(self.initial.plasma.density, 'rho'), 'No wake'
-        assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield'
-        
-        # calculate densities and extents
-        Ezmax = 0.8*wave_breaking_field(self.plasma_density)
+        if not hasattr(self.initial.plasma.density, 'rho'):
+            print('No wake calculated')
+            return
+        if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
+            print('No wakefield calculated')
+            return
         
         # make figures
         has_final_step = hasattr(self.final.plasma.density, 'rho')
@@ -233,6 +251,16 @@ class Stage(Trackable):
             rho0_plasma = data_struct.plasma.density.rho
             rho0_beam = data_struct.beam.density.rho
 
+            # find field at the driver and beam
+            if i==0:
+                zs_I = self.initial.beam.current.zs
+                Is = self.initial.beam.current.Is
+                z_mid = zs_I.max()-(zs_I.max()-zs_I.min())/2
+                z_beam = zs_I[np.abs(Is[zs_I < z_mid]).argmax()]
+                Ez_driver = Ezs0[zs0 > z_mid].max()
+                Ez_beam = np.interp(z_beam, zs0, Ezs0)
+                Ezmax = 1.7*np.max([np.abs(Ez_driver), np.abs(Ez_beam)])
+            
             # plot on-axis wakefield and axes
             ax2 = ax1.twinx()
             ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')

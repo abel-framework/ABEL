@@ -28,10 +28,14 @@ class StageQuasistatic2d(Stage):
     # track the particles through
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
+        # suppress numba warnings from Ocelot
+        import warnings
+        warnings.simplefilter('ignore', category=RuntimeWarning)
+        
         # make driver (and convert to WakeT bunch)
         driver0 = self.driver_source.track()
         
-        # apply plasma-density down ramp (demagnify beta function)
+        # apply plasma-density up ramp (demagnify beta function)
         driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
@@ -40,8 +44,8 @@ class StageQuasistatic2d(Stage):
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
 
         # create plasma stage
-        box_min_z = beam0.z_offset() - 5 * beam0.bunch_length() - 0.25/k_p(self.plasma_density)
-        box_max_z = driver0.z_offset() + 4 * driver0.bunch_length()
+        box_min_z = beam0.z_offset(clean=True) - 5 * beam0.bunch_length(clean=True) - 0.25/k_p(self.plasma_density)
+        box_max_z = driver0.z_offset(clean=True) + 4 * driver0.bunch_length(clean=True)
         box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
         k_beta_driver = k_p(self.plasma_density)/np.sqrt(2*driver0.gamma())
         k_beta_beam = k_p(self.plasma_density)/np.sqrt(2*beam0.gamma())
@@ -108,7 +112,7 @@ class StageQuasistatic2d(Stage):
         driver.flip_transverse_phase_spaces()
         driver.set_Es(driver0.Es() + delta_Es_driver)
         
-        # apply plasma-density up ramp (magnify beta function)
+        # apply plasma-density down ramp (magnify beta function)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         
