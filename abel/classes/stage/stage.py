@@ -69,7 +69,7 @@ class Stage(Trackable):
         self.efficiency.driver_to_beam = self.efficiency.driver_to_wake*self.efficiency.wake_to_beam
 
     
-    def calculate_beam_current(self, beam0, driver0, beam, driver):
+    def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
         
         dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
         num_sigmas = 6
@@ -81,9 +81,10 @@ class Stage(Trackable):
         self.initial.beam.current.zs = ts0*SI.c
         self.initial.beam.current.Is = Is0
 
-        Is, ts = (driver + beam).current_profile(bins=tbins)
-        self.final.beam.current.zs = ts*SI.c
-        self.final.beam.current.Is = Is
+        if beam is not None and driver is not None:
+            Is, ts = (driver + beam).current_profile(bins=tbins)
+            self.final.beam.current.zs = ts*SI.c
+            self.final.beam.current.Is = Is
 
     
     @abstractmethod
