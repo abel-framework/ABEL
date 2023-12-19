@@ -10,12 +10,14 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 class StageWakeT(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, num_cell_xy=256):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
         self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
+        
+        self.num_cell_xy = num_cell_xy
 
 
         
@@ -46,7 +48,11 @@ class StageWakeT(Stage):
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_r = np.max([5/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
+        box_size_r = np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
+        
+        # calculate number of cells in x to get similar resolution
+        dr = box_size_r/self.num_cell_xy
+        num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # find stepsize
         beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
@@ -55,7 +61,7 @@ class StageWakeT(Stage):
         n_out = round(self.length/dz/8)
         plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
-                                    n_out=n_out, n_r=128, n_xi=256, dz_fields=dz, ppc=1)
+                                    n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
         # do tracking
         bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)

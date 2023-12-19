@@ -6,7 +6,7 @@ from abel import CONFIG, Beam
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, n_cell_xy=511, n_cell_z=424):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=424):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -21,9 +21,9 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         plasma_components = 'plasma'
     
     # define inputs
-    inputs = {'n_cell_x': int(n_cell_xy), 
-              'n_cell_y': int(n_cell_xy), 
-              'n_cell_z': int(n_cell_z),
+    inputs = {'num_cell_x': int(num_cell_xy), 
+              'num_cell_y': int(num_cell_xy), 
+              'num_cell_z': int(num_cell_z),
               'plasma_density': plasma_density,
               'grid_low_x': -box_size/2,
               'grid_high_x': box_size/2,

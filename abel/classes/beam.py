@@ -328,7 +328,7 @@ class Beam():
     def angular_momentum(self):
         covxy = np.cov(self.norm_transverse_vector())
         det_covxy_cross = np.linalg.det(covxy[2:4,0:2])
-        return np.sign(det_covxy_cross)*np.sqrt(np.abs(det_covxy_cross))
+        return np.sign(covxy[3,0]-covxy[2,1])*np.sqrt(np.abs(det_covxy_cross))
 
     def eigen_emittance_max(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) + self.angular_momentum()

@@ -1,4 +1,4 @@
-amr.n_cell = $n_cell_x $n_cell_y $n_cell_z
+amr.n_cell = $num_cell_x $num_cell_y $num_cell_z
 
 hipace.normalized_units = 0
 hipace.bxby_solver = explicit

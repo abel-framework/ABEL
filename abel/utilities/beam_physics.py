@@ -57,7 +57,7 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
     rho_L = np.sqrt(1 + ratio**2)
     
     # particle positions
-    xs = sigx*(us_x + abs(ratio)*vs_y)/np.sqrt(rho_L)
+    xs = sigx*(us_x + ratio*vs_y)/np.sqrt(rho_L)
     ys = sigy*(us_y - ratio*vs_x)/np.sqrt(rho_L)
     
     # particle angles

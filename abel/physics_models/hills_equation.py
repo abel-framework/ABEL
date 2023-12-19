@@ -53,7 +53,7 @@ def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp):
     
     # calculate final positions and angles (imaginary part is zero)
     x = np.real(1j*(Di*scispec.kv(0,A*1j) + Dk*scispec.iv(0,A*1j))/E)
-    xp = np.real((dgamma_ds*C**2/(2*A*E))*(Dk*scispec.iv(1,A*1j) - Di*scispec.kv(1,A*1j)))
+    xp = -np.real((dgamma_ds*C**2/(2*A*E))*(Dk*scispec.iv(1,A*1j) - Di*scispec.kv(1,A*1j)))
     
     # convert angles back to proper velocoties
     ux = xp * gamma2proper_velocity(gamma)

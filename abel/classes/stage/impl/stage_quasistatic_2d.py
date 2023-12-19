@@ -42,7 +42,7 @@ class StageQuasistatic2d(Stage):
         # convert beams to WakeT bunches
         driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
-
+        
         # create plasma stage
         box_min_z = beam0.z_offset(clean=True) - 5 * beam0.bunch_length(clean=True) - 0.25/k_p(self.plasma_density)
         box_max_z = driver0.z_offset(clean=True) + 4 * driver0.bunch_length(clean=True)
@@ -52,6 +52,7 @@ class StageQuasistatic2d(Stage):
         lambda_betatron_min = 2*np.pi/max(k_beta_beam, k_beta_driver)
         lambda_betatron_max = 2*np.pi/min(k_beta_beam, k_beta_driver)
         dz = lambda_betatron_min/10
+        
         # need to make sufficiently many steps
         n_out = max(1, round(lambda_betatron_max/lambda_betatron_min/2))
         plasma = wake_t.PlasmaStage(length=dz, density=self.plasma_density, wakefield_model='quasistatic_2d',
