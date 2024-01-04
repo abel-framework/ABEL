@@ -115,7 +115,7 @@ class SpectrometerFacetOcelot(Spectrometer):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
         # import OCELOT
-        from ocelot import track, twiss, get_envelope
+        from ocelot import track, twiss, get_envelope, Navigator
         
         # set imaging
         self.set_imaging()
@@ -127,7 +127,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         lattice = self.get_lattice(energy=beam0.energy(), obj_plane=0)
         
         # perform tracking
-        _, p_array = track(lattice, p_array0, navi=ocelot.Navigator(lattice), print_progress=False)
+        _, p_array = track(lattice, p_array0, navi=Navigator(lattice), print_progress=False)
         
         # calculate Twiss evolution
         twiss0 = get_envelope(p_array0)
