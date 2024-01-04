@@ -1,6 +1,7 @@
 from abel import Stage, CONFIG
 from matplotlib import pyplot as plt
 import numpy as np
+import scipy
 import scipy.constants as SI
 from abel.utilities.plasma_physics import *
 import wake_t
@@ -8,10 +9,11 @@ import os, shutil, uuid, copy, sys
 from openpmd_viewer import OpenPMDTimeSeries
 from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
 from contextlib import contextmanager
+from abel.physics_models.particles_transverse_wake_instability import transverse_wake_instability_particles
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, add_driver_to_beam=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, transverse_instability=True, add_driver_to_beam=False):
         
         super().__init__(length, nom_energy_gain, plasma_density)
         
@@ -19,6 +21,7 @@ class StageQuasistatic2d(Stage):
         self.driver_source = driver_source
         
         self.ramp_beta_mag = 1
+        self.transverse_instability = transverse_instability
         
         self._driver_initial = None
         self._driver_final = None
@@ -90,23 +93,64 @@ class StageQuasistatic2d(Stage):
         self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
 
         # extract wakefield info
-        tseries = OpenPMDTimeSeries(tmpfolder+'hdf5/')
-        Ez, metadata = tseries.get_field(field='E', coord='z', iteration=0)
+        ts = OpenPMDTimeSeries(tmpfolder+'hdf5/')
+        Ez, metadata = ts.get_field(field='E', coord='z', iteration=min(ts.iterations))
         self.initial.plasma.wakefield.onaxis.zs = metadata.z
         self.initial.plasma.wakefield.onaxis.Ezs = Ez[round(len(metadata.r)/2),:].flatten()
         
+        # extract initial plasma density
+        rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
+        self.initial.plasma.density.extent = metadata0_plasma.imshow_extent
+        self.initial.plasma.density.rho = -(rho0_plasma/SI.e)
+        
+        # extract initial beam density
+        data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
+        data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
+        extent0 = metadata0_plasma.imshow_extent
+        Nbins0 = self.initial.plasma.density.rho.shape
+        dr0 = (extent0[3]-extent0[2])/Nbins0[0]
+        dz0 = (extent0[1]-extent0[0])/Nbins0[1]
+        mask0_beam = np.logical_and(data0_beam[1] < dr0/2, data0_beam[1] > -dr0/2)
+        jz0_beam, _, _ = np.histogram2d(data0_beam[0][mask0_beam], data0_beam[2][mask0_beam], weights=data0_beam[3][mask0_beam], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
+        mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
+        jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
+        self.initial.beam.density.extent = metadata0_plasma.imshow_extent
+        self.initial.beam.density.rho = (jz0_beam+jz0_driver)/(dr0*dr0*dz0)
+
         # remove temporary directory
         shutil.rmtree(tmpfolder)
         
-        # calculate energy gain
-        delta_Es = self.length*(beam.Es() - beam0.Es())/dz
-        
-        # find driver offset (to shift the beam relative) and apply betatron motion
-        beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
-        
-        # accelerate beam (and remove nans)
-        beam.set_Es(beam0.Es() + delta_Es)
-        
+        if self.transverse_instability:
+
+            # TODO: make sure driver offset is correctly handled
+            
+            # find maximum blowout radius
+            rs = np.linspace(self.initial.plasma.density.extent[2], self.initial.plasma.density.extent[3], self.initial.plasma.density.rho.shape[0])
+            rbs = np.zeros(self.initial.plasma.density.rho.shape[1])
+            threshold = 0.9*self.plasma_density
+            for i in range(len(rbs)):
+                rbs_upper = rs[np.logical_and(rs > 0, self.initial.plasma.density.rho[:,i] > threshold)].min()
+                rbs_lower = rs[np.logical_and(rs < 0, self.initial.plasma.density.rho[:,i] > threshold)].max()
+                rbs[i] = (rbs_upper-rbs_lower)/2
+
+            # interpolate for each particle
+            rbs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
+            Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
+
+            # perform tracking
+            beam, _, _, _, _, _ = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length, show_prog_bar=True)
+            
+        else:
+            
+            # calculate energy gain
+            delta_Es = self.length*(beam.Es() - beam0.Es())/dz
+            
+            # find driver offset (to shift the beam relative) and apply betatron motion
+            beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+            
+            # accelerate beam (and remove nans)
+            beam.set_Es(beam0.Es() + delta_Es)
+            
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length*(driver0.Es()-driver.Es())/dz
         driver.apply_betatron_damping(delta_Es_driver)

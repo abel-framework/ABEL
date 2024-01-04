@@ -335,7 +335,23 @@ class Beam():
 
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
-    
+
+    def norm_amplitude_x(self, clean=False):
+        xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
+        covx = np.cov(xs, xps)
+        emgx = np.sqrt(np.linalg.det(covx))
+        beta_x = covx[0,0]/emgx
+        alpha_x = -covx[1,0]/emgx
+        return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
+        
+    def norm_amplitude_y(self, clean=False):
+        ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
+        covy = np.cov(ys, yps)
+        emgy = np.sqrt(np.linalg.det(covy))
+        beta_y = covy[0,0]/emgy
+        alpha_y = -covy[1,0]/emgy
+        return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
+        
     def peak_density(self):
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
