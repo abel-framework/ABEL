@@ -7,7 +7,7 @@ from abel.utilities.relativity import energy2gamma
 
 class SourceTrapezoid(Source):
     
-    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, current_head=0, z_offset=0, x_offset=0, y_offset=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, wallplug_efficiency=1, accel_gradient=None):
+    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, current_head=0, z_offset=0, x_offset=0, y_offset=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
         self.energy = energy
         self.charge = charge
         self.energy_spread = energy_spread # [eV]
@@ -27,6 +27,7 @@ class SourceTrapezoid(Source):
         self.length = length # [m]
         self.wallplug_efficiency = wallplug_efficiency
         self.accel_gradient = accel_gradient
+        self.symmetrize = symmetrize
         
         self.jitter = SimpleNamespace()
         self.jitter.x = 0
