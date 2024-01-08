@@ -6,7 +6,7 @@ from abel import CONFIG, Beam
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=424):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=424, driver_only=False):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -19,6 +19,12 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         plasma_components = 'electrons ions'
     else:
         plasma_components = 'plasma'
+
+    if driver_only:
+        beam_components = 'driver'
+    else:
+        beam_components = 'driver beam'
+        
     
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
@@ -35,6 +41,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'max_step': int(num_steps),
               'output_period': output_period,
               'radiation_reaction': int(radiation_reaction),
+              'beam_components': beam_components,
               'plasma_components': plasma_components,
               'ion_species': ion_species,
               'beam_ionization': int(beam_ionization),
@@ -117,7 +124,10 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     
     # when finished, load the beam and driver
     filename = runfolder + "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps))
-    beam = Beam.load(filename, beam_name='beam')
+    try:
+        beam = Beam.load(filename, beam_name='beam')
+    except:
+        beam = None
     driver = Beam.load(filename, beam_name='driver')
     
     return beam, driver

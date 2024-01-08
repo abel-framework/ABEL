@@ -9,6 +9,9 @@ class Source(Trackable):
         pass
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        beam.location = 0
+        beam.stage_number = 0
+        beam.trackable_number = -1
         return super().track(beam, savedepth, runnable, verbose)
     
     @abstractmethod

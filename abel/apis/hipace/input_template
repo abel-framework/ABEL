@@ -18,7 +18,7 @@ geometry.is_periodic = 1 1 0  # Is periodic?
 geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
 geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z
 
-beams.names = driver beam
+beams.names = $beam_components # 'driver' or 'driver beam'
 beams.insitu_period = 1
 
 beam.injection_type = from_file

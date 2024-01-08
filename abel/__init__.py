@@ -30,6 +30,7 @@ from .classes.collider.collider import *
 from .classes.source.impl.source_basic import *
 from .classes.source.impl.source_trapezoid import *
 from .classes.source.impl.source_combiner import *
+from .classes.source.impl.source_from_file import *
 from .classes.stage.impl.stage_basic import *
 from .classes.stage.impl.stage_nonlinear_1d import *
 from .classes.stage.impl.stage_hipace import *
