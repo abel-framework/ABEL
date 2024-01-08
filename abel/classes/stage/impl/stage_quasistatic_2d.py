@@ -13,20 +13,13 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, transverse_instability=True, add_driver_to_beam=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, transverse_instability=True):
         
-        super().__init__(length, nom_energy_gain, plasma_density)
+        super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
-        self.add_driver_to_beam = add_driver_to_beam
-        self.driver_source = driver_source
-        
-        self.ramp_beta_mag = 1
+        # physics flags
         self.transverse_instability = transverse_instability
-        
-        self._driver_initial = None
-        self._driver_final = None
-        self._initial_wakefield = None
-        self._current_profile = None
+    
         
     # track the particles through
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
@@ -136,6 +129,7 @@ class StageQuasistatic2d(Stage):
             # interpolate for each particle
             rbs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
             Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
+            #Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs*0-self.nom_energy_gain/self.length)
 
             # perform tracking
             beam, _, _, _, _, _ = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length, show_prog_bar=True)
@@ -154,7 +148,6 @@ class StageQuasistatic2d(Stage):
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length*(driver0.Es()-driver.Es())/dz
         driver.apply_betatron_damping(delta_Es_driver)
-        driver.flip_transverse_phase_spaces()
         driver.set_Es(driver0.Es() + delta_Es_driver)
         
         # apply plasma-density down ramp (magnify beta function)
@@ -177,12 +170,4 @@ class StageQuasistatic2d(Stage):
         self.calculate_beam_current(beam0, driver0, beam, driver)
         
         return super().track(beam, savedepth, runnable, verbose)
-    
-    
-    # matched beta function of the stage (for a given energy)
-    def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
-        
-    def energy_usage(self):
-        return self.driver_source.energy_usage()
     

@@ -9,13 +9,12 @@ from abel.physics_models.plasma_wake_1d import wakefield_1d
 
 class StageNonlinear1d(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, enable_betatron=True, add_driver_to_beam=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, enable_betatron=True, add_driver_to_beam=False):
         
-        super().__init__(length, nom_energy_gain, plasma_density)
+        super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         self.enable_betatron = enable_betatron
         self.add_driver_to_beam = add_driver_to_beam
-        self.driver_source = driver_source
         
         self.driver_to_wake_efficiency = None
         self.wake_to_beam_efficiency = None
@@ -23,8 +22,6 @@ class StageNonlinear1d(Stage):
         
         self.reljitter = SimpleNamespace()
         self.reljitter.plasma_density = 0
-        
-        self.ramp_beta_mag = 1
         
         # internally sampled values (given some jitter)
         self.__n = None
@@ -41,10 +38,6 @@ class StageNonlinear1d(Stage):
             self.__n = self.plasma_density * np.random.normal(loc = 1, scale = self.reljitter.plasma_density)
         return self.__n
     
-    
-    # matched beta function of the stage (for a given energy)
-    def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
     
     # track the particles through
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -202,19 +195,3 @@ class StageNonlinear1d(Stage):
             plt.savefig(save_to_file, format="pdf", bbox_inches="tight")
         
         
-        
-    def get_length(self):
-        return self.length
-    
-    def get_nom_energy_gain(self):
-        return self.nom_energy_gain
-    
-    def energy_efficiency(self):
-        return self.driver_to_beam_efficiency, self.driver_to_wake_efficiency, self.wake_to_beam_efficiency
-    
-    #def get_wallplug_efficiency(self):
-    #    return self.driver_to_beam_efficiency*self.driver_source.get_energy_efficiency()
-    
-    def energy_usage(self):
-        return self.driver_source.energy_usage()
-    

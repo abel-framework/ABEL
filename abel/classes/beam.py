@@ -4,9 +4,9 @@ from datetime import datetime
 from pytz import timezone
 from abel import CONFIG
 import scipy.constants as SI
-from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma
+from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
 from abel.utilities.statistics import prct_clean, prct_clean2d
-from abel.utilities.plasma_physics import k_p
+from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
 from matplotlib import pyplot as plt
 
@@ -336,20 +336,28 @@ class Beam():
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
 
-    def norm_amplitude_x(self, clean=False):
+    def norm_amplitude_x(self, n0=None, clean=False):
         xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
-        covx = np.cov(xs, xps)
-        emgx = np.sqrt(np.linalg.det(covx))
-        beta_x = covx[0,0]/emgx
-        alpha_x = -covx[1,0]/emgx
+        if n0 is None:
+            beta_x = beta_matched(n0, self.energy())
+            alpha_x = 0
+        else:
+            covx = np.cov(xs, xps)
+            emgx = np.sqrt(np.linalg.det(covx))
+            beta_x = covx[0,0]/emgx
+            alpha_x = -covx[1,0]/emgx
         return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
         
-    def norm_amplitude_y(self, clean=False):
+    def norm_amplitude_y(self, n0=None, clean=False):
         ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
-        covy = np.cov(ys, yps)
-        emgy = np.sqrt(np.linalg.det(covy))
-        beta_y = covy[0,0]/emgy
-        alpha_y = -covy[1,0]/emgy
+        if n0 is None:
+            beta_y = beta_matched(n0, self.energy())
+            alpha_y = 0
+        else:
+            covy = np.cov(ys, yps)
+            emgy = np.sqrt(np.linalg.det(covy))
+            beta_y = covy[0,0]/emgy
+            alpha_y = -covy[1,0]/emgy
         return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
         
     def peak_density(self):
@@ -553,6 +561,7 @@ class Beam():
         elif flip_positions:
             self.set_xs(-self.xs())
             self.set_ys(-self.ys())
+
         
     def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0):
         

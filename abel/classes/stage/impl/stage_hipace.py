@@ -19,15 +19,11 @@ class StageHipace(Stage):
     
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511):
         
-        super().__init__(length, nom_energy_gain, plasma_density)
+        super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
-        self.driver_source = driver_source
-        self.ramp_beta_mag = ramp_beta_mag
-        
+        # simulation specifics
         self.keep_data = keep_data
         self.output = output
-
-        # simulation specifics
         self.num_nodes = num_nodes
         self.num_cell_xy = num_cell_xy
 
@@ -167,13 +163,6 @@ class StageHipace(Stage):
         self.calculate_beam_current(beam0, driver0, beam, driver)
 
         return super().track(beam, savedepth, runnable, verbose)
-    
-    
-    def energy_usage(self):
-        return None # TODO
-    
-    def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy)*self.ramp_beta_mag
     
     
     def __extract_evolution(self, tmpfolder, beam0, runnable):

@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from matplotlib import patches
 from abel import Trackable, CONFIG
+from abel.utilities.plasma_physics import beta_matched
 import numpy as np
 import scipy.constants as SI
 from matplotlib import pyplot as plt
@@ -11,12 +12,14 @@ from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius
 class Stage(Trackable):
     
     @abstractmethod
-    def __init__(self, length, nom_energy_gain, plasma_density, driver_source=None):
-        
+    def __init__(self, length, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=1):
+
+        # common variables
         self.length = length
         self.nom_energy_gain = nom_energy_gain
         self.plasma_density = plasma_density
         self.driver_source = driver_source
+        self.ramp_beta_mag = ramp_beta_mag
         
         self.evolution = SimpleNamespace()
         
@@ -51,14 +54,17 @@ class Stage(Trackable):
     
     def get_nom_energy_gain(self):
         return self.nom_energy_gain
-    
-    @abstractmethod
+
     def matched_beta_function(self, energy):
-        pass
+        return beta_matched(self.plasma_density, energy)*self.ramp_beta_mag
+    
+    def energy_usage(self):
+        return self.driver_source.energy_usage()
     
     def energy_efficiency(self):
         return self.efficiency
 
+    
     def calculate_efficiency(self, beam0, driver0, beam, driver):
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
@@ -68,7 +74,6 @@ class Stage(Trackable):
         self.efficiency.wake_to_beam = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
         self.efficiency.driver_to_beam = self.efficiency.driver_to_wake*self.efficiency.wake_to_beam
 
-    
     def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
         
         dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
@@ -85,11 +90,6 @@ class Stage(Trackable):
             Is, ts = (driver + beam).current_profile(bins=tbins)
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
-
-    
-    @abstractmethod
-    def energy_usage(self):
-        pass
 
     
     def plot_evolution(self):
@@ -292,7 +292,6 @@ class Stage(Trackable):
             cb_electrons.set_ticklabels([])
             
             # plot beam electrons
-            #p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
             p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
             p_beam.set_clim(clims/1e6)
             cb_beam = plt.colorbar(p_beam, cax=cax1)

@@ -4,54 +4,58 @@ import time
 # generate trace space from geometric emittance and twiss parameters
 def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
 
-    gamma = (1 + alpha**2) / beta; # Twiss gamma
-    
-    sigx = np.sqrt(beta * epsilon); # rms beam size
-    sigxp = np.sqrt(gamma * epsilon); # rms divergence
-    rho = - alpha / np.sqrt(1 + alpha**2); # correlation
+    # calculate beam size, divergence and correlation
+    sigx = np.sqrt(epsilon * beta)
+    sigxp = np.sqrt(epsilon * (1 + alpha**2) / beta)
+    rho = - alpha / np.sqrt(1 + alpha**2)
 
-    if not symmetrize:
-        us = np.random.normal(size = N) # Gaussian random variable 1
-        vs = np.random.normal(size = N) # Gaussian random variable 2
+    # make underlying Gaussian variables
+    if symmetrize:
+        N_actual = round(N/2)
     else:
-        us = np.random.normal(size = round(N/4)) # Gaussian random variable 1
-        vs = np.random.normal(size = round(N/4)) # Gaussian random variable 2
-    
-    xs = sigx*us; # particle positions
-    xps = sigxp*us*rho + sigxp*vs*np.sqrt(1 - rho**2); # particle angles
+        N_actual = N
+    us = np.random.normal(size=N_actual)
+    vs = np.random.normal(size=N_actual)
+
+    # particle positions and angles
+    xs = sigx*us
+    xps = sigxp*us*rho + sigxp*vs*np.sqrt(1 - rho**2)
 
     if symmetrize:
-        xs = np.concatenate((xs, -xs, xs, -xs))
-        xps = np.concatenate((xps, xps, -xps, -xps))
+        xs = np.concatenate((xs, -xs))
+        xps = np.concatenate((xps, -xps))
     
     return xs, xps
 
 
-# generate trace space from geometric emittance and twiss parameters
+# generate trace space from geometric emittance and twiss parameters (2 planes)
 def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, L=0, symmetrize=False):
 
-    # Twiss gamma
-    gamma_x = (1 + alpha_x**2) / beta_x
-    gamma_y = (1 + alpha_y**2) / beta_y
-    
-    sigx = np.sqrt(beta_x * epsilon_x) # rms beam size
-    sigy = np.sqrt(beta_y * epsilon_y) # rms beam size
-    sigxp = np.sqrt(gamma_x * epsilon_x) # rms divergence
-    sigyp = np.sqrt(gamma_y * epsilon_y) # rms divergence
-    rho_x = - alpha_x / np.sqrt(1 + alpha_x**2) # correlation
-    rho_y = - alpha_y / np.sqrt(1 + alpha_y**2) # correlation
+    # calculate beam size, divergence and correlation
+    sigx = np.sqrt(epsilon_x * beta_x)
+    sigy = np.sqrt(epsilon_y * beta_y)
+    sigxp = np.sqrt(epsilon_x * (1 + alpha_x**2) / beta_x)
+    sigyp = np.sqrt(epsilon_y * (1 + alpha_y**2) / beta_y)
+    rho_x = - alpha_x / np.sqrt(1 + alpha_x**2)
+    rho_y = - alpha_y / np.sqrt(1 + alpha_y**2)
 
-    if not symmetrize:
-        us_x = np.random.normal(size = N) # Gaussian random variable 1
-        vs_x = np.random.normal(size = N) # Gaussian random variable 2
-        us_y = np.random.normal(size = N) # Gaussian random variable 1
-        vs_y = np.random.normal(size = N) # Gaussian random variable 2
+    # make underlying Gaussian variables
+    if symmetrize:
+        N_actual = round(N/4)
     else:
-        us_x = np.random.normal(size = round(N/4)) # Gaussian random variable 1
-        vs_x = np.random.normal(size = round(N/4)) # Gaussian random variable 2
-        us_y = np.random.normal(size = round(N/4)) # Gaussian random variable 1
-        vs_y = np.random.normal(size = round(N/4)) # Gaussian random variable 2
+        N_actual = N
+    us_x = np.random.normal(size=N_actual)
+    vs_x = np.random.normal(size=N_actual)
+    us_y = np.random.normal(size=N_actual)
+    vs_y = np.random.normal(size=N_actual)
 
+    # do symmetrization
+    if symmetrize:
+        us_x  = np.concatenate((us_x, -us_x, us_x, -us_x))
+        vs_x = np.concatenate((vs_x, -vs_x, vs_x, -vs_x))
+        us_y  = np.concatenate((us_y, us_y, -us_y, -us_y))
+        vs_y = np.concatenate((vs_y, vs_y, -vs_y, -vs_y))
+        
     # angular momentum correlations
     ratio = L/np.sqrt(epsilon_x*epsilon_y)
     rho_L = np.sqrt(1 + ratio**2)
@@ -63,13 +67,6 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
     # particle angles
     xps = (sigxp*us_x*rho_x + sigxp*vs_x*np.sqrt(1 - rho_x**2))*np.sqrt(rho_L)
     yps = (sigyp*us_y*rho_y + sigyp*vs_y*np.sqrt(1 - rho_y**2))*np.sqrt(rho_L)
-    
-    # complete the symmetrization
-    if symmetrize:
-        xs = np.concatenate((xs, -xs, xs, -xs))
-        xps = np.concatenate((xps, xps, -xps, -xps))
-        ys = np.concatenate((ys, -ys, ys, -ys))
-        yps = np.concatenate((yps, yps, -yps, -yps))
     
     return xs, xps, ys, yps
 
