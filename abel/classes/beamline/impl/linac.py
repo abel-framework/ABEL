@@ -331,7 +331,7 @@ class Linac(Beamline):
         axs[2,2].set_ylabel('Transverse offset (um)')
         
         plt.show()
-    
+        return fig
     
     
     # density plots
@@ -399,7 +399,7 @@ class Linac(Beamline):
 
     
     # animate the longitudinal phase space
-    def animate_lps(self, rel_energy_window=0.06):
+    def animate_lps(self, rel_energy_window=0.06, file_name=None):
         
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
@@ -523,7 +523,10 @@ class Linac(Beamline):
         plot_path = self.run_path() + 'plots/'
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
-        filename = plot_path + 'lps_shot' + str(self.shot) + '.gif'
+        if file_name is None:
+            filename = plot_path + 'lps_shot' + str(self.shot) + '.gif'
+        else:
+            filename = file_name + '.gif'
         animation.save(filename, writer="pillow", fps=10)
 
         # hide the figure

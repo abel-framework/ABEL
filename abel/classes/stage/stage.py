@@ -148,6 +148,7 @@ class Stage(Trackable):
         axs[1,1].set_xlim(long_limits)
         
         plt.show()
+        return fig
 
         
     def plot_wakefield(self):
