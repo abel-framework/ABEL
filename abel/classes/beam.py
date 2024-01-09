@@ -43,7 +43,7 @@ class Beam():
         del self[np.isnan(self).any(axis=1)]
         
     # set phase space
-    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None):
+    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None):
         
         # make empty phase space
         num_particles = len(xs)
@@ -77,7 +77,10 @@ class Beam():
         self.__phasespace[4,:] = uys
         
         # charge
-        self.__phasespace[6,:] = Q/num_particles
+        if weightings is None:
+            self.__phasespace[6,:] = Q/num_particles
+        else:
+            self.__phasespace[6,:] = (Q/num_particles)*weightings/np.sum(weightings)
         
         # ids
         self.__phasespace[7,:] = np.arange(num_particles)
@@ -731,7 +734,7 @@ class Beam():
         
         # make beam
         beam = Beam()
-        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs)
+        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
         
         # add metadata to beam
         try: 
