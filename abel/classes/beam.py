@@ -80,7 +80,7 @@ class Beam():
         if weightings is None:
             self.__phasespace[6,:] = Q/num_particles
         else:
-            self.__phasespace[6,:] = (Q/num_particles)*weightings/np.sum(weightings)
+            self.__phasespace[6,:] = Q*weightings/np.sum(weightings)
         
         # ids
         self.__phasespace[7,:] = np.arange(num_particles)
