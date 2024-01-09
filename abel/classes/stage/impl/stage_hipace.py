@@ -17,7 +17,7 @@ import read_insitu_diagnostics
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, test_particle_source=None):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -27,8 +27,8 @@ class StageHipace(Stage):
         self.num_nodes = num_nodes
         self.num_cell_xy = num_cell_xy
         self.driver_only = driver_only
-        self.plasma_density_from_file = plasma_density_from_file
-
+        self.test_particle_source = test_particle_source
+        
         # physics flags
         self.ion_motion = ion_motion
         self.ion_species = ion_species
@@ -81,16 +81,13 @@ class StageHipace(Stage):
         path_driver = tmpfolder + filename_driver
         driver0.save(filename = path_driver, beam_name = 'driver')
 
-        # make directory
-        if self.plasma_density_from_file is not None:
-            density_table_file = os.path.basename(self.plasma_density_from_file)
-            shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
-
-            self.length = self.get_length()
-            self.plasma_density = self.get_plasma_density()
-        else:
-            density_table_file = None
-        
+        if self.test_particle_source is not None:
+            test_particle0 = self.test_particle_source.track()
+            filename_test_particle = 'test_particle.h5'
+            path_test_particle = tmpfolder + filename_test_particle
+            test_particle0.save(filename = path_test_particle, beam_name = 'test_particle')
+        else: 
+            filename_test_particle = ''
         
         # MAKE INPUT FILE
         
@@ -135,7 +132,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, filename_test_particle=filename_test_particle)
         
         
         ## RUN SIMULATION
@@ -145,7 +142,7 @@ class StageHipace(Stage):
         hipace_write_jobscript(filename_job_script, filename_input, num_nodes=self.num_nodes)
         
         # run HiPACE++
-        beam, driver = hipace_run(filename_job_script, self.num_steps)
+        beam, driver, test_particle = hipace_run(filename_job_script, self.num_steps)
         if self.driver_only:
             beam = beam0
         
@@ -153,7 +150,9 @@ class StageHipace(Stage):
         # apply plasma-density down ramp (magnify beta function)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-
+        
+        if test_particle:
+            
         
         ## ADD METADATA
         
@@ -193,7 +192,7 @@ class StageHipace(Stage):
             # extract in-situ data
             all_data = read_insitu_diagnostics.read_file(insitu_file)
             average_data = all_data['average']
-            
+    
             # store variables
             self.evolution.location = beam0.location + all_data['time']*SI.c
             self.evolution.charge = read_insitu_diagnostics.total_charge(all_data)
@@ -358,21 +357,8 @@ class StageHipace(Stage):
                 beta_matched = np.sqrt(2*gamma)/k_p(self.plasma_density)
                 amplitudes[int(i/self.output)] = np.sqrt(np.mean(puz*((x**2)/beta_matched + (pux**2)*beta_matched)))
         self.__amplitude_evol = phase_advances, amplitudes
-
-    
-    def get_plasma_density(self):
-        if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ns = density_table[:,1]
-            self.plasma_density = ns.max()
-        return self.plasma_density
-
-    def get_length(self):
-        if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ss = density_table[:,0]
-            self.length = ss.max()-ss.min()
-        return self.length
+        
+        
     
     def get_amplitudes(self):
         if self.__amplitude_evol is None:
