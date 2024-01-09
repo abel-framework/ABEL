@@ -8,6 +8,8 @@ from abel.utilities.relativity import energy2proper_velocity, proper_velocity2en
 from abel.utilities.statistics import prct_clean, prct_clean2d
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
+from abel.physics_models.betatron_motion import evolve_betatron_motion
+
 from matplotlib import pyplot as plt
 
 class Beam():
@@ -563,7 +565,7 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False):
         
         # remove particles with subzero energy
         del self[self.Es() < 0]
@@ -571,19 +573,24 @@ class Beam():
         
         # determine initial and final Lorentz factor
         gamma0s = energy2gamma(self.Es())
-        gammas = energy2gamma(abs(self.Es()+deltaEs))
+        Es_final = self.Es()+deltaEs
+        gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
         # calculate final positions and angles after betatron motion
-        xs, uxs = evolve_hills_equation_analytic(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
-        ys, uys = evolve_hills_equation_analytic(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+        if radiation_reaction:
+            xs, uxs, ys, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.uxs(), self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+        else:
+            xs, uxs = evolve_hills_equation_analytic(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
+            ys, uys = evolve_hills_equation_analytic(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
         
         # set new beam positions and angles (shift back driver offsets)
         self.set_xs(xs+x0_driver)
         self.set_uxs(uxs)
         self.set_ys(ys+y0_driver)
         self.set_uys(uys)
-        
+
+        return Es_final
         
   
     ## SAVE AND LOAD BEAM

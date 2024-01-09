@@ -13,12 +13,13 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, transverse_instability=True):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, transverse_instability=False, radiation_reaction=False):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # physics flags
         self.transverse_instability = transverse_instability
+        self.radiation_reaction = radiation_reaction
     
         
     # track the particles through
@@ -129,7 +130,6 @@ class StageQuasistatic2d(Stage):
             # interpolate for each particle
             rbs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
             Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
-            #Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs*0-self.nom_energy_gain/self.length)
 
             # perform tracking
             beam, _, _, _, _, _ = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length, show_prog_bar=True)
@@ -140,10 +140,10 @@ class StageQuasistatic2d(Stage):
             delta_Es = self.length*(beam.Es() - beam0.Es())/dz
             
             # find driver offset (to shift the beam relative) and apply betatron motion
-            beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+            Es_final = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction)
             
             # accelerate beam (and remove nans)
-            beam.set_Es(beam0.Es() + delta_Es)
+            beam.set_Es(Es_final)
             
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length*(driver0.Es()-driver.Es())/dz

@@ -6,7 +6,7 @@ from abel import CONFIG, Beam
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=424, driver_only=False):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=424, driver_only=False, density_table_file=None):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -20,12 +20,21 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     else:
         plasma_components = 'plasma'
 
+    # driver-only mode
     if driver_only:
         beam_components = 'driver'
     else:
         beam_components = 'driver beam'
-        
     
+    # plasma-density profile from file
+    if density_table_file is not None:
+        density_comment1 = '#'
+        density_comment2 = ''
+    else:
+        density_comment1 = ''
+        density_comment2 = '#'
+        density_table_file = ''
+        
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
               'num_cell_y': int(num_cell_xy), 
@@ -43,6 +52,9 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'radiation_reaction': int(radiation_reaction),
               'beam_components': beam_components,
               'plasma_components': plasma_components,
+              'density_table_file': density_table_file,
+              'density_comment1': density_comment1,
+              'density_comment2': density_comment2,
               'ion_species': ion_species,
               'beam_ionization': int(beam_ionization),
               'filename_beam': filename_beam,

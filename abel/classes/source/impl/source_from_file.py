@@ -29,12 +29,8 @@ class SourceFromFile(Source):
         
         # make empty beam
         beam = Beam.load(self.file)
-
-
         self.energy = beam.energy()
         self.charge = beam.charge()
-
-        
         
         return super().track(beam, savedepth, runnable, verbose)
     
@@ -46,9 +42,15 @@ class SourceFromFile(Source):
             return self.length
     
     def get_charge(self):
+        if self.charge is None:
+            beam = Beam.load(self.file)
+            self.charge = beam.charge()
         return self.charge
     
     def get_energy(self):
+        if self.energy is None:
+            beam = Beam.load(self.file)
+            self.energy = beam.energy()
         return self.energy
     
     def energy_efficiency(self):

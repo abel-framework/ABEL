@@ -9,7 +9,7 @@ from matplotlib import ticker as mticker
 
 class Linac(Beamline):
     
-    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=0, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False):
+    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False):
         
         self.source = source
         self.stage = stage
@@ -41,7 +41,13 @@ class Linac(Beamline):
             assert(isinstance(self.last_stage, Stage))
         if self.last_interstage is not None:
             assert(isinstance(self.last_interstage, Interstage))
-        
+
+        # set default number of stages
+        if self.stage is not None:
+            self.num_stages = 1
+        else:
+            self.num_stages = 0
+            
         # prepare for multiplication of stages and interstages
         self.stages = [None]*self.num_stages
         self.interstages = [None]*max(0,self.num_stages-1)
