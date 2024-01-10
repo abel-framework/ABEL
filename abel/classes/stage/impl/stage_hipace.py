@@ -28,6 +28,7 @@ class StageHipace(Stage):
         self.num_cell_xy = num_cell_xy
         self.driver_only = driver_only
         self.test_particle_source = test_particle_source
+        self.test_particle_evolution = SimpleNamespace()
         
         # physics flags
         self.ion_motion = ion_motion
@@ -87,7 +88,7 @@ class StageHipace(Stage):
             path_test_particle = tmpfolder + filename_test_particle
             test_particle0.save(filename = path_test_particle, beam_name = 'test_particle')
         else: 
-            filename_test_particle = ''
+            filename_test_particle = 'empty.h5'
         
         # MAKE INPUT FILE
         
@@ -150,9 +151,10 @@ class StageHipace(Stage):
         # apply plasma-density down ramp (magnify beta function)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+
         
-        if test_particle:
-            
+        if self.test_particle_source is not None:
+            self.__extract_test_particle_evolution(tmpfolder, beam0)
         
         ## ADD METADATA
         
@@ -215,7 +217,39 @@ class StageHipace(Stage):
         if self.keep_data:
             destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number) + '/insitu'
             shutil.move(insitu_path, destination_path)
+            
+    def __extract_test_particle_evolution(self, tmpfolder, beam0):
+
+        insitu_path = tmpfolder + 'diags/insitu/'
         
+        if self.test_particle_source is not None:
+            
+            insitu_file = insitu_path + 'reduced_test_particle.*.txt'
+                
+            # extract in-situ data
+            all_data = read_insitu_diagnostics.read_file(insitu_file)
+            average_data = all_data['average']
+    
+            # store variables
+            self.test_particle_evolution.location = beam0.location + all_data['time']*SI.c
+            self.test_particle_evolution.charge = read_insitu_diagnostics.total_charge(all_data)
+            self.test_particle_evolution.energy = read_insitu_diagnostics.energy_mean_eV(all_data)
+            self.test_particle_evolution.z = average_data['[z]']
+            self.test_particle_evolution.x = average_data['[x]']
+            self.test_particle_evolution.y = average_data['[y]']
+            self.test_particle_evolution.xp = average_data['[ux]']/average_data['[uz]']
+            self.test_particle_evolution.yp = average_data['[uy]']/average_data['[uz]']
+            """
+            self.test_particle_evolution.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
+            self.test_particle_evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
+            self.test_particle_evolution.beam_size_x = read_insitu_diagnostics.position_std(average_data, direction='x')
+            self.test_particle_evolution.beam_size_y = read_insitu_diagnostics.position_std(average_data, direction='y')
+            self.test_particle_evolution.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
+            self.test_particle_evolution.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
+            self.test_particle_evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
+            """
+            # TODO: add angular momentum and normalized amplitude
+    
         
     def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
         
@@ -451,4 +485,52 @@ class StageHipace(Stage):
         
         E_z_rms = np.mean(Ez0[index_witness_tail:index_witness_head])
         return E_z_rms
-    
+        
+    def plot_test_particle_evolution(self):
+
+        # extract wakefield if not already existing
+        if not hasattr(self.test_particle_evolution, 'location'):
+            print('No evolution calculated')
+            return
+            
+        # preprate plot
+        fig = plt.figure()
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        gs = fig.add_gridspec(3,1)
+        ax1 = fig.add_subplot(gs[0,:])
+        ax2 = fig.add_subplot(gs[1,:])
+        ax3 = fig.add_subplot(gs[2,:])
+        ax1.grid()
+        ax2.grid()
+        ax3.grid()
+        
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        long_label = 'Location (m)'
+        long_limits = [min(self.test_particle_evolution.location), max(self.test_particle_evolution.location)]
+
+        # plot energy
+        ax1.plot(self.test_particle_evolution.location, self.test_particle_evolution.energy / 1e9, color=col1)
+        ax1.set_ylabel('Energy (GeV)')
+        ax1.set_xlim(long_limits)
+
+        # plot charge
+        ax2.plot(self.test_particle_evolution.location, -self.test_particle_evolution.charge[0] * np.ones(self.test_particle_evolution.location.shape) * 1e9, ':', color=col0)
+        ax2.plot(self.test_particle_evolution.location, -self.test_particle_evolution.charge * 1e9, color=col1)
+        ax2.set_ylabel('Charge (nC)')
+        ax2.set_xlim(long_limits)
+        
+
+        # plot transverse offset
+        ax3.plot(self.test_particle_evolution.location, np.zeros(self.test_particle_evolution.location.shape), ':', color=col0)
+        ax3.plot(self.test_particle_evolution.location, self.test_particle_evolution.y*1e6, color=col2)  
+        ax3.plot(self.test_particle_evolution.location, self.test_particle_evolution.x*1e6, color=col1)
+        ax3.set_ylabel('Transverse offset (um)')
+        ax3.set_xlabel(long_label)
+        ax3.set_xlim(long_limits)
+        
+        plt.show()
+        return fig

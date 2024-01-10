@@ -28,6 +28,7 @@ from .classes.beamline.impl.experiment import *
 from .classes.collider.collider import *
 
 from .classes.source.impl.source_basic import *
+from .classes.source.impl.source_single_particle import *
 from .classes.source.impl.source_trapezoid import *
 from .classes.source.impl.source_combiner import *
 from .classes.source.impl.source_from_file import *
