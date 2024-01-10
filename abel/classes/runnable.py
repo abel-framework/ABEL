@@ -51,7 +51,7 @@ class Runnable(ABC):
         
         # return final beam from first shot
         self.__dict__.update(self[0].__dict__)
-        return self.final_beam()
+        return self.final_beam
     
     
     # shot tracking function (to be repeated)
@@ -188,12 +188,14 @@ class Runnable(ABC):
         
     
     # initial beam
-    def initial_beam(self, shot=None):
-        return self.get_beam(0,shot)
+    @property
+    def initial_beam(self):
+        return self.get_beam(0)
     
     # final beam
-    def final_beam(self, shot=None):
-        return self.get_beam(-1,shot)
+    @property
+    def final_beam(self):
+        return self.get_beam(-1)
     
     
     ## SCAN FUNCTIONALITY

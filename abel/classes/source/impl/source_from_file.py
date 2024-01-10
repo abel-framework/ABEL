@@ -8,12 +8,16 @@ from abel.utilities.relativity import energy2gamma
 
 class SourceFromFile(Source):
     
-    def __init__(self, length=0, accel_gradient=None, file=None, wallplug_efficiency=1):
+    def __init__(self, length=0, accel_gradient=None, file=None, x_offset=0, y_offset=0, x_angle=0, y_angle=0, wallplug_efficiency=1):
         
         self.length = length # [m]
         self.accel_gradient = accel_gradient
         self.wallplug_efficiency = wallplug_efficiency
         self.file = file
+        self.x_offset = x_offset
+        self.y_offset = y_offset
+        self.x_angle = x_angle
+        self.y_angle = y_angle
         
         self.energy = None
         self.charge = None
@@ -31,6 +35,12 @@ class SourceFromFile(Source):
         beam = Beam.load(self.file)
         self.energy = beam.energy()
         self.charge = beam.charge()
+
+        # add offsets and angles
+        beam.set_xs(beam.xs()+self.x_offset)
+        beam.set_ys(beam.ys()+self.y_offset)
+        beam.set_xps(beam.xps()+self.x_angle)
+        beam.set_yps(beam.yps()+self.y_angle)
         
         return super().track(beam, savedepth, runnable, verbose)
     

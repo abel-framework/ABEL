@@ -33,8 +33,9 @@ class Experiment(Beamline):
     
     # density plots
     def plot_spectrometer_screen(self, xlims=None, ylims=None, E_calib = False, diverg = None, plot_m12 = False, savefig = None):
+        
         # load phase space
-        beam = self.final_beam()
+        beam = self.final_beam
 
         # make screen projection
         xbins, ybins = None, None
@@ -164,7 +165,7 @@ class Experiment(Beamline):
         Bs = np.zeros(len(shots))
         Es = np.zeros(len(shots))
         for id, shot in enumerate(shots):
-            beam = self[shot].final_beam()
+            beam = self[shot].final_beam
             xbins, ybins = None, None
             num_bins = round(np.sqrt(len(beam))/2)
             if xlims is not None:

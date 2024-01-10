@@ -343,7 +343,7 @@ class Beam():
 
     def norm_amplitude_x(self, n0=None, clean=False):
         xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
-        if n0 is None:
+        if n0 is not None:
             beta_x = beta_matched(n0, self.energy())
             alpha_x = 0
         else:
@@ -355,7 +355,7 @@ class Beam():
         
     def norm_amplitude_y(self, n0=None, clean=False):
         ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
-        if n0 is None:
+        if n0 is not None:
             beta_y = beta_matched(n0, self.energy())
             alpha_y = 0
         else:

@@ -1,8 +1,10 @@
 import os, subprocess, time
 import numpy as np
+import scipy.constants as SI
 from string import Template
 from pathlib import Path
 from abel import CONFIG, Beam
+from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
@@ -102,7 +104,8 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
         output = subprocess.check_output(cmd, shell=True)
         words = str(output).replace('\\n','').replace("'",'').split()
         jobid = int(words[3].strip())
-        print("Running job " + str(jobid))
+        #print("Running job " + str(jobid))
+        pbar = tqdm(total=int(num_steps), desc='Queueing HiPACE++ (job ' + str(jobid) + ')', unit='steps', leave=True)
     
     # progress loop
     while True:
@@ -118,20 +121,45 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
         if len(keywords) > 1:
             status = keywords[4]
             time_spent = keywords[5]
-            if status == 'PD':
-                print('>> Starting (' + time_spent + ')')
-            elif status == 'R':
-                print('>> Running (' + time_spent + ')')
-            elif status == 'CG':
-                print('>> Ending (' + time_spent + ')')
+            if status == 'PD': # starting
+                if not quiet:
+                    pbar.set_description('Starting HiPACE++ (job ' + str(jobid) + ')')
+                    pbar.update(0)
+            
+            elif status == 'R': # running
+                if not quiet:
+                    pbar.set_description('Running HiPACE++  (job ' + str(jobid) + ')')
+                    
+                # read progress from output file
+                outputfile = runfolder + 'hipace-' + str(jobid) + '.out'
+                if os.path.exists(outputfile) and not quiet:
+                    with open(outputfile, 'rb') as f:
+                        try:  # catch OSError in case of a one line file 
+                            f.seek(-2, os.SEEK_END)
+                            while f.read(1) != b'\n':
+                                f.seek(-2, os.SEEK_CUR)
+                        except OSError:
+                            f.seek(0)
+                        last_line = f.readline().decode()
+                    stepnum, position = 0, 0
+                    split_line = last_line.split(' step ', 1)
+                    if len(split_line) > 1:
+                        split_line2 = split_line[1].split(' at time = ', 1)
+                        stepnum = int(split_line2[0])
+                        position = float(split_line2[1].split(' with dt = ', 1)[0])*SI.c
+                    pbar.update(int(stepnum-pbar.n))
+                
+            elif status == 'CG': # closing
+                if not quiet:
+                    pbar.set_description('Finished HiPACE++ (job ' + str(jobid) + ')')
+                    pbar.update(int(num_steps-pbar.n))
+                    pbar.close()
                 break
         else:
-            print('>> Done!')
-            # the simulation is done
             break
-        
+
         # wait for some time
-        wait_time = 10 # [s]
+        wait_time = 3 # [s]
         time.sleep(wait_time)
     
     # when finished, load the beam and driver

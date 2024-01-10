@@ -43,10 +43,11 @@ class Linac(Beamline):
             assert(isinstance(self.last_interstage, Interstage))
 
         # set default number of stages
-        if self.stage is not None:
-            self.num_stages = 1
-        else:
-            self.num_stages = 0
+        if self.num_stages is None:
+            if self.stage is not None:
+                self.num_stages = 1
+            else:
+                self.num_stages = 0
             
         # prepare for multiplication of stages and interstages
         self.stages = [None]*self.num_stages
@@ -85,12 +86,18 @@ class Linac(Beamline):
                     self.trackables[2+2*i] = interstage_instance
                     self.interstages[i] = interstage_instance
             
+            # populate first/last stage properties
+            if self.first_stage is None:
+                self.first_stage = self.stages[0]
+            if self.last_stage is None:
+                self.last_stage = self.stages[-1]
+                    
         # add beam delivery system
         if self.bds is not None:
             if self.bds.nom_energy is None:
                 self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
             self.trackables[max(1,2*self.num_stages)] = self.bds
-        
+
     
     ## ENERGY CONSIDERATIONS
     
@@ -122,7 +129,7 @@ class Linac(Beamline):
         return Etot
     
     def energy_efficiency(self):
-        Etot_beam = self.final_beam().total_energy()
+        Etot_beam = self.final_beam.total_energy()
         return Etot_beam/self.energy_usage()
     
     
@@ -305,10 +312,11 @@ class Linac(Beamline):
         axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnys[0]*1e6, ':', color=col0)
         axs[0,2].plot(long_axis, emnxs*1e6, color=col1)
         axs[0,2].plot(long_axis, emnys*1e6, color=col2)
-        axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnxs+emnxs_error, np.flip(emnxs-emnxs_error))) * 1e6, color=col1, alpha=af)
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnys+emnys_error, np.flip(emnys-emnys_error))) * 1e6, color=col2, alpha=af)
-        axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
+        if Lzs.max() > (min(emnxs.min(), emnys.min()))*1e-2:
+            axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
+            axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
         axs[0,2].set_xlabel(long_label)
         axs[0,2].set_ylabel('Emittance, rms (mm mrad)')
         axs[0,2].set_yscale('log')
@@ -348,7 +356,7 @@ class Linac(Beamline):
                 shot = 0
         
         # calculate values
-        beam0 = self.initial_beam(shot=shot)
+        beam0 = self.get_beam(0,shot=shot)
         num_bins = int(np.sqrt(len(beam0)*2))
         nsig = 5
         tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
