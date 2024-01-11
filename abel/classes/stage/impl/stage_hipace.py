@@ -239,6 +239,7 @@ class StageHipace(Stage):
             self.test_particle_evolution.y = average_data['[y]']
             self.test_particle_evolution.xp = average_data['[ux]']/average_data['[uz]']
             self.test_particle_evolution.yp = average_data['[uy]']/average_data['[uz]']
+
             """
             self.test_particle_evolution.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
             self.test_particle_evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
@@ -505,6 +506,9 @@ class StageHipace(Stage):
         ax1.grid()
         ax2.grid()
         ax3.grid()
+        
+        ax1.set_xticks([])
+        ax2.set_xticks([])     
         
         col0 = "tab:gray"
         col1 = "tab:blue"
