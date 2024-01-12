@@ -17,22 +17,16 @@ rb_fit_obj: [m] interpolation object?
 stage_length: [m] float
     Length of the plasma stage.
 
-time_ste_mod: float
+time_step_mod: float
     Determines the time step of the instability tracking in units of beta_wave_length/c.
 
-get_centroids: bool
-    TODO
+show_prog_bar: bool
+    Flag for displaying the progress bar.
 
-s_slices: [m] 1D float array
-    Contains the propagation coordinate of each slice.
-
-z_slices: [m] 1D float array
-    Contains the co-moving coordinate of each slice.
     
-
 Returns
 ----------
-    beam_out, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table
+    beam_out
 
 
 Ben Chen, 5 October 2023, University of Oslo
@@ -41,15 +35,14 @@ Ben Chen, 5 October 2023, University of Oslo
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-#from abel.classes.stage.impl.stage_slice_transverse_wake_instability import particles2slices
-from abel.classes.beam import *
-#from abel.utilities.other import find_closest_value_in_arr
-from abel.utilities.relativity import energy2gamma
+
 from tqdm import tqdm
 import time
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
 
+from abel.classes.beam import *
+from abel.utilities.relativity import energy2gamma
 from abel.utilities.plasma_physics import k_p
 
 
@@ -151,7 +144,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 
 # ==================================================
-def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, get_centroids=False, s_slices=None, z_slices=None, show_prog_bar=True):
+def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, show_prog_bar=True):
     
     energies = beam.Es()
     xs = beam.xs()
@@ -189,31 +182,6 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     bubble_radius = rb_fit_obj(zs_sorted)
     
     skin_depth = 1/k_p(plasma_density)  # [m] 1/kp, plasma skin depth.
-
-    if get_centroids is True:  # TODO
-        if s_slices is None or z_slices is None:
-            raise ValueError('s_slices or z_slices are not defined.')
-        
-        # Record s_slices, x_slices and xp_slices at each time step in tables
-        s_slices = s_slices + prop_length
-        x_slices = particles2slices(beam=beam, beam_quant=beam.xs(), z_slices=z_slices, make_plot=False)
-        xp_slices = particles2slices(beam=beam, beam_quant=beam.xps(), z_slices=z_slices, make_plot=False)
-        y_slices = particles2slices(beam=beam, beam_quant=beam.ys(), z_slices=z_slices, make_plot=False)
-        yp_slices = particles2slices(beam=beam, beam_quant=beam.yps(), z_slices=z_slices, make_plot=False)
-        
-        #s_start = beam.location  # Set the current propagation distance.
-        #s_slices = z_slices + beam0.location
-        s_slices_table = s_slices  # [m]
-        x_slices_table = x_slices  # [m]
-        xp_slices_table = xp_slices  # [rad]
-        y_slices_table = y_slices  # [m]
-        yp_slices_table = yp_slices  # [rad]
-    else:
-        s_slices_table = None
-        x_slices_table = None
-        xp_slices_table = None
-        y_slices_table = None
-        yp_slices_table = None
     
     
     ############# Beam propagation through the plasma cell #############
@@ -282,7 +250,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         pxs_sorted = results[0]
         pys_sorted = results[1]
 
-        #Ez = -6.4e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. #############################################################################
+        #Ez = -6.4e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. # <-###################################################
         pzs_sorted = pzs_sorted - e*Ez*time_step  # Update longitudinal momenta.
         
         
@@ -325,24 +293,6 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
                              pys=pys_sorted,
                              pzs=pzs_sorted)
         
-
-        #============= Add some diagnostics =============
-        if get_centroids is True:  # TODO
-            # Record s_slices, x_slices and xp_slices at each time step in tables
-            s_slices = s_slices + prop_length
-            x_slices = particles2slices(beam=beam, beam_quant=beam.xs(), z_slices=z_slices, make_plot=False)
-            xp_slices = particles2slices(beam=beam, beam_quant=beam.xps(), z_slices=z_slices, make_plot=False)
-            y_slices = particles2slices(beam=beam, beam_quant=beam.ys(), z_slices=z_slices, make_plot=False)
-            yp_slices = particles2slices(beam=beam, beam_quant=beam.yps(), z_slices=z_slices, make_plot=False)
-            #energy_slices = particles2slices(beam=beam, beam_quant=beam.Es(), z_slices=z_slices, make_plot=False)
-            
-            s_slices_table = np.vstack((s_slices_table, s_slices))  # [m]
-            x_slices_table = np.vstack((x_slices_table, x_slices))  # [m]
-            xp_slices_table = np.vstack((xp_slices_table, xp_slices))  # [rad]
-            y_slices_table = np.vstack((y_slices_table, y_slices))  # [m]
-            yp_slices_table = np.vstack((yp_slices_table, yp_slices))  # [rad]
-        
-
         # Progress bar
         if show_prog_bar is True:
             pbar.update(prop_length/stage_length*100 - pbar.n)        
@@ -353,4 +303,4 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     if show_prog_bar is True:
         pbar.close()
     
-    return beam_out, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table
+    return beam_out

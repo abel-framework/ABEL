@@ -186,47 +186,29 @@ class StageSlicesTransWakeInstability(Stage):
         # Define a Wake-T stage
         stage_wakeT = StageWakeT()
         stage_wakeT.driver_source = self.driver_source
-        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0,self.drive_beam.gamma()/2))
+        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, self.drive_beam.gamma()/2))
         lambda_betatron = (2*np.pi/k_beta)
         stage_wakeT.length = lambda_betatron/10  # [m]
         stage_wakeT.plasma_density = plasma_density  # [m^-3]
-        stage_wakeT.box_min_z = beam0.zs().min() - 7 * beam0.bunch_length()
-        stage_wakeT.box_max_z = np.mean(self.drive_beam.zs()) + 5 * self.drive_beam.bunch_length()
-        stage_wakeT.opmd_diag = True  # Set to True for saving simulation results.
-        stage_wakeT.diag_dir = self.diag_path + 'wake_t'
         
         # Run the Wake-T stage
         beam_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 to avoid changes on beam0.
         beam_wakeT = stage_wakeT.track(beam_copy)
         
         # Read the Wake-T simulation data
-        path_sep = os.sep
-        path = stage_wakeT.diag_dir + path_sep + 'hdf5'
-        ts = OpenPMDTimeSeries(path)
-        time = ts.t[0]  # Extract first time step dump.
-
-        # Extract longitudinal E-field
-        Ez_wakeT, info_Ez = ts.get_field(field='E', coord='z', iteration=0, plot=False)
-        zs_Ez_wakeT = info_Ez.z
-        rs_Ez = info_Ez.r
-        # Extract axial longitudinal E-field
-        Ez_axis_wakeT = Ez_wakeT[round(len(info_Ez.r)/2),:]
+        Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.zs
+        rho = stage_wakeT.initial.plasma.density.rho*-e
+        plasma_num_density = stage_wakeT.initial.plasma.density.rho/stage_wakeT.plasma_density
+        info_rho = stage_wakeT.initial.plasma.density.metadata
+        zs_rho = info_rho.z
+        rs_rho = info_rho.r
 
         # Cut out axial Ez over the ROI
         Ez, _ = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, xi_slices, beam0)
         self.Ez_roi = Ez
         self.Ez_axial = Ez_axis_wakeT
         self.zs_Ez_axial = zs_Ez_wakeT
-        
-        # Extract plasma charge density
-        rho, info_rho = ts.get_field(field='rho', iteration=0, plot=False)
-        
-        # Calculate the number density
-        plasma_num_density = rho/stage_wakeT.plasma_density/-e
-        
-        # Extract coordinates
-        zs_rho = info_rho.z
-        rs_rho = info_rho.r
         
         # Extract the plasma bubble radius
         bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, threshold=0.8)

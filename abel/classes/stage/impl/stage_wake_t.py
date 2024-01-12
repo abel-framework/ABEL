@@ -10,13 +10,15 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 class StageWakeT(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, num_cell_xy=256):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, num_cell_xy=256, keep_data=False):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source)
         
+        #self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
         self.num_cell_xy = num_cell_xy
-    
+        self.keep_data = keep_data
+
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
@@ -40,12 +42,13 @@ class StageWakeT(Stage):
         
         # make longitudinal box range
         num_sigmas = 6
-        box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+        #box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+        box_min_z = driver0.z_offset() - 2.8 * blowout_radius(self.plasma_density, driver0.peak_current())
         box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_r = np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
+        box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, driver0.peak_current())])
         
         # calculate number of cells in x to get similar resolution
         dr = box_size_r/self.num_cell_xy
@@ -93,6 +96,7 @@ class StageWakeT(Stage):
 
     
     def __extract_evolution(self, bunches):
+    #def __extract_evolution(self, tmpfolder, bunches, runnable):
 
         # get beam
         beam_evol = wake_t.diagnostics.analyze_bunch_list(bunches[1])
@@ -116,6 +120,12 @@ class StageWakeT(Stage):
         self.evolution.beta_x = beam_evol['beta_x']
         self.evolution.beta_y = beam_evol['beta_y']
 
+        # delete or move data
+        #if self.keep_data:
+        #    shot_path = runnable.shot_path()  # TODO: this does not work yet
+        #    destination_path = runnable.shot_path() + 'stage_' + str(bunches[1].stage_number) + '/insitu'
+        #    shutil.move(tmpfolder, destination_path)
+
     
     def __extract_initial_and_final_step(self, tmpfolder):
         
@@ -124,19 +134,60 @@ class StageWakeT(Stage):
         ts = OpenPMDTimeSeries(source_path)
 
         # extract initial on-axis wakefield
-        Ez0, metadata0 = ts.get_field(field='E', coord='z', slice_across=['r'], iteration=min(ts.iterations))
-        self.initial.plasma.wakefield.onaxis.zs = metadata0.z
+        Ez0, metadata0_Ez = ts.get_field(field='E', coord='z', slice_across=['r'], iteration=min(ts.iterations))
+        self.initial.plasma.wakefield.onaxis.zs = metadata0_Ez.z
         self.initial.plasma.wakefield.onaxis.Ezs = Ez0
         
         # extract final on-axis wakefield
-        Ez, metadata = ts.get_field(field='E', coord='z', slice_across=['r'], iteration=max(ts.iterations))
-        self.final.plasma.wakefield.onaxis.zs = metadata.z
+        Ez, metadata_Ez = ts.get_field(field='E', coord='z', slice_across=['r'], iteration=max(ts.iterations))
+        self.final.plasma.wakefield.onaxis.zs = metadata_Ez.z
         self.final.plasma.wakefield.onaxis.Ezs = Ez
+
+        # extract initial fields
+        Ez0, metadata0_Ez = ts.get_field(field='E', coord='z', iteration=min(ts.iterations), plot=False)
+        self.initial.plasma.wakefield.Ezs = Ez0
+        self.initial.plasma.wakefield.Ezs_metadata = metadata0_Ez
+        Ex0, metadata0_Ex = ts.get_field(field='E', coord='x', iteration=min(ts.iterations), plot=False)
+        self.initial.plasma.wakefield.Exs = Ex0
+        self.initial.plasma.wakefield.Exs_metadata = metadata0_Ex
+        Bx0, metadata0_Bx = ts.get_field(field='B', coord='x', iteration=min(ts.iterations), plot=False)
+        self.initial.plasma.wakefield.Bxs = Bx0
+        self.initial.plasma.wakefield.Bxs_metadata = metadata0_Bx
+        Ey0, metadata0_Ey = ts.get_field(field='E', coord='y', iteration=min(ts.iterations), plot=False)
+        self.initial.plasma.wakefield.Eys = Ey0
+        self.initial.plasma.wakefield.Ey_metadata = metadata0_Ey
+        By0, metadata0_By = ts.get_field(field='B', coord='y', iteration=min(ts.iterations), plot=False)
+        self.initial.plasma.wakefield.Bys = By0
+        self.initial.plasma.wakefield.Bys_metadata = metadata0_By
+
+        # extract final fields
+        Ez, metadata_Ez = ts.get_field(field='E', coord='z', iteration=max(ts.iterations), plot=False)
+        self.final.plasma.wakefield.Ezs = Ez
+        self.final.plasma.wakefield.Ezs_metadata = metadata_Ez
+        Ex, metadata_Ex = ts.get_field(field='E', coord='x', iteration=max(ts.iterations), plot=False)
+        self.final.plasma.wakefield.Exs = Ex
+        self.final.plasma.wakefield.Exs_metadata = metadata_Ex
+        Bx, metadata_Bx = ts.get_field(field='B', coord='x', iteration=max(ts.iterations), plot=False)
+        self.final.plasma.wakefield.Bxs = Bx
+        self.final.plasma.wakefield.Bxs_metadata = metadata_Bx
+        Ey, metadata_Ey = ts.get_field(field='E', coord='y', iteration=max(ts.iterations), plot=False)
+        self.final.plasma.wakefield.Eys = Ey
+        self.final.plasma.wakefield.Eys_metadata = metadata_Ey
+        By, metadata_By = ts.get_field(field='B', coord='y', iteration=max(ts.iterations), plot=False)
+        self.final.plasma.wakefield.Bys = By
+        self.final.plasma.wakefield.Bys_metadata = metadata_By
         
         # extract initial plasma density
         rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
         self.initial.plasma.density.extent = metadata0_plasma.imshow_extent
         self.initial.plasma.density.rho = -(rho0_plasma/SI.e)
+        self.initial.plasma.density.metadata = metadata0_plasma
+
+        # extract final plasma density
+        rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=max(ts.iterations))
+        self.final.plasma.density.extent = metadata_plasma.imshow_extent
+        self.final.plasma.density.rho = -(rho_plasma/SI.e)
+        self.final.plasma.density.metadata = metadata_plasma
         
         # extract initial beam density
         data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
@@ -152,11 +203,6 @@ class StageWakeT(Stage):
         self.initial.beam.density.extent = metadata0_plasma.imshow_extent
         self.initial.beam.density.rho = (jz0_beam+jz0_driver)/(dr0*dr0*dz0)
 
-        # extract final plasma density
-        rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=max(ts.iterations))
-        self.final.plasma.density.extent = metadata_plasma.imshow_extent
-        self.final.plasma.density.rho = -(rho_plasma/SI.e)
-
         # extract final beam density
         data_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=max(ts.iterations))
         data_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=max(ts.iterations))
@@ -171,6 +217,9 @@ class StageWakeT(Stage):
         self.final.beam.density.extent = metadata_plasma.imshow_extent
         self.final.beam.density.rho = (jz_beam+jz_driver)/(dr*dr*dz)
         
+        
+    def energy_usage(self):
+        return None # TODO
     
     def matched_beta_function(self, energy):
         return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
