@@ -8,7 +8,7 @@ from abel.utilities.relativity import energy2gamma
 
 class SourceBasic(Source):
     
-    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
+    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
         self.energy = energy
         self.charge = charge
         self.rel_energy_spread = rel_energy_spread # [eV]
@@ -17,6 +17,8 @@ class SourceBasic(Source):
         self.z_offset = z_offset # [m]
         self.x_offset = x_offset # [m]
         self.y_offset = y_offset # [m]
+        self.x_angle = x_angle # [rad]
+        self.y_angle = y_angle # [rad]
         self.num_particles = num_particles
         self.emit_nx = emit_nx # [m rad]
         self.emit_ny = emit_ny # [m rad]
@@ -33,6 +35,8 @@ class SourceBasic(Source):
         self.jitter = SimpleNamespace()
         self.jitter.x = 0
         self.jitter.y = 0
+        self.jitter.xp = 0
+        self.jitter.yp = 0
         self.jitter.z = 0
         self.jitter.t = 0
         
@@ -53,6 +57,12 @@ class SourceBasic(Source):
         y0 = np.random.normal(scale=self.jitter.y) + self.y_offset
         xs += x0
         ys += y0
+
+        # add transverse jitters and offsets
+        xp0 = np.random.normal(scale=self.jitter.xp) + self.x_angle
+        yp0 = np.random.normal(scale=self.jitter.yp) + self.y_angle
+        xps += xp0
+        yps += yp0
         
         # generate relative/absolute energy spreads
         if self.rel_energy_spread is not None:
