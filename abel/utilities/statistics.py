@@ -2,15 +2,18 @@ import numpy as np
 
 # remove the extreme percentiles
 def clean_mask(values, enable=True, cut_percentile=5):
-    if clean and x.size > 0:
-        return np.logical_and(x > np.percentile(x, cut_percentile), x < np.percentile(x, 100-cut_percentile))
+    if enable and values.size > 0:
+        return np.logical_and(values > np.percentile(values, cut_percentile), values < np.percentile(values, 100-cut_percentile))
     else:
-        return np.full(x.shape, True)
+        return np.full(values.shape, True)
 
 def prct_clean(x, enable=True, cut_percentile=5):
-    return x[clean_mask[x], enable=enable, cut_percentile=cut_percentile]
+    #return x[clean_mask[x], enable=enable, cut_percentile=cut_percentile]
+    mask = clean_mask(x, enable=enable, cut_percentile=cut_percentile)
+    return x[mask]
+    
 
-def prct_clean2d(xs, xs, enable=True, cut_percentile=5):
+def prct_clean2d(xs, ys, enable=True, cut_percentile=5):
     mask_x = clean_mask(xs, enable=enable, cut_percentile=cut_percentile/2)
     mask_y = clean_mask(ys, enable=enable, cut_percentile=cut_percentile/2)
     mask = np.logical_and(mask_x, mask_y)
