@@ -238,7 +238,7 @@ class Beam():
         return weighted_mean(self.gammas(), self.weightings(), clean)
     
     def total_energy(self):
-        return abs(np.nansum(self.qs()*self.Es()))  # Is this correct? Shouldn't it be self.weightings() instead of self.qs()?
+        return SI.e * np.nansum(self.weightings()*self.Es())
     
     def energy_spread(self, clean=False):
         return weighted_std(self.Es(), self.weightings(), clean)
@@ -320,11 +320,11 @@ class Beam():
         return covy[1,1]/np.sqrt(np.linalg.det(covy))
 
     def intrinsic_emittance(self):
-        covxy = np.cov(self.norm_transverse_vector(), aweights=abs(self.weightings()))
+        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
         return np.sqrt(np.sqrt(np.linalg.det(covxy)))
 
     def angular_momentum(self):
-        covxy = np.cov(self.norm_transverse_vector(), aweights=abs(self.weightings()))
+        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
         det_covxy_cross = np.linalg.det(covxy[2:4,0:2])
         return np.sign(covxy[3,0]-covxy[2,1])*np.sqrt(np.abs(det_covxy_cross))
 
