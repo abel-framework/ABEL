@@ -88,8 +88,8 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
     # Calculate the wakefield on each macroparticle
     wakefields = np.zeros(len(zs_sorted))
     
-    for idx_particle in range(len(zs_sorted)-2, -1, -1):
-        wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
+    #for idx_particle in range(len(zs_sorted)-2, -1, -1):
+    #    wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
 
     # Calculate the total transverse force on macroparticles
     tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
@@ -250,7 +250,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         pxs_sorted = results[0]
         pys_sorted = results[1]
 
-        #Ez = -6.4e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. # <-###################################################
+        #Ez = -3.2e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. # <-###################################################
         pzs_sorted = pzs_sorted - e*Ez*time_step  # Update longitudinal momenta.
         
         

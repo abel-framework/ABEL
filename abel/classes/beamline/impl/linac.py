@@ -278,35 +278,35 @@ class Linac(Beamline):
         axs[0,0].plot(long_axis, Es / 1e9, color=col1)
         axs[0,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Es+Es_error, np.flip(Es-Es_error))) / 1e9, color=col1, alpha=af)
         axs[0,0].set_xlabel(long_label)
-        axs[0,0].set_ylabel('Energy (GeV)')
+        axs[0,0].set_ylabel('Energy [GeV]')
         
         axs[1,0].plot(long_axis, sigdeltas * 100, color=col1)
         axs[1,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigdeltas+sigdeltas_error, np.flip(sigdeltas-sigdeltas_error))) * 100, color=col1, alpha=af)
         axs[1,0].set_xlabel(long_label)
-        axs[1,0].set_ylabel('Energy spread (%)')
+        axs[1,0].set_ylabel('Energy spread [%]')
         axs[1,0].set_yscale('log')
         
         axs[2,0].plot(long_axis, np.zeros(deltas.shape), ':', color=col0)
         axs[2,0].plot(long_axis, deltas * 100, color=col1)
         axs[2,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((deltas+deltas_error, np.flip(deltas-deltas_error))) * 100, color=col1, alpha=af)
         axs[2,0].set_xlabel(long_label)
-        axs[2,0].set_ylabel('Energy offset (%)')
+        axs[2,0].set_ylabel('Energy offset [%]')
 
         axs[0,1].plot(long_axis, Q0 * np.ones(Qs.shape) * 1e9, ':', color=col0)
         axs[0,1].plot(long_axis, Qs * 1e9, color=col1)
         axs[0,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
         axs[0,1].set_xlabel(long_label)
-        axs[0,1].set_ylabel('Charge (nC)')
+        axs[0,1].set_ylabel('Charge [nC]')
         
         axs[1,1].plot(long_axis, sigzs*1e6, color=col1)
         axs[1,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigzs+sigzs_error, np.flip(sigzs-sigzs_error))) * 1e6, color=col1, alpha=af)
         axs[1,1].set_xlabel(long_label)
-        axs[1,1].set_ylabel('Bunch length (um)')
+        axs[1,1].set_ylabel('Bunch length [$\mathrm{\mu}$m]')
         
         axs[2,1].plot(long_axis, z0s*1e6, color=col1)
         axs[2,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((z0s+z0s_error, np.flip(z0s-z0s_error))) * 1e6, color=col1, alpha=af)
         axs[2,1].set_xlabel(long_label)
-        axs[2,1].set_ylabel('Longitudinal offset (um)')
+        axs[2,1].set_ylabel('Longitudinal offset [$\mathrm{\mu}$m]')
         
         axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnxs[0]*1e6, ':', color=col0)
         axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnys[0]*1e6, ':', color=col0)
@@ -318,7 +318,7 @@ class Linac(Beamline):
             axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
             axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
         axs[0,2].set_xlabel(long_label)
-        axs[0,2].set_ylabel('Emittance, rms (mm mrad)')
+        axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_yscale('log')
         
         #axs[1,2].plot(long_axis, np.sqrt(Es_nom/Es_nom[0])*betaxs[0]*1e3, ':', color=col0)
@@ -327,7 +327,7 @@ class Linac(Beamline):
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigxs+sigxs_error, np.flip(sigxs-sigxs_error))) * 1e6, color=col1, alpha=af)
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigys+sigys_error, np.flip(sigys-sigys_error))) * 1e6, color=col2, alpha=af)
         axs[1,2].set_xlabel(long_label)
-        axs[1,2].set_ylabel('Beam size, rms (um)')
+        axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
         axs[1,2].set_yscale('log')
         
         axs[2,2].plot(long_axis, np.zeros(x0s.shape), ':', color=col0)
@@ -336,7 +336,7 @@ class Linac(Beamline):
         axs[2,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((x0s+x0s_error, np.flip(x0s-x0s_error))) * 1e6, color=col1, alpha=af)
         axs[2,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((y0s+y0s_error, np.flip(y0s-y0s_error))) * 1e6, color=col2, alpha=af)
         axs[2,2].set_xlabel(long_label)
-        axs[2,2].set_ylabel('Transverse offset (um)')
+        axs[2,2].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
         
         plt.show()
     
@@ -376,8 +376,8 @@ class Linac(Beamline):
         ts = bins[0]
         c0 = axs[0].pcolor(trackable_numbers, ts*SI.c*1e6, -Is/1e3, cmap=CONFIG.default_cmap, shading='auto')
         cbar0 = fig.colorbar(c0, ax=axs[0])
-        axs[0].set_ylabel('Longitudinal position (um)')
-        cbar0.ax.set_ylabel('Beam current (kA)')
+        axs[0].set_ylabel('Longitudinal position [$\mathrm{\mu}$m]')
+        cbar0.ax.set_ylabel('Beam current [kA]')
         axs[0].set_title('Shot ' + str(shot+1))
         
         # energy profile
@@ -385,23 +385,23 @@ class Linac(Beamline):
         deltas = bins[1]
         c1 = axs[1].pcolor(trackable_numbers, deltas*1e2, -dQddeltas*1e7, cmap=CONFIG.default_cmap, shading='auto')
         cbar1 = fig.colorbar(c1, ax=axs[1])
-        axs[1].set_ylabel('Energy offset (%)')
-        cbar1.ax.set_ylabel('Spectral density (nC/%)')
+        axs[1].set_ylabel('Energy offset [%]')
+        cbar1.ax.set_ylabel('Spectral density [nC/%]')
         
         densityX = waterfalls[2]
         xs = bins[2]
         c2 = axs[2].pcolor(trackable_numbers, xs*1e6, -densityX*1e3, cmap=CONFIG.default_cmap, shading='auto')
         cbar2 = fig.colorbar(c2, ax=axs[2])
-        axs[2].set_ylabel('Horizontal position (um)')
-        cbar2.ax.set_ylabel('Charge density (nC/um)')
+        axs[2].set_ylabel('Horizontal position [$\mathrm{\mu}$m]')
+        cbar2.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$m]')
         
         densityY = waterfalls[3]
         ys = bins[3]
         c3 = axs[3].pcolor(trackable_numbers, ys*1e6, -densityY*1e3, cmap=CONFIG.default_cmap, shading='auto')
         cbar3 = fig.colorbar(c3, ax=axs[3])
         axs[3].set_xlabel('Trackable element number')
-        axs[3].set_ylabel('Vertical position (um)')
-        cbar3.ax.set_ylabel('Charge density (nC/um)')
+        axs[3].set_ylabel('Vertical position [$\mathrm{\mu}$m]')
+        cbar3.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$m]')
         
         plt.show()
 
@@ -452,8 +452,8 @@ class Linac(Beamline):
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
             axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
-            axs[0,0].set_xlabel('Position in linac (m)')
-            axs[0,0].set_ylabel('Mean energy (GeV)')
+            axs[0,0].set_xlabel('Position in linac [m]')
+            axs[0,0].set_ylabel('Mean energy [GeV]')
             axs[0,0].set_xlim(beam_init.location,beam_final.location)
             axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
             axs[0,0].xaxis.tick_top()
@@ -467,8 +467,8 @@ class Linac(Beamline):
             axs[0,1].plot(sigzs[-1]*1e6, sigdeltas[-1]*1e2, 'o', color=col1)
             axs[0,1].set_ylim(min([min(sigdeltas)*0.8e2, 1e-1]), max([max(sigdeltas)*1.2e2, 10]))
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, sigzs[0]*0.7e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.3e6]))
-            axs[0,1].set_xlabel('Bunch length (um)')
-            axs[0,1].set_ylabel('Energy spread (%)')
+            axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Energy spread [%]')
             axs[0,1].set_yscale('log')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
@@ -480,7 +480,7 @@ class Linac(Beamline):
             Ebins = Es_nom[i]*np.linspace(1-rel_energy_window, 1+rel_energy_window, 2*Es0.size)
             dQdzdE, zs, Es = beam.phase_space_density(beam.zs, beam.Es, hbins=zs0, vbins=Ebins)
             cax = axs[1,0].pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto', clim=[0, abs(dQdzdE).max()*1e15])
-            axs[1,0].set_ylabel('Energy (GeV)')
+            axs[1,0].set_ylabel('Energy [GeV]')
             axs[1,0].set_title('Longitudinal phase space')
             
             # plot current profile
@@ -491,8 +491,8 @@ class Linac(Beamline):
             axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
             axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
-            axs[2,0].set_xlabel('z (um)')
-            axs[2,0].set_ylabel('I (kA)')
+            axs[2,0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$I$ [kA]')
             
             # plot energy spectrum
             dQdE, Es2 = beam.energy_spectrum(bins=Ebins)
@@ -502,11 +502,11 @@ class Linac(Beamline):
             axs[1,1].plot(-dQdE*1e18, deltas2*100)
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
-            axs[1,1].set_ylabel('Rel. energy (%)')
+            axs[1,1].set_ylabel('Rel. energy [%]')
             axs[1,1].set_ylim([-rel_energy_window*100, rel_energy_window*100])
             axs[1,1].set_xlim([0, max(-dQdE)*1.1e18])
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel('dQ/dE (nC/GeV)')
+            axs[1,1].set_xlabel('dQ/dE [nC/GeV]')
             
             # plot E and z centroid evolution
             z0s.append(beam.z_offset())
@@ -516,8 +516,8 @@ class Linac(Beamline):
             axs[2,1].plot(z0s[-1]*1e6, deltas[-1]*100, 'o', color=col1)
             axs[2,1].set_ylim([-rel_energy_window*0.5e2, rel_energy_window*0.5e2])
             axs[2,1].set_xlim([(z0s[0]-sigzs[0]/2)*1e6, (z0s[0]+sigzs[0]/2)*1e6])
-            axs[2,1].set_xlabel('z offset (um)')
-            axs[2,1].set_ylabel('Energy offset (%)')
+            axs[2,1].set_xlabel('$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel('Energy offset [%]')
             axs[2,1].yaxis.tick_right()
             axs[2,1].yaxis.set_label_position('right')
 
@@ -587,8 +587,8 @@ class Linac(Beamline):
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(emitns)*1e6, '-', color=col0)
             axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
-            axs[0,0].set_xlabel('Position in linac (m)')
-            axs[0,0].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,0].set_xlabel('Position in linac [m]')
+            axs[0,0].set_ylabel('Norm. emittance\n[mm mrad]')
             axs[0,0].set_xlim(beam_init.location,beam_final.location)
             axs[0,0].set_ylim(beam_init.norm_emittance_x()*0.5e6,beam_final.norm_emittance_x()*2e6)
             axs[0,0].set_yscale('log')
@@ -606,8 +606,8 @@ class Linac(Beamline):
             axs[0,1].set_xlim(min([min(sigxs)*0.9e6, beam_final.beam_size_x()*0.8e6]), max([max(sigxs)*1.1e6, sigxs[0]*1.2e6]))
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
-            axs[0,1].set_xlabel('Beam size (um)')
-            axs[0,1].set_ylabel('Divergence (mrad)')
+            axs[0,1].set_xlabel('Beam size [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Divergence [mrad]')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
             axs[0,1].xaxis.tick_top()
@@ -619,7 +619,7 @@ class Linac(Beamline):
             dQdxdpx, xs, pxs = beam.phase_space_density(beam.xs, beam.pxs, hbins=xs0, vbins=pxs_final)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(xs*1e6, pxs*1e-6*SI.c/SI.e, -dQdxdpx, cmap=CONFIG.default_cmap, shading='auto')
-            axs[1,0].set_ylabel("Momentum, $p_x$ (MeV/c)")
+            axs[1,0].set_ylabel("Momentum, $p_x$ [MeV/c]")
             axs[1,0].set_title('Horizontal phase space')
             
             # plot position projection
@@ -630,8 +630,8 @@ class Linac(Beamline):
             axs[2,0].plot(xs2*1e6, -dQdx*1e3, color=col1)
             axs[2,0].set_xlim([min(xs0)*1e6, max(xs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-dQdx0), max(-dQdx_final)])*1.2e3])
-            axs[2,0].set_xlabel('Transverse position, $x$ (um)')
-            axs[2,0].set_ylabel('$dQ/dy$ (nC/um)')
+            axs[2,0].set_xlabel('Transverse position, $x$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$dQ/dy$ [nC/$\mathrm{\mu}$m]')
             
             # plot angular projection
             dQdpx, pxs2 = beam.projected_density(beam.pxs, bins=pxs_final)
@@ -652,8 +652,8 @@ class Linac(Beamline):
             axs[2,1].cla()
             axs[2,1].plot(np.array(x0s)*1e6, np.array(xp0s)*1e6, '-', color=col0)
             axs[2,1].plot(x0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
-            axs[2,1].set_xlabel('Centroid offset (um)')
-            axs[2,1].set_ylabel('Centroid angle (urad)')
+            axs[2,1].set_xlabel('Centroid offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel('Centroid angle [$\mathrm{\mu}$rad]')
             axs[2,1].set_xlim(min(-max(x0s)*1.1,-0.1*sigxs[0])*1e6, max(max(x0s)*1.1,0.1*sigxs[0])*1e6)
             axs[2,1].set_ylim(min(-max(xp0s)*1.1,-0.1*sigxps[0])*1e6, max(max(xp0s)*1.1,0.1*sigxps[0])*1e6)
             axs[2,1].yaxis.tick_right()
@@ -725,8 +725,8 @@ class Linac(Beamline):
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(emitns)*1e6, '-', color=col0)
             axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
-            axs[0,0].set_xlabel('Position in linac (m)')
-            axs[0,0].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,0].set_xlabel('Position in linac [m]')
+            axs[0,0].set_ylabel('Norm. emittance\n[mm mrad]')
             axs[0,0].set_xlim(beam_init.location,beam_final.location)
             axs[0,0].set_ylim(beam_init.norm_emittance_y()*0.5e6,beam_final.norm_emittance_y()*2e6)
             axs[0,0].set_yscale('log')
@@ -744,8 +744,8 @@ class Linac(Beamline):
             axs[0,1].set_xlim(min([min(sigys)*0.9e6, beam_final.beam_size_y()*0.8e6]), max([max(sigys)*1.1e6, sigys[0]*1.2e6]))
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
-            axs[0,1].set_xlabel('Beam size (um)')
-            axs[0,1].set_ylabel('Divergence (mrad)')
+            axs[0,1].set_xlabel('Beam size [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Divergence [mrad]')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
             axs[0,1].xaxis.tick_top()
@@ -757,7 +757,7 @@ class Linac(Beamline):
             dQdydpy, ys, pys = beam.phase_space_density(beam.ys, beam.pys, hbins=ys0, vbins=pys_final)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(ys*1e6, pys*1e-6*SI.c/SI.e, -dQdydpy, cmap=CONFIG.default_cmap, shading='auto')
-            axs[1,0].set_ylabel("Momentum, $p_y$ (MeV/c)")
+            axs[1,0].set_ylabel("Momentum, $p_y$ [MeV/c]")
             axs[1,0].set_title('Vertical phase space')
             
             # plot position projection
@@ -768,8 +768,8 @@ class Linac(Beamline):
             axs[2,0].plot(ys2*1e6, -dQdy*1e3, color=col1)
             axs[2,0].set_xlim([min(ys0)*1e6, max(ys0)*1e6])
             axs[2,0].set_ylim([0, max([max(-dQdy0), max(-dQdy_final)])*1.2e3])
-            axs[2,0].set_xlabel('Transverse position, $y$ (um)')
-            axs[2,0].set_ylabel('$dQ/dy$ (nC/um)')
+            axs[2,0].set_xlabel('Transverse position, $y$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$dQ/dy$ [nC/$\mathrm{\mu}$m]')
             
             # plot angular projection
             dQdpy, pys2 = beam.projected_density(beam.pys, bins=pys_final)
@@ -781,8 +781,8 @@ class Linac(Beamline):
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel("$dQ/dp_y$ (nC c/MeV)")
-            axs[1,1].set_ylabel("Momentum, $p_y$ (MeV/c)")
+            axs[1,1].set_xlabel("$dQ/dp_y$ [nC c/MeV]")
+            axs[1,1].set_ylabel("Momentum, $p_y$ [MeV/c]")
             
             # plot centroid evolution
             y0s.append(beam.y_offset())
@@ -790,8 +790,8 @@ class Linac(Beamline):
             axs[2,1].cla()
             axs[2,1].plot(np.array(y0s)*1e6, np.array(yp0s)*1e6, '-', color=col0)
             axs[2,1].plot(y0s[-1]*1e6, yp0s[-1]*1e6, 'o', color=col1)
-            axs[2,1].set_xlabel('Centroid offset (um)')
-            axs[2,1].set_ylabel('Centroid angle (urad)')
+            axs[2,1].set_xlabel('Centroid offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel('Centroid angle [$\mathrm{\mu}$rad]')
             axs[2,1].set_xlim(min(-max(y0s)*1.1,-0.1*sigys[0])*1e6, max(max(y0s)*1.1,0.1*sigys[0])*1e6)
             axs[2,1].set_ylim(min(-max(yp0s)*1.1,-0.1*sigyps[0])*1e6, max(max(yp0s)*1.1,0.1*sigyps[0])*1e6)
             axs[2,1].yaxis.tick_right()
@@ -860,8 +860,8 @@ class Linac(Beamline):
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
             axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
-            axs[0,0].set_xlabel('Position in linac (m)')
-            axs[0,0].set_ylabel('Mean energy (GeV)')
+            axs[0,0].set_xlabel('Position in linac [m]')
+            axs[0,0].set_ylabel('Mean energy [GeV]')
             axs[0,0].set_xlim(beam_init.location,beam_final.location)
             axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
             axs[0,0].xaxis.tick_top()
@@ -877,8 +877,8 @@ class Linac(Beamline):
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, beam_final.bunch_length()*0.8e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.2e6]))
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
-            axs[0,1].set_xlabel('Bunch length (um)')
-            axs[0,1].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Norm. emittance\n[mm mrad]')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
             axs[0,1].xaxis.tick_top()
@@ -890,7 +890,7 @@ class Linac(Beamline):
             dQdzdx, zs, xs = beam.phase_space_density(beam.zs, beam.xs, hbins=zs0, vbins=xs0)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(zs*1e6, xs*1e6, -dQdzdx, cmap=CONFIG.default_cmap, shading='auto')
-            axs[1,0].set_ylabel("Transverse offset, $x$ (um)")
+            axs[1,0].set_ylabel("Transverse offset, $x$ [$\mathrm{\mu}$m]")
             axs[1,0].set_title('Horizontal sideview (top view)')
 
             # plot current profile
@@ -901,8 +901,8 @@ class Linac(Beamline):
             axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
             axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
-            axs[2,0].set_xlabel('z (um)')
-            axs[2,0].set_ylabel('I (kA)')
+            axs[2,0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$I$ [kA]')
             
             # plot position projection
             dQdx, xs2 = beam.projected_density(beam.xs, bins=xs0)
@@ -914,8 +914,8 @@ class Linac(Beamline):
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel("$dQ/dx$ (nC/um)")
-            axs[1,1].set_ylabel("$x$ (um)")
+            axs[1,1].set_xlabel("$dQ/dx$ [nC/$\mathrm{\mu}$m]")
+            axs[1,1].set_ylabel("$x$ [$\mathrm{\mu}$m]")
             
             # plot centroid evolution
             z0s.append(beam.z_offset())
@@ -924,8 +924,8 @@ class Linac(Beamline):
             axs[2,1].cla()
             axs[2,1].plot(np.array(z0s)*1e6, np.array(x0s)*1e6, '-', color=col0)
             axs[2,1].plot(z0s[-1]*1e6, x0s[-1]*1e6, 'o', color=col1)
-            axs[2,1].set_xlabel('z offset (um)')
-            axs[2,1].set_ylabel('x offset (um)')
+            axs[2,1].set_xlabel('$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel('$x$ offset [$\mathrm{\mu}$m]')
             axs[2,1].set_xlim(min([min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, max([max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
             axs[2,1].set_ylim(min(-max(x0s)*1.1,-0.1*sigxs[0])*1e6, max(max(x0s)*1.1,0.1*sigxs[0])*1e6)
             axs[2,1].yaxis.tick_right()
@@ -995,8 +995,8 @@ class Linac(Beamline):
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
             axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
-            axs[0,0].set_xlabel('Position in linac (m)')
-            axs[0,0].set_ylabel('Mean energy (GeV)')
+            axs[0,0].set_xlabel('Position in linac [m]')
+            axs[0,0].set_ylabel('Mean energy [GeV]')
             axs[0,0].set_xlim(beam_init.location,beam_final.location)
             axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
             axs[0,0].xaxis.tick_top()
@@ -1012,8 +1012,8 @@ class Linac(Beamline):
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, beam_final.bunch_length()*0.8e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.2e6]))
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
-            axs[0,1].set_xlabel('Bunch length (um)')
-            axs[0,1].set_ylabel('Norm. emittance\n(mm mrad)')
+            axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Norm. emittance\n[mm mrad]')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
             axs[0,1].xaxis.tick_top()
@@ -1025,7 +1025,7 @@ class Linac(Beamline):
             dQdzdy, zs, ys = beam.phase_space_density(beam.zs, beam.ys, hbins=zs0, vbins=ys0)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(zs*1e6, ys*1e6, -dQdzdy, cmap=CONFIG.default_cmap, shading='auto')
-            axs[1,0].set_ylabel("Transverse offset, $y$ (um)")
+            axs[1,0].set_ylabel("Transverse offset, $y$ [$\mathrm{\mu}$m]")
             axs[1,0].set_title('Vertical sideview')
 
             # plot current profile
@@ -1036,8 +1036,8 @@ class Linac(Beamline):
             axs[2,0].plot(ts*SI.c*1e6, -Is/1e3, color=col1)
             axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
-            axs[2,0].set_xlabel('z (um)')
-            axs[2,0].set_ylabel('I (kA)')
+            axs[2,0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$I$ [kA]')
             
             # plot position projection
             dQdy, ys2 = beam.projected_density(beam.ys, bins=ys0)
@@ -1049,8 +1049,8 @@ class Linac(Beamline):
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel("$dQ/dy$ (nC/um)")
-            axs[1,1].set_ylabel("$y$ (um)")
+            axs[1,1].set_xlabel("$dQ/dy$ [nC/$\mathrm{\mu}$m]")
+            axs[1,1].set_ylabel("$y$ [$\mathrm{\mu}$m]")
             
             # plot centroid evolution
             z0s.append(beam.z_offset())
@@ -1059,8 +1059,8 @@ class Linac(Beamline):
             axs[2,1].cla()
             axs[2,1].plot(np.array(z0s)*1e6, np.array(y0s)*1e6, '-', color=col0)
             axs[2,1].plot(z0s[-1]*1e6, y0s[-1]*1e6, 'o', color=col1)
-            axs[2,1].set_xlabel('z offset (um)')
-            axs[2,1].set_ylabel('y offset (um)')
+            axs[2,1].set_xlabel('$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel('y offset [$\mathrm{\mu}$m]')
             axs[2,1].set_xlim(min([min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, max([max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
             axs[2,1].set_ylim(min(-max(y0s)*1.1,-0.1*sigys[0])*1e6, max(max(y0s)*1.1,0.1*sigys[0])*1e6)
             axs[2,1].yaxis.tick_right()

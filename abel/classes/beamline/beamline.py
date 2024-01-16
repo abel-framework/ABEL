@@ -57,7 +57,7 @@ class Beamline(Trackable, Runnable):
         fig, ax = plt.subplots()
         fig.set_figwidth(20)
         fig.set_figheight(1)
-        ax.set_xlabel('s (m)')
+        ax.set_xlabel('s [m]')
         ax.set_yticks([])
         ax.set_yticklabels([])
         ax.set_xlim(-1, self.get_length()+1)

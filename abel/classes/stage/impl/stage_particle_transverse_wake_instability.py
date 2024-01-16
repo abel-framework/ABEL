@@ -210,9 +210,9 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # Actually same as Ez_shift_fit. Consider making just one function instead... 
 
         # Save quantities to the stage
-        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam, beam0=beam0)
         self.Ez_fit_obj = Ez_fit
         self.rb_fit_obj = rb_fit
+        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam, beam0=beam0)
         
         self.Ez_roi = Ez
         #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
@@ -227,7 +227,8 @@ class StagePrtclTransWakeInstability(Stage):
         
 
         # ========== Instability tracking ==========
-        inputs = [beam0, plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, z_slices]
+        beam_filtered = self.bubble_filter(copy.deepcopy(beam0))
+        inputs = [beam_filtered, plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
@@ -239,8 +240,8 @@ class StagePrtclTransWakeInstability(Stage):
             
             with joblib_progress('Tracking x and y in parallel:', 2):
                 results = Parallel(n_jobs=2)([
-                    delayed(twoD_transverse_wake_instability_particles)(beam0, beam0.xs(), beam0.pxs(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None),
-                    delayed(twoD_transverse_wake_instability_particles)(beam0, beam0.ys(), beam0.pys(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
+                    delayed(twoD_transverse_wake_instability_particles)(beam_filtered, beam_filtered.xs(), beam_filtered.pxs(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None),
+                    delayed(twoD_transverse_wake_instability_particles)(beam_filtered, beam_filtered.ys(), beam_filtered.pys(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
                 ])
                 time.sleep(0.1) # hack to allow printing progress
             
@@ -260,7 +261,7 @@ class StagePrtclTransWakeInstability(Stage):
                                  pzs=pzs_sorted)
             
         else:
-            beam = transverse_wake_instability_particles(beam0, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, show_prog_bar=self.show_prog_bar)
+            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, show_prog_bar=self.show_prog_bar)
         
 
         # ========== Shift the main beam back to the original coordinate system ==========
@@ -324,6 +325,55 @@ class StagePrtclTransWakeInstability(Stage):
         
         # ========== Save initial beam currents ==========
         self.calculate_beam_current(beam0, driver0)
+
+
+    # ==================================================
+    # Filter out particles that collide into bubble
+    def bubble_filter(self, beam):
+        xs = beam.xs()
+        ys = beam.ys()
+        zs = beam.zs()
+        pxs = beam.pxs()
+        pys = beam.pys()
+        pzs = beam.pzs()
+        weights = beam.weightings()
+    
+        # Sort the arrays based on zs
+        indices = np.argsort(zs)
+        zs_sorted = zs[indices]
+        xs_sorted = xs[indices]
+        ys_sorted = ys[indices]
+        pxs_sorted = pxs[indices]
+        pys_sorted = pys[indices]
+        pzs_sorted = pzs[indices]
+        weights_sorted = weights[indices]
+
+        # Calculate rb based on interpolation of rb vs z
+        rb_fit_obj = self.rb_fit_obj
+        bubble_radius = rb_fit_obj(zs_sorted)
+
+        # Apply the filter
+        bool_indices = (np.sqrt(xs_sorted**2 + ys_sorted**2) - bubble_radius <= 0)
+        zs_sorted = zs_sorted[bool_indices]
+        xs_sorted = xs_sorted[bool_indices]
+        ys_sorted = ys_sorted[bool_indices]
+        pxs_sorted = pxs_sorted[bool_indices]
+        pys_sorted = pys_sorted[bool_indices]
+        pzs_sorted = pzs_sorted[bool_indices]
+        weights_sorted = weights_sorted[bool_indices]
+
+        # Initialise ABEL Beam object
+        beam_out = Beam()
+        
+        # Set the phase space of the ABEL beam
+        beam_out.set_phase_space(Q=np.sum(weights_sorted)*-e,
+                             xs=xs_sorted,
+                             ys=ys_sorted,
+                             zs=zs_sorted, 
+                             pxs=pxs_sorted,  # Always use single particle momenta?
+                             pys=pys_sorted,
+                             pzs=pzs_sorted)
+        return beam_out
 
     
     # ==================================================
@@ -775,15 +825,15 @@ class StagePrtclTransWakeInstability(Stage):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs_Ez*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs_Ez.shape)/1e9, ':', color=col0)
         axs[0].plot(zs_Ez*1e6, Ezs/1e9, '-', color=col1)
-        axs[0].set_xlabel('z (um)')
-        axs[0].set_ylabel('Longitudinal electric field (GV/m)')
+        axs[0].set_xlabel('z [$\mathrm{\mu}$m]')
+        axs[0].set_ylabel('Longitudinal electric field [GV/m]')
         axs[0].set_xlim(zlims)
         axs[0].set_ylim(bottom=1.05*min(Ezs)/1e9, top=1.3*max(Ezs)/1e9)
         
         axs[1].fill(np.concatenate((zs0, np.flip(zs0)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
         axs[1].plot(zs0*1e6, -Is/1e3, '-', color=col1)
-        axs[1].set_xlabel('z (um)')
-        axs[1].set_ylabel('Beam current (kA)')
+        axs[1].set_xlabel('z [$\mathrm{\mu}$m]')
+        axs[1].set_ylabel('Beam current [kA]')
         axs[1].set_xlim(zlims)
         axs[1].set_ylim(bottom=0, top=1.2*max(-Is)/1e3)
         axs[1].set_xlim(zlims)
@@ -792,8 +842,8 @@ class StagePrtclTransWakeInstability(Stage):
         if includeWakeRadius:
             axs[2].fill(np.concatenate((zs_rho, np.flip(zs_rho)))*1e6, np.concatenate((bubble_radius, np.ones(zs_rho.shape)))*1e6, color=col2, alpha=af)
             axs[2].plot(zs_rho*1e6, bubble_radius*1e6, '-', color=col2)
-            axs[2].set_xlabel('z (um)')
-            axs[2].set_ylabel('Plasma-wake radius (um)')
+            axs[2].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2].set_ylabel('Plasma-wake radius [$\mathrm{\mu}$m]')
             axs[2].set_xlim(zlims)
             axs[2].set_ylim(bottom=0, top=max(bubble_radius*1.2)*1e6)
         
@@ -846,7 +896,7 @@ class StagePrtclTransWakeInstability(Stage):
             zlims = [min(zs0)*1e6, max(zs0)*1e6]
             ax2 = ax1.twinx()
             ax2.plot(zs0*1e6, Ezs0/1e9, color='black')
-            ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
+            ax2.set_ylabel(r'$E_{z}$' ' [GV/m]')
             ax2.set_xlim(zlims)
             ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
             axpos = ax1.get_position()
@@ -868,14 +918,14 @@ class StagePrtclTransWakeInstability(Stage):
             # plot beam electrons
             charge_density_plot0 = ax1.imshow(rho0_beam/1e6, extent=data_struct.beam.density.extent*1e6, norm=LogNorm(), origin='lower', cmap=CONFIG.default_cmap, alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
             cb2 = plt.colorbar(charge_density_plot0, cax = cax2)
-            cb2.set_label(label=r'Electron density ' + r'$\mathrm{cm^{-3}}$',size=10)
+            cb2.set_label(label=r'Electron density ' + r'[$\mathrm{cm^{-3}}$]',size=10)
             cb2.ax.tick_params(axis='y',which='both', direction='in')
             charge_density_plot0.set_clim(clims/1e6)
     
             # set labels
             if i==(num_plots-1):
-                ax1.set_xlabel('z (um)')
-            ax1.set_ylabel('x (um)')
+                ax1.set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            ax1.set_ylabel('$x$ [$\mathrm{\mu}$ m]')
             ax1.set_title(title)
             ax1.grid(False)
             ax2.grid(False)

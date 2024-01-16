@@ -106,36 +106,36 @@ class Stage(Trackable):
         col0 = "tab:gray"
         col1 = "tab:blue"
         col2 = "tab:orange"
-        long_label = 'Location (m)'
+        long_label = 'Location [m]'
         long_limits = [min(self.evolution.location), max(self.evolution.location)]
 
         # plot energy
         axs[0,0].plot(self.evolution.location, self.evolution.energy / 1e9, color=col1)
-        axs[0,0].set_ylabel('Energy (GeV)')
+        axs[0,0].set_ylabel('Energy [GeV]')
         axs[0,0].set_xlim(long_limits)
 
         # plot charge
         axs[0,1].plot(self.evolution.location, -self.evolution.charge[0] * np.ones(self.evolution.location.shape) * 1e9, ':', color=col0)
         axs[0,1].plot(self.evolution.location, -self.evolution.charge * 1e9, color=col1)
-        axs[0,1].set_ylabel('Charge (nC)')
+        axs[0,1].set_ylabel('Charge [nC]')
         axs[0,1].set_xlim(long_limits)
         
         # plot normalized emittance
         axs[0,2].plot(self.evolution.location, self.evolution.emit_ny*1e6, color=col2)
         axs[0,2].plot(self.evolution.location, self.evolution.emit_nx*1e6, color=col1)
-        axs[0,2].set_ylabel('Emittance, rms (mm mrad)')
+        axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_xlim(long_limits)
         
         # plot energy spread
         axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)
-        axs[1,0].set_ylabel('Energy spread, rms (%)')
+        axs[1,0].set_ylabel('Energy spread, rms [%]')
         axs[1,0].set_xlabel(long_label)
         axs[1,0].set_xlim(long_limits)
         
         # plot beam size
         axs[1,2].plot(self.evolution.location, self.evolution.beam_size_y*1e6, color=col2)
         axs[1,2].plot(self.evolution.location, self.evolution.beam_size_x*1e6, color=col1)
-        axs[1,2].set_ylabel('Beam size, rms (um)')
+        axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
         axs[1,2].set_xlabel(long_label)
         axs[1,2].set_xlim(long_limits)
 
@@ -143,7 +143,7 @@ class Stage(Trackable):
         axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)
         axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)  
         axs[1,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
-        axs[1,1].set_ylabel('Transverse offset (um)')
+        axs[1,1].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
         axs[1,1].set_xlabel(long_label)
         axs[1,1].set_xlim(long_limits)
         
@@ -197,8 +197,8 @@ class Stage(Trackable):
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
         axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
-        axs[0].set_xlabel('z (um)')
-        axs[0].set_ylabel('Longitudinal electric field (GV/m)')
+        axs[0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+        axs[0].set_ylabel('Longitudinal electric field [GV/m]')
         zlims = [min(zs0)*1e6, max(zs0)*1e6]
         axs[0].set_xlim(zlims)
         axs[0].set_ylim(bottom=-1.7*np.max([np.abs(Ez_beam), Ez_driver])/1e9, top=1.3*Ez_driver/1e9)
@@ -206,8 +206,8 @@ class Stage(Trackable):
         # plot beam current
         axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
         axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
-        axs[1].set_xlabel('z (um)')
-        axs[1].set_ylabel('Beam current (kA)')
+        axs[1].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+        axs[1].set_ylabel('Beam current [kA]')
         axs[1].set_xlim(zlims)
         axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
 
@@ -265,7 +265,7 @@ class Stage(Trackable):
             # plot on-axis wakefield and axes
             ax2 = ax1.twinx()
             ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
-            ax2.set_ylabel(r'$E_{z}$' ' (GV/m)')
+            ax2.set_ylabel(r'$E_{z}$' ' [GV/m]')
             ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
             axpos = ax1.get_position()
             pad_fraction = 0.13  # Fraction of the figure width to use as padding between the ax and colorbar
@@ -281,7 +281,7 @@ class Stage(Trackable):
             p_ions = ax1.imshow(-rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Greens', alpha=np.array(-rho0_plasma>clims.min(), dtype=float))
             p_ions.set_clim(clims/1e6)
             cb_ions = plt.colorbar(p_ions, cax=cax3)
-            cb_ions.set_label(label=r'Beam/plasma-electron/ion density $\mathrm{cm^{-3}}$', size=10)
+            cb_ions.set_label(label=r'Beam/plasma-electron/ion density [$\mathrm{cm^{-3}}$]', size=10)
             cb_ions.ax.tick_params(axis='y',which='both', direction='in')
             
             # plot plasma electrons
@@ -300,8 +300,8 @@ class Stage(Trackable):
             
             # set labels
             if i==(num_plots-1):
-                ax1.set_xlabel('z (um)')
-            ax1.set_ylabel('x (um)')
+                ax1.set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            ax1.set_ylabel('$x$ [$\mathrm{\mu}$m]')
             ax1.set_title(title)
             ax1.grid(False)
             ax2.grid(False)

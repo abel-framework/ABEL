@@ -69,6 +69,12 @@ class StageWakeT(Stage):
         # save evolution of the beam and driver
         self.__extract_evolution(bunches)
         self.__extract_initial_and_final_step(tmpfolder)
+
+        # delete or move data
+        #if self.keep_data:
+        #    shot_path = runnable.shot_path()  # TODO: this does not work yet
+        #    destination_path = runnable.shot_path() + 'stage_' + str(bunches[1].stage_number) + '/insitu'
+        #    shutil.move(tmpfolder, destination_path)
         
         # remove temporary directory
         shutil.rmtree(tmpfolder)
@@ -119,12 +125,6 @@ class StageWakeT(Stage):
         self.evolution.emit_ny = beam_evol['emitt_y']
         self.evolution.beta_x = beam_evol['beta_x']
         self.evolution.beta_y = beam_evol['beta_y']
-
-        # delete or move data
-        #if self.keep_data:
-        #    shot_path = runnable.shot_path()  # TODO: this does not work yet
-        #    destination_path = runnable.shot_path() + 'stage_' + str(bunches[1].stage_number) + '/insitu'
-        #    shutil.move(tmpfolder, destination_path)
 
     
     def __extract_initial_and_final_step(self, tmpfolder):
