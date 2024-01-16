@@ -68,6 +68,8 @@ class Linac(Beamline):
                     stage_instance = self.first_stage
                 elif i == (self.num_stages-1) and self.last_stage is not None:
                     stage_instance = self.last_stage
+                elif i == 0:
+                    stage_instance = self.stage
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 self.trackables[1+2*i] = stage_instance
