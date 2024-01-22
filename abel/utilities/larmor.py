@@ -27,7 +27,7 @@ def mean_larmor_formula(s, n0, gammas, rx, ry):
     kp = pp.k_p(n0)
     k_beta = kp/np.sqrt(2*gammas)
     const = SI.e**2 * SI.c / 12 / np.pi / SI.epsilon_0
-    P = 1/SI.c * const * np.power(gammas,4) * np.power(k_beta,4) * rx**2 + ry**2) # [J/m]
+    P = 1/SI.c * const * np.power(gammas,4) * np.power(k_beta,4) * (rx**2 + ry**2) # [J/m]
 
     return s, P
 
