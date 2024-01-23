@@ -17,22 +17,16 @@ rb_fit_obj: [m] interpolation object?
 stage_length: [m] float
     Length of the plasma stage.
 
-time_ste_mod: float
+time_step_mod: float
     Determines the time step of the instability tracking in units of beta_wave_length/c.
 
-get_centroids: bool
-    TODO
+show_prog_bar: bool
+    Flag for displaying the progress bar.
 
-s_slices: [m] 1D float array
-    Contains the propagation coordinate of each slice.
-
-z_slices: [m] 1D float array
-    Contains the co-moving coordinate of each slice.
     
-
 Returns
 ----------
-    beam_out, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table
+    beam_out
 
 
 Ben Chen, 5 October 2023, University of Oslo
@@ -41,15 +35,15 @@ Ben Chen, 5 October 2023, University of Oslo
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-#from abel.classes.stage.impl.stage_slice_transverse_wake_instability import particles2slices
-from abel.classes.beam import *
-#from abel.utilities.other import find_closest_value_in_arr
-from abel.utilities.relativity import energy2gamma
+
 from tqdm import tqdm
 import time
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
 
+from abel.classes.beam import *
+#from abel.utilities.relativity import energy2gamma
+from abel.utilities.relativity import momentum2gamma
 from abel.utilities.plasma_physics import k_p
 
 
@@ -107,6 +101,41 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 
 # ==================================================
+# Single pass integration of (Stupakov's wake function)
+def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, enable_rr=True):
+    
+    a = bubble_radius + 0.75*skin_depth
+    dzs = np.diff(zs_sorted)
+
+    # Calculate the derivative of the wakefield (Stupakov's wake function)
+    temp = np.flip(2 / (np.pi * eps0 * a**4) * -e * weights_sorted * offsets)
+    temp[0] = 0
+    dwakefields_dz = np.cumsum(temp)  # Cumulative sum from 1st to last element.
+    dwakefields_dz = np.flip(dwakefields_dz)
+    
+    # Calculate the wakefield on each macroparticle
+    wakefields = np.zeros(len(zs_sorted))
+    
+    for idx_particle in range(len(zs_sorted)-2, -1, -1):
+        wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
+
+    # Calculate the total transverse force on macroparticles
+    tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
+    
+    # Update momenta
+    if enable_rr:
+        # Backward differentiation option (implicit method)
+        denominators = 1 + c*1.87863e-15 * time_step * (1/skin_depth)**2/2 * (1+(1/skin_depth)**2/2*gammas*tot_offsets_sqr)
+        tr_momenta = (tr_momenta + tr_force*time_step)/denominators
+        
+        # Forward differentiation option (direct method)
+        #tr_momenta = tr_momenta + tr_force*time_step - c*1.87863e-15*(1/skin_depth)**2/2*tr_momenta*(1+(1/skin_depth)**2/2*gammas*tot_offsets_sqr)*time_step
+    else:
+        tr_momenta = tr_momenta + tr_force*time_step
+    return tr_momenta
+
+
+# ==================================================
 #def doffset_dt(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta, Ez, pzs_sorted):
 #    tr_force = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
 #    for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macroparticles
@@ -151,7 +180,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 
 # ==================================================
-def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, get_centroids=False, s_slices=None, z_slices=None, show_prog_bar=True):
+def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, enable_rr=True, show_prog_bar=True):
     
     energies = beam.Es()
     xs = beam.xs()
@@ -162,7 +191,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     pzs = beam.pzs()
     weights = beam.weightings()
 
-    # Sort the arrays based on zs
+    # Sort the arrays based on zs  TODO: find a way to skip this step when it has already been sorted.
     indices = np.argsort(zs)
     zs_sorted = zs[indices]
     xs_sorted = xs[indices]
@@ -174,7 +203,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     weights_sorted = weights[indices]
 
     # Filter out particles that have too small energies
-    bool_indices = (energs_sorted > 7.0*m_e*c**2/e)  # Corresponds to 0.99c.
+    bool_indices = (energs_sorted > 7.0*m_e*c**2/e)  # Corresponds to 0.99c.  TODO: do this using pzs_sorted instead.
     zs_sorted = zs_sorted[bool_indices]
     xs_sorted = xs_sorted[bool_indices]
     ys_sorted = ys_sorted[bool_indices]
@@ -189,35 +218,15 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     bubble_radius = rb_fit_obj(zs_sorted)
     
     skin_depth = 1/k_p(plasma_density)  # [m] 1/kp, plasma skin depth.
-
-    if get_centroids is True:  # TODO
-        if s_slices is None or z_slices is None:
-            raise ValueError('s_slices or z_slices are not defined.')
-        
-        # Record s_slices, x_slices and xp_slices at each time step in tables
-        s_slices = s_slices + prop_length
-        x_slices = particles2slices(beam=beam, beam_quant=beam.xs(), z_slices=z_slices, make_plot=False)
-        xp_slices = particles2slices(beam=beam, beam_quant=beam.xps(), z_slices=z_slices, make_plot=False)
-        y_slices = particles2slices(beam=beam, beam_quant=beam.ys(), z_slices=z_slices, make_plot=False)
-        yp_slices = particles2slices(beam=beam, beam_quant=beam.yps(), z_slices=z_slices, make_plot=False)
-        
-        #s_start = beam.location  # Set the current propagation distance.
-        #s_slices = z_slices + beam0.location
-        s_slices_table = s_slices  # [m]
-        x_slices_table = x_slices  # [m]
-        xp_slices_table = xp_slices  # [rad]
-        y_slices_table = y_slices  # [m]
-        yp_slices_table = yp_slices  # [rad]
-    else:
-        s_slices_table = None
-        x_slices_table = None
-        xp_slices_table = None
-        y_slices_table = None
-        yp_slices_table = None
+    #gammas = energy2gamma(energies)  # Initial Lorentz factor for each particle.
+    #beta_func = c/e*np.sqrt(2* np.mean(gammas) *eps0*m_e/plasma_density)  # [m] matched beta function.
+    beta_func = c/e*np.sqrt(2* beam.gamma() *eps0*m_e/plasma_density)  # [m] matched beta function.
+    beta_wave_length = 2*np.pi*beta_func  # [m] betatron wavelength.
+    time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
     
     
     ############# Beam propagation through the plasma cell #############
-    time_step_count = 0.0
+    #time_step_count = 0.0
     prop_length = 0.0
 
     # Progress bar
@@ -258,39 +267,44 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         
         
         # ============= Drift of beam =============
-        gammas = energy2gamma(energies)  # Initial Lorentz factor for each particle.
-        beta_func = c/e*np.sqrt(2* np.mean(gammas) *eps0*m_e/plasma_density)  # [m] matched beta function.
-        beta_wave_length = 2*np.pi*beta_func  # [m] betatron wavelength.
-        time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
-
         # Leapfrog
-        time_step_count = time_step_count + 1/2
+        #time_step_count = time_step_count + 1/2
         prop_length = prop_length + 1/2*c*time_step
         xs_sorted = xs_sorted + pxs_sorted/pzs_sorted*1/2*c*time_step
         ys_sorted = ys_sorted + pys_sorted/pzs_sorted*1/2*c*time_step
 
         
         # ============= Integrate the wake function =============
+        gammas = momentum2gamma(pzs_sorted)  # Lorentz factor for each particle.
+        tot_offsets_sqr = xs_sorted**2 + ys_sorted**2
+        
         # Parallel tracking
         results = Parallel(n_jobs=2)([
             #delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
             #delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
-            delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
-            delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
+            #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
+            #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
+            delayed(calc_tr_momenta)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, enable_rr=enable_rr),
+            delayed(calc_tr_momenta)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, enable_rr=enable_rr)
         ])
         # Update momenta
         pxs_sorted = results[0]
         pys_sorted = results[1]
 
-        #Ez = -6.4e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. #############################################################################
-        pzs_sorted = pzs_sorted - e*Ez*time_step  # Update longitudinal momenta.
+        #Ez = -3.2e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. # <-###################################################
+
+        # Update longitudinal momenta.
+        if enable_rr:
+            pzs_sorted = pzs_sorted - (e*Ez + m_e*c**2 * 1.87863e-15 * (1/skin_depth)**4/4 * gammas**2 * (xs_sorted**2+ys_sorted**2))*time_step
+        else:
+            pzs_sorted = pzs_sorted - e*Ez*time_step
         
         
         # ============= Drift of beam =============
         # Leapfrog
         xs_sorted = xs_sorted + pxs_sorted/pzs_sorted*1/2*c*time_step
         ys_sorted = ys_sorted + pys_sorted/pzs_sorted*1/2*c*time_step
-        time_step_count = time_step_count + 1/2
+        #time_step_count = time_step_count + 1/2
         prop_length = prop_length + 1/2*c*time_step
 
         # RK4
@@ -311,38 +325,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         weights_sorted = weights_sorted[bool_indices]
         Ez = Ez[bool_indices]
         bubble_radius = bubble_radius[bool_indices]
-
         
-        # Initialise ABEL Beam object
-        beam_out = Beam()
-        
-        # set the phase space of the ABEL beam
-        beam_out.set_phase_space(Q=np.sum(weights_sorted)*-e,
-                             xs=xs_sorted,
-                             ys=ys_sorted,
-                             zs=zs_sorted, 
-                             pxs=pxs_sorted,  # Always use single particle momenta?
-                             pys=pys_sorted,
-                             pzs=pzs_sorted)
-        
-
-        #============= Add some diagnostics =============
-        if get_centroids is True:  # TODO
-            # Record s_slices, x_slices and xp_slices at each time step in tables
-            s_slices = s_slices + prop_length
-            x_slices = particles2slices(beam=beam, beam_quant=beam.xs(), z_slices=z_slices, make_plot=False)
-            xp_slices = particles2slices(beam=beam, beam_quant=beam.xps(), z_slices=z_slices, make_plot=False)
-            y_slices = particles2slices(beam=beam, beam_quant=beam.ys(), z_slices=z_slices, make_plot=False)
-            yp_slices = particles2slices(beam=beam, beam_quant=beam.yps(), z_slices=z_slices, make_plot=False)
-            #energy_slices = particles2slices(beam=beam, beam_quant=beam.Es(), z_slices=z_slices, make_plot=False)
-            
-            s_slices_table = np.vstack((s_slices_table, s_slices))  # [m]
-            x_slices_table = np.vstack((x_slices_table, x_slices))  # [m]
-            xp_slices_table = np.vstack((xp_slices_table, xp_slices))  # [rad]
-            y_slices_table = np.vstack((y_slices_table, y_slices))  # [m]
-            yp_slices_table = np.vstack((yp_slices_table, yp_slices))  # [rad]
-        
-
         # Progress bar
         if show_prog_bar is True:
             pbar.update(prop_length/stage_length*100 - pbar.n)        
@@ -352,5 +335,17 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     #=============  =============
     if show_prog_bar is True:
         pbar.close()
+
+    # Initialise ABEL Beam object
+    beam_out = Beam()
+        
+    # set the phase space of the ABEL beam
+    beam_out.set_phase_space(Q=np.sum(weights_sorted)*-e,
+                            xs=xs_sorted,
+                            ys=ys_sorted,
+                            zs=zs_sorted, 
+                            pxs=pxs_sorted,  # Always use single particle momenta?
+                            pys=pys_sorted,
+                            pzs=pzs_sorted)
     
-    return beam_out, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table
+    return beam_out

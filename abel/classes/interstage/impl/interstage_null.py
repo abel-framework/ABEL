@@ -4,7 +4,7 @@ from abel import Interstage
 class InterstageNull(Interstage):
     
     def __init__(self, nom_energy=None):
-        #self.nom_energy = nom_energy
+        self.nom_energy = nom_energy
         self.dipole_length = 0.0
         self.dipole_field = 0.0
     

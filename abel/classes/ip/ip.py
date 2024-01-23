@@ -25,7 +25,7 @@ class InteractionPoint(Runnable):
             self.shot1 = shot1
             
             # get first beam
-            beam1 = runnable1[shot1].final_beam()
+            beam1 = runnable1[shot1].final_beam
             
             # do shot-by-shot or all-shots-by-all-shots?
             if all_by_all:
@@ -46,7 +46,7 @@ class InteractionPoint(Runnable):
                 else:
                     
                     # get second beam
-                    beam2 = runnable2[shot2].final_beam()
+                    beam2 = runnable2[shot2].final_beam
                     
                     # get event
                     event = self.interact(beam1, beam2)

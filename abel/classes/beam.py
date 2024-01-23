@@ -5,7 +5,7 @@ from pytz import timezone
 from abel import CONFIG
 import scipy.constants as SI
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
-from abel.utilities.statistics import prct_clean, prct_clean2d
+from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
 from abel.physics_models.betatron_motion import evolve_betatron_motion
@@ -43,7 +43,7 @@ class Beam():
         del self[np.isnan(self).any(axis=1)]
         
     # set phase space
-    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None):
+    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None):
         
         # make empty phase space
         num_particles = len(xs)
@@ -77,7 +77,10 @@ class Beam():
         self.__phasespace[4,:] = uys
         
         # charge
-        self.__phasespace[6,:] = Q/num_particles
+        if weightings is None:
+            self.__phasespace[6,:] = Q/num_particles
+        else:
+            self.__phasespace[6,:] = Q*weightings/np.sum(weightings)
         
         # ids
         self.__phasespace[7,:] = np.arange(num_particles)
@@ -160,6 +163,9 @@ class Beam():
     # copy another beam's macroparticle charge
     def copy_particle_charge(self, beam):
         self.set_qs(np.median(beam.qs()))
+
+    def scale_charge(self, Q):
+        self.set_qs(Q*self.qs()/self.charge())
     
     
     def rs(self):
@@ -217,8 +223,7 @@ class Beam():
     ## BEAM STATISTICS
     
     def charge(self):
-        qs = self.qs()
-        return np.sum(qs[~np.isnan(qs)])
+        return np.nansum(self.qs())
     
     def abs_charge(self):
         return abs(self.charge())
@@ -227,108 +232,99 @@ class Beam():
         return self.charge()/abs(self.charge())
     
     def energy(self, clean=False):
-        return np.mean(prct_clean(self.Es(), clean))
+        return weighted_mean(self.Es(), self.weightings(), clean)
     
     def gamma(self, clean=False):
-        return np.mean(prct_clean(self.gammas(), clean))
+        return weighted_mean(self.gammas(), self.weightings(), clean)
     
     def total_energy(self):
-        return self.abs_charge()*self.energy()
+        return SI.e * np.nansum(self.weightings()*self.Es())
     
     def energy_spread(self, clean=False):
-        return np.std(prct_clean(self.Es(), clean))
+        return weighted_std(self.Es(), self.weightings(), clean)
     
     def rel_energy_spread(self, clean=False):
         return self.energy_spread(clean)/self.energy(clean)
     
     def z_offset(self, clean=False):
-        return np.mean(prct_clean(self.zs(), clean))
+        return weighted_mean(self.zs(), self.weightings(), clean)
     
     def bunch_length(self, clean=False):
-        return np.std(prct_clean(self.zs(), clean))
+        return weighted_std(self.zs(), self.weightings(), clean)
     
     def x_offset(self, clean=False):
-        return np.mean(prct_clean(self.xs(), clean))
-    
-    def y_offset(self, clean=False):
-        return np.mean(prct_clean(self.ys(), clean))
-
-    def x_angle(self, clean=False):
-        return np.mean(prct_clean(self.xps(), clean))
-    
-    def y_angle(self, clean=False):
-        return np.mean(prct_clean(self.yps(), clean))
-        
-    def ux_offset(self, clean=False):
-        return np.mean(prct_clean(self.uxs(), clean))
-    
-    def uy_offset(self, clean=False):
-        return np.mean(prct_clean(self.uys(), clean))
+        return weighted_mean(self.xs(), self.weightings(), clean)
     
     def beam_size_x(self, clean=False):
-        return np.std(prct_clean(self.xs(), clean))
+        return weighted_std(self.xs(), self.weightings(), clean)
+
+    def y_offset(self, clean=False):
+        return weighted_mean(self.ys(), self.weightings(), clean)
 
     def beam_size_y(self, clean=False):
-        return np.std(prct_clean(self.ys(), clean))
+        return weighted_std(self.ys(), self.weightings(), clean)
+    
+    def x_angle(self, clean=False):
+        return weighted_mean(self.xps(), self.weightings(), clean)
     
     def divergence_x(self, clean=False):
-        return np.std(prct_clean(self.xps(), clean))
+        return weighted_std(self.xps(), self.weightings(), clean)
 
+    def y_angle(self, clean=False):
+        return weighted_mean(self.yps(), self.weightings(), clean)
+    
     def divergence_y(self, clean=False):
-        return np.std(prct_clean(self.yps(), clean))
+        return weighted_std(self.yps(), self.weightings(), clean)
+    
+    def ux_offset(self, clean=False):
+        return weighted_mean(self.uxs(), self.weightings(), clean)
+    
+    def uy_offset(self, clean=False):
+        return weighted_mean(self.uys(), self.weightings(), clean)
+
     
     def geom_emittance_x(self, clean=False):
-        xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
-        return np.sqrt(np.linalg.det(np.cov(xs, xps)))
+        return np.sqrt(np.linalg.det(weighted_cov(self.xs(), self.xps(), self.weightings(), clean)))
     
     def geom_emittance_y(self, clean=False):
-        ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
-        return np.sqrt(np.linalg.det(np.cov(ys, yps)))
+        return np.sqrt(np.linalg.det(weighted_cov(self.ys(), self.yps(), self.weightings(), clean)))
     
     def norm_emittance_x(self, clean=False):
-        xs, uxs = prct_clean2d(self.xs(), self.uxs(), clean)
-        return np.sqrt(np.linalg.det(np.cov(xs, uxs/SI.c)))
+        return np.sqrt(np.linalg.det(weighted_cov(self.xs(), self.uxs()/SI.c, self.weightings(), clean)))
     
     def norm_emittance_y(self, clean=False):
-        ys, uys = prct_clean2d(self.ys(), self.uys(), clean)
-        return np.sqrt(np.linalg.det(np.cov(ys, uys/SI.c)))
+        return np.sqrt(np.linalg.det(weighted_cov(self.ys(), self.uys()/SI.c, self.weightings(), clean)))
     
     def beta_x(self, clean=False):
-        xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
-        covx = np.cov(xs, xps)
+        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
         return covx[0,0]/np.sqrt(np.linalg.det(covx))
     
     def beta_y(self, clean=False):
-        ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
-        covy = np.cov(ys, yps)
+        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
         return covy[0,0]/np.sqrt(np.linalg.det(covy))
     
     def alpha_x(self, clean=False):
-        xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
-        covx = np.cov(xs, xps)
+        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
         return -covx[1,0]/np.sqrt(np.linalg.det(covx))
     
     def alpha_y(self, clean=False):
-        ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
-        covy = np.cov(ys, yps)
+        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
         return -covy[1,0]/np.sqrt(np.linalg.det(covy))
     
     def gamma_x(self, clean=False):
-        xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
-        covx = np.cov(xs, xps)
+        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
         return covx[1,1]/np.sqrt(np.linalg.det(covx))
     
     def gamma_y(self, clean=False):
-        ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
-        covy = np.cov(ys, yps)
+        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
         return covy[1,1]/np.sqrt(np.linalg.det(covy))
 
     def intrinsic_emittance(self):
-        covxy = np.cov(self.norm_transverse_vector())
+        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
         return np.sqrt(np.sqrt(np.linalg.det(covxy)))
 
     def angular_momentum(self):
-        covxy = np.cov(self.norm_transverse_vector())
+        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
         det_covxy_cross = np.linalg.det(covxy[2:4,0:2])
         return np.sign(covxy[3,0]-covxy[2,1])*np.sqrt(np.abs(det_covxy_cross))
 
@@ -338,25 +334,23 @@ class Beam():
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
 
-    def norm_amplitude_x(self, n0=None, clean=False):
-        xs, xps = prct_clean2d(self.xs(), self.xps(), clean)
-        if n0 is None:
-            beta_x = beta_matched(n0, self.energy())
+    def norm_amplitude_x(self, plasma_density=None, clean=False):
+        if plasma_density is not None:
+            beta_x = beta_matched(plasma_density, self.energy())
             alpha_x = 0
         else:
-            covx = np.cov(xs, xps)
+            covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
             emgx = np.sqrt(np.linalg.det(covx))
             beta_x = covx[0,0]/emgx
             alpha_x = -covx[1,0]/emgx
         return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
         
-    def norm_amplitude_y(self, n0=None, clean=False):
-        ys, yps = prct_clean2d(self.ys(), self.yps(), clean)
-        if n0 is None:
-            beta_y = beta_matched(n0, self.energy())
+    def norm_amplitude_y(self, plasma_density=None, clean=False):
+        if plasma_density is not None:
+            beta_y = beta_matched(plasma_density, self.energy())
             alpha_y = 0
         else:
-            covy = np.cov(ys, yps)
+            covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
             emgy = np.sqrt(np.linalg.det(covy))
             beta_y = covy[0,0]/emgy
             alpha_y = -covy[1,0]/emgy
@@ -731,7 +725,7 @@ class Beam():
         
         # make beam
         beam = Beam()
-        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs)
+        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
         
         # add metadata to beam
         try: 

@@ -16,13 +16,14 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors  # For logarithmic colour scales
 from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
 
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
 from types import SimpleNamespace
 from openpmd_viewer import OpenPMDTimeSeries
-import os, shutil, uuid, copy
+import os, copy
 
 from abel.physics_models.particles_transverse_wake_instability import *
 from abel.physics_models.twoD_particles_transverse_wake_instability import *
@@ -30,7 +31,6 @@ from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
 #from abel.utilities.relativity import energy2gamma
 from abel.utilities.statistics import prct_clean, prct_clean2d
 from abel.utilities.other import find_closest_value_in_arr
-#import abel.utilities.colors as cmaps  # Standardised colour maps
 from abel.classes.stage.impl.stage_wake_t import StageWakeT
 from abel import Stage, CONFIG
 from abel import Beam
@@ -40,10 +40,18 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, main_beam_roi=6.0, num_beam_slice=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_rr=True):
         """
         Parameters
         ----------
+        driver_source: Source object of drive beam.
+        
+        main_source: Source object of main beam.
+
+        driver_beam: Beam object of drive beam.
+
+        main_beam: Beam object of main beam.
+        
         length: [m] float
             Length of the plasma stage.
         
@@ -52,36 +60,27 @@ class StagePrtclTransWakeInstability(Stage):
         
         plasma_density: [m^-3] float
             Plasma density.
-        
-        driver_source: Source object of drive beam.
-        
-        main_source: Source object of main beam.
-
-        main_beam: Beam object of main beam.
-
-        driver_beam: Beam object of drive beam.
 
         time_step_mod: [beta_wave_length/c] float
             Determines the time step of the instability tracking in units of beta_wave_length/c.
-        
-        #main_beam_roi: float
-            Determines the region of interest (also effective beam length) in units of main beam beam length.
-        
-        #num_beam_slice: int. Number of beam slices.
             
-        Ez_fit: [V/m] interpolation object
+        Ez_fit_obj: [V/m] interpolation object
             1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
 
         Ez_roi: [V/m] 1D array
             Longitudinal E-field in the region of interest fitted to a selection of zs along the main beam (main beam head to tail).
 
-        rb_fit: [m] interpolation object?
+        rb_fit_obj: [m] interpolation object?
             1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
         
         bubble_radius_roi: [m] 1D array
             The bubble radius in the region of interest fitted to a selection of zs along the main beam.
 
-        ...
+        ramp_beta_mag: float
+            blabla
+
+        enable_rr: bool
+            Flag for enabling radiation reactions.
         """
         
         super().__init__(length, nom_energy_gain, plasma_density)
@@ -101,25 +100,17 @@ class StagePrtclTransWakeInstability(Stage):
         #    self.main_beam = main_beam
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
+        self.interstage_dipole_field = None
+        self.ramp_beta_mag = ramp_beta_mag
+        self.enable_rr = enable_rr
+        
         self.interstages_enabled = False
         self.show_prog_bar = True
-        self.interstage_dipole_field = None
-        
-        #self.main_beam_roi = main_beam_roi
-        #self.num_beam_slice = num_beam_slice
-        #if num_beam_slice is None:
-        #    # Use the Freedman–Diaconis rule to determine the number of beam slices.
-        #    if self.main_beam is None:
-        #        self.num_beam_slice = self.FD_rule_num_slice(zs=main_source.track().zs())
-        #    else:
-        #        self.num_beam_slice = self.FD_rule_num_slice()
-        #else:
-        #    self.num_beam_slice = num_beam_slice
 
         self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
         self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
-        self.Ez_axial = None
-        self.zs_Ez_axial = None
+        #self.Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
+        #self.zs_Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.zs
         self.rb_fit_obj = rb_fit_obj  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
         self.bubble_radius_roi = bubble_radius_roi  # [m] bubble radius in the region of interest.
         self.bubble_radius_axial = None
@@ -132,25 +123,9 @@ class StagePrtclTransWakeInstability(Stage):
         self.z_slices = None
         self.main_slices_edges = None
         
-        #self.prop_dist = prop_dist # Obsolete
-        #self.driver_num_profile = None
-        #self.zs_driver_cut = None
-        
-        #self.x_slices_main = None
-        #self.xp_slices_main = None
-        #self.y_slices_main = None
-        #self.yp_slices_main = None
-        #self.energy_slices_main = None
-        #self.s_slices_table_main = None
-        #self.x_slices_table_main = None
-        #self.xp_slices_table_main = None
-        #self.y_slices_table_main = None
-        #self.yp_slices_table_main = None
-        
         self.diag_path = None
         self.parallel_track_2D = False
-
-        self.ramp_beta_mag = 1
+        
         self.driver_to_wake_efficiency = None
         self.wake_to_beam_efficiency = None
         self.driver_to_beam_efficiency = None
@@ -164,7 +139,7 @@ class StagePrtclTransWakeInstability(Stage):
 
     
     # ==================================================
-    # Track the particles through. Note that when called as part of a Linac object, a copy of the original stage (where no changes has been made) is sent to track() every time. All changes done to self here is saved to a separate stage under the Linac object.
+    # Track the particles through. Note that when called as part of a Linac object, a copy of the original stage (where no changes has been made) is sent to track() every time. All changes done to self here are saved to a separate stage under the Linac object.
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
         # Set the diagnostics directory
@@ -206,13 +181,6 @@ class StagePrtclTransWakeInstability(Stage):
         self.z_slices = z_slices  # Update the longitudinal position of the beam slices.
         self.main_num_profile = main_num_profile
         
-        # Sample initial main beam slice x, energy and x'-offsets
-        #x_slices_start = self.particles2slices(beam=beam0, beam_quant=beam0.xs(), z_slices=z_slices)
-        #xp_slices_start = self.particles2slices(beam=beam0, beam_quant=beam0.xps(), z_slices=z_slices)
-        #y_slices_start = self.particles2slices(beam=beam0, beam_quant=beam0.ys(), z_slices=z_slices)
-        #yp_slices_start = self.particles2slices(beam=beam0, beam_quant=beam0.yps(), z_slices=z_slices)
-        #energy_slices_start = self.particles2slices(beam=beam0, beam_quant=beam0.Es(), z_slices=z_slices)
-
 
         # ========== Wake-T simulation and extraction ==========
         # Define a Wake-T stage
@@ -222,52 +190,23 @@ class StagePrtclTransWakeInstability(Stage):
         lambda_betatron = (2*np.pi/k_beta)
         stage_wakeT.length = lambda_betatron/10  # [m]
         stage_wakeT.plasma_density = plasma_density  # [m^-3]
-        #
-        #stage_wakeT.box_min_z = beam0.zs().min() - 7 * beam0.bunch_length()
-        #stage_wakeT.box_max_z = np.mean(drive_beam.zs()) + 5 * drive_beam.bunch_length()
-        #
-        stage_wakeT.opmd_diag = True  # Set to True for saving simulation results.
-        #stage_wakeT.diag_dir = self.diag_path + 'wake_t'
-
-        # Make temp folder
-        if not os.path.exists(CONFIG.temp_path):
-            os.mkdir(CONFIG.temp_path)
-        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
-        if not os.path.exists(tmpfolder):
-            os.mkdir(tmpfolder)
-        stage_wakeT.diag_dir = tmpfolder
+        #stage_wakeT.keep_data = False  # TODO: Does not work yet.
         
         # Run the Wake-T stage
         beam_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 to avoid changes on beam0.
         beam_wakeT = stage_wakeT.track(beam_copy)
         
         # Read the Wake-T simulation data
-        path_sep = os.sep
-        path = stage_wakeT.diag_dir + path_sep + 'hdf5'
-        ts = OpenPMDTimeSeries(path)
-        #dump_time = ts.t[0]  # Extract first time step dump.
-
-        # Extract longitudinal E-field
-        Ez_wakeT, info_Ez = ts.get_field(field='E', coord='z', iteration=0, plot=False)
-        zs_Ez_wakeT = info_Ez.z
-        rs_Ez = info_Ez.r
-        
-        # Extract axial longitudinal E-field
-        Ez_axis_wakeT = Ez_wakeT[round(len(info_Ez.r)/2),:]
-
-        # Cut out axial Ez over the ROI
-        Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
-        
-        
-        # Extract plasma charge density
-        rho, info_rho = ts.get_field(field='rho', iteration=0, plot=False)
-        
-        # Calculate the number density
-        plasma_num_density = rho/stage_wakeT.plasma_density/-e
-        
-        # Extract coordinates
+        Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.zs
+        rho = stage_wakeT.initial.plasma.density.rho*-e
+        plasma_num_density = stage_wakeT.initial.plasma.density.rho/stage_wakeT.plasma_density
+        info_rho = stage_wakeT.initial.plasma.density.metadata
         zs_rho = info_rho.z
         rs_rho = info_rho.r
+        
+        # Cut out axial Ez over the ROI
+        Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
         bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, x_offset, threshold=0.8)
@@ -276,29 +215,25 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # Actually same as Ez_shift_fit. Consider making just one function instead... 
 
         # Save quantities to the stage
-        self.__save_initial_wake(Ez0_axial=Ez_axis_wakeT, metadata_Ez0=info_Ez, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam, beam0=beam0)
         self.Ez_fit_obj = Ez_fit
         self.rb_fit_obj = rb_fit
+        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam, beam0=beam0)
         
-        # TODO: move these to self.initial
         self.Ez_roi = Ez
-        self.Ez_axial = Ez_axis_wakeT
-        self.zs_Ez_axial = zs_Ez_wakeT
+        #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
+        #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
         self.bubble_radius_roi = bubble_radius
         self.bubble_radius_axial = bubble_radius_wakeT
         self.zs_bubble_radius_axial = zs_rho
         
-
-        # Remove temporary directory
-        if os.path.exists(tmpfolder):
-            shutil.rmtree(tmpfolder)
 
         # Make plots for control if necessary
         #self.plot_Ez_rb_cut(z_slices, main_num_profile, zs_Ez_wakeT, Ez_axis_wakeT, Ez, zs_rho, bubble_radius_wakeT, bubble_radius, zlab='$z$ [$\mathrm{\mu}$m]')
         
 
         # ========== Instability tracking ==========
-        inputs = [beam0, plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, z_slices]
+        beam_filtered = self.bubble_filter(copy.deepcopy(beam0))
+        inputs = [beam_filtered, plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
@@ -310,8 +245,8 @@ class StagePrtclTransWakeInstability(Stage):
             
             with joblib_progress('Tracking x and y in parallel:', 2):
                 results = Parallel(n_jobs=2)([
-                    delayed(twoD_transverse_wake_instability_particles)(beam0, beam0.xs(), beam0.pxs(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None),
-                    delayed(twoD_transverse_wake_instability_particles)(beam0, beam0.ys(), beam0.pys(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
+                    delayed(twoD_transverse_wake_instability_particles)(beam_filtered, beam_filtered.xs(), beam_filtered.pxs(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None),
+                    delayed(twoD_transverse_wake_instability_particles)(beam_filtered, beam_filtered.ys(), beam_filtered.pys(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
                 ])
                 time.sleep(0.1) # hack to allow printing progress
             
@@ -329,14 +264,9 @@ class StagePrtclTransWakeInstability(Stage):
                                  pxs=pxs_sorted,
                                  pys=pys_sorted,
                                  pzs=pzs_sorted)
+            
         else:
-            beam, s_slices_table, x_slices_table, xp_slices_table, y_slices_table, yp_slices_table = transverse_wake_instability_particles(beam0, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, get_centroids=False, s_slices=None, z_slices=None, show_prog_bar=self.show_prog_bar)
-        
-        #s_slices = s_slices_table[-1,:]
-        #x_slices = x_slices_table[-1,:]
-        #xp_slices = xp_slices_table[-1,:]
-        #y_slices = y_slices_table[-1,:] ##############
-        #yp_slices = yp_slices_table[-1,:] ##############
+            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, enable_rr=self.enable_rr, show_prog_bar=self.show_prog_bar)
         
 
         # ========== Shift the main beam back to the original coordinate system ==========
@@ -349,17 +279,6 @@ class StagePrtclTransWakeInstability(Stage):
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)
         
         self.main_beam = copy.deepcopy(beam)  # Need to make a deepcopy, or changes to beam may affect the Beam object saved here.
-        #self.x_slices_main = x_slices  # Update the transverse offsets of the beam slices.
-        #self.xp_slices_main = xp_slices  # [rad] Update the x's of the beam slices.
-        #self.y_slices_main = y_slices  # Update the transverse offsets of the beam slices.
-        #self.yp_slices_main = yp_slices  # [rad] Update the x's of the beam slices.
-        #self.energy_slices_main = energy_slices  # Update the energies of the beam slices.
-        #self.s_slices_table_main = s_slices_table
-        #self.x_slices_table_main = x_slices_table
-        #self.xp_slices_table_main = xp_slices_table
-        #self.y_slices_table_main = y_slices_table
-        #self.yp_slices_table_main = yp_slices_table
-
         
         # Copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number
@@ -370,18 +289,18 @@ class StagePrtclTransWakeInstability(Stage):
 
 
     # ==================================================
-    # 
-    def __save_initial_wake(self, Ez0_axial, metadata_Ez0, rho0, metadata_rho0, driver0, beam0):
+    # Save initial electric field, plasma and beam quantities
+    def __save_initial_step(self, Ez0_axial, zs_Ez0, rho0, metadata_rho0, driver0, beam0):
         
         # ========== Save initial axial wakefield info ========== 
-        self.initial.plasma.wakefield.onaxis.zs = metadata_Ez0.z
+        self.initial.plasma.wakefield.onaxis.zs = zs_Ez0
         self.initial.plasma.wakefield.onaxis.Ezs = Ez0_axial
 
-        # ========== Save plasma electron number density info ========== 
+        # ========== Save plasma electron number density ========== 
         self.initial.plasma.density.rho = rho0/-SI.e
         self.initial.plasma.density.extent = metadata_rho0.imshow_extent  # array([z_min, z_max, x_min, x_max])
 
-        # ========== Initial beam particle density ==========
+        # ========== Calculate and save initial beam particle density ==========
         zs_beams = np.append(driver0.zs(), beam0.zs())
         xs_beams = np.append(driver0.xs(), beam0.xs())
         ys_beams = np.append(driver0.ys(), beam0.ys())
@@ -404,6 +323,7 @@ class StagePrtclTransWakeInstability(Stage):
         projection_zx = np.sum(particle_density, axis=2)
         projection_zx = projection_zx.T
         extent_beams = np.array([edges_z[0], edges_z[-1], edges_x[0], edges_x[-1]])
+        #TODO: projection_zy?
 
         self.initial.beam.density.extent = extent_beams  # array([z_min, z_max, x_min, x_max])
         self.initial.beam.density.rho = projection_zx
@@ -411,122 +331,170 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Save initial beam currents ==========
         self.calculate_beam_current(beam0, driver0)
 
+
+    # ==================================================
+    # Filter out particles that collide into bubble
+    def bubble_filter(self, beam):
+        xs = beam.xs()
+        ys = beam.ys()
+        zs = beam.zs()
+        pxs = beam.pxs()
+        pys = beam.pys()
+        pzs = beam.pzs()
+        weights = beam.weightings()
+    
+        # Sort the arrays based on zs
+        indices = np.argsort(zs)
+        zs_sorted = zs[indices]
+        xs_sorted = xs[indices]
+        ys_sorted = ys[indices]
+        pxs_sorted = pxs[indices]
+        pys_sorted = pys[indices]
+        pzs_sorted = pzs[indices]
+        weights_sorted = weights[indices]
+
+        # Calculate rb based on interpolation of rb vs z
+        rb_fit_obj = self.rb_fit_obj
+        bubble_radius = rb_fit_obj(zs_sorted)
+
+        # Apply the filter
+        bool_indices = (np.sqrt(xs_sorted**2 + ys_sorted**2) - bubble_radius <= 0)
+        zs_sorted = zs_sorted[bool_indices]
+        xs_sorted = xs_sorted[bool_indices]
+        ys_sorted = ys_sorted[bool_indices]
+        pxs_sorted = pxs_sorted[bool_indices]
+        pys_sorted = pys_sorted[bool_indices]
+        pzs_sorted = pzs_sorted[bool_indices]
+        weights_sorted = weights_sorted[bool_indices]
+
+        # Initialise ABEL Beam object
+        beam_out = Beam()
+        
+        # Set the phase space of the ABEL beam
+        beam_out.set_phase_space(Q=np.sum(weights_sorted)*-e,
+                             xs=xs_sorted,
+                             ys=ys_sorted,
+                             zs=zs_sorted, 
+                             pxs=pxs_sorted,  # Always use single particle momenta?
+                             pys=pys_sorted,
+                             pzs=pzs_sorted)
+        return beam_out
+
     
     # ==================================================
-    def fill_nan_with_mean(self, arr):
-        nan_indices = np.isnan(arr)
-        valid_indices = ~nan_indices
-        edge_indices = np.where(nan_indices & (valid_indices | np.roll(valid_indices, 1) | np.roll(valid_indices, -1)))
-    
-        for i in edge_indices[0]:
-            if valid_indices[i]:
-                continue  # Skip non-NaN values
-    
-            left_neighbor_idx = i - 1
-            right_neighbor_idx = i + 1
-    
-            while left_neighbor_idx >= 0 and np.isnan(arr[left_neighbor_idx]):
-                left_neighbor_idx -= 1
-    
-            while right_neighbor_idx < len(arr) and np.isnan(arr[right_neighbor_idx]):
-                right_neighbor_idx += 1
-    
-            left_neighbor = arr[left_neighbor_idx] if left_neighbor_idx >= 0 else np.nan
-            right_neighbor = arr[right_neighbor_idx] if right_neighbor_idx < len(arr) else np.nan
-    
-            # Calculate the mean of the valid neighbors
-            neighbor_mean = np.nanmean([left_neighbor, right_neighbor])
-    
-            arr[i] = neighbor_mean
-    
-        return arr
+    #def fill_nan_with_mean(self, arr):
+    #    nan_indices = np.isnan(arr)
+    #    valid_indices = ~nan_indices
+    #    edge_indices = np.where(nan_indices & (valid_indices | np.roll(valid_indices, 1) | np.roll(valid_indices, -1)))
+    #
+    #    for i in edge_indices[0]:
+    #        if valid_indices[i]:
+    #            continue  # Skip non-NaN values
+    #
+    #        left_neighbor_idx = i - 1
+    #        right_neighbor_idx = i + 1
+    #
+    #        while left_neighbor_idx >= 0 and np.isnan(arr[left_neighbor_idx]):
+    #            left_neighbor_idx -= 1
+    #
+    #        while right_neighbor_idx < len(arr) and np.isnan(arr[right_neighbor_idx]):
+    #            right_neighbor_idx += 1
+    #
+    #        left_neighbor = arr[left_neighbor_idx] if left_neighbor_idx >= 0 else np.nan
+    #        right_neighbor = arr[right_neighbor_idx] if right_neighbor_idx < len(arr) else np.nan
+    #
+    #        # Calculate the mean of the valid neighbors
+    #        neighbor_mean = np.nanmean([left_neighbor, right_neighbor])
+    #
+    #        arr[i] = neighbor_mean
+    #
+    #    return arr
 
     
     # ==================================================
     # Returns the mean of a beam quantity beam_quant (1D float array) for all particles inside the beam slices.
-    def particles2slices(self, beam, beam_quant, z_slices=None, bin_number=None, cut_off=None, make_plot=False):
-        """
-        Returns the mean of a beam quantity beam_quant for all particles inside the beam slices.
-
-        Parameters
-        ----------
-        beam: Beam object.
-            
-        beam_quant: 1D float arrays
-            Beam quantity to be binned into bins/slices defined by z_slices. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
-            
-        z_slices: [m] 1D float array
-            z-coordinates of the beam slices.
-
-        bin_number: float
-            Number of beam slices.
-
-        cut_off: float
-            Determines the longitudinal coordinates inside the region of interest
-
-        make_plot: boolean
-            Flag for making plots.
-
-            
-        Returns
-        ----------
-        beam_quant_slices: 1D float array
-            beam_quant binned into bins/slices defined by z_slices. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
-        """
-        
-        if bin_number is None:
-            bin_number = self.num_beam_slice
-        if cut_off is None:
-            cut_off = self.main_beam_roi * beam.bunch_length()
-        
-        zs = beam.zs()
-        mean_z = np.mean(zs)
-
-        # Get all elements inside the region of interest.
-        bool_indices = (zs <= mean_z + cut_off) & (zs >= mean_z - cut_off)
-        zs_roi = zs[bool_indices]
-        #beam_quant = beam_quant[bool_indices]
-
-        if z_slices is None:
-            _, edges = np.histogram(zs_roi, bins=bin_number)  # Get the edges of the histogram of z with bin_number bins.
-            z_slices = (edges[0:-1] + edges[1:])/2  # Centres of the beam slices (z).
-
-        # Make small bins for interpolation
-        Nbins = int(np.sqrt(len(zs)/2))
-        _, edges = np.histogram(zs, bins=Nbins)
-        zs_bins = (edges[0:-1] + edges[1:])/2  # Centres of the bins (z).
-        
-        # Sort the arrays
-        indices = np.argsort(zs)
-        zs_sorted = zs[indices]  # Particle quantity.
-        beam_quant_sorted = beam_quant[indices]  # Particle quantity.
-
-        # Compute the mean of beam_quant of all particles inside a z-bin.
-        beam_quant_bins = np.empty(len(zs_bins))
-        for i in range(0,len(zs_bins)-1):
-            left = np.searchsorted(zs_sorted, zs_bins[i])  # zs_sorted[left:len(zs_sorted)] >= zs_bins[i], left side of bin i.
-            right = np.searchsorted(zs_sorted, zs_bins[i+1], side='right')  # zs_sorted[0:right] <= zs_bins[i+1], right (larger) side of bin i.
-            beam_quant_bins[i] = np.mean(beam_quant_sorted[left:right])
-
-        if np.any(np.isnan(beam_quant_bins)):
-            beam_quant_bins = self.fill_nan_with_mean(beam_quant_bins)  # Replace the nan values with the mean.
-           
-        beam_quant_slices = np.interp(z_slices, zs_bins, beam_quant_bins)
-        beam_quant_slices = self.fill_nan_with_mean(beam_quant_slices)  # Replace the nan values with the mean.
-        if np.any(np.isnan(beam_quant_slices)):
-            plt.figure()
-            plt.scatter(zs*1e6, beam_quant)
-            plt.plot(z_slices*1e6, beam_quant_slices, 'r')
-            plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
-            raise ValueError('Interpolated array still contains Nan.')
-
-        if make_plot is True:
-            plt.figure()
-            plt.scatter(zs*1e6, beam_quant)
-            plt.plot(z_slices*1e6, beam_quant_slices, 'rx-')
-            plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
-        
-        return beam_quant_slices
+    #def particles2slices(self, beam, beam_quant, z_slices=None, bin_number=None, cut_off=None, make_plot=False):
+    #    """
+    #    Returns the mean of a beam quantity beam_quant for all particles inside the beam slices.
+#
+    #    Parameters
+    #    ----------
+    #    beam: Beam object.
+    #        
+    #    beam_quant: 1D float arrays
+    #        Beam quantity to be binned into bins/slices defined by z_slices. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+    #        
+    #    z_slices: [m] 1D float array
+    #        z-coordinates of the beam slices.
+#
+    #    bin_number: float
+    #        Number of beam slices.
+#
+    #    cut_off: float
+    #        Determines the longitudinal coordinates inside the region of interest
+#
+    #    make_plot: boolean
+    #        Flag for making plots.
+#
+    #        
+    #    Returns
+    #    ----------
+    #    beam_quant_slices: 1D float array
+    #        beam_quant binned into bins/slices defined by z_slices. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+    #    """
+    #    
+    #    if bin_number is None:
+    #        bin_number = self.num_beam_slice
+    #    if cut_off is None:
+    #        cut_off = self.main_beam_roi * beam.bunch_length()
+    #    
+    #    zs = beam.zs()
+    #    mean_z = np.mean(zs)
+#
+    #    # Get all elements inside the region of interest.
+    #    bool_indices = (zs <= mean_z + cut_off) & (zs >= mean_z - cut_off)
+    #    zs_roi = zs[bool_indices]
+#
+    #    if z_slices is None:
+    #        _, edges = np.histogram(zs_roi, bins=bin_number)  # Get the edges of the histogram of z with bin_number bins.
+    #        z_slices = (edges[0:-1] + edges[1:])/2  # Centres of the beam slices (z).
+#
+    #    # Make small bins for interpolation
+    #    Nbins = int(np.sqrt(len(zs)/2))
+    #    _, edges = np.histogram(zs, bins=Nbins)
+    #    zs_bins = (edges[0:-1] + edges[1:])/2  # Centres of the bins (z).
+    #    
+    #    # Sort the arrays
+    #    indices = np.argsort(zs)
+    #    zs_sorted = zs[indices]  # Particle quantity.
+    #    beam_quant_sorted = beam_quant[indices]  # Particle quantity.
+#
+    #    # Compute the mean of beam_quant of all particles inside a z-bin.
+    #    beam_quant_bins = np.empty(len(zs_bins))
+    #    for i in range(0,len(zs_bins)-1):
+    #        left = np.searchsorted(zs_sorted, zs_bins[i])  # zs_sorted[left:len(zs_sorted)] >= zs_bins[i], left side of bin i.
+    #        right = np.searchsorted(zs_sorted, zs_bins[i+1], side='right')  # zs_sorted[0:right] <= zs_bins[i+1], right (larger) side of bin i.
+    #        beam_quant_bins[i] = np.mean(beam_quant_sorted[left:right])
+#
+    #    if np.any(np.isnan(beam_quant_bins)):
+    #        beam_quant_bins = self.fill_nan_with_mean(beam_quant_bins)  # Replace the nan values with the mean.
+    #       
+    #    beam_quant_slices = np.interp(z_slices, zs_bins, beam_quant_bins)
+    #    beam_quant_slices = self.fill_nan_with_mean(beam_quant_slices)  # Replace the nan values with the mean.
+    #    if np.any(np.isnan(beam_quant_slices)):
+    #        plt.figure()
+    #        plt.scatter(zs*1e6, beam_quant)
+    #        plt.plot(z_slices*1e6, beam_quant_slices, 'r')
+    #        plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
+    #        raise ValueError('Interpolated array still contains Nan.')
+#
+    #    if make_plot is True:
+    #        plt.figure()
+    #        plt.scatter(zs*1e6, beam_quant)
+    #        plt.plot(z_slices*1e6, beam_quant_slices, 'rx-')
+    #        plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
+    #    
+    #    return beam_quant_slices
 
     
     # ==================================================
@@ -564,6 +532,7 @@ class StagePrtclTransWakeInstability(Stage):
         
         # Start index (head of the beam) of extraction interval.
         head_idx, _ = find_closest_value_in_arr(arr=zs_Ez, val=zs.max())
+        
         # End index (tail of the beam) of extraction interval.
         tail_idx, _ = find_closest_value_in_arr(arr=zs_Ez, val=zs.min())
         
@@ -628,7 +597,6 @@ class StagePrtclTransWakeInstability(Stage):
         idx_offset, _ = find_closest_value_in_arr(plasma_tr_coord, main_offset)
 
         rows, cols = np.shape(plasma_num_density)
-        #idx_middle = np.round(rows/2)
         bubble_radius = np.zeros(cols)
 
         for i in range(0,cols):  # Loop through all transverse slices.
@@ -729,7 +697,6 @@ class StagePrtclTransWakeInstability(Stage):
         zs = beam.zs()
         if bin_number is None:
             bin_number = self.FD_rule_num_slice(zs)
-            #bin_number = self.num_beam_slice
 
         weights = beam.weightings()  # The weight of each macroparticle.
         num_profile, edges = np.histogram(zs, weights=weights, bins=bin_number)  # Compute the histogram of z using bin_number bins.
@@ -838,8 +805,10 @@ class StagePrtclTransWakeInstability(Stage):
     def plot_wakefield(self, beam=None, saveToFile=None, includeWakeRadius=True):
         
         # Get wakefield
-        Ezs = self.Ez_axial
-        zs_Ez = self.zs_Ez_axial
+        #Ezs = self.Ez_axial
+        #zs_Ez = self.zs_Ez_axial
+        Ezs = self.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez = self.initial.plasma.wakefield.onaxis.zs
         zs_rho =  self.zs_bubble_radius_axial
         bubble_radius = self.bubble_radius_axial
         
@@ -861,15 +830,15 @@ class StagePrtclTransWakeInstability(Stage):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs_Ez*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs_Ez.shape)/1e9, ':', color=col0)
         axs[0].plot(zs_Ez*1e6, Ezs/1e9, '-', color=col1)
-        axs[0].set_xlabel('z (um)')
-        axs[0].set_ylabel('Longitudinal electric field (GV/m)')
+        axs[0].set_xlabel('z [$\mathrm{\mu}$m]')
+        axs[0].set_ylabel('Longitudinal electric field [GV/m]')
         axs[0].set_xlim(zlims)
         axs[0].set_ylim(bottom=1.05*min(Ezs)/1e9, top=1.3*max(Ezs)/1e9)
         
         axs[1].fill(np.concatenate((zs0, np.flip(zs0)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
         axs[1].plot(zs0*1e6, -Is/1e3, '-', color=col1)
-        axs[1].set_xlabel('z (um)')
-        axs[1].set_ylabel('Beam current (kA)')
+        axs[1].set_xlabel('z [$\mathrm{\mu}$m]')
+        axs[1].set_ylabel('Beam current [kA]')
         axs[1].set_xlim(zlims)
         axs[1].set_ylim(bottom=0, top=1.2*max(-Is)/1e3)
         axs[1].set_xlim(zlims)
@@ -878,8 +847,8 @@ class StagePrtclTransWakeInstability(Stage):
         if includeWakeRadius:
             axs[2].fill(np.concatenate((zs_rho, np.flip(zs_rho)))*1e6, np.concatenate((bubble_radius, np.ones(zs_rho.shape)))*1e6, color=col2, alpha=af)
             axs[2].plot(zs_rho*1e6, bubble_radius*1e6, '-', color=col2)
-            axs[2].set_xlabel('z (um)')
-            axs[2].set_ylabel('Plasma-wake radius (um)')
+            axs[2].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2].set_ylabel('Plasma-wake radius [$\mathrm{\mu}$m]')
             axs[2].set_xlim(zlims)
             axs[2].set_ylim(bottom=0, top=max(bubble_radius*1.2)*1e6)
         
@@ -887,6 +856,91 @@ class StagePrtclTransWakeInstability(Stage):
         if saveToFile is not None:
             plt.savefig(saveToFile, format="pdf", bbox_inches="tight")
 
+
+    # ==================================================
+    # Overloads the plot_wake method in the Stage class.
+    def plot_wake(self, savefig=None):
+        
+        # extract density if not already existing
+        assert hasattr(self.initial.plasma.density, 'rho'), 'No wake'
+        assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield'
+        
+        # calculate densities and extents
+        Ezmax = 0.8*wave_breaking_field(self.plasma_density)
+        
+        # make figures
+        has_final_step = hasattr(self.final.plasma.density, 'rho')
+        num_plots = 1 + int(has_final_step)
+        fig, ax = plt.subplots(num_plots,1)
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*0.5*num_plots)
+
+        # cycle through initial and final step
+        for i in range(num_plots):
+            if not has_final_step:
+                ax1 = ax
+            else:
+                ax1 = ax[i]
+
+            # extract initial or final
+            if i==0:
+                data_struct = self.initial
+                title = 'Initial step'
+            elif i==1:
+                data_struct = self.final
+                title = 'Final step'
+
+            # get data
+            extent = data_struct.plasma.density.extent
+            zs0 = data_struct.plasma.wakefield.onaxis.zs
+            Ezs0 = data_struct.plasma.wakefield.onaxis.Ezs
+            rho0_plasma = data_struct.plasma.density.rho
+            rho0_beam = data_struct.beam.density.rho
+
+            # plot on-axis wakefield and axes
+            zlims = [min(zs0)*1e6, max(zs0)*1e6]
+            ax2 = ax1.twinx()
+            ax2.plot(zs0*1e6, Ezs0/1e9, color='black')
+            ax2.set_ylabel(r'$E_{z}$' ' [GV/m]')
+            ax2.set_xlim(zlims)
+            ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
+            axpos = ax1.get_position()
+            pad_fraction = 0.15  # Fraction of the figure width to use as padding between the ax and colorbar
+            cbar_width_fraction = 0.03  # Fraction of the figure width for the colorbar width
+    
+            # create colorbar axes based on the relative position and size
+            cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
+            cax2 = fig.add_axes([axpos.x1 + pad_fraction + cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
+            clims = np.array([1e-2, 1e3])*self.plasma_density
+            
+            # plot plasma electrons
+            initial = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float))
+            cb = plt.colorbar(initial, cax=cax1)
+            initial.set_clim(clims/1e6)
+            cb.ax.tick_params(axis='y',which='both', direction='in')
+            cb.set_ticklabels([])
+            
+            # plot beam electrons
+            charge_density_plot0 = ax1.imshow(rho0_beam/1e6, extent=data_struct.beam.density.extent*1e6, norm=LogNorm(), origin='lower', cmap=CONFIG.default_cmap, alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
+            cb2 = plt.colorbar(charge_density_plot0, cax = cax2)
+            cb2.set_label(label=r'Electron density ' + r'[$\mathrm{cm^{-3}}$]',size=10)
+            cb2.ax.tick_params(axis='y',which='both', direction='in')
+            charge_density_plot0.set_clim(clims/1e6)
+    
+            # set labels
+            if i==(num_plots-1):
+                ax1.set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            ax1.set_ylabel('$x$ [$\mathrm{\mu}$ m]')
+            ax1.set_title(title)
+            ax1.grid(False)
+            ax2.grid(False)
+            
+        # save the figure
+        if savefig is not None:
+            fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
+        
+        return 
+        
     
     # ==================================================
     def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=r'$\xi$ [$\mathrm{\mu}$m]', ylab=r'$x$ [$\mathrm{\mu}$m]', clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
@@ -980,7 +1034,6 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Macroparticles data
         zs = beam.zs()
-        #xis = zs
         xs = beam.xs()
         xps = beam.xps()
         ys = beam.ys()
@@ -991,11 +1044,8 @@ class StagePrtclTransWakeInstability(Stage):
         # Labels for plots
         zlab = '$z$ [$\mathrm{\mu}$m]'
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
-        #slab = '$s$ [m]'
         xlab = '$x$ [$\mathrm{\mu}$m]'
         ylab = '$y$ [$\mathrm{\mu}$m]'
-        #field_lab = '$E_z$ [GV/m]'
-        #dN_dz_lab = '$\partial N/\partial z$ [$\mathrm{m}^{-1}$]'
         xps_lab = '$x\'$ [mrad]'
         yps_lab = '$y\'$ [mrad]'
         energ_lab = '$\mathcal{E}$ [GeV]'
@@ -1015,9 +1065,7 @@ class StagePrtclTransWakeInstability(Stage):
         extent_zx = [i*1e6 for i in extent_zx]  # [um]
 
         self.distribution_plot_2D(arr1=zs, arr2=xs, weights=weights, hist_bins=hist_bins, hist_range=hist_range, axes=axs[0][0], extent=extent_zx, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xlab, clab=r'$\partial^2 N/\partial\xi \partial x$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        if plot_centroids is True:
-            axs[0][0].plot(self.z_slices*1e6, self.x_slices_main*1e6, 'r', alpha=0.5)
-            axs[0][0].axis(extent_zx)
+        
 
         # 2D z-x' distribution
         hist_range_xps = [[None, None], [None, None]]
@@ -1030,9 +1078,7 @@ class StagePrtclTransWakeInstability(Stage):
         extent_xps[3] = extent_xps[3]*1e3  # [mrad]
 
         self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        if plot_centroids is True:
-            axs[0][1].plot(self.z_slices*1e6, self.xp_slices_main*1e3, 'r', alpha=0.5)
-            axs[0][1].axis(extent_xps)
+        
         
         # 2D x-x' distribution
         hist_range_xxp = [[None, None], [None, None]]
@@ -1045,8 +1091,7 @@ class StagePrtclTransWakeInstability(Stage):
         extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
 
         self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        #if plot_centroids is True:
-        #    axs[0][2].plot(self.x_slices_main*1e6, self.xp_slices_main*1e3, 'rx', alpha=0.5, label='From tracking')
+        
 
         # 2D z-y distribution
         hist_range_zy = [[None, None], [None, None]]
@@ -1056,9 +1101,7 @@ class StagePrtclTransWakeInstability(Stage):
         extent_zy = [i*1e6 for i in extent_zy]  # [um]
 
         self.distribution_plot_2D(arr1=zs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_zy, axes=axs[1][0], extent=extent_zy, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=ylab, clab=r'$\partial^2 N/\partial\xi \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        if plot_centroids is True:
-            axs[1][0].plot(self.z_slices*1e6, self.y_slices_main*1e6, 'r', alpha=0.5)
-            axs[1][0].axis(extent_zy)
+        
 
         # 2D z-y' distribution
         hist_range_yps = [[None, None], [None, None]]
@@ -1071,9 +1114,7 @@ class StagePrtclTransWakeInstability(Stage):
         extent_yps[3] = extent_yps[3]*1e3  # [mrad]
         
         self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        if plot_centroids is True:
-            axs[1][1].plot(self.z_slices*1e6, self.yp_slices_main*1e3, 'r', alpha=0.5)
-            axs[1][1].axis(extent_yps)
+        
 
         # 2D y-y' distribution
         hist_range_yyp = [[None, None], [None, None]]
@@ -1084,9 +1125,9 @@ class StagePrtclTransWakeInstability(Stage):
         extent_yyp[1] = extent_yyp[1]*1e6  # [um]
         extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
         extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
+        
         self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        #if plot_centroids is True:
-        #    axs[1][2].plot(self.y_slices_main*1e6, self.yp_slices_main*1e3, 'rx', alpha=0.5, label='From tracking')
+       
 
         # 2D x-y distribution
         hist_range_xy = [[None, None], [None, None]]
@@ -1096,17 +1137,7 @@ class StagePrtclTransWakeInstability(Stage):
         extent_xy = [i*1e6 for i in extent_xy]  # [um]
 
         self.distribution_plot_2D(arr1=xs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xy, axes=axs[2][0], extent=extent_xy, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=ylab, clab=r'$\partial^2 N/\partial x \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-
-        # 2D x'-y' distribution
-        #hist_range_xpyp = [[None, None], [None, None]]
-        #hist_range_xpyp[0] = hist_range_xps[1]
-        #hist_range_xpyp[1] = hist_range_yyp[1]
-        #extent_xpyp = hist_range_xpyp[0] + hist_range_xpyp[1]
-        #extent_xpyp[0] = extent_xpyp[0]*1e3  # [mrad]
-        #extent_xpyp[1] = extent_xpyp[1]*1e3  # [mrad]
-        #extent_xpyp[2] = extent_xpyp[2]*1e3  # [mrad]
-        #extent_xpyp[3] = extent_xpyp[3]*1e3  # [mrad]
-        #self.distribution_plot_2D(arr1=xps, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xpyp, axes=axs[2][1], extent=extent_xpyp, vmin=None, vmax=None, colmap=cmap, xlab=xps_lab, ylab=yps_lab, clab='$\partial^2 N/\partial x\' \partial y\'$ [$\mathrm{rad}^{-2}$]', origin='lower', interpolation='nearest')
+        
 
         # Energy distribution
         ax = axs[2][1]
@@ -1130,21 +1161,12 @@ class StagePrtclTransWakeInstability(Stage):
         extent_energ[2] = extent_energ[2]/1e9  # [GeV]
         extent_energ[3] = extent_energ[3]/1e9  # [GeV]
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
-        if plot_centroids is True:
-            axs[2][2].plot(self.z_slices*1e6, self.energy_slices_main/1e9, 'r', alpha=0.3)
-            axs[2][2].axis(extent_energ)
 
     
     # ==================================================
-    def scatter_diags(self, beam=None, plot_centroids=False, n_th_particle=1, show_slice_grid=False, plot_k_beta=False):
+    def scatter_diags(self, beam=None, n_th_particle=1):
         '''
-        plot_centroids:  Plot the centroids of the beam obtained from instability tracking.
-        
         n_th_particle:  Use this to reduce the amount of plotted particles by only plotting every n_th_particle particle.
-
-        show_slice_grid: Plot a vertical grid to display the longitudinal position of the beam slices.
-
-        plot_k_beta: Plot the betatron wavenumber along the beam.
         '''
 
         # Define the color map and boundaries
@@ -1181,77 +1203,38 @@ class StagePrtclTransWakeInstability(Stage):
         # 2D z-x distribution
         ax = axs[0][0]
         p = ax.scatter(zs[::n_th_particle]*1e6, xs[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
-        #ax.axis(extent)
         ax.set_xlabel(xilab)
         ax.set_ylabel(xlab)
-        if plot_centroids is True:
-            X_slices_from_beam = self.particles2slices(beam=beam, beam_quant=xs, z_slices=self.z_slices)
-            ax.plot(self.z_slices*1e6, X_slices_from_beam*1e6, 'cx', alpha=0.7, label='Slice mean $x$ from particles')
-            ax.plot(self.z_slices*1e6, self.x_slices_main*1e6, 'b', alpha=0.5, label='Slice mean $x$ from tracking')
-            ax.legend()
-        if show_slice_grid is True:
-            for z_slice in self.z_slices:
-                ax.axvline(x=z_slice*1e6, color=(0.5, 0.5, 0.5), linestyle='-', alpha=0.3)
-        if plot_k_beta is True:  # Drop this?
-            ax_twin = ax.twinx()
-            #ax_Ez_cut_wakeT2 = axs_wakeT_cut[0].twinx()
-            k_beta = self.beta_wavenumber_slices(beam=beam, clean=False)
-            ax_twin.plot(self.z_slices*1e6, k_beta, 'g')
-            ax_twin.set_ylabel(r'$k_\beta$ [$\mathrm{m}^{-1}$]')
             
         # 2D z-x' distribution
         ax = axs[0][1]
         ax.scatter(zs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
         ax.set_xlabel(xilab)
         ax.set_ylabel(xps_lab)
-        if plot_centroids is True:
-            xp_slices_from_beam = self.particles2slices(beam=beam, beam_quant=xps, z_slices=self.z_slices)
-            ax.plot(self.z_slices*1e6, xp_slices_from_beam*1e3, 'cx', alpha=0.7, label='Slice mean $x\'$ from particles')
-            ax.plot(self.z_slices*1e6, self.xp_slices_main*1e3, 'b', alpha=0.5, label='Slice mean $x\'$ from tracking')
-            ax.legend()
             
         # 2D x-x' distribution
         ax = axs[0][2]
         ax.scatter(xs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
         ax.set_xlabel(xlab)
         ax.set_ylabel(xps_lab)
-        if plot_centroids is True:
-            ax.plot(self.x_slices_main*1e6, self.xp_slices_main*1e3, 'cx', alpha=0.5, label='From tracking')
-            ax.legend()
             
         # 2D z-y distribution
         ax = axs[1][0]
         ax.scatter(zs[::n_th_particle]*1e6, ys[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
         ax.set_xlabel(xilab)
         ax.set_ylabel(ylab)
-        if plot_centroids is True:
-            y_slices_from_beam = self.particles2slices(beam=beam, beam_quant=ys, z_slices=self.z_slices)
-            ax.plot(self.z_slices*1e6, y_slices_from_beam*1e6, 'cx', alpha=0.7, label='Slice mean $y$ from particles')
-            ax.plot(self.z_slices*1e6, self.y_slices_main*1e6, 'b', alpha=0.5, label='Slice mean $y$ from tracking')
-            ax.legend()
-        if show_slice_grid is True:
-            for z_slice in self.z_slices:
-                ax.axvline(x=z_slice*1e6, color=(0.5, 0.5, 0.5), linestyle='-', alpha=0.5)
             
         # 2D z-y' distribution
         ax = axs[1][1]
         ax.scatter(zs[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
         ax.set_xlabel(xilab)
         ax.set_ylabel(yps_lab)
-        if plot_centroids is True:
-            yp_slices_from_beam = self.particles2slices(beam=beam, beam_quant=yps, z_slices=self.z_slices)
-            ax.plot(self.z_slices*1e6, yp_slices_from_beam*1e3, 'cx', alpha=0.7, label='Slice mean $y\'$ from particles')
-            ax.plot(self.z_slices*1e6, self.yp_slices_main*1e3, 'b', alpha=0.5, label='Slice mean $y\'$ from tracking')
-            ax.legend()
             
         # 2D y-y' distribution
         ax = axs[1][2]
         ax.scatter(ys[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
         ax.set_xlabel(ylab)
         ax.set_ylabel(yps_lab)
-        if plot_centroids is True:
-            ax.plot(self.y_slices_main*1e6, self.yp_slices_main*1e3, 'cx', alpha=0.5, label='From tracking')
-            ax.legend()
             
         # 2D x-y distribution
         ax = axs[2][0]
@@ -1282,11 +1265,6 @@ class StagePrtclTransWakeInstability(Stage):
         ax.scatter(zs[::n_th_particle]*1e6, Es[::n_th_particle]/1e9, c=Es[::n_th_particle]/1e9, cmap=cmap)
         ax.set_xlabel(xilab)
         ax.set_ylabel(energ_lab)
-        if plot_centroids is True:
-            energy_slices_from_beam = self.particles2slices(beam=beam, beam_quant=beam.Es(), z_slices=self.z_slices)
-            ax.plot(self.z_slices*1e6, energy_slices_from_beam/1e9, 'kx', alpha=0.7, label='Slice mean $\mathcal{E}$ from particles')
-            ax.plot(self.z_slices*1e6, self.energy_slices_main/1e9, 'r', alpha=0.5, label='Slice mean $\mathcal{E}$ from tracking')
-            ax.legend()
             
         # Set label and other properties for the colorbar
         fig.suptitle('$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
@@ -1306,9 +1284,11 @@ class StagePrtclTransWakeInstability(Stage):
         if main_num_profile is None:
             main_num_profile = self.main_num_profile
         if zs_Ez is None:
-            zs_Ez = self.zs_Ez_axial
+            #zs_Ez = self.zs_Ez_axial
+            zs_Ez = self.initial.plasma.wakefield.onaxis.zs
         if Ez is None:
-            Ez = self.Ez_axial
+            #Ez = self.Ez_axial
+            Ez = self.initial.plasma.wakefield.onaxis.Ezs
         if Ez_cut is None:
             #Ez_cut = self.Ez_roi
             zs = self.main_beam.zs()
@@ -1357,223 +1337,6 @@ class StagePrtclTransWakeInstability(Stage):
         ax_rb_cut_wakeT2.set_ylabel('Bubble radius [$\mathrm{\mu}$m]')
         ax_rb_cut_wakeT2.legend(loc='upper right')
 
-
-    # ==================================================
-    # Plots the transverse oscillation vs propagation coordinate s for selected beam slices. TODO
-    def slice_offset_s_diag(self, beam):
-        z_slices = self.z_slices
-        
-        # Beam slices data
-        s_slices_table = self.s_slices_table_main
-        x_slices_table = self.x_slices_table_main
-        y_slices_table = self.y_slices_table_main
-
-        # Find the corresponding offset data for comparison
-        ref_slice_sigma_z_min2 = -2.0
-        ref_slice_sigma_z_min1 = -1.0
-        ref_slice_sigma_z_0 = 0.0
-        ref_slice_sigma_z_2 = 2.0
-        
-        mean_z = beam.z_offset(clean=False)
-        slice_index_min2, _ = find_closest_value_in_arr(z_slices, mean_z+ref_slice_sigma_z_min2*beam.bunch_length())  # index n_sigma_z*sigma_z away from beam center towards tail. Lower index towards tail.
-        slice_index_min1, _ = find_closest_value_in_arr(z_slices, mean_z+ref_slice_sigma_z_min1*beam.bunch_length())
-        slice_index_0, _ = find_closest_value_in_arr(z_slices, mean_z)
-        slice_index_2, _ = find_closest_value_in_arr(z_slices, mean_z+ref_slice_sigma_z_2*beam.bunch_length())
-        
-        s_min2 = s_slices_table[:,slice_index_min2]
-        X_min2 = x_slices_table[:,slice_index_min2]*1e6  # [um]
-        Y_min2 = y_slices_table[:,slice_index_min2]*1e6  # [um]
-        s_min1 = s_slices_table[:,slice_index_min1]
-        X_min1 = x_slices_table[:,slice_index_min1]*1e6  # [um]
-        Y_min1 = y_slices_table[:,slice_index_min1]*1e6  # [um]
-        s_0 = s_slices_table[:,slice_index_0]
-        X_0 = x_slices_table[:,slice_index_0]*1e6  # [um]
-        Y_0 = y_slices_table[:,slice_index_0]*1e6  # [um]
-        s_2 = s_slices_table[:,slice_index_2]
-        X_2 = x_slices_table[:,slice_index_2]*1e6  # [um]
-        Y_2 = y_slices_table[:,slice_index_2]*1e6  # [um]
-
-        # Make figure with axes
-        fig, axs = plt.subplots(nrows=1, ncols=4, layout="constrained", figsize=(3.5*4, 3))
-        slab = '$s$ [m]'
-        
-        axs[0].plot(s_min2, X_min2, label='$x$')
-        axs[0].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        axs[0].set_xlabel(slab)
-        axs[0].set_ylabel('$X$ [$\mathrm{\mu}$m]')
-        ax = plt.twinx(axs[0])
-        ax.plot(s_min2, Y_min2, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
-        lns = axs[0].get_lines() + ax.get_lines()
-        labs = [l.get_label() for l in lns]
-        axs[0].legend(lns, labs)
-        axs[0].set_title(r'Transverse offset, slice at $\langle\xi\rangle$' f"{round(ref_slice_sigma_z_min2)}"r'$\sigma_z$')
-        
-        axs[1].plot(s_min1, X_min1, label='x')
-        axs[1].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        axs[1].set_xlabel(slab)
-        axs[1].set_ylabel('$X$ [$\mathrm{\mu}$m]')
-        ax = plt.twinx(axs[1])
-        ax.plot(s_min1, Y_min1, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
-        lns = axs[1].get_lines() + ax.get_lines()
-        labs = [l.get_label() for l in lns]
-        axs[1].legend(lns, labs)
-        axs[1].set_title(r'Transverse offset, slice at $\langle\xi\rangle$' f"{round(ref_slice_sigma_z_min1)}"r'$\sigma_z$')
-        
-        axs[2].plot(s_0, X_0, label='x')
-        axs[2].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        axs[2].set_xlabel(slab)
-        axs[2].set_ylabel('$X$ [$\mathrm{\mu}$m]')
-        ax = plt.twinx(axs[2])
-        ax.plot(s_0, Y_0, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
-        lns = axs[2].get_lines() + ax.get_lines()
-        labs = [l.get_label() for l in lns]
-        axs[2].legend(lns, labs)
-        axs[2].set_title(r'Transverse offset, slice at $\langle\xi\rangle$')
-        
-        axs[3].plot(s_2, X_2, label='Model')
-        axs[3].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        axs[3].set_xlabel(slab)
-        axs[3].set_ylabel('$X$ [$\mathrm{\mu}$m]')
-        ax = plt.twinx(axs[3])
-        ax.plot(s_2, Y_2, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
-        lns = axs[3].get_lines() + ax.get_lines()
-        labs = [l.get_label() for l in lns]
-        axs[3].legend(lns, labs)
-        axs[3].set_title(r'Transverse offset, slice at $\langle\xi\rangle +$' f"{round(ref_slice_sigma_z_2)}"r'$\sigma_z$')
-
-    
-    # ==================================================
-    # Plots snapshots of the beam slices vs xi at various propagation distances s. TODO
-    def centroid_snapshot_plots(self, beam):
-
-        x_slices_table = self.x_slices_table_main
-        y_slices_table = self.y_slices_table_main
-        s_slices_table = self.s_slices_table_main
-        z_slices = self.z_slices
-        middle_slice_index, _ = find_closest_value_in_arr(z_slices, np.mean(z_slices))
-        mean_s = s_slices_table[:,middle_slice_index]
-
-        dN_dz, zs_dNdz = beam.longitudinal_num_density()
-        dN_dz = -dN_dz
-        zs_dNdz = zs_dNdz*1e6  # [um]
-        
-        
-        # Make figure with axes
-        fig, axs = plt.subplots(nrows=2, ncols=4, layout="constrained", figsize=(3.5*4, 3*2))
-        fig.suptitle('Beam slice transverse offsets along x')
-        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
-        xlab = r'$x$ [$\mathrm{\mu}$m]'
-
-        z_slices = z_slices*1e6  # [um]
-        
-        snap_idx = 0
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[0][0]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
-        snap_idx = int(len(mean_s)/8*2)
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[0][1]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
-        snap_idx = int(len(mean_s)/8*3)
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[0][2]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
-        snap_idx = int(len(mean_s)/8*4)
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[0][3]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
-        snap_idx = int(len(mean_s)/8*5)
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[1][0]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
-        snap_idx = int(len(mean_s)/8*6)
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[1][1]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
-        snap_idx = int(len(mean_s)/8*7)
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[1][2]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
-        snap_idx = -1
-        x_slices = x_slices_table[snap_idx,:]*1e6  # [um]
-        ax = axs[1][3]
-        ax.plot(z_slices, x_slices, '-x')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(xilab)
-        ax.set_ylabel(xlab)
-        ax.set_title(f"$s={round(mean_s[snap_idx],2)}$ m")
-        ax_twin = ax.twinx()
-        ax_twin.fill_between(x=zs_dNdz, y1=dN_dz, y2=0, color='g', alpha=0.3)
-        ax_twin.plot(zs_dNdz, dN_dz, 'g', alpha=0.5)
-        ax_twin.yaxis.set_ticks([])
-
     
     # ==================================================
     def print_initial_summary(self, drive_beam, main_beam):
@@ -1590,6 +1353,8 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             interstage_dipole_field = self.interstage_dipole_field
             print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
+
+        print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_rr) :s}")
 
         if self.main_source is None:
             main_symmetrise = 'Not registered.'
@@ -1613,8 +1378,8 @@ class StagePrtclTransWakeInstability(Stage):
 
         _, z_centre = find_closest_value_in_arr(arr=main_beam.zs(), val=main_beam.z_offset())  # Centre z of beam.
         print(f"Beam centre gradient [GV/m]:\t\t\t\t  \t\t {self.Ez_fit_obj(z_centre)/1e9 :.3f}")
-        print(f"Initial mean gamma:\t\t\t\t {np.mean(drive_beam.gamma()) :.3f} \t\t {np.mean(main_beam.gamma()) :.3f}")
-        print(f"Initial mean energy [GeV]:\t\t\t {np.mean(drive_beam.Es())/1e9 :.3f} \t\t {np.mean(main_beam.Es())/1e9 :.3f}")
+        print(f"Initial mean gamma:\t\t\t\t {drive_beam.gamma() :.3f} \t\t {main_beam.gamma() :.3f}")
+        print(f"Initial mean energy [GeV]:\t\t\t {drive_beam.energy()/1e9 :.3f} \t\t {main_beam.energy()/1e9 :.3f}")
         print(f"Initial rms energy spread [%]:\t\t\t {drive_beam.rel_energy_spread()*1e2 :.3f} \t\t\t {main_beam.rel_energy_spread()*1e2 :.3f}\n")
 
         print(f"Initial beam x offset [um]:\t\t\t {drive_beam.x_offset()*1e6 :.3f} \t\t {main_beam.x_offset()*1e6 :.3f}")
@@ -1623,15 +1388,15 @@ class StagePrtclTransWakeInstability(Stage):
 
         print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x()*1e6 :.3f} \t\t\t {main_beam.norm_emittance_x()*1e6 :.3f}")
         print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y()*1e6 :.3f} \t\t {main_beam.norm_emittance_y()*1e6 :.3f}\n")
-
-        print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(np.mean(main_beam.Es()))*1e3 :.3f}")
+        
+        print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(main_beam.energy())*1e3 :.3f}")
         print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x()*1e3 :.3f} \t\t {main_beam.beta_x()*1e3 :.3f}")
         print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y()*1e3 :.3f} \t\t {main_beam.beta_y()*1e3 :.3f}\n")
 
         print(f"Initial x beam size [um]:\t\t\t {drive_beam.beam_size_x()*1e6 :.3f} \t\t\t {main_beam.beam_size_x()*1e6 :.3f}")
         print(f"Initial y beam size [um]:\t\t\t {drive_beam.beam_size_y()*1e6 :.3f} \t\t\t {main_beam.beam_size_y()*1e6 :.3f}")
         print(f"Initial rms beam length [um]:\t\t\t {drive_beam.bunch_length()*1e6 :.3f} \t\t {main_beam.bunch_length()*1e6 :.3f}")
-        print(f"Initial peak current [kA]:\t\t\t {np.mean(drive_beam.peak_current())/1e3 :.3f} \t\t {np.mean(main_beam.peak_current())/1e3 :.3f}")
+        print(f"Initial peak current [kA]:\t\t\t {drive_beam.peak_current()/1e3 :.3f} \t\t {main_beam.peak_current()/1e3 :.3f}")
         print(f"Bubble radius at beam head [um]:\t\t \t\t\t {self.rb_fit_obj(np.max(main_beam.zs()))*1e6 :.3f}")
         print(f"Bubble radius at beam tail [um]:\t\t \t\t\t {self.rb_fit_obj(np.min(main_beam.zs()))*1e6 :.3f}")
         print('-------------------------------------------------------------------------------------')
@@ -1654,6 +1419,8 @@ class StagePrtclTransWakeInstability(Stage):
                 interstage_dipole_field = self.interstage_dipole_field
                 print(f"Interstage dipole field:\t\t {interstage_dipole_field :.3f}", file=f)
 
+            print(f"Radiation reaction enabled:\t\t {str(self.enable_rr) :s}", file=f)
+            
             if self.main_source is None:
                 main_symmetrise = 'Not registered.'
             else:
@@ -1680,9 +1447,9 @@ class StagePrtclTransWakeInstability(Stage):
             
             _, z_centre = find_closest_value_in_arr(arr=beam_out.zs(), val=beam_out.z_offset())  # Centre z of beam.
             print(f"Beam centre gradient [GV/m]:\t\t\t\t  \t\t {self.Ez_fit_obj(z_centre)/1e9 :.3f}", file=f)
-            print(f"Current mean gamma:\t\t\t\t \t \t\t {np.mean(beam_out.gamma()) :.3f}", file=f)
-            print(f"Initial mean energy [GeV]:\t\t\t {np.mean(drive_beam.Es())/1e9 :.3f} \t\t {np.mean(initial_main_beam.Es())/1e9 :.3f}", file=f)
-            print(f"Current mean energy [GeV]:\t\t\t \t \t\t {np.mean(beam_out.Es())/1e9 :.3f}", file=f)
+            print(f"Current mean gamma:\t\t\t\t \t \t\t {beam_out.gamma() :.3f}", file=f)
+            print(f"Initial mean energy [GeV]:\t\t\t {drive_beam.energy()/1e9 :.3f} \t\t {initial_main_beam.energy()/1e9 :.3f}", file=f)
+            print(f"Current mean energy [GeV]:\t\t\t \t \t\t {beam_out.energy()/1e9 :.3f}", file=f)
             print(f"Initial rms energy spread [%]:\t\t\t {drive_beam.rel_energy_spread()*1e2 :.3f} \t\t\t {initial_main_beam.rel_energy_spread()*1e2 :.3f}", file=f)
             print(f"Current rms energy spread [%]:\t\t\t  \t\t\t {beam_out.rel_energy_spread()*1e2 :.3f}\n", file=f)
     
@@ -1695,7 +1462,7 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y()*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y()*1e6 :.3f}", file=f)
             print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y()*1e6 :.3f}\n", file=f)
             
-            print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(np.mean(initial_main_beam.Es()))*1e3 :.3f}", file=f)
+            print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(initial_main_beam.energy())*1e3 :.3f}", file=f)
             print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x()*1e3 :.3f} \t\t {initial_main_beam.beta_x()*1e3 :.3f}", file=f)
             print(f"Current x beta function [mm]:\t\t\t \t \t\t {beam_out.beta_x()*1e3 :.3f}", file=f)
             print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y()*1e3 :.3f} \t\t {initial_main_beam.beta_y()*1e3 :.3f}", file=f)
@@ -1707,8 +1474,8 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Current y beam size [um]:\t\t\t  \t\t\t {beam_out.beam_size_y()*1e6 :.3f}", file=f)
             print(f"Initial rms beam length [um]:\t\t\t {drive_beam.bunch_length()*1e6 :.3f} \t\t {initial_main_beam.bunch_length()*1e6 :.3f}", file=f)
             print(f"Current rms beam length [um]:\t\t\t \t \t\t {beam_out.bunch_length()*1e6 :.3f}", file=f)
-            print(f"Initial peak current [kA]:\t\t\t {np.mean(drive_beam.peak_current())/1e3 :.3f} \t\t {np.mean(initial_main_beam.peak_current())/1e3 :.3f}", file=f)
-            print(f"Current peak current [kA]:\t\t\t  \t\t\t {np.mean(beam_out.peak_current())/1e3 :.3f}", file=f)
+            print(f"Initial peak current [kA]:\t\t\t {drive_beam.peak_current()/1e3 :.3f} \t\t {initial_main_beam.peak_current()/1e3 :.3f}", file=f)
+            print(f"Current peak current [kA]:\t\t\t  \t\t\t {beam_out.peak_current()/1e3 :.3f}", file=f)
             print(f"Bubble radius at beam head [um]:\t\t \t\t\t {self.rb_fit_obj(np.max(beam_out.zs()))*1e6 :.3f}", file=f)
             print(f"Bubble radius at beam tail [um]:\t\t \t\t\t {self.rb_fit_obj(np.min(beam_out.zs()))*1e6 :.3f}", file=f)
             print('-------------------------------------------------------------------------------------', file=f)
