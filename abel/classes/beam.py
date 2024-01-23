@@ -579,7 +579,7 @@ class Beam():
         
         # calculate final positions and angles after betatron motion
         if radiation_reaction:
-            xs, uxs, ys, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.uxs(), self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+            xs, ys, uxs, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.ys()-y0_driver, self.uxs(), self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
         else:
             xs, uxs = evolve_hills_equation_analytic(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
             ys, uys = evolve_hills_equation_analytic(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
