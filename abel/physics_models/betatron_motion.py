@@ -35,7 +35,7 @@ def acc_func(y, A, B, C, D):
     dgamma = A - D*y[:,-1]**2*(y[:,0]**2 + y[:,1]**2)
     return np.c_[y[:,2], y[:,3], ax, ay, dgamma]
 
-
+"""
 # Assume x0 etc is a vector containing appropriate value for each particle
 #def evolve_betatron_motion(x0, ux0, y0, uy0, L, gamma, kp, Es):
 def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
@@ -64,7 +64,7 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     length = x0.size
     
     vys = uy0/gamma
-    vxs = ux0/gamma   
+    vxs = ux0/gamma
     
     # Solve the equation of motion for each particle, and loop over As as well, as it is different for each particle
     def parallel_process(i):
@@ -161,7 +161,7 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     solution[:,3,-1]* solution[:,4,-1], solution[:,4,-1]*SI.m_e*SI.c**2 / SI.e
 
     
-"""
+
 
 
 
