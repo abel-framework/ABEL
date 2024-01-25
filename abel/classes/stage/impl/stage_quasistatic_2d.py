@@ -13,13 +13,13 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, transverse_instability=False, radiation_reaction=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, enable_transverse_instability=False, enable_radiation_reaction=False):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # physics flags
-        self.transverse_instability = transverse_instability
-        self.radiation_reaction = radiation_reaction
+        self.enable_transverse_instability = enable_transverse_instability
+        self.enable_radiation_reaction = enable_radiation_reaction
     
         
     # track the particles through
@@ -114,7 +114,7 @@ class StageQuasistatic2d(Stage):
         # remove temporary directory
         shutil.rmtree(tmpfolder)
         
-        if self.transverse_instability:
+        if self.enable_transverse_instability:
 
             # TODO: make sure driver offset is correctly handled
             
@@ -132,7 +132,7 @@ class StageQuasistatic2d(Stage):
             Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
 
             # perform tracking
-            beam, _, _, _, _, _ = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length, show_prog_bar=True)
+            beam = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length, show_prog_bar=True)
             
         else:
             
@@ -140,7 +140,7 @@ class StageQuasistatic2d(Stage):
             delta_Es = self.length*(beam.Es() - beam0.Es())/dz
             
             # find driver offset (to shift the beam relative) and apply betatron motion
-            Es_final = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction)
+            Es_final = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction)
             
             # accelerate beam (and remove nans)
             beam.set_Es(Es_final)
