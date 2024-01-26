@@ -7,7 +7,7 @@ from abel.utilities.relativity import energy2gamma
 
 class SourceTrapezoid(Source):
     
-    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, current_head=0, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
+    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, current_head=0, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, front_heavy_distribution=False):
         self.energy = energy
         self.charge = charge
         self.energy_spread = energy_spread # [eV]
@@ -31,6 +31,7 @@ class SourceTrapezoid(Source):
         self.wallplug_efficiency = wallplug_efficiency
         self.accel_gradient = accel_gradient
         self.symmetrize = symmetrize
+        self.front_heavy_distribution = front_heavy_distribution
         
         self.jitter = SimpleNamespace()
         self.jitter.x = 0
@@ -103,6 +104,29 @@ class SourceTrapezoid(Source):
         zs = np.zeros(num_particles_actual)
         zs[mask_uniform] = np.random.uniform(low=self.z_offset-self.bunch_length+z_jitter, high=self.z_offset+z_jitter, size = len(mask_uniform))
         zs[mask_triangle] = np.random.triangular(left=self.z_offset-self.bunch_length+z_jitter, right=self.z_offset+z_jitter, mode=zmode+z_jitter, size=len(mask_triangle))
+
+        # make particle distribution front-heavy (more particles at the bunch head)
+        if self.front_heavy_distribution:
+
+            # normalize distance within bunch
+            zmax = zs.max()
+            zmin = zs.min()
+            zs_norm = -(zs-zmax)/(zmax-zmin)
+
+            # shift normalized particles
+            front_heaviness = 10
+            zs_norm_redist = (1+1/front_heaviness)/((1-zs_norm)*front_heaviness+1)-1/front_heaviness
+            zs = zmax - (zmax-zmin)*zs_norm_redist
+
+            # recalculate weightings (lower where there are more particles)
+            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+            weightings[mask_uniform] = (1+front_heaviness*zs_norm_redist[mask_uniform])**2
+            weightings[mask_uniform] = weightings[mask_uniform]/(np.sum(weightings[mask_uniform])/(self.charge/SI.e))*np.sum(mask_uniform)/len(zs)
+            weightings[mask_triangle] = (1+front_heaviness*zs_norm_redist[mask_triangle])**3
+            weightings[mask_triangle] = weightings[mask_triangle]/(np.sum(weightings[mask_triangle])/(self.charge/SI.e))*np.sum(mask_triangle)/len(zs)
+            
+        else:
+            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
         
         # energies
         Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
@@ -111,9 +135,10 @@ class SourceTrapezoid(Source):
         if self.symmetrize:
             zs = np.tile(zs, num_tiling)
             Es = np.tile(Es, num_tiling)
+            weightings = np.tile(weightings, num_tiling)
         
         # create phase space
-        beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge)
+        beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge, weightings=weightings)
         
         return super().track(beam, savedepth, runnable, verbose)
     
