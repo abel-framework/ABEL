@@ -3,14 +3,103 @@ from scipy.integrate import solve_ivp, odeint
 import scipy.constants as SI
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
+from numba import jit, prange
 import multiprocessing
 import os
-
+import time
 num_cores = multiprocessing.cpu_count()
 os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
 
 re = SI.physical_constants['classical electron radius'][0]
 
+#For matrix of particles and coordinates
+@jit(nopython=True, parallel=False)
+def acc_func(ys, A, B, C, D):
+    # ys =[[x0, x1, x2, ...           ]
+    #     [y0, y1, y2, ...            ]
+    #     [vx0, vx1, vx2, ...         ]
+    #     [vy0, vy1, vy2, ...         ]
+    #     [gamma0, gamma1, gamma2, ...]]
+    ax = -(A/ys[4] + B)*ys[2] - C/ys[4]*ys[0]
+    ay = -(A/ys[4] + B)*ys[3] - C/ys[4]*ys[1]
+    dgamma = A - D*ys[4]**2*(ys[0]**2 + ys[1]**2)
+
+    result = np.empty_like(ys, dtype = np.float64)
+    result[0] = ys[2]
+    result[1] = ys[3]
+    result[2] = ax
+    result[3] = ay
+    result[4] = dgamma
+    
+    return result
+    
+@jit(nopython=False, parallel=True)
+def parallel_process(particle_matrix, A_vec, B, C, D, n, dz, n_cores):
+    result = [np.empty_like(particle_matrix[0], dtype=np.float64) for _ in range(n_cores)]
+    for j in prange(n_cores):
+        mat = particle_matrix[j].copy()
+        A = A_vec[j]
+        for i in range(n-1):
+            y_ = mat[:,:,i]
+            
+            k1 = acc_func(y_, A, B, C, D)
+        
+            k2 = acc_func(y_ + k1 * dz/2, A, B, C, D)
+            
+            k3 = acc_func(y_ + k2 * dz/2, A, B, C, D)
+            
+            k4 = acc_func(y_ + k3 * dz, A, B, C, D)
+            
+            k_av = 1/6*(k1+2*k2+2*k3+k4)
+            
+            mat[:,:,i+1] = y_ + k_av*dz
+        result[j] = mat
+    return result
+    
+#@jit(nopython=True)           
+def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
+    # Constants
+    #Ezs = Es/L #eV/m = J/e/m = V/m
+    n_cores = 16
+    
+    #Ezs = dgamma_ds*SI.m_e*SI.c**2/SI.e #eV/m = J/e/m = V/m
+    K_sq = kp**2/2
+    
+    C = K_sq # constant
+    As = dgamma_ds # vector, dependant on Ez = E / L
+    #Plasma constants
+    
+    #tau_r = 2*re/3/SI.c
+    B = 2/3 * re* C # constant
+    D = B * K_sq # constant
+
+    #Find the smallest wavelength of oscillations to resolve
+    beta_matched = np.sqrt(2*gamma)/kp # Vector
+    lambda_beta = min(2*np.pi*beta_matched) # Vector
+    n_per_beta = 200
+    
+    #Find the appropriate ammount of steps to resolve each oscillation    
+    n = round(L/lambda_beta * n_per_beta)
+    dz = L/(n-1)
+    
+    vys = uy0/gamma/SI.c #velocity with respect to z instead of t
+    vxs = ux0/gamma/SI.c
+    
+    Particles = np.zeros((5, len(x0), n))
+    Particles[:,:,0]= [x0, y0, vxs, vys, gamma]
+
+    split_array = [round(len(x0)/n_cores*i) for i in range(1,n_cores)]
+    particle_matrix = np.split(Particles,split_array, axis = 1)
+    A_vec = np.split(As, split_array)
+    start = time.time()
+    result = parallel_process(particle_matrix, A_vec, B, C, D, n, dz, n_cores)
+    end = time.time()
+    print('time = ',end-start, ' sec')
+    solution = np.concatenate(result, axis = 1)
+    # xs, uxs, ys, uys, Es = solution[:,0,-1], solution[:,1,-1], solution[:,2,-1], solution[:,3,-1], solution[:,4,-1]
+    return solution[0,:,-1], solution[1,:,-1], solution[2,:,-1] * solution[4,:,-1]*SI.c, solution[3,:,-1]* solution[4,:,-1]*SI.c, solution[4,:,-1]*SI.m_e*SI.c**2 / SI.e
+    
+"""
 # Calculate acceleration and change in gamma
 def oscillator2d(t, x, A, B, C, D):
     # x= [x,vx, y, vy, gamma]
@@ -25,17 +114,6 @@ def oscillator2d(t, x, A, B, C, D):
     
     return np.array([vx_, a_x, vy_, a_y, d_gamma])
 
-#For matrix of particles and coordinates
-def acc_func(y, A, B, C, D):
-    # y =[[x, y, vx, vy, gamma]
-    #     [same for nesxt part] ...]
-    dy = np.zeros(y.shape) # [[vx, vy, ax, xy, dgamma] ...]
-    ax = -(A/y[:,-1] + B)*y[:,2] - C/y[:,-1]*y[:,0]
-    ay = -(A/y[:,-1] + B)*y[:,3] - C/y[:,-1]*y[:,1]
-    dgamma = A - D*y[:,-1]**2*(y[:,0]**2 + y[:,1]**2)
-    return np.c_[y[:,2], y[:,3], ax, ay, dgamma]
-
-"""
 # Assume x0 etc is a vector containing appropriate value for each particle
 #def evolve_betatron_motion(x0, ux0, y0, uy0, L, gamma, kp, Es):
 def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
@@ -55,7 +133,7 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 500
+    n_per_beta = 200
     #Find the appropriate ammount of steps to resolve each oscillation
     T = L/SI.c    
     n = round(L/lambda_beta * n_per_beta)
@@ -65,7 +143,7 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     
     vys = uy0/gamma
     vxs = ux0/gamma
-    
+    n_cores = 16
     # Solve the equation of motion for each particle, and loop over As as well, as it is different for each particle
     def parallel_process(i):
         x_, vx_, y_, vy_, gamma_, A_ = x0[i], vxs[i], y0[i], vys[i], gamma[i], As[i]
@@ -106,80 +184,13 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
         #Es[i] = E
     
         return x_end, ux_end, y_end, uy_end, E
-
-    res = np.array(Parallel(n_jobs=15)(delayed(parallel_process)(i) for i in range(length)))
+    
+    res = np.array(Parallel(n_jobs=n_cores)(delayed(parallel_process)(i) for i in range(length)))
 
     xs, uxs, ys, uys, Es = res[:,0], res[:,1], res[:,2], res[:,3], res[:,4]
 
     return xs, ys, uxs, uys, Es
-
 """
-def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
-    # Constants
-    #Ezs = Es/L #eV/m = J/e/m = V/m
-    Ezs = dgamma_ds*SI.m_e*SI.c**2/SI.e #eV/m = J/e/m = V/m
-    K = kp/ np.sqrt(2)
-    
-    C = SI.c**2 * K**2 # constant
-    As = SI.e/SI.m_e/SI.c * Ezs # vector, dependant on Ez = E / L
-    #Plasma constants
-    tau_r = 2*re/3/SI.c
-    B = tau_r * C # constant
-    D = B * K**2 # constant
-
-    #Find the smallest wavelength of oscillations to resolve
-    beta_matched = np.sqrt(2*gamma)/kp # Vector
-    lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 500
-    #Find the appropriate ammount of steps to resolve each oscillation
-    T = L/SI.c    
-    n = round(L/lambda_beta * n_per_beta)
-    t, dt = np.linspace(0,T,n, retstep = True)
-    
-    vys = uy0/gamma
-    vxs = ux0/gamma
-    
-    y = np.c_[x0, y0, vxs, vys, gamma]
-    solution = np.zeros((y.shape[0], y.shape[1], t.size))
-    solution[:,:,0] = y
-    for i in range(t.size -1):
-        y_ = solution[:,:,i]
-        k1 = acc_func(y_, As, B, C, D)
-        
-        k2 = acc_func(y_ + k1 * dt/2, As, B, C, D)
-        
-        k3 = acc_func(y_ + k2 * dt/2, As, B, C, D)
-
-        k4 = acc_func(y_ + k3 * dt, As, B, C, D)
-        
-        k_av = 1/6*(k1+2*k2+2*k3+k4)
-        
-        solution[:,:,i+1] = y_ + k_av*dt
-
-    # xs, uxs, ys, uys, Es = solution[:,0,-1], solution[:,1,-1], solution[:,2,-1], solution[:,3,-1], solution[:,4,-1]
-    return solution[:,0,-1], solution[:,1,-1], solution[:,2,-1] * solution[:,4,-1], \
-    solution[:,3,-1]* solution[:,4,-1], solution[:,4,-1]*SI.m_e*SI.c**2 / SI.e
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
