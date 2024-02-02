@@ -13,14 +13,14 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, transverse_instability=False, radiation_reaction=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, transverse_instability=False, radiation_reaction=False, save_evolution = False):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # physics flags
         self.transverse_instability = transverse_instability
         self.radiation_reaction = radiation_reaction
-    
+        self.save_evolution = save_evolution
         
     # track the particles through
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
@@ -140,10 +140,13 @@ class StageQuasistatic2d(Stage):
             delta_Es = self.length*(beam.Es() - beam0.Es())/dz
             
             # find driver offset (to shift the beam relative) and apply betatron motion
-            Es_final = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction)
+            Es_final, evolution = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction, save_evolution = self.save_evolution)
             
             # accelerate beam (and remove nans)
             beam.set_Es(Es_final)
+            if self.save_evolution:
+                self.evolution = evolution
+                self.evolution.location = beam0.location
             
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length*(driver0.Es()-driver.Es())/dz
@@ -170,4 +173,26 @@ class StageQuasistatic2d(Stage):
         self.calculate_beam_current(beam0, driver0, beam, driver)
         
         return super().track(beam, savedepth, runnable, verbose)
+
+    """
+    def plot_quasistatic_evolution(self):
+        if not hasattr(self.evolution, 'location'):
+            print('No evolution calculated')
+            return
+            
+        # preprate plot
+        fig, axs = plt.subplots(2,2)
+        fig.set_figwidth(CONFIG.plot_fullwidth_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        long_label = 'Location [m]'
+        long_limits = [min(self.evolution.location), max(self.evolution.location)]
+
+        # plot energy
+        axs[0,0].plot(self.evolution.location, self.evolution.energy / 1e9, color=col1)
+        axs[0,0].set_ylabel('Energy [GeV]')
+        axs[0,0].set_xlim(long_limits)
+    """
     

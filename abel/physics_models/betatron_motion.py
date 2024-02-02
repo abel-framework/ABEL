@@ -4,6 +4,7 @@ import scipy.constants as SI
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 from numba import jit, prange
+from types import SimpleNamespace
 import multiprocessing
 import os
 import time
@@ -33,32 +34,69 @@ def acc_func(ys, A, B, C, D):
     
     return result
     
-@jit(nopython=True, parallel=True)
-def parallel_process(particle_list, A_list, B, C, D, n, dz, n_cores):
+@jit(nopython=False, parallel=True)
+def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution = False):
     result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
+    evolution = [np.zeros((4, n)) for _ in range(n_cores)]
+    Q_core = [np.sum(q) for q in Q_list]
     for j in prange(n_cores):
         mat = particle_list[j].copy()
         A = A_list[j]
-        for i in range(n-1):
-            k1 = acc_func(mat, A, B, C, D)
-
-            k2 = acc_func(mat + k1 * dz/2, A, B, C, D)
+        q = Q_list[j]
+        if save_evolution:
+            evolution[j][0,0] = np.sum(q*mat[0])
+            evolution[j][1,0] = np.sum(q*mat[1])
+            evolution[j][2,0] = np.sum(q*mat[4])
+            evolution[j][3,0] = np.sum(q*mat[4]**2)
+            for i in range(n-1):
+                k1 = acc_func(mat, A, B, C, D)
+    
+                k2 = acc_func(mat + k1 * dz/2, A, B, C, D)
+                
+                k3 = acc_func(mat + k2 * dz/2, A, B, C, D)
+                
+                k4 = acc_func(mat + k3 * dz, A, B, C, D)
+                
+                k_av = 1/6*(k1+2*k2+2*k3+k4)
+                
+                mat += k_av*dz
+ 
+                evolution[j][0,i+1] = np.sum(q*mat[0])
+                evolution[j][1,i+1] = np.sum(q*mat[1])
+                evolution[j][2,i+1] = np.sum(q*mat[4])
+                evolution[j][3,i+1] = np.sum(q*mat[4]**2)
+        else:
+            for i in range(n-1):
+                k1 = acc_func(mat, A, B, C, D)
             
-            k3 = acc_func(mat + k2 * dz/2, A, B, C, D)
-            
-            k4 = acc_func(mat + k3 * dz, A, B, C, D)
-            
-            k_av = 1/6*(k1+2*k2+2*k3+k4)
-            
-            mat += k_av*dz
+                k2 = acc_func(mat + k1 * dz/2, A, B, C, D)
+                
+                k3 = acc_func(mat + k2 * dz/2, A, B, C, D)
+                
+                k4 = acc_func(mat + k3 * dz, A, B, C, D)
+                
+                k_av = 1/6*(k1+2*k2+2*k3+k4)
+                
+                mat += k_av*dz
+                
         result[j] = mat
-    return result
+
+    if save_evolution:
+        evolution_tot = evolution[0]
+        for i in range(n_cores-1):
+            evolution_tot += evolution[i+1]
+        evolution_tot[0] = evolution_tot[0]/Q_tot
+        evolution_tot[1] = evolution_tot[1]/Q_tot
+        evolution_tot[2] = evolution_tot[2]/Q_tot
+        evolution_tot[3] = np.sqrt(evolution_tot[3])/(Q_tot-1)
+    return result, evolution
     
 #@jit(nopython=True)           
-def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
+def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_evolution = False):
     # Constants
     #Ezs = Es/L #eV/m = J/e/m = V/m
-    n_cores = 16
+    n_cores = max(1,min(16, round(len(x0)/10000)))
+    print("Number of cores:", n_cores)
     
     #Ezs = dgamma_ds*SI.m_e*SI.c**2/SI.e #eV/m = J/e/m = V/m
     K_sq = kp**2/2
@@ -82,24 +120,30 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     
     vys = uy0/gamma/SI.c #velocity with respect to z instead of t
     vxs = ux0/gamma/SI.c
-    
+
     Particles = np.zeros((5, len(x0)))#, n))
     Particles[:,:] = [x0, y0, vxs, vys, gamma]
-
-    split_array = [round(len(x0)/n_cores*i) for i in range(1,n_cores)]
-    particle_list = np.split(Particles,split_array, axis = 1)
-    particle_list = [np.ascontiguousarray(particle_list[i]) for i in range(n_cores)]
-    A_list = np.split(As, split_array)
     
+    particle_list = np.array_split(Particles,n_cores, axis=1)#split_array, axis = 1)
+    Q_list = np.array_split(qs, n_cores)
+    A_list = np.array_split(As, n_cores)
+    Q_tot = np.sum(qs)
     start = time.time()
-    results = parallel_process(particle_list, A_list, B, C, D, n, dz, n_cores)
+    results, evolution = parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution = save_evolution)
     #print(results)
     end = time.time()
-    
     print('time = ',end-start, ' sec')
+    evolution = np.concatenate(evolution, axis =1)
+    
+    evolution_ = SimpleNamespace()
+    evolution_.x = evolution[0]
+    evolution_.y = evolution[1]
+    evolution_.energy = evolution[2]*SI.m_e*SI.c**2/SI.e
+    
+    
     solution = np.concatenate(results, axis = 1)
     # xs, uxs, ys, uys, Es = solution[:,0,-1], solution[:,1,-1], solution[:,2,-1], solution[:,3,-1], solution[:,4,-1]
-    return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e
+    return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e, evolution_
     
 """
 # Calculate acceleration and change in gamma
@@ -145,7 +189,7 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     
     vys = uy0/gamma
     vxs = ux0/gamma
-    n_cores = 16
+    n_cores = 24
     # Solve the equation of motion for each particle, and loop over As as well, as it is different for each particle
     def parallel_process(i):
         x_, vx_, y_, vy_, gamma_, A_ = x0[i], vxs[i], y0[i], vys[i], gamma[i], As[i]
@@ -184,7 +228,6 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
 
         E = gamma_end*SI.m_e*SI.c**2 / SI.e # eV
         #Es[i] = E
-    
         return x_end, ux_end, y_end, uy_end, E
     
     res = np.array(Parallel(n_jobs=n_cores)(delayed(parallel_process)(i) for i in range(length)))
@@ -192,8 +235,8 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     xs, uxs, ys, uys, Es = res[:,0], res[:,1], res[:,2], res[:,3], res[:,4]
 
     return xs, ys, uxs, uys, Es
-"""
 
+"""
 
 
 
