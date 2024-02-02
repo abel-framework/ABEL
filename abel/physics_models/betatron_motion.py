@@ -13,7 +13,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
 re = SI.physical_constants['classical electron radius'][0]
 
 #For matrix of particles and coordinates
-@jit(nopython=True, parallel=False)
+@jit(nopython=True)
 def acc_func(ys, A, B, C, D):
     # ys =[[x0, x1, x2, ...           ]
     #     [y0, y1, y2, ...            ]
@@ -33,26 +33,24 @@ def acc_func(ys, A, B, C, D):
     
     return result
     
-@jit(nopython=False, parallel=True)
-def parallel_process(particle_matrix, A_vec, B, C, D, n, dz, n_cores):
-    result = [np.empty_like(particle_matrix[0], dtype=np.float64) for _ in range(n_cores)]
+@jit(nopython=True, parallel=True)
+def parallel_process(particle_list, A_list, B, C, D, n, dz, n_cores):
+    result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
     for j in prange(n_cores):
-        mat = particle_matrix[j].copy()
-        A = A_vec[j]
+        mat = particle_list[j].copy()
+        A = A_list[j]
         for i in range(n-1):
-            y_ = mat[:,:,i]
+            k1 = acc_func(mat, A, B, C, D)
+
+            k2 = acc_func(mat + k1 * dz/2, A, B, C, D)
             
-            k1 = acc_func(y_, A, B, C, D)
-        
-            k2 = acc_func(y_ + k1 * dz/2, A, B, C, D)
+            k3 = acc_func(mat + k2 * dz/2, A, B, C, D)
             
-            k3 = acc_func(y_ + k2 * dz/2, A, B, C, D)
-            
-            k4 = acc_func(y_ + k3 * dz, A, B, C, D)
+            k4 = acc_func(mat + k3 * dz, A, B, C, D)
             
             k_av = 1/6*(k1+2*k2+2*k3+k4)
             
-            mat[:,:,i+1] = y_ + k_av*dz
+            mat += k_av*dz
         result[j] = mat
     return result
     
@@ -85,19 +83,23 @@ def evolve_betatron_motion(x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp):
     vys = uy0/gamma/SI.c #velocity with respect to z instead of t
     vxs = ux0/gamma/SI.c
     
-    Particles = np.zeros((5, len(x0), n))
-    Particles[:,:,0]= [x0, y0, vxs, vys, gamma]
+    Particles = np.zeros((5, len(x0)))#, n))
+    Particles[:,:] = [x0, y0, vxs, vys, gamma]
 
     split_array = [round(len(x0)/n_cores*i) for i in range(1,n_cores)]
-    particle_matrix = np.split(Particles,split_array, axis = 1)
-    A_vec = np.split(As, split_array)
+    particle_list = np.split(Particles,split_array, axis = 1)
+    particle_list = [np.ascontiguousarray(particle_list[i]) for i in range(n_cores)]
+    A_list = np.split(As, split_array)
+    
     start = time.time()
-    result = parallel_process(particle_matrix, A_vec, B, C, D, n, dz, n_cores)
+    results = parallel_process(particle_list, A_list, B, C, D, n, dz, n_cores)
+    #print(results)
     end = time.time()
+    
     print('time = ',end-start, ' sec')
-    solution = np.concatenate(result, axis = 1)
+    solution = np.concatenate(results, axis = 1)
     # xs, uxs, ys, uys, Es = solution[:,0,-1], solution[:,1,-1], solution[:,2,-1], solution[:,3,-1], solution[:,4,-1]
-    return solution[0,:,-1], solution[1,:,-1], solution[2,:,-1] * solution[4,:,-1]*SI.c, solution[3,:,-1]* solution[4,:,-1]*SI.c, solution[4,:,-1]*SI.m_e*SI.c**2 / SI.e
+    return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e
     
 """
 # Calculate acceleration and change in gamma
