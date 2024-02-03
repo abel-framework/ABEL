@@ -165,7 +165,10 @@ class Beam():
         self.set_qs(np.median(beam.qs()))
 
     def scale_charge(self, Q):
-        self.set_qs(Q*self.qs()/self.charge())
+        self.set_qs((Q/self.charge())*self.qs())
+
+    def scale_energy(self, E):
+        self.set_Es((E/self.energy())*self.Es())
     
     
     def rs(self):

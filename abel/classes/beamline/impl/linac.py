@@ -299,6 +299,7 @@ class Linac(Beamline):
         axs[0,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
         axs[0,1].set_xlabel(long_label)
         axs[0,1].set_ylabel('Charge [nC]')
+        axs[0,1].set_ylim(0, Q0 * 1.3 * 1e9)
         
         axs[1,1].plot(long_axis, sigzs*1e6, color=col1)
         axs[1,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigzs+sigzs_error, np.flip(sigzs-sigzs_error))) * 1e6, color=col1, alpha=af)

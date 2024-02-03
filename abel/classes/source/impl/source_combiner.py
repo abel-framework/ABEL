@@ -8,7 +8,7 @@ class SourceCombiner(Source):
         self.source2 = source2
     
     
-    def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
+    def track(self, _=None, savedepth=0, runnable=None, verbose=False):
         
         # generate beams
         beam1 = self.source1.track(None, savedepth, runnable, verbose)

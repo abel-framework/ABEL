@@ -13,7 +13,7 @@ import dill as pickle
 class Runnable(ABC):
     
     # run simulation
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=True, parallel=False, max_cores=16): 
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=None, overwrite=True, parallel=False, max_cores=16): 
         # TODO: implement overwrite_from=(trackable)
         
         # define run name (generate if not given)
@@ -21,6 +21,10 @@ class Runnable(ABC):
             self.run_name = 'run_' + datetime.now().strftime('%Y%m%d_%H%M%S')
         else:
             self.run_name = run_name
+        
+        # default verbosity
+        if verbose is None:
+            verbose = not parallel
         
         # save variables
         self.num_shots = num_shots
@@ -204,13 +208,17 @@ class Runnable(ABC):
         return hasattr(self, 'scan_fcn')
         
     # scan function
-    def scan(self, run_name=None, fcn=None, vals=None, label=None, scale=1, num_shots_per_step=1, savedepth=2, verbose=True, overwrite=True, parallel=False, max_cores=16):
-        
+    def scan(self, run_name=None, fcn=None, vals=None, label=None, scale=1, num_shots_per_step=1, savedepth=2, verbose=None, overwrite=True, parallel=False, max_cores=16):
+
         # define run name (generate if not given)
         if run_name is None:
             self.run_name = "scan_" + datetime.now().strftime("%Y%m%d_%H%M%S")
         else:
             self.run_name = run_name
+        
+        # default verbosity
+        if verbose is None:
+            verbose = not parallel
         
         # set scan values
         self.scan_fcn = fcn
@@ -235,6 +243,9 @@ class Runnable(ABC):
 
     def plot_energy(self, index=-1):
         self.plot_beam_function(Beam.energy, scale=1e9, label='Energy (GeV)', index=index)
+
+    def plot_energy_spread(self, index=-1):
+        self.plot_beam_function(Beam.rel_energy_spread, scale=1e-2, label='Energy spread, rms (%)', index=index)
 
     def plot_charge(self, index=-1):
         self.plot_beam_function(Beam.charge, scale=1e-9, label='Charge (nC)', index=index)
@@ -272,7 +283,7 @@ class Runnable(ABC):
         fig.set_figwidth(CONFIG.plot_width_default)
         fig.set_figheight(CONFIG.plot_width_default*0.6)
         
-        ax.errorbar(self.vals/self.scale, val_mean/scale, val_std/scale, ls=':', capsize=5)
+        ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5)
         ax.set_xlabel(self.label)
         ax.set_ylabel(label)
         ax.set_xscale(xscale)
