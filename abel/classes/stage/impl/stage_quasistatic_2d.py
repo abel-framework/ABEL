@@ -140,14 +140,16 @@ class StageQuasistatic2d(Stage):
             delta_Es = self.length*(beam.Es() - beam0.Es())/dz
             
             # find driver offset (to shift the beam relative) and apply betatron motion
-            Es_final, evolution = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction, save_evolution = self.save_evolution)
+            Es_final, evolution, location = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction, save_evolution = self.save_evolution)
             
             # accelerate beam (and remove nans)
             beam.set_Es(Es_final)
             if self.save_evolution:
-                self.evolution = evolution
-                self.evolution.location = beam0.location
-            
+                self.evolution.x = evolution[0]
+                self.evolution.y = evolution[1]
+                self.evolution.energy = evolution[2]
+                self.evolution.rel_energy_spread = evolution[3]
+                self.evolution.location = location
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length*(driver0.Es()-driver.Es())/dz
         driver.apply_betatron_damping(delta_Es_driver)
@@ -161,7 +163,7 @@ class StageQuasistatic2d(Stage):
         beam.trackable_number = beam0.trackable_number
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
-        
+            
         # clean nan particles and extreme outliers
         beam.remove_nans()
         beam.remove_halo_particles()
@@ -174,7 +176,7 @@ class StageQuasistatic2d(Stage):
         
         return super().track(beam, savedepth, runnable, verbose)
 
-    """
+    
     def plot_quasistatic_evolution(self):
         if not hasattr(self.evolution, 'location'):
             print('No evolution calculated')
@@ -193,6 +195,23 @@ class StageQuasistatic2d(Stage):
         # plot energy
         axs[0,0].plot(self.evolution.location, self.evolution.energy / 1e9, color=col1)
         axs[0,0].set_ylabel('Energy [GeV]')
-        axs[0,0].set_xlim(long_limits)
-    """
+        #axs[0,0].set_xlim(long_limits)
+        
+        # plot energy spread
+        axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)
+        axs[1,0].set_ylabel('Energy spread, rms [%]')
+        axs[1,0].set_xlabel(long_label)
+        #axs[1,0].set_xlim(long_limits)
+        axs[1,0].set_yscale('log')
+        
+        # plot transverse offset
+        axs[0,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
+        axs[0,1].set_ylabel('Transverse offset in x [$\mathrm{\mu}$m]')
+        #axs[0,1].set_xlabel(long_label)
+        #axs[0,1].set_xlim(long_limits)
+        
+        axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)
+        axs[1,1].set_ylabel('Transverse offset in y [$\mathrm{\mu}$m]')
+        axs[1,1].set_xlabel(long_label)
+        #axs[1,1].set_xlim(long_limits)
     

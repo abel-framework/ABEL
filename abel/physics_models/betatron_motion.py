@@ -3,7 +3,7 @@ from scipy.integrate import solve_ivp, odeint
 import scipy.constants as SI
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
-from numba import jit, prange
+from numba import prange, jit
 from types import SimpleNamespace
 import multiprocessing
 import os
@@ -14,7 +14,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
 re = SI.physical_constants['classical electron radius'][0]
 
 #For matrix of particles and coordinates
-@jit(nopython=True)
+@jit(nopython=False)
 def acc_func(ys, A, B, C, D):
     # ys =[[x0, x1, x2, ...           ]
     #     [y0, y1, y2, ...            ]
@@ -25,20 +25,20 @@ def acc_func(ys, A, B, C, D):
     ay = -(A/ys[4] + B)*ys[3] - C/ys[4]*ys[1]
     dgamma = A - D*ys[4]**2*(ys[0]**2 + ys[1]**2)
 
-    result = np.empty_like(ys, dtype = np.float64)
-    result[0] = ys[2]
-    result[1] = ys[3]
-    result[2] = ax
-    result[3] = ay
-    result[4] = dgamma
+    dy_dz = np.empty_like(ys, dtype = np.float64)
+    dy_dz[0] = ys[2]
+    dy_dz[1] = ys[3]
+    dy_dz[2] = ax
+    dy_dz[3] = ay
+    dy_dz[4] = dgamma
     
-    return result
+    return dy_dz
     
-@jit(nopython=False, parallel=True)
-def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution = False):
+@jit(nopython=True, parallel=True)
+def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution):
     result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
-    evolution = [np.zeros((4, n)) for _ in range(n_cores)]
-    Q_core = [np.sum(q) for q in Q_list]
+    evolution = [np.zeros((4, n), dtype = np.float64) for _ in range(n_cores)]
+    #Q_core = [np.sum(q) for q in Q_list]
     for j in prange(n_cores):
         mat = particle_list[j].copy()
         A = A_list[j]
@@ -47,7 +47,7 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
             evolution[j][0,0] = np.sum(q*mat[0])
             evolution[j][1,0] = np.sum(q*mat[1])
             evolution[j][2,0] = np.sum(q*mat[4])
-            evolution[j][3,0] = np.sum(q*mat[4]**2)
+            evolution[j][3,0] = np.sum(q*(mat[4]-np.sum(q*mat[4])/np.sum(q))**2)
             for i in range(n-1):
                 k1 = acc_func(mat, A, B, C, D)
     
@@ -64,7 +64,8 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 evolution[j][0,i+1] = np.sum(q*mat[0])
                 evolution[j][1,i+1] = np.sum(q*mat[1])
                 evolution[j][2,i+1] = np.sum(q*mat[4])
-                evolution[j][3,i+1] = np.sum(q*mat[4]**2)
+                evolution[j][3,i+1] = np.sum(q*(mat[4]-np.sum(q*mat[4])/np.sum(q))**2)
+            
         else:
             for i in range(n-1):
                 k1 = acc_func(mat, A, B, C, D)
@@ -80,19 +81,19 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 mat += k_av*dz
                 
         result[j] = mat
-
+        
+    evolution_tot = evolution[0]
     if save_evolution:
-        evolution_tot = evolution[0]
         for i in range(n_cores-1):
             evolution_tot += evolution[i+1]
         evolution_tot[0] = evolution_tot[0]/Q_tot
         evolution_tot[1] = evolution_tot[1]/Q_tot
         evolution_tot[2] = evolution_tot[2]/Q_tot
-        evolution_tot[3] = np.sqrt(evolution_tot[3])/(Q_tot-1)
-    return result, evolution
+        evolution_tot[3] = np.sqrt(evolution_tot[3]/Q_tot)
     
-#@jit(nopython=True)           
-def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_evolution = False):
+    return result, evolution_tot
+          
+def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_evolution, cache = True):
     # Constants
     #Ezs = Es/L #eV/m = J/e/m = V/m
     n_cores = max(1,min(16, round(len(x0)/10000)))
@@ -112,7 +113,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 200
+    n_per_beta = 150
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
@@ -122,28 +123,31 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     vxs = ux0/gamma/SI.c
 
     Particles = np.zeros((5, len(x0)))#, n))
-    Particles[:,:] = [x0, y0, vxs, vys, gamma]
+    Particles[0] = x0
+    Particles[1] = y0
+    Particles[2] = vxs
+    Particles[3] = vys
+    Particles[4] = gamma
     
     particle_list = np.array_split(Particles,n_cores, axis=1)#split_array, axis = 1)
+    #qs = qs/(-SI.e)
     Q_list = np.array_split(qs, n_cores)
     A_list = np.array_split(As, n_cores)
     Q_tot = np.sum(qs)
+
     start = time.time()
-    results, evolution = parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution = save_evolution)
-    #print(results)
+    results, evolution = parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution)
     end = time.time()
-    print('time = ',end-start, ' sec')
-    evolution = np.concatenate(evolution, axis =1)
-    
-    evolution_ = SimpleNamespace()
-    evolution_.x = evolution[0]
-    evolution_.y = evolution[1]
-    evolution_.energy = evolution[2]*SI.m_e*SI.c**2/SI.e
+    print('time = ', end-start, ' sec')
+    if save_evolution:
+        evolution[2] = evolution[2]*SI.m_e*SI.c**2/SI.e
+        evolution[3] = evolution[3]*SI.m_e*SI.c**2/SI.e/evolution[2]
+    location = np.linspace(0,L,n)
     
     
-    solution = np.concatenate(results, axis = 1)
-    # xs, uxs, ys, uys, Es = solution[:,0,-1], solution[:,1,-1], solution[:,2,-1], solution[:,3,-1], solution[:,4,-1]
-    return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e, evolution_
+    solution: np.ndarray = np.concatenate(results, axis=1)
+
+    return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e, evolution, location
     
 """
 # Calculate acceleration and change in gamma
