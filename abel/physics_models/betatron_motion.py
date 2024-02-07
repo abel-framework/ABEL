@@ -3,24 +3,26 @@ from scipy.integrate import solve_ivp, odeint
 import scipy.constants as SI
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
-from numba import prange, jit
+from numba import prange, jit, njit
+import numba as nb
 from types import SimpleNamespace
 import multiprocessing
 import os
 import time
+from abel.utilities.statistics import weighted_cov
 num_cores = multiprocessing.cpu_count()
 os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
 
 re = SI.physical_constants['classical electron radius'][0]
 
 #For matrix of particles and coordinates
-@jit(nopython=False)
+@njit("float64[:, :](float64[:, :], float64[::1], float64, float64, float64)")
 def acc_func(ys, A, B, C, D):
-    # ys =[[x0, x1, x2, ...           ]
-    #     [y0, y1, y2, ...            ]
-    #     [vx0, vx1, vx2, ...         ]
-    #     [vy0, vy1, vy2, ...         ]
-    #     [gamma0, gamma1, gamma2, ...]]
+    # ys =[[x0, x1, x2, ...           ]  0
+    #     [y0, y1, y2, ...            ]  1
+    #     [vx0, vx1, vx2, ...         ]  2
+    #     [vy0, vy1, vy2, ...         ]  3
+    #     [gamma0, gamma1, gamma2, ...]] 4
     ax = -(A/ys[4] + B)*ys[2] - C/ys[4]*ys[0]
     ay = -(A/ys[4] + B)*ys[3] - C/ys[4]*ys[1]
     dgamma = A - D*ys[4]**2*(ys[0]**2 + ys[1]**2)
@@ -34,20 +36,38 @@ def acc_func(ys, A, B, C, D):
     
     return dy_dz
     
-@jit(nopython=True, parallel=True)
+@jit("Tuple((List(float64[:, ::1]), float64[:, ::1]))(List(float64[:, :], reflected=True), List(float64[::1], reflected=True), List(float64[::1], reflected=True), float64, float64, float64, int64, float64, int64, float64, boolean)", nopython=True, parallel=True)
 def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution):
     result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
-    evolution = [np.zeros((4, n), dtype = np.float64) for _ in range(n_cores)]
+    evolution = [np.zeros((10, n), dtype = np.float64) for _ in range(n_cores)]
     #Q_core = [np.sum(q) for q in Q_list]
     for j in prange(n_cores):
         mat = particle_list[j].copy()
         A = A_list[j]
         q = Q_list[j]
         if save_evolution:
-            evolution[j][0,0] = np.sum(q*mat[0])
-            evolution[j][1,0] = np.sum(q*mat[1])
+            x_sum = np.sum(q*mat[0])
+            y_sum = np.sum(q*mat[1])
+            Q_sum = np.sum(q)
+            
+            # Sum of x, y and gamma
+            evolution[j][0,0] = x_sum
+            evolution[j][1,0] = y_sum
             evolution[j][2,0] = np.sum(q*mat[4])
-            evolution[j][3,0] = np.sum(q*(mat[4]-np.sum(q*mat[4])/np.sum(q))**2)
+            
+            # Sum of (gamma-gamma_mean)**2, (x-x_mean)**2, (y-y_mean)**2
+            evolution[j][3,0] = np.sum(q*(mat[4]-np.sum(q*mat[4])/Q_sum)**2)
+            evolution[j][4,0] = np.sum(q*(mat[0]-x_sum/Q_sum)**2)
+            evolution[j][5,0] = np.sum(q*(mat[1]-y_sum/Q_sum)**2)
+            
+            #Sum of (xp-xp_mean)**2, (yp-yp_mean)**2
+            evolution[j][6,0] = np.sum(q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum)**2)
+            evolution[j][7,0] = np.sum(q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum)**2)
+            
+            # Sum of x-x_mean * xp-xp_mean (xp = vx*gamma = mat[2]*mat[4]), and same for y
+            evolution[j][8,0] = np.sum(q*(mat[0]-x_sum/Q_sum)*q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum))
+            evolution[j][9,0] = np.sum(q*(mat[1]-y_sum/Q_sum)*q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum))
+
             for i in range(n-1):
                 k1 = acc_func(mat, A, B, C, D)
     
@@ -61,10 +81,25 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 
                 mat += k_av*dz
  
-                evolution[j][0,i+1] = np.sum(q*mat[0])
-                evolution[j][1,i+1] = np.sum(q*mat[1])
+                # Sum of x, y and gamma
+                x_sum = np.sum(q*mat[0])
+                y_sum = np.sum(q*mat[1])
+                evolution[j][0,i+1] = x_sum
+                evolution[j][1,i+1] = y_sum
                 evolution[j][2,i+1] = np.sum(q*mat[4])
-                evolution[j][3,i+1] = np.sum(q*(mat[4]-np.sum(q*mat[4])/np.sum(q))**2)
+                
+                # Sum of (gamma-gamma_mean)**2, (x-x_mean)**2, (y-y_mean)**2
+                evolution[j][3,i+1] = np.sum(q*(mat[4]-np.sum(q*mat[4])/Q_sum)**2)
+                evolution[j][4,i+1] = np.sum(q*(mat[0]-x_sum/Q_sum)**2)
+                evolution[j][5,i+1] = np.sum(q*(mat[1]-y_sum/Q_sum)**2)
+                
+                #Sum of (xp-xp_mean)**2, (yp-yp_mean)**2
+                evolution[j][6,i+1] = np.sum(q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum)**2)
+                evolution[j][7,i+1] = np.sum(q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum)**2)
+                
+                # Sum of (x-x_mean) * (xp-xp_mean) (xp = vx*gamma = mat[2]*mat[4]), same for y
+                evolution[j][8,i+1] = np.sum(q*(mat[0]-x_sum/Q_sum)*q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum))
+                evolution[j][9,i+1] = np.sum(q*(mat[1]-y_sum/Q_sum)*q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum))
             
         else:
             for i in range(n-1):
@@ -83,17 +118,26 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
         result[j] = mat
         
     evolution_tot = evolution[0]
+    finished_evolution = np.zeros((8, n), dtype = np.float64)
     if save_evolution:
         for i in range(n_cores-1):
             evolution_tot += evolution[i+1]
-        evolution_tot[0] = evolution_tot[0]/Q_tot
-        evolution_tot[1] = evolution_tot[1]/Q_tot
-        evolution_tot[2] = evolution_tot[2]/Q_tot
-        evolution_tot[3] = np.sqrt(evolution_tot[3]/Q_tot)
+        # x and y offset
+        finished_evolution[0] = evolution_tot[0]/Q_tot
+        finished_evolution[1] = evolution_tot[1]/Q_tot
+        # Average energy and rel. energy spread
+        finished_evolution[2] = evolution_tot[2]/Q_tot
+        finished_evolution[3] = np.sqrt(evolution_tot[3]/Q_tot)
+        # norm emittance in x and y
+        finished_evolution[4] = abs(1/Q_tot)*np.sqrt(evolution_tot[4]*evolution_tot[6] - evolution_tot[8]**2)
+        finished_evolution[5] = abs(1/Q_tot)*np.sqrt(evolution_tot[5]*evolution_tot[7] - evolution_tot[9]**2)
+        # Beam size in x and y
+        finished_evolution[6] = np.sqrt(evolution_tot[4]/Q_tot)
+        finished_evolution[7] = np.sqrt(evolution_tot[5]/Q_tot)
     
-    return result, evolution_tot
+    return result, finished_evolution
           
-def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_evolution, cache = True):
+def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_evolution):
     # Constants
     #Ezs = Es/L #eV/m = J/e/m = V/m
     n_cores = max(1,min(16, round(len(x0)/10000)))
@@ -119,18 +163,18 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     n = round(L/lambda_beta * n_per_beta)
     dz = L/(n-1)
     
-    vys = uy0/gamma/SI.c #velocity with respect to z instead of t
+    #velocities with respect to z instead of t
+    vys = uy0/gamma/SI.c 
     vxs = ux0/gamma/SI.c
 
-    Particles = np.zeros((5, len(x0)))#, n))
+    Particles = np.zeros((5, len(x0)))
     Particles[0] = x0
     Particles[1] = y0
     Particles[2] = vxs
     Particles[3] = vys
     Particles[4] = gamma
     
-    particle_list = np.array_split(Particles,n_cores, axis=1)#split_array, axis = 1)
-    #qs = qs/(-SI.e)
+    particle_list = np.array_split(Particles,n_cores, axis=1)
     Q_list = np.array_split(qs, n_cores)
     A_list = np.array_split(As, n_cores)
     Q_tot = np.sum(qs)
@@ -145,7 +189,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     location = np.linspace(0,L,n)
     
     
-    solution: np.ndarray = np.concatenate(results, axis=1)
+    solution = np.concatenate(results, axis=1)
 
     return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e, evolution, location
     

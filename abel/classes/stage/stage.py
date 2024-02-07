@@ -125,6 +125,7 @@ class Stage(Trackable):
         axs[0,2].plot(self.evolution.location, self.evolution.emit_nx*1e6, color=col1)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_xlim(long_limits)
+        axs[0,2].set_yscale('log')
         
         # plot energy spread
         axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)

@@ -140,16 +140,23 @@ class StageQuasistatic2d(Stage):
             delta_Es = self.length*(beam.Es() - beam0.Es())/dz
             
             # find driver offset (to shift the beam relative) and apply betatron motion
-            Es_final, evolution, location = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction, save_evolution = self.save_evolution)
-            
-            # accelerate beam (and remove nans)
-            beam.set_Es(Es_final)
             if self.save_evolution:
+                Es_final, evolution, location = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction, save_evolution = self.save_evolution)
                 self.evolution.x = evolution[0]
                 self.evolution.y = evolution[1]
                 self.evolution.energy = evolution[2]
                 self.evolution.rel_energy_spread = evolution[3]
+                self.evolution.emit_nx = evolution[4]
+                self.evolution.emit_ny = evolution[5]
+                self.evolution.beam_size_x = evolution[6]
+                self.evolution.beam_size_y = evolution[7]
+                self.evolution.charge = np.sum(beam.qs())*np.ones_like(location)
                 self.evolution.location = location
+            else:
+                Es_final = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction, save_evolution = self.save_evolution)
+            # accelerate beam (and remove nans)
+            beam.set_Es(Es_final)
+                
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length*(driver0.Es()-driver.Es())/dz
         driver.apply_betatron_damping(delta_Es_driver)
