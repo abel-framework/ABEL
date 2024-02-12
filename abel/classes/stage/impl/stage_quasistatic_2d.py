@@ -48,7 +48,7 @@ class StageQuasistatic2d(Stage):
         k_beta_beam = k_p(self.plasma_density)/np.sqrt(2*beam0.gamma())
         lambda_betatron_min = 2*np.pi/max(k_beta_beam, k_beta_driver)
         lambda_betatron_max = 2*np.pi/min(k_beta_beam, k_beta_driver)
-        dz = lambda_betatron_min/10
+        dz = lambda_betatron_min/2
         
         # need to make sufficiently many steps
         n_out = max(1, round(lambda_betatron_max/lambda_betatron_min/2))
@@ -144,12 +144,13 @@ class StageQuasistatic2d(Stage):
                 Es_final, evolution, location = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.radiation_reaction, save_evolution = self.save_evolution)
                 self.evolution.x = evolution[0]
                 self.evolution.y = evolution[1]
-                self.evolution.energy = evolution[2]
-                self.evolution.rel_energy_spread = evolution[3]
-                self.evolution.emit_nx = evolution[4]
-                self.evolution.emit_ny = evolution[5]
-                self.evolution.beam_size_x = evolution[6]
-                self.evolution.beam_size_y = evolution[7]
+                self.evolution.beam_size_x = evolution[2]
+                self.evolution.beam_size_y = evolution[3]
+                self.evolution.energy = evolution[4]
+                self.evolution.rel_energy_spread = evolution[5]
+                self.evolution.emit_nx = evolution[6]
+                self.evolution.emit_ny = evolution[7]
+                
                 self.evolution.charge = np.sum(beam.qs())*np.ones_like(location)
                 self.evolution.location = location
             else:

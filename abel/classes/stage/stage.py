@@ -139,6 +139,7 @@ class Stage(Trackable):
         axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
         axs[1,2].set_xlabel(long_label)
         axs[1,2].set_xlim(long_limits)
+        axs[1,2].set_yscale('log')
 
         # plot transverse offset
         axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)

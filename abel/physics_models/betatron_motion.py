@@ -41,32 +41,37 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
     result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
     evolution = [np.zeros((10, n), dtype = np.float64) for _ in range(n_cores)]
     #Q_core = [np.sum(q) for q in Q_list]
+
     for j in prange(n_cores):
         mat = particle_list[j].copy()
         A = A_list[j]
         q = Q_list[j]
-        if save_evolution:
-            x_sum = np.sum(q*mat[0])
-            y_sum = np.sum(q*mat[1])
-            Q_sum = np.sum(q)
+        Q_sum = np.sum(q)
+        if save_evolution:      
+            x_mean = np.sum(q*mat[0])/Q_sum
+            y_mean = np.sum(q*mat[1])/Q_sum
+            gamma_mean = np.sum(q*mat[4])/Q_sum
+            xp_mean = np.sum(q*mat[2]*mat[4])/Q_sum
+            yp_mean = np.sum(q*mat[3]*mat[4])/Q_sum
+            # Sum of x, y
+            evolution[j][0,0] = np.sum(q*mat[0])
+            evolution[j][1,0] = np.sum(q*mat[1])
             
-            # Sum of x, y and gamma
-            evolution[j][0,0] = x_sum
-            evolution[j][1,0] = y_sum
-            evolution[j][2,0] = np.sum(q*mat[4])
+            # sum of (x-x_mean)**2, (y-y_mean)**2
+            evolution[j][2,0] = np.sum(q*(mat[0]-x_mean)**2)
+            evolution[j][3,0] = np.sum(q*(mat[1]-y_mean)**2)
             
-            # Sum of (gamma-gamma_mean)**2, (x-x_mean)**2, (y-y_mean)**2
-            evolution[j][3,0] = np.sum(q*(mat[4]-np.sum(q*mat[4])/Q_sum)**2)
-            evolution[j][4,0] = np.sum(q*(mat[0]-x_sum/Q_sum)**2)
-            evolution[j][5,0] = np.sum(q*(mat[1]-y_sum/Q_sum)**2)
+            # Sum of gamma and (gamma-gamma_mean)**2
+            evolution[j][4,0] = np.sum(q*mat[4])
+            evolution[j][5,0] = np.sum(q*(mat[4]-gamma_mean)**2)
             
             #Sum of (xp-xp_mean)**2, (yp-yp_mean)**2
-            evolution[j][6,0] = np.sum(q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum)**2)
-            evolution[j][7,0] = np.sum(q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum)**2)
+            evolution[j][6,0] = np.sum(q*(mat[2]*mat[4]-xp_mean)**2)
+            evolution[j][7,0] = np.sum(q*(mat[3]*mat[4]-yp_mean)**2)
             
             # Sum of x-x_mean * xp-xp_mean (xp = vx*gamma = mat[2]*mat[4]), and same for y
-            evolution[j][8,0] = np.sum(q*(mat[0]-x_sum/Q_sum)*q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum))
-            evolution[j][9,0] = np.sum(q*(mat[1]-y_sum/Q_sum)*q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum))
+            evolution[j][8,0] = np.sum(q*(mat[0]-x_mean)*q*(mat[2]*mat[4]-xp_mean))
+            evolution[j][9,0] = np.sum(q*(mat[1]-y_mean)*q*(mat[3]*mat[4]-yp_mean))
 
             for i in range(n-1):
                 k1 = acc_func(mat, A, B, C, D)
@@ -80,26 +85,31 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 k_av = 1/6*(k1+2*k2+2*k3+k4)
                 
                 mat += k_av*dz
- 
-                # Sum of x, y and gamma
-                x_sum = np.sum(q*mat[0])
-                y_sum = np.sum(q*mat[1])
-                evolution[j][0,i+1] = x_sum
-                evolution[j][1,i+1] = y_sum
-                evolution[j][2,i+1] = np.sum(q*mat[4])
                 
-                # Sum of (gamma-gamma_mean)**2, (x-x_mean)**2, (y-y_mean)**2
-                evolution[j][3,i+1] = np.sum(q*(mat[4]-np.sum(q*mat[4])/Q_sum)**2)
-                evolution[j][4,i+1] = np.sum(q*(mat[0]-x_sum/Q_sum)**2)
-                evolution[j][5,i+1] = np.sum(q*(mat[1]-y_sum/Q_sum)**2)
+                x_mean = np.sum(q*mat[0])/Q_sum
+                y_mean = np.sum(q*mat[1])/Q_sum
+                gamma_mean = np.sum(q*mat[4])/Q_sum
+                xp_mean = np.sum(q*mat[2]*mat[4])/Q_sum
+                yp_mean = np.sum(q*mat[3]*mat[4])/Q_sum
+                # Sum of x, y
+                evolution[j][0,i+1] = np.sum(q*mat[0])
+                evolution[j][1,i+1] = np.sum(q*mat[1])
                 
+                # sum of (x-x_mean)**2, (y-y_mean)**2
+                evolution[j][2,i+1] = np.sum(q*(mat[0]-x_mean)**2)
+                evolution[j][3,i+1] = np.sum(q*(mat[1]-y_mean)**2)
+            
+                # Sum of gamma and (gamma-gamma_mean)**2
+                evolution[j][4,i+1] = np.sum(q*mat[4])
+                evolution[j][5,i+1] = np.sum(q*(mat[4]-gamma_mean)**2)
+            
                 #Sum of (xp-xp_mean)**2, (yp-yp_mean)**2
-                evolution[j][6,i+1] = np.sum(q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum)**2)
-                evolution[j][7,i+1] = np.sum(q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum)**2)
-                
-                # Sum of (x-x_mean) * (xp-xp_mean) (xp = vx*gamma = mat[2]*mat[4]), same for y
-                evolution[j][8,i+1] = np.sum(q*(mat[0]-x_sum/Q_sum)*q*(mat[2]*mat[4]-np.sum(q*mat[2]*mat[4])/Q_sum))
-                evolution[j][9,i+1] = np.sum(q*(mat[1]-y_sum/Q_sum)*q*(mat[3]*mat[4]-np.sum(q*mat[3]*mat[4])/Q_sum))
+                evolution[j][6,i+1] = np.sum(q*(mat[2]*mat[4]-xp_mean)**2)
+                evolution[j][7,i+1] = np.sum(q*(mat[3]*mat[4]-yp_mean)**2)
+            
+                # Sum of x-x_mean * xp-xp_mean (xp = vx*gamma = mat[2]*mat[4]), and same for y
+                evolution[j][8,i+1] = np.sum(q*(mat[0]-x_mean)*q*(mat[2]*mat[4]-xp_mean))
+                evolution[j][9,i+1] = np.sum(q*(mat[1]-y_mean)*q*(mat[3]*mat[4]-yp_mean))
             
         else:
             for i in range(n-1):
@@ -125,15 +135,19 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
         # x and y offset
         finished_evolution[0] = evolution_tot[0]/Q_tot
         finished_evolution[1] = evolution_tot[1]/Q_tot
-        # Average energy and rel. energy spread
-        finished_evolution[2] = evolution_tot[2]/Q_tot
+        
+        # x and y beam size
+        finished_evolution[2] = np.sqrt(evolution_tot[2]/Q_tot)
         finished_evolution[3] = np.sqrt(evolution_tot[3]/Q_tot)
+        
+        # Average energy and rel. energy spread
+        finished_evolution[4] = evolution_tot[4]/Q_tot
+        finished_evolution[5] = np.sqrt(evolution_tot[5]/Q_tot)
+        
         # norm emittance in x and y
-        finished_evolution[4] = abs(1/Q_tot)*np.sqrt(evolution_tot[4]*evolution_tot[6] - evolution_tot[8]**2)
-        finished_evolution[5] = abs(1/Q_tot)*np.sqrt(evolution_tot[5]*evolution_tot[7] - evolution_tot[9]**2)
-        # Beam size in x and y
-        finished_evolution[6] = np.sqrt(evolution_tot[4]/Q_tot)
-        finished_evolution[7] = np.sqrt(evolution_tot[5]/Q_tot)
+        finished_evolution[6] = abs(1/Q_tot)*np.sqrt(evolution_tot[2]*evolution_tot[6] - evolution_tot[8]**2)
+        finished_evolution[7] = abs(1/Q_tot)*np.sqrt(evolution_tot[3]*evolution_tot[7] - evolution_tot[9]**2)
+
     
     return result, finished_evolution
           
@@ -151,6 +165,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Plasma constants
     
     #tau_r = 2*re/3/SI.c
+    #Radiation reaction constants
     B = 2/3 * re* C # constant
     D = B * K_sq # constant
 
@@ -181,11 +196,12 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
 
     start = time.time()
     results, evolution = parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution)
+    
     end = time.time()
     print('time = ', end-start, ' sec')
     if save_evolution:
-        evolution[2] = evolution[2]*SI.m_e*SI.c**2/SI.e
-        evolution[3] = evolution[3]*SI.m_e*SI.c**2/SI.e/evolution[2]
+        evolution[4] = evolution[4]*SI.m_e*SI.c**2/SI.e
+        evolution[5] = evolution[5]*SI.m_e*SI.c**2/SI.e/evolution[4]
     location = np.linspace(0,L,n)
     
     
