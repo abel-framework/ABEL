@@ -20,6 +20,9 @@ stage_length: [m] float
 time_step_mod: float
     Determines the time step of the instability tracking in units of beta_wave_length/c.
 
+enable_radiation_reaction: bool
+    Flag for enabling radiation reactions.
+
 show_prog_bar: bool
     Flag for displaying the progress bar.
 
@@ -102,7 +105,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 # ==================================================
 # Single pass integration of (Stupakov's wake function)
-def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, enable_rr=True):
+def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, enable_radiation_reaction=True):
     
     a = bubble_radius + 0.75*skin_depth
     dzs = np.diff(zs_sorted)
@@ -116,14 +119,14 @@ def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_rad
     # Calculate the wakefield on each macroparticle
     wakefields = np.zeros(len(zs_sorted))
     
-    for idx_particle in range(len(zs_sorted)-2, -1, -1):
-        wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
+    #for idx_particle in range(len(zs_sorted)-2, -1, -1):
+    #    wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
 
     # Calculate the total transverse force on macroparticles
     tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
     
     # Update momenta
-    if enable_rr:
+    if enable_radiation_reaction:
         # Backward differentiation option (implicit method)
         denominators = 1 + c*1.87863e-15 * time_step * (1/skin_depth)**2/2 * (1+(1/skin_depth)**2/2*gammas*tot_offsets_sqr)
         tr_momenta = (tr_momenta + tr_force*time_step)/denominators
@@ -180,7 +183,7 @@ def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_rad
 
 
 # ==================================================
-def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, enable_rr=True, show_prog_bar=True):
+def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, enable_radiation_reaction=True, show_prog_bar=True):
     
     energies = beam.Es()
     xs = beam.xs()
@@ -284,8 +287,8 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
             #delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
             #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
             #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
-            delayed(calc_tr_momenta)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, enable_rr=enable_rr),
-            delayed(calc_tr_momenta)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, enable_rr=enable_rr)
+            delayed(calc_tr_momenta)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, enable_radiation_reaction=enable_radiation_reaction),
+            delayed(calc_tr_momenta)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, enable_radiation_reaction=enable_radiation_reaction)
         ])
         # Update momenta
         pxs_sorted = results[0]
@@ -294,8 +297,8 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         #Ez = -3.2e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. # <-###################################################
 
         # Update longitudinal momenta.
-        if enable_rr:
-            pzs_sorted = pzs_sorted - (e*Ez + m_e*c**2 * 1.87863e-15 * (1/skin_depth)**4/4 * gammas**2 * (xs_sorted**2+ys_sorted**2))*time_step
+        if enable_radiation_reaction:
+            pzs_sorted = pzs_sorted - (e*Ez + m_e*c**2 * 1.87863e-15 * (1/skin_depth)**4/4 * gammas**2 * tot_offsets_sqr)*time_step
         else:
             pzs_sorted = pzs_sorted - e*Ez*time_step
         
@@ -315,7 +318,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
 
         
         # ============= Filter out particles that collide into bubble =============
-        bool_indices = (np.sqrt(xs_sorted**2 + ys_sorted**2) - bubble_radius <= 0)
+        bool_indices = (np.sqrt(tot_offsets_sqr) - bubble_radius <= 0)
         zs_sorted = zs_sorted[bool_indices]
         xs_sorted = xs_sorted[bool_indices]
         ys_sorted = ys_sorted[bool_indices]

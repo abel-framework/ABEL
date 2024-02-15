@@ -1,4 +1,4 @@
-import os, subprocess, time
+import os, subprocess, time, sys
 import numpy as np
 import scipy.constants as SI
 from string import Template
@@ -8,7 +8,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=424, driver_only=False, filename_test_particle='empty.h5'):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, filename_test_particle='empty.h5'):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -28,7 +28,23 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
 
     if not filename_test_particle == 'empty.h5':
         beam_components += ' test_particle'
-        
+    
+    # plasma-density profile from file
+    if density_table_file is not None:
+        density_comment1 = '#'
+        density_comment2 = ''
+    else:
+        density_comment1 = ''
+        density_comment2 = '#'
+        density_table_file = ''
+    
+    # check that the number of transverse cells is 2^n-1
+    num_cell_xy = num_cell_xy
+    closest_exponent_xy = round(np.log2(num_cell_xy+1))
+    new_num_cell_xy = 2**closest_exponent_xy - 1
+    if not num_cell_xy == new_num_cell_xy:
+        print('>> HiPACE++: Changing from', num_cell_xy, 'to', new_num_cell_xy, ' (i.e., 2^n-1) for better performance.')
+        num_cell_xy = new_num_cell_xy
     
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
@@ -60,13 +76,26 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
 
 
 # write the HiPACE++ job script to file
-def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1):
+def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num_tasks_per_node=8):
     
     # locate template file
     filename_job_script_template = CONFIG.abel_path + 'abel/apis/hipace/job_script_template'
     
+    # set the partition based on the number of nodes and tasks
+    if num_nodes == 1 and num_tasks_per_node < 8:
+        partition_name = CONFIG.partition_name_small
+    else:
+        partition_name = CONFIG.partition_name_standard
+
+    # calculate the memory
+    memory_per_gpu = 60 # [GB]
+        
     # define inputs
-    inputs = {'num_nodes': num_nodes,
+    inputs = {'project_name': CONFIG.project_name,
+              'partition_name': partition_name,
+              'memory': str(int(memory_per_gpu*num_tasks_per_node))+'g',
+              'num_nodes': num_nodes,
+              'num_tasks_per_node': num_tasks_per_node,
               'filename_input': filename_input}
     
     # fill in template file
@@ -91,12 +120,16 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     if quiet:
         subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
     else:
-        #subprocess.call(cmd, shell=True, stdout=None)
+        # run the command
         output = subprocess.check_output(cmd, shell=True)
+        
+        # get the job id
         words = str(output).replace('\\n','').replace("'",'').split()
         jobid = int(words[3].strip())
-        #print("Running job " + str(jobid))
-        pbar = tqdm(total=int(num_steps), desc='Queueing HiPACE++ (job ' + str(jobid) + ')', unit='steps', leave=True)
+
+        # set up a progress bar
+        desc = '>> Queueing HiPACE++ (job ' + str(jobid) + ')'
+        pbar = tqdm(total=int(num_steps), desc=desc, unit=' steps', leave=True, file=sys.stdout, colour='green')
     
     # progress loop
     while True:
@@ -114,12 +147,12 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
             time_spent = keywords[5]
             if status == 'PD': # starting
                 if not quiet:
-                    pbar.set_description('Starting HiPACE++ (job ' + str(jobid) + ')')
+                    pbar.set_description('>> Starting HiPACE++ (job ' + str(jobid) + ')')
                     pbar.update(0)
             
             elif status == 'R': # running
                 if not quiet:
-                    pbar.set_description('Running HiPACE++  (job ' + str(jobid) + ')')
+                    pbar.set_description('>>> Running HiPACE++ (job ' + str(jobid) + ')')
                     
                 # read progress from output file
                 outputfile = runfolder + 'hipace-' + str(jobid) + '.out'
@@ -142,7 +175,7 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
                 
             elif status == 'CG': # closing
                 if not quiet:
-                    pbar.set_description('Finished HiPACE++ (job ' + str(jobid) + ')')
+                    pbar.set_description('>> Finished HiPACE++ (job ' + str(jobid) + ')')
                     pbar.update(int(num_steps-pbar.n))
                     pbar.close()
                 break
@@ -167,3 +200,4 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
         test_particle = None
     
     return beam, driver, test_particle
+

@@ -2,9 +2,9 @@
 ! by Carl A. Lindstrom (University of Oslo), 13.08.2022
 
 &run_setup
-    lattice             = "{printenv LATTICE}",
+    lattice             = "$latticefile",
     use_beamline        = "ACHROMAT",
-    p_central_mev       = "({printenv ENERGY})",
+    p_central_mev       = $p_central_mev,
     random_number_seed  = 0,
 &end
 
@@ -12,7 +12,7 @@
 &end
 
 &sdds_beam
-    input               = "{printenv BEAM}",
+    input               = "$inputbeamfile",
 &end
 
 &track

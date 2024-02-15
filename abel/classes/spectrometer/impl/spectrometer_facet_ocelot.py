@@ -3,6 +3,7 @@ import numpy as np
 import scipy.constants as SI
 import scipy
 from abel.apis.ocelot.ocelot_api import ocelot_particle_array2beam, beam2ocelot_particle_array
+from matplotlib import pyplot as plt
 
 
 class SpectrometerFacetOcelot(Spectrometer):
@@ -175,7 +176,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         twiss_evol = twiss(lattice, twiss0, nPoints=100)
         
         # plot evolution
-        plot_opt_func(lattice, twiss_evol, top_plot=['Dy'], legend=False)
+        plot_opt_func(lattice, twiss_evol, top_plot=['Dy'], legend=False, grid=False)
 
     
     def get_dispersion(self, energy=None):

@@ -1,24 +1,18 @@
 import numpy as np
 import scipy.constants as SI
-from types import SimpleNamespace
 from abel import Source, Beam
 from abel.utilities.beam_physics import generate_trace_space_xy
 from abel.utilities.relativity import energy2gamma
 
 class SourceTrapezoid(Source):
     
-    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, current_head=0, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
-        self.energy = energy
-        self.charge = charge
+    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, current_head=0, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, front_heavy_distribution=False):
+        
         self.energy_spread = energy_spread # [eV]
         self.rel_energy_spread = rel_energy_spread # [eV]
         self.current_head = current_head # [A]
         self.bunch_length = bunch_length # [m]
         self.z_offset = z_offset # [m]
-        self.x_offset = x_offset # [m]
-        self.y_offset = y_offset # [m]
-        self.x_angle = x_angle # [rad]
-        self.y_angle = y_angle # [rad]
         self.num_particles = num_particles
         self.emit_nx = emit_nx # [m rad]
         self.emit_ny = emit_ny # [m rad]
@@ -27,40 +21,20 @@ class SourceTrapezoid(Source):
         self.alpha_x = alpha_x # [m]
         self.alpha_y = alpha_y # [m]
         self.angular_momentum = angular_momentum
-        self.length = length # [m]
-        self.wallplug_efficiency = wallplug_efficiency
-        self.accel_gradient = accel_gradient
         self.symmetrize = symmetrize
+        self.front_heavy_distribution = front_heavy_distribution
         
-        self.jitter = SimpleNamespace()
-        self.jitter.x = 0
-        self.jitter.y = 0
-        self.jitter.xp = 0
-        self.jitter.yp = 0
-        self.jitter.z = 0
-        self.jitter.t = 0
+        super().__init__(length, charge, energy, accel_gradient, wallplug_efficiency, x_offset, y_offset, x_angle, y_angle)
     
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
         
         # make empty beam
         beam = Beam()
-
-        # Lorentz gamma
-        gamma = energy2gamma(self.energy)
         
         # horizontal and vertical phase spaces
+        gamma = energy2gamma(self.energy)
         xs, xps, ys, yps = generate_trace_space_xy(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, self.angular_momentum/gamma, symmetrize=self.symmetrize)
-        
-        # add transverse jitters and offsets
-        x0 = np.random.normal(scale=self.jitter.x) + self.x_offset
-        y0 = np.random.normal(scale=self.jitter.y) + self.y_offset
-        xs += x0
-        ys += y0
-        xp0 = np.random.normal(scale=self.jitter.xp) + self.x_angle
-        yp0 = np.random.normal(scale=self.jitter.yp) + self.y_angle
-        xps += xp0
-        yps += yp0
         
         # generate relative/absolute energy spreads
         if self.rel_energy_spread is not None:
@@ -83,12 +57,6 @@ class SourceTrapezoid(Source):
             Q_uniform = abs(self.charge) - Q_triangle
             zmode = self.z_offset
         
-        # add longitudinal jitter
-        if abs(self.jitter.t) > 0:
-            z_jitter = np.random.normal(scale=self.jitter.t*SI.c)
-        else:
-            z_jitter = np.random.normal(scale=self.jitter.z)
-        
         if self.symmetrize:
             num_tiling = 4
             num_particles_actual = round(self.num_particles/num_tiling)
@@ -101,8 +69,31 @@ class SourceTrapezoid(Source):
         mask_uniform = inds[0:index_split]
         mask_triangle = inds[index_split:num_particles_actual]
         zs = np.zeros(num_particles_actual)
-        zs[mask_uniform] = np.random.uniform(low=self.z_offset-self.bunch_length+z_jitter, high=self.z_offset+z_jitter, size = len(mask_uniform))
-        zs[mask_triangle] = np.random.triangular(left=self.z_offset-self.bunch_length+z_jitter, right=self.z_offset+z_jitter, mode=zmode+z_jitter, size=len(mask_triangle))
+        zs[mask_uniform] = np.random.uniform(low=self.z_offset-self.bunch_length, high=self.z_offset, size=len(mask_uniform))
+        zs[mask_triangle] = np.random.triangular(left=self.z_offset-self.bunch_length, right=self.z_offset, mode=zmode, size=len(mask_triangle))
+
+        # make particle distribution front-heavy (more particles at the bunch head)
+        if self.front_heavy_distribution:
+
+            # normalize distance within bunch
+            zmax = zs.max()
+            zmin = zs.min()
+            zs_norm = -(zs-zmax)/(zmax-zmin)
+
+            # shift normalized particles
+            front_heaviness = 20
+            zs_norm_redist = (1+1/front_heaviness)/((1-zs_norm)*front_heaviness+1)-1/front_heaviness
+            zs = zmax - (zmax-zmin)*zs_norm_redist
+
+            # recalculate weightings (lower where there are more particles)
+            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+            weightings[mask_uniform] = (1+front_heaviness*zs_norm_redist[mask_uniform])**2
+            weightings[mask_uniform] = weightings[mask_uniform]/(np.sum(weightings[mask_uniform])/(self.charge/SI.e))*np.sum(mask_uniform)/len(zs)
+            weightings[mask_triangle] = (1+front_heaviness*zs_norm_redist[mask_triangle])**3
+            weightings[mask_triangle] = weightings[mask_triangle]/(np.sum(weightings[mask_triangle])/(self.charge/SI.e))*np.sum(mask_triangle)/len(zs)
+            
+        else:
+            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
         
         # energies
         Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
@@ -111,10 +102,12 @@ class SourceTrapezoid(Source):
         if self.symmetrize:
             zs = np.tile(zs, num_tiling)
             Es = np.tile(Es, num_tiling)
+            weightings = np.tile(weightings, num_tiling)
         
         # create phase space
-        beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge)
-        
+        beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge, weightings=weightings)
+
+        # add jitters and offsets in super function
         return super().track(beam, savedepth, runnable, verbose)
     
     

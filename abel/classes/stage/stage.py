@@ -98,7 +98,7 @@ class Stage(Trackable):
         if not hasattr(self.evolution, 'location'):
             print('No evolution calculated')
             return
-            
+
         # preprate plot
         fig, axs = plt.subplots(2,3)
         fig.set_figwidth(CONFIG.plot_fullwidth_default)
@@ -119,6 +119,7 @@ class Stage(Trackable):
         axs[0,1].plot(self.evolution.location, -self.evolution.charge * 1e9, color=col1)
         axs[0,1].set_ylabel('Charge [nC]')
         axs[0,1].set_xlim(long_limits)
+        axs[0,1].set_ylim(0, -self.evolution.charge[0] * 1.3 * 1e9)
         
         # plot normalized emittance
         axs[0,2].plot(self.evolution.location, self.evolution.emit_ny*1e6, color=col2)
@@ -183,7 +184,7 @@ class Stage(Trackable):
         Is = self.initial.beam.current.Is
 
         # find field at the driver and beam
-        z_mid = zs_I.min() + (zs_I.max()-zs_I.min())*0.4
+        z_mid = zs_I.min() + (zs_I.max()-zs_I.min())*0.3
         mask = zs_I < z_mid
         zs_masked = zs_I[mask]
         z_beam = zs_masked[np.abs(Is[mask]).argmax()]
@@ -259,7 +260,7 @@ class Stage(Trackable):
             if i==0:
                 zs_I = self.initial.beam.current.zs
                 Is = self.initial.beam.current.Is
-                z_mid = zs_I.max()-(zs_I.max()-zs_I.min())/2
+                z_mid = zs_I.max()-(zs_I.max()-zs_I.min())*0.3
                 z_beam = zs_I[np.abs(Is[zs_I < z_mid]).argmax()]
                 Ez_driver = Ezs0[zs0 > z_mid].max()
                 Ez_beam = np.interp(z_beam, zs0, Ezs0)

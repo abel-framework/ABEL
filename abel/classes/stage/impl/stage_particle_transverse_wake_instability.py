@@ -40,7 +40,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_rr=True):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_radiation_reaction=True):
         """
         Parameters
         ----------
@@ -79,7 +79,7 @@ class StagePrtclTransWakeInstability(Stage):
         ramp_beta_mag: float
             blabla
 
-        enable_rr: bool
+        enable_radiation_reaction: bool
             Flag for enabling radiation reactions.
         """
         
@@ -102,7 +102,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
         self.interstage_dipole_field = None
         self.ramp_beta_mag = ramp_beta_mag
-        self.enable_rr = enable_rr
+        self.enable_radiation_reaction = enable_radiation_reaction
         
         self.interstages_enabled = False
         self.show_prog_bar = True
@@ -212,7 +212,7 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, x_offset, threshold=0.8)
 
         # Cut out bubble radius over the ROI
-        bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # Actually same as Ez_shift_fit. Consider making just one function instead... 
+        bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead... 
 
         # Save quantities to the stage
         self.Ez_fit_obj = Ez_fit
@@ -266,7 +266,7 @@ class StagePrtclTransWakeInstability(Stage):
                                  pzs=pzs_sorted)
             
         else:
-            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, enable_rr=self.enable_rr, show_prog_bar=self.show_prog_bar)
+            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, enable_radiation_reaction=self.enable_radiation_reaction, show_prog_bar=self.show_prog_bar)
         
 
         # ========== Shift the main beam back to the original coordinate system ==========
@@ -930,7 +930,7 @@ class StagePrtclTransWakeInstability(Stage):
             # set labels
             if i==(num_plots-1):
                 ax1.set_xlabel('$z$ [$\mathrm{\mu}$m]')
-            ax1.set_ylabel('$x$ [$\mathrm{\mu}$ m]')
+            ax1.set_ylabel('$x$ [$\mathrm{\mu}$m]')
             ax1.set_title(title)
             ax1.grid(False)
             ax2.grid(False)
@@ -1354,7 +1354,7 @@ class StagePrtclTransWakeInstability(Stage):
             interstage_dipole_field = self.interstage_dipole_field
             print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
 
-        print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_rr) :s}")
+        print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
 
         if self.main_source is None:
             main_symmetrise = 'Not registered.'
@@ -1387,7 +1387,8 @@ class StagePrtclTransWakeInstability(Stage):
         print(f"Initial beam z offset [um]:\t\t\t {drive_beam.z_offset()*1e6 :.3f} \t\t {main_beam.z_offset()*1e6 :.3f}\n")
 
         print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x()*1e6 :.3f} \t\t\t {main_beam.norm_emittance_x()*1e6 :.3f}")
-        print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y()*1e6 :.3f} \t\t {main_beam.norm_emittance_y()*1e6 :.3f}\n")
+        print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y()*1e6 :.3f} \t\t {main_beam.norm_emittance_y()*1e6 :.3f}")
+        print(f"Initial angular momentum [mm mrad]:\t\t {drive_beam.angular_momentum()*1e6 :.3f} \t\t\t {main_beam.angular_momentum()*1e6 :.3f}\n")
         
         print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(main_beam.energy())*1e3 :.3f}")
         print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x()*1e3 :.3f} \t\t {main_beam.beta_x()*1e3 :.3f}")
@@ -1419,7 +1420,7 @@ class StagePrtclTransWakeInstability(Stage):
                 interstage_dipole_field = self.interstage_dipole_field
                 print(f"Interstage dipole field:\t\t {interstage_dipole_field :.3f}", file=f)
 
-            print(f"Radiation reaction enabled:\t\t {str(self.enable_rr) :s}", file=f)
+            print(f"Radiation reaction enabled:\t\t {str(self.enable_radiation_reaction) :s}", file=f)
             
             if self.main_source is None:
                 main_symmetrise = 'Not registered.'
@@ -1462,10 +1463,13 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y()*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y()*1e6 :.3f}", file=f)
             print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y()*1e6 :.3f}\n", file=f)
             
+            print(f"Initial angular momentum [mm mrad]:\t\t {drive_beam.angular_momentum()*1e6 :.3f} \t\t\t {initial_main_beam.angular_momentum()*1e6 :.3f}", file=f)
+            print(f"Current angular momentum [mm mrad]:\t\t  \t\t\t {beam_out.angular_momentum()*1e6 :.3f}\n", file=f)
+            
             print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(initial_main_beam.energy())*1e3 :.3f}", file=f)
-            print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x()*1e3 :.3f} \t\t {initial_main_beam.beta_x()*1e3 :.3f}", file=f)
+            print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x()*1e3 :.3f} \t\t\t {initial_main_beam.beta_x()*1e3 :.3f}", file=f)
             print(f"Current x beta function [mm]:\t\t\t \t \t\t {beam_out.beta_x()*1e3 :.3f}", file=f)
-            print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y()*1e3 :.3f} \t\t {initial_main_beam.beta_y()*1e3 :.3f}", file=f)
+            print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y()*1e3 :.3f} \t\t\t {initial_main_beam.beta_y()*1e3 :.3f}", file=f)
             print(f"Current y beta function [mm]:\t\t\t \t \t\t {beam_out.beta_y()*1e3 :.3f}\n", file=f)
     
             print(f"Initial x beam size [um]:\t\t\t {drive_beam.beam_size_x()*1e6 :.3f} \t\t\t {initial_main_beam.beam_size_x()*1e6 :.3f}", file=f)

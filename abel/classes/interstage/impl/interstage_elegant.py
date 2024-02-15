@@ -3,24 +3,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as SI
 from string import Template
+from types import SimpleNamespace
 from abel import CONFIG, Interstage
-from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D
+from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
 from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion
 
 class InterstageElegant(Interstage):
     
-    def __init__(self, nom_energy=None, beta0=None, dipole_length=None, dipole_field=1, Bdip2=None, enable_isr=True, enable_csr=True):
+    def __init__(self, nom_energy=None, beta0=None, dipole_length=None, dipole_field=1, Bdip2=None, enable_isr=True, enable_csr=True, save_evolution=False):
         self.nom_energy = nom_energy
         self.beta0 = beta0
         self.dipole_length = dipole_length
         self.dipole_field = dipole_field
         self.Bdip2 = Bdip2
         self.g_max = 1000 # [T/m] 
-        self.enable_isr = enable_isr
-        self.enable_csr = enable_csr
         self.disableNonlinearity = False
         
         self.default_Bdip2_Bdip_ratio = 0.8
+
+        self.enable_isr = enable_isr
+        self.enable_csr = enable_csr
+        self.save_evolution = save_evolution
+        
+        self.evolution = SimpleNamespace()
     
     # evaluate beta function 
     def __eval_initial_beta_function(self):
@@ -123,11 +128,29 @@ class InterstageElegant(Interstage):
         
     
     # make run script file
-    def __make_run_script(self):
-        return CONFIG.abel_path + 'abel/apis/elegant/templates/runscript_interstage.ele'
+    def __make_run_script(self, latticefile, inputbeamfile, tmpfolder=None):
+
+        # create temporary CSV file and folder
+        make_new_tmpfolder = tmpfolder is None
+        if make_new_tmpfolder:
+            tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
+            os.mkdir(tmpfolder)
+        tmpfile = tmpfolder + '/runfile.ele'
+        
+        # inputs
+        inputs = {'p_central_mev': self.nom_energy/1e6,
+                  'latticefile': latticefile,
+                  'inputbeamfile': inputbeamfile}
+
+        runfile_template = CONFIG.abel_path + 'abel/apis/elegant/templates/runscript_interstage.ele'
+        with open(runfile_template, 'r') as fin, open(tmpfile, 'w') as fout:
+            results = Template(fin.read()).substitute(inputs)
+            fout.write(results)
+        
+        return tmpfile
     
     
-    def __make_lattice(self, beam, output_filename, latticefile, lensfile, dumpBeams=False):
+    def __make_lattice(self, beam, outputbeamfile, latticefile, lensfile, evolutionfolder, save_evolution=False, tmpfolder=None):
         
         # perform matching to find exact element strengths
         g_lens, tau_lens, Bdip3, m_sext = self.match()
@@ -137,27 +160,37 @@ class InterstageElegant(Interstage):
             m_sext = 0
         
         # make lens field
-        elegant_apl_fieldmap2D(tau_lens, lensfile)
+        elegant_apl_fieldmap2D(tau_lens, lensfile, tmpfolder=tmpfolder)
         
         # make lattice file from template
         lattice_template = CONFIG.abel_path + 'abel/apis/elegant/templates/lattice_interstage.lte'
+        if save_evolution:
+            num_watches = 5
+            watch_disabled = False
+        else:
+            num_watches = 1
+            watch_disabled = True
         
         # inputs
         inputs = {'charge': abs(beam.charge()),
-                  'dipole_length': self.__eval_dipole_length(),
-                  'dipole_angle': self.__eval_dipole_length()*self.__eval_dipole_field()*SI.c/self.nom_energy,
-                  'chicanedipole_length': self.__eval_chicane_dipole_length(),
-                  'chicanedipole_angle1': self.__eval_chicane_dipole_length()*self.__eval_chicane_field() * SI.c/self.nom_energy,
-                  'chicanedipole_angle2': self.__eval_chicane_dipole_length()*Bdip3*SI.c/self.nom_energy,
-                  'lens_length': self.__eval_lens_length(),
+                  'num_kicks': int(100/num_watches),
+                  'dipole_length': self.__eval_dipole_length()/num_watches,
+                  'dipole_angle': self.__eval_dipole_length()*self.__eval_dipole_field()*SI.c/self.nom_energy/num_watches,
+                  'chicanedipole_length': self.__eval_chicane_dipole_length()/num_watches,
+                  'chicanedipole_angle1': self.__eval_chicane_dipole_length()*self.__eval_chicane_field() * SI.c/self.nom_energy/num_watches,
+                  'chicanedipole_angle2': self.__eval_chicane_dipole_length()*Bdip3*SI.c/self.nom_energy/num_watches,
+                  'lens_length': self.__eval_lens_length()/num_watches,
                   'lens_filename': lensfile,
                   'lens_strength': g_lens,
-                  'spacer_length': self.__eval_spacer_length(),
-                  'sextupole_length': self.__eval_sextupole_length(),
+                  'spacer_length': self.__eval_spacer_length()/num_watches,
+                  'sextupole_length': self.__eval_sextupole_length()/num_watches,
                   'sextupole_strength': m_sext,
-                  'output_filename': output_filename,
+                  'output_filename': outputbeamfile,
                   'enable_ISR': int(self.enable_isr),
-                  'enable_CSR': int(self.enable_csr)}
+                  'enable_CSR': int(self.enable_csr),
+                  'num_out': int(num_watches),
+                  'watch_filename': evolutionfolder + 'output_%03ld.bun',
+                  'watch_disabled': int(watch_disabled)}
         
         with open(lattice_template, 'r') as fin, open(latticefile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
@@ -235,42 +268,46 @@ class InterstageElegant(Interstage):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
         # make temporary folder and files
-        # create the parent directory if it doesn't exist
         parent_dir = CONFIG.temp_path
         if not os.path.exists(parent_dir):
             os.makedirs(parent_dir)
         
         # create the temporary folder
-        tmpfolder = os.path.join(parent_dir, str(uuid.uuid4()))
+        tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + '/'
         os.mkdir(tmpfolder)
-        beamfile = tmpfolder + '/beam.bun'
-        latticefile = tmpfolder + '/interstage.lte'
-        lensfile = tmpfolder + '/map.csv'
+        inputbeamfile = tmpfolder + 'input_beam.bun'
+        outputbeamfile = tmpfolder + 'output_beam.bun'
+        latticefile = tmpfolder + 'interstage.lte'
+        lensfile = tmpfolder + 'map.csv'
+        evolution_folder = tmpfolder + 'evolution/'
+        os.mkdir(evolution_folder)
         
         # make lattice file
-        self.__make_lattice(beam0, beamfile, latticefile, lensfile)
-        
-        # environment variables
-        envars = {}
-        envars['ENERGY'] = self.nom_energy / 1e6 # [MeV]
-        envars['LATTICE'] = latticefile
+        self.__make_lattice(beam0, outputbeamfile, latticefile, lensfile, evolution_folder, self.save_evolution, tmpfolder=tmpfolder)
         
         # run ELEGANT
-        runfile = self.__make_run_script()
-        beam = elegant_run(runfile, beam0, beamfile, envars, quiet=True)
+        runfile = self.__make_run_script(latticefile, inputbeamfile, tmpfolder)
+        beam = elegant_run(runfile, beam0, inputbeamfile, outputbeamfile, quiet=True, tmpfolder=tmpfolder)
 
+        # extract evolution
+        self.evolution.location = np.empty([0])
+        self.evolution.beam_size_x = np.empty([0])
+        self.evolution.beam_size_y = np.empty([0])
+        self.evolution.norm_emittance_x = np.empty([0])
+        self.evolution.norm_emittance_y = np.empty([0])
+        for file in sorted(os.listdir(evolution_folder)):
+            output_beam = elegant_read_beam(evolution_folder + os.fsdecode(file), tmpfolder=tmpfolder)
+            self.evolution.location = np.append(self.evolution.location, output_beam.location)
+            self.evolution.beam_size_x = np.append(self.evolution.beam_size_x, output_beam.beam_size_x())
+            self.evolution.beam_size_y = np.append(self.evolution.beam_size_y, output_beam.beam_size_y())
+            self.evolution.norm_emittance_x = np.append(self.evolution.norm_emittance_x, output_beam.norm_emittance_x())
+            self.evolution.norm_emittance_y = np.append(self.evolution.norm_emittance_y, output_beam.norm_emittance_y())
+        
         # clean extreme outliers
         beam.remove_halo_particles()
         
         # remove temporary files
         shutil.rmtree(tmpfolder)
-        #os.remove(beamfile)
-        #os.remove(latticefile)
-        #os.remove(lensfile)
-        #beamfile_backup = beamfile + '~'
-        #if os.path.exists(beamfile_backup):
-        #    os.remove(beamfile_backup)
-        #os.rmdir(tmpfolder)
 
         return super().track(beam, savedepth, runnable, verbose)
     
