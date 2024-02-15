@@ -4,11 +4,11 @@ import abel.utilities.colors as cmaps
 class CONFIG:
 
     # select cluster
-    cluster_name = 'your_cluster_here' # lumi/betzy/heplab/etc.
+    cluster_name = 'lumi' # lumi/betzy/heplab/etc.
     
     if cluster_name == 'lumi':
-        project_name = 'your_project_number_here'
-        #project_name = 'project_465000445' # PLASMACOLLIDER project (E. Adli)
+        #project_name = 'your_project_number_here'
+        project_name = 'project_465000445' # PLASMACOLLIDER project (E. Adli)
         #project_name = 'project_465000962' # SPARTA project (C. A. Lindstrøm)
         partition_name_standard = 'standard-g'
         partition_name_small = 'small-g'
@@ -48,8 +48,8 @@ class CONFIG:
     ## EXTERNAL CODE DIRECTORIES
     
     # common software path
-    software_path = '/your/project/path/here/'
-    #software_path = '/project/project_465000445/software/'
+    #software_path = '/your/project/path/here/'
+    software_path = '/project/project_465000445/software/'
     
     # path to ELEGANT directory
     elegant_use_container = True
