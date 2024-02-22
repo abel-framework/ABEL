@@ -1,5 +1,6 @@
 import os
 import abel.utilities.colors as cmaps
+import matplotlib.pyplot as plt
 
 class CONFIG:
 
@@ -28,7 +29,8 @@ class CONFIG:
     # plot width default
     plot_fullwidth_default = 18 # [cm]
     plot_width_default = 8 # [cm]
-
+    
+    
     # default colormap
     default_cmap = cmaps.FLASHForward # 'GnBu'
     

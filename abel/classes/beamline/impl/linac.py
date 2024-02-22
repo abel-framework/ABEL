@@ -207,7 +207,6 @@ class Linac(Beamline):
              
         
     def plot_evolution(self, use_stage_nums=False, shot=None):
-        
         if self.trackables is None:
             self.assemble_trackables()
             
@@ -272,21 +271,24 @@ class Linac(Beamline):
         af = 0.2
         
         # plot evolution
+        plt.rcParams.update({'font.size': 18})
         fig, axs = plt.subplots(3,3)
-        fig.set_figwidth(20)
+        fig.set_figwidth(16)
         fig.set_figheight(12)
+        fig.suptitle('Evolution of Beam Parameters')
+        plt.subplots_adjust(wspace=0.4)
         
         axs[0,0].plot(long_axis, Es_nom / 1e9, ':', color=col0)
         axs[0,0].plot(long_axis, Es / 1e9, color=col1)
         axs[0,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Es+Es_error, np.flip(Es-Es_error))) / 1e9, color=col1, alpha=af)
-        axs[0,0].set_xlabel(long_label)
         axs[0,0].set_ylabel('Energy [GeV]')
+        axs[0,0].set_xticks([])
         
         axs[1,0].plot(long_axis, sigdeltas * 100, color=col1)
         axs[1,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigdeltas+sigdeltas_error, np.flip(sigdeltas-sigdeltas_error))) * 100, color=col1, alpha=af)
-        axs[1,0].set_xlabel(long_label)
         axs[1,0].set_ylabel('Energy spread [%]')
         axs[1,0].set_yscale('log')
+        axs[1,0].set_xticks([])
         
         axs[2,0].plot(long_axis, np.zeros(deltas.shape), ':', color=col0)
         axs[2,0].plot(long_axis, deltas * 100, color=col1)
@@ -297,20 +299,21 @@ class Linac(Beamline):
         axs[0,1].plot(long_axis, Q0 * np.ones(Qs.shape) * 1e9, ':', color=col0)
         axs[0,1].plot(long_axis, Qs * 1e9, color=col1)
         axs[0,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
-        axs[0,1].set_xlabel(long_label)
         axs[0,1].set_ylabel('Charge [nC]')
         axs[0,1].set_ylim(0, Q0 * 1.3 * 1e9)
+        axs[0,1].set_xticks([])
         
         axs[1,1].plot(long_axis, sigzs*1e6, color=col1)
         axs[1,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigzs+sigzs_error, np.flip(sigzs-sigzs_error))) * 1e6, color=col1, alpha=af)
-        axs[1,1].set_xlabel(long_label)
         axs[1,1].set_ylabel('Bunch length [$\mathrm{\mu}$m]')
+        axs[1,1].set_xticks([])
         
         axs[2,1].plot(long_axis, z0s*1e6, color=col1)
         axs[2,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((z0s+z0s_error, np.flip(z0s-z0s_error))) * 1e6, color=col1, alpha=af)
         axs[2,1].set_xlabel(long_label)
         axs[2,1].set_ylabel('Longitudinal offset [$\mathrm{\mu}$m]')
         
+        #axs[0,2].yaxis.set_major_formatter(mticker.StrMethodFormatter("{x:.1f}"))
         axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnxs[0]*1e6, ':', color=col0)
         axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnys[0]*1e6, ':', color=col0)
         axs[0,2].plot(long_axis, emnxs*1e6, color=col1)
@@ -320,18 +323,18 @@ class Linac(Beamline):
         if Lzs.max() > (min(emnxs.min(), emnys.min()))*1e-2:
             axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
             axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
-        axs[0,2].set_xlabel(long_label)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
-        axs[0,2].set_yscale('log')
+        #axs[0,2].set_yscale('log')
+        axs[0,2].set_xticks([])
         
         #axs[1,2].plot(long_axis, np.sqrt(Es_nom/Es_nom[0])*betaxs[0]*1e3, ':', color=col0)
         axs[1,2].plot(long_axis, sigxs*1e6, color=col1)
         axs[1,2].plot(long_axis, sigys*1e6, color=col2)
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigxs+sigxs_error, np.flip(sigxs-sigxs_error))) * 1e6, color=col1, alpha=af)
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigys+sigys_error, np.flip(sigys-sigys_error))) * 1e6, color=col2, alpha=af)
-        axs[1,2].set_xlabel(long_label)
         axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
-        axs[1,2].set_yscale('log')
+        #axs[1,2].set_yscale('log')
+        axs[1,2].set_xticks([])
         
         axs[2,2].plot(long_axis, np.zeros(x0s.shape), ':', color=col0)
         axs[2,2].plot(long_axis, x0s*1e6, color=col1)
@@ -472,7 +475,7 @@ class Linac(Beamline):
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, sigzs[0]*0.7e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.3e6]))
             axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
             axs[0,1].set_ylabel('Energy spread [%]')
-            axs[0,1].set_yscale('log')
+            #axs[0,1].set_yscale('log')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
             axs[0,1].xaxis.tick_top()

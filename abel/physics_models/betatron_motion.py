@@ -35,8 +35,10 @@ def acc_func(ys, A, B, C, D):
     dy_dz[4] = dgamma
     
     return dy_dz
-    
-@jit("Tuple((List(float64[:, ::1]), float64[:, ::1]))(List(float64[:, :], reflected=True), List(float64[::1], reflected=True), List(float64[::1], reflected=True), float64, float64, float64, int64, float64, int64, float64, boolean)", nopython=True, parallel=True)
+
+ 
+#41.8 sek without, with 41.9 sek
+@jit("Tuple((List(float64[:, ::1]), float64[:, ::1]))(List(float64[:, :], reflected=True), List(float64[::1], reflected=True), List(float64[::1], reflected=True), float64, float64, float64, int64, float64, int64, float64, boolean)",nopython=True, parallel=True)
 def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution):
     result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
     evolution = [np.zeros((10, n), dtype = np.float64) for _ in range(n_cores)]

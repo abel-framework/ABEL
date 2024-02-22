@@ -93,7 +93,7 @@ class Stage(Trackable):
 
     
     def plot_evolution(self):
-
+        plt.rcParams.update({'font.size': 13})
         # extract wakefield if not already existing
         if not hasattr(self.evolution, 'location'):
             print('No evolution calculated')
@@ -101,7 +101,7 @@ class Stage(Trackable):
 
         # preprate plot
         fig, axs = plt.subplots(2,3)
-        fig.set_figwidth(CONFIG.plot_fullwidth_default)
+        fig.set_figwidth(CONFIG.plot_fullwidth_default*1.2)
         fig.set_figheight(CONFIG.plot_width_default*0.8)
         col0 = "tab:gray"
         col1 = "tab:blue"
@@ -218,7 +218,7 @@ class Stage(Trackable):
         
     # plot wake
     def plot_wake(self, savefig=None):
-        
+        plt.rcParams.update({'font.size': 16})
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
             print('No wake calculated')
@@ -314,7 +314,7 @@ class Stage(Trackable):
         if savefig is not None:
             fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
         
-        return 
+        return fig
 
     
     def survey_object(self):
