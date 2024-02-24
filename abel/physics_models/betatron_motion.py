@@ -157,7 +157,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     # Constants
     #Ezs = Es/L #eV/m = J/e/m = V/m
     n_cores = max(1,min(16, round(len(x0)/10000)))
-    print("Number of cores:", n_cores)
+    #print("Number of cores:", n_cores)
     
     #Ezs = dgamma_ds*SI.m_e*SI.c**2/SI.e #eV/m = J/e/m = V/m
     K_sq = kp**2/2
@@ -196,11 +196,11 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     A_list = np.array_split(As, n_cores)
     Q_tot = np.sum(qs)
 
-    start = time.time()
+    #start = time.time()
     results, evolution = parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution)
     
-    end = time.time()
-    print('time = ', end-start, ' sec')
+    #end = time.time()
+    #print('time = ', end-start, ' sec')
     if save_evolution:
         evolution[4] = evolution[4]*SI.m_e*SI.c**2/SI.e
         evolution[5] = evolution[5]*SI.m_e*SI.c**2/SI.e/evolution[4]
