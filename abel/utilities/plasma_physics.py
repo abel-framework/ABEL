@@ -10,7 +10,7 @@ def k_p(n0):
 def omega_p(n0):
     return np.sqrt(n0*SI.e**2/(SI.epsilon_0*SI.m_e))
 
-# matched beta function (for a beam of energy E) [m]
+# matched beta function (for a beam of energy E (default unit is eV)) [m]
 def beta_matched(n0, E):    
     return np.sqrt(2*energy2gamma(E))/k_p(n0)
     

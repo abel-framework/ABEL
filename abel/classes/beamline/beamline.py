@@ -29,7 +29,10 @@ class Beamline(Trackable, Runnable):
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
         # assemble the trackables
-        self.assemble_trackables()
+        if self.trackables is None:                          # enable setting interstage.nom_energy individually
+            self.assemble_trackables()
+            
+        #self.assemble_trackables()
         
         # perform element-wise tracking
         for trackable in self.trackables:
