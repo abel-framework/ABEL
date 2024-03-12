@@ -14,7 +14,6 @@ class StageWakeT(Stage):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source)
         
-        #self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
         self.num_cell_xy = num_cell_xy
         self.keep_data = keep_data
@@ -43,8 +42,10 @@ class StageWakeT(Stage):
         # make longitudinal box range
         num_sigmas = 6
         #box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        box_min_z = driver0.z_offset() - 2.8 * blowout_radius(self.plasma_density, driver0.peak_current())
-        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
+        R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
+        box_min_z = driver0.z_offset() - 3.3 * R_blowout
+        #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
+        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size

@@ -4,8 +4,9 @@
 &run_setup
     lattice             = "$latticefile",
     use_beamline        = "ACHROMAT",
-    p_central_mev       = $p_central_mev,
+    p_central_mev       = "$p_central_mev",
     random_number_seed  = 0,
+    centroid            = "$path_to_beam_centroid_file",
 &end
 
 &run_control
@@ -16,4 +17,16 @@
 &end
 
 &track
+&end
+
+&twiss_output
+    filename = "$path_to_uncoupled_Twiss_parameter_output_file";
+    beta_x = 1;
+    alpha_x = 1;
+    eta_x = 1;
+    etap_x = 1;
+    beta_y = 1;
+    alpha_y = 1;
+    eta_y = 1;
+    etap_y = 1;
 &end

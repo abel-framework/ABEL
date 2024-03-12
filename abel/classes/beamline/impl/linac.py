@@ -117,10 +117,8 @@ class Linac(Beamline):
             Es = np.append(Es, E)
         return Es
     
-    
     def effective_gradient(self):
         return self.nom_energy()/self.get_length()
-    
     
     def energy_usage(self):
         if self.trackables is None:
@@ -133,7 +131,28 @@ class Linac(Beamline):
     def energy_efficiency(self):
         Etot_beam = self.final_beam.total_energy()
         return Etot_beam/self.energy_usage()
-    
+
+    # Enable setting the interstage nominal energy individually
+    def set_interstage_nom_energy(self, interstage_num, nom_energy):
+        if self.trackables is None:                                                    
+            self.assemble_trackables()                                                 
+        self.interstages[interstage_num].set_nom_energy(nom_energy)
+
+    # Enable setting the stage nominal energy gain (and succeeding interstage nominal energy) individually
+    def set_stage_nom_energy_gain(self, stage_num, nom_energy_gain):                          
+        if self.trackables is None:                                                    
+            self.assemble_trackables()                                                 
+        self.stages[stage_num].set_nom_energy_gain(nom_energy_gain)
+        nom_energies = self.nom_stage_energies()
+        if 2*stage_num+1 < len(nom_energies)-1:
+            nom_energy = nom_energies[2*stage_num+1]
+            self.set_interstage_nom_energy(interstage_num=stage_num, nom_energy=nom_energy)
+
+    # Enable setting the interstage plasma lens offset individually
+    def set_interstage_lens_offset(self, interstage_num, lens_x_offset=0.0, lens_y_offset=0.0):
+        if self.trackables is None:                                                    
+            self.assemble_trackables()                                                 
+        self.interstages[interstage_num].set_lens_offset(lens_x_offset, lens_y_offset)
     
     ## PLOT EVOLUTION
     
@@ -206,7 +225,8 @@ class Linac(Beamline):
         return waterfalls, trackable_numbers, bins
              
         
-    def plot_evolution(self, use_stage_nums=False, shot=None):
+    def plot_evolution(self, use_stage_nums=False, shot=None, save_fig=False):
+        
         if self.trackables is None:
             self.assemble_trackables()
             
@@ -313,43 +333,52 @@ class Linac(Beamline):
         axs[2,1].set_xlabel(long_label)
         axs[2,1].set_ylabel('Longitudinal offset [$\mathrm{\mu}$m]')
         
-        #axs[0,2].yaxis.set_major_formatter(mticker.StrMethodFormatter("{x:.1f}"))
-        axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnxs[0]*1e6, ':', color=col0)
+        axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnxs[0]*1e6, ':', color=col0, label='Nominal value')
         axs[0,2].plot(long_axis, np.ones(len(long_axis))*emnys[0]*1e6, ':', color=col0)
-        axs[0,2].plot(long_axis, emnxs*1e6, color=col1)
-        axs[0,2].plot(long_axis, emnys*1e6, color=col2)
+        axs[0,2].plot(long_axis, emnxs*1e6, color=col1, label=r'$\varepsilon_{\mathrm{n}x}$')
+        axs[0,2].plot(long_axis, emnys*1e6, color=col2, label=r'$\varepsilon_{\mathrm{n}y}$')
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnxs+emnxs_error, np.flip(emnxs-emnxs_error))) * 1e6, color=col1, alpha=af)
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnys+emnys_error, np.flip(emnys-emnys_error))) * 1e6, color=col2, alpha=af)
-        if Lzs.max() > (min(emnxs.min(), emnys.min()))*1e-2:
-            axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
-            axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
+        #if Lzs.max() > (min(emnxs.min(), emnys.min()))*1e-2:
+        #    axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
+        #    axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
+        axs[0,2].set_xlabel(long_label)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
-        #axs[0,2].set_yscale('log')
-        axs[0,2].set_xticks([])
+        axs[0,2].set_yscale('log')
+        axs[0,2].legend()
         
-        #axs[1,2].plot(long_axis, np.sqrt(Es_nom/Es_nom[0])*betaxs[0]*1e3, ':', color=col0)
-        axs[1,2].plot(long_axis, sigxs*1e6, color=col1)
-        axs[1,2].plot(long_axis, sigys*1e6, color=col2)
+        axs[1,2].plot(long_axis, (Es_nom[0]/Es_nom)**(1/4)*sigxs[0]*1e6, ':', color=col0, label='Nominal value')
+        axs[1,2].plot(long_axis, (Es_nom[0]/Es_nom)**(1/4)*sigys[0]*1e6, ':', color=col0)
+        axs[1,2].plot(long_axis, sigxs*1e6, color=col1, label='$\sigma_x$')
+        axs[1,2].plot(long_axis, sigys*1e6, color=col2, label='$\sigma_y$')
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigxs+sigxs_error, np.flip(sigxs-sigxs_error))) * 1e6, color=col1, alpha=af)
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigys+sigys_error, np.flip(sigys-sigys_error))) * 1e6, color=col2, alpha=af)
         axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
-        #axs[1,2].set_yscale('log')
-        axs[1,2].set_xticks([])
+        axs[1,2].set_yscale('log')
+        axs[1,2].legend()
         
         axs[2,2].plot(long_axis, np.zeros(x0s.shape), ':', color=col0)
-        axs[2,2].plot(long_axis, x0s*1e6, color=col1)
-        axs[2,2].plot(long_axis, y0s*1e6, color=col2)
+        axs[2,2].plot(long_axis, x0s*1e6, color=col1, label=r'$\langle x\rangle$')
+        axs[2,2].plot(long_axis, y0s*1e6, color=col2, label=r'$\langle y\rangle$')
         axs[2,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((x0s+x0s_error, np.flip(x0s-x0s_error))) * 1e6, color=col1, alpha=af)
         axs[2,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((y0s+y0s_error, np.flip(y0s-y0s_error))) * 1e6, color=col2, alpha=af)
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
+        axs[2,2].legend()
         
         plt.show()
-        return fig
+
+        if save_fig:
+            plot_path = self.run_path() + 'plots/'
+            if not os.path.exists(plot_path):
+                os.makedirs(plot_path)
+            filename = plot_path + 'evolution' + str(self.shot) + '.png'
+            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+    
     
     
     # density plots
-    def plot_waterfalls(self, shot=None):
+    def plot_waterfalls(self, shot=None, save_fig=False):
         
         if self.trackables is None:
             self.assemble_trackables()
@@ -410,6 +439,13 @@ class Linac(Beamline):
         cbar3.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$m]')
         
         plt.show()
+
+        if save_fig:
+            plot_path = self.run_path() + 'plots/'
+            if not os.path.exists(plot_path):
+                os.makedirs(plot_path)
+            filename = plot_path + 'waterfalls' + str(self.shot) + '.png'
+            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
 
     
     # animate the longitudinal phase space
@@ -640,7 +676,7 @@ class Linac(Beamline):
             axs[2,0].set_xlim([min(xs0)*1e6, max(xs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-dQdx0), max(-dQdx_final)])*1.2e3])
             axs[2,0].set_xlabel('Transverse position, $x$ [$\mathrm{\mu}$m]')
-            axs[2,0].set_ylabel('$dQ/dy$ [nC/$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$dQ/dx$ [nC/$\mathrm{\mu}$m]')
             
             # plot angular projection
             dQdpx, pxs2 = beam.projected_density(beam.pxs, bins=pxs_final)
@@ -652,8 +688,8 @@ class Linac(Beamline):
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel("$dQ/dp_x$ (nC c/MeV)")
-            axs[1,1].set_ylabel("Momentum, $p_x$ (MeV/c)")
+            axs[1,1].set_xlabel("$dQ/dp_x$ [nC c/MeV]")
+            axs[1,1].set_ylabel("Momentum, $p_x$ [MeV/c]")
             
             # plot centroid evolution
             x0s.append(beam.x_offset())
