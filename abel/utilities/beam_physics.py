@@ -74,8 +74,8 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
 
 
 # generate trace space from geometric emittance and twiss parameters for a beam symmetrised in 6D
-def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, bunch_length, energy_spread, L=0):
-
+def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, bunch_length, energy_spread, L=0, seed=None):
+    rng = np.random.default_rng(seed=seed)
     # calculate beam size, divergence and correlation
     sigx = np.sqrt(epsilon_x * beta_x)
     sigy = np.sqrt(epsilon_y * beta_y)
@@ -86,12 +86,12 @@ def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y,
 
     # make underlying Gaussian variables
     N_actual = round(N/8)
-    us_x = np.random.normal(size=N_actual*2)
-    vs_x = np.random.normal(size=N_actual*2)
-    us_y = np.random.normal(size=N_actual*2)
-    vs_y = np.random.normal(size=N_actual*2)
-    zs = np.random.normal(scale=bunch_length, size=N_actual)
-    Es = np.random.normal(scale=energy_spread, size=N_actual)
+    us_x = rng.normal(size=N_actual*2)
+    vs_x = rng.normal(size=N_actual*2)
+    us_y = rng.normal(size=N_actual*2)
+    vs_y = rng.normal(size=N_actual*2)
+    zs = rng.normal(scale=bunch_length, size=N_actual)
+    Es = rng.normal(scale=energy_spread, size=N_actual)
 
     # do symmetrization
     us_x  = np.concatenate((us_x, -us_x, us_x, -us_x))
