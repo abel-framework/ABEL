@@ -250,7 +250,7 @@ class StageHipace(Stage):
             self.test_particle_evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
             """
             # TODO: add angular momentum and normalized amplitude
-    
+        return self
         
     def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
         
@@ -537,4 +537,4 @@ class StageHipace(Stage):
         ax3.set_xlim(long_limits)
         
         plt.show()
-        return fig
+        return fig, self.test_particle_evolution.energy

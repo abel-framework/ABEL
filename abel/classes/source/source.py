@@ -8,7 +8,7 @@ import scipy.constants as SI
 class Source(Trackable):
     
     @abstractmethod
-    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0):
+    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0, seed = None):
         
         self.length = length
         self.energy = energy
@@ -23,6 +23,8 @@ class Source(Trackable):
         
         self.waist_shift_x = waist_shift_x
         self.waist_shift_y = waist_shift_y
+
+        self.seed = seed
         
         self.jitter = SimpleNamespace()
         self.jitter.x = 0
@@ -31,12 +33,11 @@ class Source(Trackable):
         self.jitter.t = 0
         self.jitter.xp = 0
         self.jitter.yp = 0
-        self.jitter.E = 0
+        self.jitter.E = 0 
     
     
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        
         # add offsets and angles
         beam.set_xs(beam.xs() + np.random.normal(loc=self.x_offset, scale=self.jitter.x))
         beam.set_ys(beam.ys() + np.random.normal(loc=self.y_offset, scale=self.jitter.y))

@@ -30,7 +30,7 @@ def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False, seed = None)
 
 
 # generate trace space from geometric emittance and twiss parameters (2 planes)
-def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, L=0, symmetrize=False, seed = None):
+def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, rng, L=0, symmetrize=False):
 
     # calculate beam size, divergence and correlation
     sigx = np.sqrt(epsilon_x * beta_x)
@@ -45,7 +45,6 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
         N_actual = round(N/4)
     else:
         N_actual = N
-    rng = np.random.default_rng(seed=seed)
     us_x = rng.normal(size=N_actual)
     vs_x = rng.normal(size=N_actual)
     us_y = rng.normal(size=N_actual)
@@ -74,8 +73,7 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
 
 
 # generate trace space from geometric emittance and twiss parameters for a beam symmetrised in 6D
-def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, bunch_length, energy_spread, L=0, seed=None):
-    rng = np.random.default_rng(seed=seed)
+def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, bunch_length, energy_spread, rng, L=0, seed=None):
     # calculate beam size, divergence and correlation
     sigx = np.sqrt(epsilon_x * beta_x)
     sigy = np.sqrt(epsilon_y * beta_y)
