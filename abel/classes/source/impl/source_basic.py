@@ -45,14 +45,14 @@ class SourceBasic(Source):
             if self.energy_spread is None:
                 self.energy_spread = self.energy * self.rel_energy_spread
             elif abs(self.energy_spread - self.energy * self.rel_energy_spread) > 0:
-                #raise Exception("Both absolute and relative energy spread defined.")
+                raise Exception("Both absolute and relative energy spread defined.")
         
         # longitudinal phase space
         if self.symmetrize:
             num_tiling = 4
             num_particles_actual = round(self.num_particles/num_tiling)
-            elif abs(self.energy_spread - self.energy * self.rel_energy_spread) > 0:
-                raise Exception("Both absolute and relative energy spread defined.")
+        elif abs(self.energy_spread - self.energy * self.rel_energy_spread) > 0:
+            raise Exception("Both absolute and relative energy spread defined.")
 
         if self.symmetrize_6d is False:
             
