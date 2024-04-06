@@ -427,8 +427,8 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     solution = np.concatenate(results, axis=1)
 
     return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e, evolution, location
-"""
 
+"""
 
 
 
