@@ -375,7 +375,7 @@ class Linac(Beamline):
             filename = plot_path + 'evolution' + str(self.shot) + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
     
-    
+        return fig
     
     # density plots
     def plot_waterfalls(self, shot=None, save_fig=False):
@@ -446,6 +446,7 @@ class Linac(Beamline):
                 os.makedirs(plot_path)
             filename = plot_path + 'waterfalls' + str(self.shot) + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+        return fig
 
     
     # animate the longitudinal phase space

@@ -36,7 +36,6 @@ def acc_func(ys, A, B, C, D):
     return dy_dz
 
 @njit
-# Get the second derivatives of position, velocitity and gamma (based on equations above)
 def gs(y, a, A, B, C, D):
     # y = [x, y, vx, vy, gamma]
     # a = [vx, vy, ax, ay, d_gamma]
@@ -92,29 +91,24 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
             # Sum of x-x_mean * xp-xp_mean (xp = vx*gamma = mat[2]*mat[4]), and same for y
             evolution[j][8,0] = np.sum(q*(mat[0]-x_mean)*q*(mat[2]*mat[4]-xp_mean))
             evolution[j][9,0] = np.sum(q*(mat[1]-y_mean)*q*(mat[3]*mat[4]-yp_mean))
+
+            a = acc_func(mat, A, B, C, D)
+            fs[0] = a
+            y_1 = mat + a*dz
+            a_1 = acc_func(y_1, A, B, C, D)
+            g = gs(y_1, a_1, A, B, C, D)
             
-            #Find use the derivatives at present, and future times
-            a_present = acc_func(mat, A, B, C, D)
-            fs[0] = a_present
-            y_next = mat + a_present*dz
-            a_next = acc_func(y_next, A, B, C, D)
-            # Find acceleration at future time
-            g = gs(y_next, a_next, A, B, C, D)
-            #Use multistep formula with k=1 to evolve the particles to next time step.
-            mat += dz*(2/3*a_next + 1/3*a_present) - 1/6*dz**2*g
+            mat += dz*(2/3*a_1 + 1/3*a) - 1/6*dz**2*g
             
             for i in range(1,n-1):
-                # Get derivatives of present time
-                a_present = acc_func(mat, A, B, C, D)
-                fs[i%2] = a_present # store the present acceleration values for use in next timestep
-                a_prev = fs[(i+1)%2] # get the accelerations from the previous timestep
-                #get derivatives at next timestep
-                y_next = mat + a_present*dz
-                a_next = acc_func(y_next, A, B, C, D)
-                # get accelerations at next timestep
-                g = gs(y_next, a_next, A, B, C, D)
-                # Use multistep formula with k=2 to evolve the particles
-                mat += dz*(29/48*a_next + 5/12*a_present- 1/48*a_prev) - 1/8*dz**2*g               
+                a = acc_func(mat, A, B, C, D)
+                fs[i%2] = a # store the present acceleration values for use in next timestep
+                prev_acc = fs[(i+1)%2] # contains the v, a and d_gamma from previous timestep
+                y_1 = mat + a*dz
+                a_1 = acc_func(y_1, A, B, C, D)
+                g = gs(y_1, a_1, A, B, C, D)
+            
+                mat += dz*(29/48*a_1 + 5/12*a- 1/48*prev_acc) - 1/8*dz**2*g               
                 
                 x_mean = np.sum(q*mat[0])/Q_sum
                 y_mean = np.sum(q*mat[1])/Q_sum
@@ -142,31 +136,23 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 evolution[j][9,i+1] = np.sum(q*(mat[1]-y_mean)*q*(mat[3]*mat[4]-yp_mean))
             
         else:
-            #Find use the derivatives at present, and future times
-            a_present = acc_func(mat, A, B, C, D)
-            fs[0] = a_present
-            y_next = mat + a_present*dz
-            a_next = acc_func(y_next, A, B, C, D)
-            # Find acceleration at future time
-            g = gs(y_next, a_next, A, B, C, D)
-            #Use multistep formula with k=1 to evolve the particles to next time step.
-            mat += dz*(2/3*a_next + 1/3*a_present) - 1/6*dz**2*g
+            a = acc_func(mat, A, B, C, D)
+            fs[0] = a
+            y_1 = mat + a*dz
+            a_1 = acc_func(y_1, A, B, C, D)
+            g = gs(y_1, a_1, A, B, C, D)
+            
+            mat += dz*(2/3*a_1 + 1/3*a) - 1/6*dz**2*g
             
             for i in range(1,n-1):
-                # Get derivatives of present time
-                a_present = acc_func(mat, A, B, C, D)
-                fs[i%2] = a_present # store the present acceleration values for use in next timestep
-                a_prev = fs[(i+1)%2] # get the accelerations from the previous timestep
-                
-                #get derivatives at next timestep
-                y_next = mat + a_present*dz
-                a_next = acc_func(y_next, A, B, C, D)
-                
-                # get accelerations at next timestep
-                g = gs(y_next, a_next, A, B, C, D)
-                
-                # Use multistep formula with k=2 to evolve the particles            
-                mat += dz*(29/48*a_next + 5/12*a_present- 1/48*a_prev) - 1/8*dz**2*g
+                a = acc_func(mat, A, B, C, D)
+                fs[i%2] = a # store the present acceleration values for use in next timestep
+                prev_acc = fs[(i+1)%2] # contains the v, a and d_gamma from previous timestep
+                y_1 = mat + a*dz
+                a_1 = acc_func(y_1, A, B, C, D)
+                g = gs(y_1, a_1, A, B, C, D)
+            
+                mat += dz*(29/48*a_1 + 5/12*a- 1/48*prev_acc) - 1/8*dz**2*g
                 
                 
         result[j] = mat
@@ -216,7 +202,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 200
+    n_per_beta = 400
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
@@ -252,8 +238,49 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     solution = np.concatenate(results, axis=1)
 
     return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e, evolution, location
-
 """
+import numpy as np
+from scipy.integrate import solve_ivp, odeint
+import scipy.constants as SI
+import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
+from numba import prange, jit, njit
+import numba as nb
+from types import SimpleNamespace
+import multiprocessing
+import os
+import time
+from abel.utilities.statistics import weighted_cov
+num_cores = multiprocessing.cpu_count()
+os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
+
+re = SI.physical_constants['classical electron radius'][0]
+
+#For matrix of particles and coordinates
+#@njit("float64[:, :](float64[:, :], float64[::1], float64, float64, float64)")
+@njit(parallel = True)
+def acc_func(ys, A, B, C, D):
+    # ys =[[x0, x1, x2, ...           ]  0
+    #     [y0, y1, y2, ...            ]  1
+    #     [vx0, vx1, vx2, ...         ]  2
+    #     [vy0, vy1, vy2, ...         ]  3
+    #     [gamma0, gamma1, gamma2, ...]] 4
+    ax = -(A/ys[4] + B)*ys[2] - C/ys[4]*ys[0]
+    ay = -(A/ys[4] + B)*ys[3] - C/ys[4]*ys[1]
+    dgamma = A - D*ys[4]**2*(ys[0]**2 + ys[1]**2)
+
+    dy_dz = np.empty_like(ys, dtype = np.float64)
+    dy_dz[0] = ys[2]
+    dy_dz[1] = ys[3]
+    dy_dz[2] = ax
+    dy_dz[3] = ay
+    dy_dz[4] = dgamma
+    
+    return dy_dz
+
+ 
+#41.8 sek without, with 41.9 sek
+#@jit("Tuple((List(float64[:, ::1]), float64[:, ::1]))(List(float64[:, :], reflected=True), List(float64[::1], reflected=True), List(float64[::1], reflected=True), float64, float64, float64, int64, float64, int64, float64, boolean)",nopython=True, parallel=True)
 @njit(parallel = True)
 def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution):
     result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
@@ -301,8 +328,21 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 k4 = acc_func(mat + k3 * dz, A, B, C, D)
                 
                 k_av = 1/6*(k1+2*k2+2*k3+k4)
+
+                #For implicit correction
+                f_0 = A - D*mat[4]**2*(mat[0]**2 + mat[1]**2)
+                gamma_1 = mat[4] + dz*(f_0)
                 
-                mat += k_av*dz                
+                mat += k_av*dz
+                
+                # Implicit correction to the energy
+                f_1 = A - D*gamma_1**2*(mat[0]**2 + mat[1]**2)
+        
+                g_1 = - 2*D*gamma_1*f_1*(mat[0]**2+mat[1]**2)\
+                -2*D*gamma_1**2 * (mat[0]*mat[2] + mat[1]*mat[3])
+                
+                mat[4] = mat[4] + dz*(2/3*f_1 + 1/3*f_0) - 1/6* dz**2 *g_1
+                
                 
                 x_mean = np.sum(q*mat[0])/Q_sum
                 y_mean = np.sum(q*mat[1])/Q_sum
@@ -331,6 +371,11 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
             
         else:
             for i in range(n-1):
+                #For implicit evolution
+                gamma_0 = mat[4]
+                x1, y1 = mat[0] + dz*mat[2], mat[1] + dz*mat[3]
+                vx, vy = mat[2], mat[3]
+                
                 k1 = acc_func(mat, A, B, C, D)
             
                 k2 = acc_func(mat + k1 * dz/2, A, B, C, D)
@@ -341,8 +386,18 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 
                 k_av = 1/6*(k1+2*k2+2*k3+k4)
                 
+                ###
+                gamma_1 = gamma_0 + dz*k1[4]
+                ###
                 
                 mat += k_av*dz
+                
+                # multistep evolution of the energy
+                f_1 = A - D*gamma_1**2*(x1**2 + y1**2)
+        
+                g_1 = -2*D*gamma_1*f_1*(x1**2+y1**2) -2*D*gamma_1**2*(x1*(vx+dz*k1[2]) + y1*(vy+dz*k1[3]))
+                
+                mat[4] = gamma_0 + dz*(2/3*f_1 + 1/3*k1[4]) - 1/6*dz**2*g_1
                 
         result[j] = mat
         
@@ -391,7 +446,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 200
+    n_per_beta = 400
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
@@ -427,9 +482,4 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     solution = np.concatenate(results, axis=1)
 
     return solution[0], solution[1], solution[2] * solution[4]*SI.c, solution[3]* solution[4]*SI.c, solution[4]*SI.m_e*SI.c**2 / SI.e, evolution, location
-"""
-
-
-
-
-
+    """
