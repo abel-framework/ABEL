@@ -130,6 +130,11 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
             
         else:
             for i in range(n-1):
+                #For implicit evolution
+                gamma_0 = mat[4]
+                f_0 = A - D*gamma_0**2*(mat[0]**2 + mat[1]**2)
+                gamma_1 = gamma_0 + dz*f_0
+                
                 k1 = acc_func(mat, A, B, C, D)
             
                 k2 = acc_func(mat + k1 * dz/2, A, B, C, D)
@@ -139,20 +144,15 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 k4 = acc_func(mat + k3 * dz, A, B, C, D)
                 
                 k_av = 1/6*(k1+2*k2+2*k3+k4)
-
-                #For implicit correction
-                f_0 = A - D*mat[4]**2*(mat[0]**2 + mat[1]**2)
-                gamma_1 = mat[4] + dz*f_0
                 
                 mat += k_av*dz
                 
-                # Implicit correction to the energy
+                # multistep evolution of the energy
                 f_1 = A - D*gamma_1**2*(mat[0]**2 + mat[1]**2)
         
-                g_1 = - 2*D*gamma_1*f_1*(mat[0]**2+mat[1]**2)\
-                -2*D*gamma_1**2*(mat[0]*mat[2] + mat[1]*mat[3])
+                g_1 = - 2*D*gamma_1*f_1*(mat[0]**2+mat[1]**2)-2*D*gamma_1**2*(mat[0]*mat[2] + mat[1]*mat[3])
                 
-                mat[4] = mat[4] + dz*(2/3*f_1 + 1/3*f_0) - 1/6*dz**2*g_1
+                mat[4] = gamma_0 + dz*(2/3*f_1 + 1/3*f_0) - 1/6*dz**2*g_1
                 
         result[j] = mat
         
@@ -201,7 +201,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 1500
+    n_per_beta = 400
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
