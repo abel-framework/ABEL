@@ -16,7 +16,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
 re = SI.physical_constants['classical electron radius'][0]
 
 #For matrix of particles and coordinates
-@njit("float64[:, :](float64[:, :], float64[::1], float64, float64, float64)")
+#@njit("float64[:, :](float64[:, :], float64[::1], float64, float64, float64)")
+@njit(parallel = True)
 def acc_func(ys, A, B, C, D):
     # ys =[[x0, x1, x2, ...           ]  0
     #     [y0, y1, y2, ...            ]  1
@@ -38,7 +39,8 @@ def acc_func(ys, A, B, C, D):
 
  
 #41.8 sek without, with 41.9 sek
-@jit("Tuple((List(float64[:, ::1]), float64[:, ::1]))(List(float64[:, :], reflected=True), List(float64[::1], reflected=True), List(float64[::1], reflected=True), float64, float64, float64, int64, float64, int64, float64, boolean)",nopython=True, parallel=True)
+#@jit("Tuple((List(float64[:, ::1]), float64[:, ::1]))(List(float64[:, :], reflected=True), List(float64[::1], reflected=True), List(float64[::1], reflected=True), float64, float64, float64, int64, float64, int64, float64, boolean)",nopython=True, parallel=True)
+@njit(parallel = True)
 def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_tot, save_evolution):
     result = [np.empty_like(particle_list[0], dtype=np.float64) for _ in range(n_cores)]
     evolution = [np.zeros((10, n), dtype = np.float64) for _ in range(n_cores)]
@@ -85,8 +87,21 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 k4 = acc_func(mat + k3 * dz, A, B, C, D)
                 
                 k_av = 1/6*(k1+2*k2+2*k3+k4)
+
+                #For implicit correction
+                f_0 = A - D*mat[4]**2*(mat[0]**2 + mat[1]**2)
+                gamma_1 = mat[4] + dz*(f_0)
                 
                 mat += k_av*dz
+                
+                # Implicit correction to the energy
+                f_1 = A - D*gamma_1**2*(mat[0]**2 + mat[1]**2)
+        
+                g_1 = - 2*D*gamma_1*f_1*(mat[0]**2+mat[1]**2)\
+                -2*D*gamma_1**2*(mat[0]*mat[2] + mat[1]*mat[3])
+                
+                mat[4] = mat[4] + dz*(2/3*f_1 + 1/3*f_0) - 1/6*dz**2*g_1
+                
                 
                 x_mean = np.sum(q*mat[0])/Q_sum
                 y_mean = np.sum(q*mat[1])/Q_sum
@@ -124,8 +139,20 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 k4 = acc_func(mat + k3 * dz, A, B, C, D)
                 
                 k_av = 1/6*(k1+2*k2+2*k3+k4)
+
+                #For implicit correction
+                f_0 = A - D*mat[4]**2*(mat[0]**2 + mat[1]**2)
+                gamma_1 = mat[4] + dz*f_0
                 
                 mat += k_av*dz
+                
+                # Implicit correction to the energy
+                f_1 = A - D*gamma_1**2*(mat[0]**2 + mat[1]**2)
+        
+                g_1 = - 2*D*gamma_1*f_1*(mat[0]**2+mat[1]**2)\
+                -2*D*gamma_1**2*(mat[0]*mat[2] + mat[1]*mat[3])
+                
+                mat[4] = mat[4] + dz*(2/3*f_1 + 1/3*f_0) - 1/6*dz**2*g_1
                 
         result[j] = mat
         
@@ -157,7 +184,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     # Constants
     #Ezs = Es/L #eV/m = J/e/m = V/m
     n_cores = max(1,min(16, round(len(x0)/10000)))
-    #print("Number of cores:", n_cores)
+    print("Number of cores:", n_cores)
     
     #Ezs = dgamma_ds*SI.m_e*SI.c**2/SI.e #eV/m = J/e/m = V/m
     K_sq = kp**2/2
@@ -174,7 +201,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 150
+    n_per_beta = 1500
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
