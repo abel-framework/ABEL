@@ -9,6 +9,8 @@ import collections
 import numpy as np
 from matplotlib import pyplot as plt
 import dill as pickle
+import functools
+import inspect
 
 class Runnable(ABC):
     
@@ -200,6 +202,54 @@ class Runnable(ABC):
     @property
     def final_beam(self):
         return self.get_beam(-1)
+
+
+    # Apply beam_func to every shot and calculate the mean and standard deviation through shots_beamfunc_vals()
+    def shots_mean_std(self, beam_fcn, clean=False, beam_index=-1):
+        input_list = inspect.signature(beam_fcn).parameters
+        if 'clean' in input_list:  # Check if the input list contains clean.
+            vals = self.shots_beamfunc_vals(lambda obj, clean : beam_fcn(obj.get_beam(index=beam_index), clean), clean)
+            
+        else:
+            vals = self.shots_beamfunc_vals(lambda obj : beam_fcn(obj.get_beam(index=beam_index)))
+
+        val_mean = np.mean(vals)
+        val_std = np.std(vals)
+        return val_mean, val_std
+
+    
+    # Apply fcn to every shot
+    def shots_beamfunc_vals(self, fcn, clean=False):
+            
+        # get values for all shots
+        fcn_outputs = np.empty(self.num_shots)
+            
+        for shot in range(self.num_shots):
+            input_list = inspect.signature(fcn).parameters
+            if 'clean' in input_list:  # Check if the input list contains clean.
+                fcn_outputs[shot] = fcn(self[shot], clean=clean)
+            else:
+                fcn_outputs[shot] = fcn(self[shot])
+        
+        return fcn_outputs
+
+    
+    ## Support for Bayesian optimisation through Ax.optimize
+    
+    def set_parameters(self, params):
+        for key in params.keys():
+            self.set_attr(key, params[key])
+            
+    # Setting attribute
+    def set_attr(self, attr, val):
+        pre, _, post = attr.rpartition('.') # Splits attr into post containing the last nested atrtibute and pre containing all previous attributes.
+        return setattr(self.get_nested_attr(pre) if pre else self, post, val)  # Sets val to the post attribute if attr is not nested. If nested, call get_nested_attr(pre) to set val correctly.
+
+    # Get nested attribute
+    def get_nested_attr(self, attr, *args):
+        def _getattr(obj, attr):
+            return getattr(obj, attr, *args)
+        return functools.reduce(_getattr, [self] + attr.split('.'))
     
     
     ## SCAN FUNCTIONALITY
@@ -235,29 +285,19 @@ class Runnable(ABC):
         beam = self.run(run_name=self.run_name, num_shots=self.num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
         
         return beam
+
     
     
-    # plot value of beam parameters across a scan
-    def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear'):
-        self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale)
-
-    def plot_energy(self, index=-1):
-        self.plot_beam_function(Beam.energy, scale=1e9, label='Energy (GeV)', index=index)
-
-    def plot_energy_spread(self, index=-1):
-        self.plot_beam_function(Beam.rel_energy_spread, scale=1e-2, label='Energy spread, rms (%)', index=index)
-
-    def plot_charge(self, index=-1):
-        self.plot_beam_function(Beam.charge, scale=1e-9, label='Charge (nC)', index=index)
-
-    def plot_beam_size_x(self, index=-1):
-        self.plot_beam_function(Beam.beam_size_x, scale=1e-3, label='Beam size, x (mm rms)', index=index)
-
-    def plot_beam_size_y(self, index=-1):
-        self.plot_beam_function(Beam.beam_size_y, scale=1e-3, label='Beam size, y (mm rms)', index=index)
-        
-    # plot value of beam parameters across a scan
-    def plot_function(self, fcn, label=None, scale=1, xscale='linear', yscale='linear'):
+    # Extract mean and standard deviation value of beam parameters across a scan
+    def extract_scan_mean_std(self, beam_fcn, clean=False, index=-1):
+        input_list = inspect.signature(beam_fcn).parameters
+        if 'clean' in input_list:  # Check if the input list contains clean.
+            val_mean, val_std = self.scan_extract_function(lambda obj, clean : beam_fcn(obj.get_beam(index=index), clean), clean)
+        else:
+            val_mean, val_std = self.scan_extract_function(lambda obj : beam_fcn(obj.get_beam(index=index)))
+        return val_mean, val_std
+            
+    def scan_extract_function(self, fcn, clean=False):
         
         # extract values
         val_mean = np.empty(self.num_steps)
@@ -267,11 +307,25 @@ class Runnable(ABC):
             # get values for this step
             val_output = np.empty(self.num_shots_per_step)
             for shot_in_step in range(self.num_shots_per_step):
-                val_output[shot_in_step] = fcn(self[step,shot_in_step])
+                
+                input_list = inspect.signature(fcn).parameters
+                if 'clean' in input_list:  # Check if the input list contains clean.
+                    val_output[shot_in_step] = fcn(self[step, shot_in_step], clean=clean)
+                else:
+                    val_output[shot_in_step] = fcn(self[step, shot_in_step])
                 
             # get step mean and error
             val_mean[step] = np.mean(val_output)
             val_std[step] = np.std(val_output)
+
+        return val_mean, val_std
+
+
+    # plot value of beam parameters across a scan
+    def plot_function(self, fcn, clean=False, label=None, scale=1, xscale='linear', yscale='linear'):
+        
+        # extract values
+        val_mean, val_std = self.scan_extract_function(fcn, clean)
         
         if not hasattr(self, 'scale'):
             self.scale = 1
@@ -289,6 +343,30 @@ class Runnable(ABC):
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
 
+    
+    # plot value of beam parameters across a scan
+    def plot_beam_function(self, beam_fcn, clean=False, index=-1, label=None, scale=1, xscale='linear', yscale='linear'):
+        input_list = inspect.signature(beam_fcn).parameters
+        if 'clean' in input_list:  # Check if the input list contains clean.
+            self.plot_function(lambda obj, clean : beam_fcn(obj.get_beam(index=index), clean), clean, label=label, scale=scale, xscale=xscale, yscale=yscale)
+        else:
+            self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale)
+
+    def plot_energy(self, index=-1):
+        self.plot_beam_function(Beam.energy, scale=1e9, label='Energy [GeV]', index=index)
+
+    def plot_energy_spread(self, index=-1):
+        self.plot_beam_function(Beam.rel_energy_spread, scale=1e-2, label='Energy spread, rms [%]', index=index)
+
+    def plot_charge(self, index=-1):
+        self.plot_beam_function(Beam.charge, scale=1e-9, label='Charge [nC]', index=index)
+
+    def plot_beam_size_x(self, index=-1):
+        self.plot_beam_function(Beam.beam_size_x, scale=1e-3, label='Beam size, x [mm rms]', index=index)
+
+    def plot_beam_size_y(self, index=-1):
+        self.plot_beam_function(Beam.beam_size_y, scale=1e-3, label='Beam size, y [mm rms]', index=index)
+        
     
     def plot_waterfall(self, proj_fcn, label=None, scale=1, index=-1):
 
@@ -324,15 +402,15 @@ class Runnable(ABC):
 
 
     def plot_waterfall_energy(self, index=-1):
-        self.plot_waterfall(Beam.energy_spectrum, scale=1e9, label='Energy (GeV)', index=index)
+        self.plot_waterfall(Beam.energy_spectrum, scale=1e9, label='Energy [GeV]', index=index)
 
     def plot_waterfall_current(self, index=-1):
-        self.plot_waterfall(Beam.current_profile, scale=1e-15, label='Time (fs)', index=index)
+        self.plot_waterfall(Beam.current_profile, scale=1e-15, label='Time [fs]', index=index)
 
     def plot_waterfall_x(self, index=-1):
-        self.plot_waterfall(Beam.transverse_profile_x, scale=1e-3, label='x (mm)', index=index)
+        self.plot_waterfall(Beam.transverse_profile_x, scale=1e-3, label='x [mm]', index=index)
 
     def plot_waterfall_y(self, index=-1):
-        self.plot_waterfall(Beam.transverse_profile_y, scale=1e-3, label='y (mm)', index=index)
+        self.plot_waterfall(Beam.transverse_profile_y, scale=1e-3, label='y [mm]', index=index)
         
     

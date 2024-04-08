@@ -100,6 +100,35 @@ class Linac(Beamline):
                 self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
             self.trackables[max(1,2*self.num_stages)] = self.bds
 
+
+    # Sets parameters to nested attributess in the Linac object
+    #def set_parameters(self, parameters):
+    #    """
+    #    Inputs
+    #    ----------
+    #    parameters: list 
+    #        Each element is a dictionary containing keys 'name', 'type', 'bounds' etc.
+    #    """
+    #    
+    #    for param in parameters:
+    #
+    #        # Split the name by '.' to access nested attributes
+    #        attr_names = param['name'].split('.')
+    #        
+    #        # Get the last attribute name and its value
+    #        param_name = attr_names[-1]
+    #        attr_value = param['bounds'][0]  # Assuming you want to use the lower bound of the range...
+    #        
+    #        obj = self
+    #        
+    #        # Iterate over the attribute names except the last one to get the object to which the attribute should be set
+    #        for name in attr_names[:-1]: 
+    #            obj = getattr(obj, name)
+    #    
+    #        # Set the attribute
+    #        setattr(obj, param_name, attr_value)
+#
+
     
     ## ENERGY CONSIDERATIONS
     
@@ -370,7 +399,7 @@ class Linac(Beamline):
             plot_path = self.run_path() + 'plots/'
             if not os.path.exists(plot_path):
                 os.makedirs(plot_path)
-            filename = plot_path + 'evolution' + str(self.shot) + '.png'
+            filename = plot_path + 'evolution' + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
     
     
@@ -442,7 +471,7 @@ class Linac(Beamline):
             plot_path = self.run_path() + 'plots/'
             if not os.path.exists(plot_path):
                 os.makedirs(plot_path)
-            filename = plot_path + 'waterfalls' + str(self.shot) + '.png'
+            filename = plot_path + 'waterfalls_shot' + str(self.shot) + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
 
     

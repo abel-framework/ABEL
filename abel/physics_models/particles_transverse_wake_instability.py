@@ -260,16 +260,6 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         # Filter out particles that diverge too much for applying small angle approximation
         bool_indices = (np.abs(pxs_sorted/pzs_sorted) < 50e-3)
         zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
-        #zs_sorted = zs_sorted[bool_indices]
-        #xs_sorted = xs_sorted[bool_indices]
-        #ys_sorted = ys_sorted[bool_indices]
-        #pxs_sorted = pxs_sorted[bool_indices]
-        #pys_sorted = pys_sorted[bool_indices]
-        #pzs_sorted = pzs_sorted[bool_indices]
-        ##energs_sorted = energs_sorted[bool_indices]
-        #weights_sorted = weights_sorted[bool_indices]
-        #Ez = Ez[bool_indices]
-        #bubble_radius = bubble_radius[bool_indices]
 
         bool_indices = (np.abs(pys_sorted/pzs_sorted) < 50e-3)
         zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
@@ -305,9 +295,9 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         pxs_sorted = results[0]
         pys_sorted = results[1]
 
-        #Ez = -3.35e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <-#######################################
-        #Ez = -3.20e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <-#######################################
-        #Ez = -11.56e9/5.8*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <-#######################################
+        #Ez = -3.35e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
+        #Ez = -3.20e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
+        #Ez = -2.0e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ######################
         
         # Update longitudinal momenta.
         if enable_radiation_reaction:

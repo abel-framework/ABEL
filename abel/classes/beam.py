@@ -372,7 +372,7 @@ class Beam():
         xfilter = np.abs(self.xs()-self.x_offset(clean=True)) > nsigma*self.beam_size_x(clean=True)
         xpfilter = np.abs(self.xps()-self.x_angle(clean=True)) > nsigma*self.divergence_x(clean=True)
         yfilter = np.abs(self.ys()-self.y_offset(clean=True)) > nsigma*self.beam_size_y(clean=True)
-        ypfilter = np.abs(self.ys()-self.y_angle(clean=True)) > nsigma*self.divergence_y(clean=True)
+        ypfilter = np.abs(self.yps()-self.y_angle(clean=True)) > nsigma*self.divergence_y(clean=True)
         filter = np.logical_or(np.logical_or(xfilter, xpfilter), np.logical_or(yfilter, ypfilter))
         del self[filter]
 

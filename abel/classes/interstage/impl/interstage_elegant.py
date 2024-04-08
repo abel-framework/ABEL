@@ -2,6 +2,7 @@ import uuid, os, scipy, shutil, subprocess, csv
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker as mticker
+from matplotlib.patches import Rectangle
 from functools import partial
 from matplotlib.animation import FuncAnimation
 from functools import partial
@@ -11,6 +12,7 @@ from types import SimpleNamespace
 from abel import CONFIG, Interstage, Beam
 from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
 from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion
+
 
 class InterstageElegant(Interstage):
     
@@ -51,6 +53,8 @@ class InterstageElegant(Interstage):
         self.spacer_length = None
         self.sextupole_length = None
         self.sextupole_strength = None
+        
+        self.element_lengths = None
                 
 
     def set_nom_energy(self, nom_energy):
@@ -128,6 +132,7 @@ class InterstageElegant(Interstage):
         L_chic = self.__eval_chicane_dipole_length()
         L_sext = self.__eval_sextupole_length()
         ls = np.array([dL, L_dip, dL, L_lens, dL, L_chic, dL, L_chic, dL, L_sext, dL, L_chic, dL, L_chic, dL, L_lens, dL, L_dip, dL])
+        self.element_lengths = ls
         
         # bending strength array
         Bdip = self.__eval_dipole_field()
@@ -430,9 +435,9 @@ class InterstageElegant(Interstage):
         self.evolution.energy = np.empty([0])  # [eV]
     
         self.evolution.location = np.empty([0])
-        self.evolution.x_offset_beam = np.empty([0])
+        #self.evolution.x_offset_beam = np.empty([0])
         #self.evolution.y_offset_beam = np.empty([0])
-        self.evolution.xp_offset_beam = np.empty([0])
+        #self.evolution.xp_offset_beam = np.empty([0])
         #self.evolution.yp_offset_beam = np.empty([0])
         #self.evolution.z_offset = np.empty([0]))  # No need to use this, as ELEGANT can output this faster.
         self.evolution.beam_size_x = np.empty([0])
@@ -445,9 +450,9 @@ class InterstageElegant(Interstage):
         for file in sorted(os.listdir(evolution_folder)):
             output_beam = elegant_read_beam(evolution_folder + os.fsdecode(file), tmpfolder=tmpfolder)
             self.evolution.location = np.append(self.evolution.location, output_beam.location)
-            self.evolution.x_offset_beam = np.append(self.evolution.x_offset_beam, output_beam.x_offset())  # No need to use this, as ELEGANT can output this faster.
+            #self.evolution.x_offset_beam = np.append(self.evolution.x_offset_beam, output_beam.x_offset())  # No need to use this, as ELEGANT can output this faster.
             #self.evolution.y_offset_beam = np.append(self.evolution.y_offset_beam, output_beam.y_offset())  # No need to use this, as ELEGANT can output this faster.
-            self.evolution.xp_offset_beam = np.append(self.evolution.xp_offset_beam, output_beam.x_angle())  # No need to use this, as ELEGANT can output this faster.
+            #self.evolution.xp_offset_beam = np.append(self.evolution.xp_offset_beam, output_beam.x_angle())  # No need to use this, as ELEGANT can output this faster.
             #self.evolution.yp_offset_beam = np.append(self.evolution.yp_offset_beam, output_beam.y_angle())  # No need to use this, as ELEGANT can output this faster.
             #self.evolution.z_offset = np.append(self.evolution.z_offset, output_beam.z_offset())  # No need to use this, as ELEGANT can output this faster.
             self.evolution.beam_size_x = np.append(self.evolution.beam_size_x, output_beam.beam_size_x())
@@ -755,10 +760,6 @@ class InterstageElegant(Interstage):
         # get initial beam
         beam_init = elegant_read_beam(evolution_folder + os.fsdecode(files[0]))
         beam_init.set_qs(self.beam0_charge_sign*beam_init.qs())      #########
-        #beam_init = self.get_beam(0)
-        #dQdzdx0, zs0, xs0 = beam_init.phase_space_density(beam_init.zs, beam_init.xs)
-        #dQdx0, xs_ = beam_init.projected_density(beam_init.xs, bins=xs0)
-        #Is0, _ = beam_init.current_profile(bins=zs0/SI.c)
         
         max_sig_index = np.argmax(self.evolution.beam_size_x)
         max_sig_beam = elegant_read_beam(evolution_folder + os.fsdecode(files[max_sig_index]))
@@ -767,7 +768,6 @@ class InterstageElegant(Interstage):
         Is0, _ = max_sig_beam.current_profile(bins=zs0/SI.c)
         
         # get final beam
-        #beam_final = self.get_beam(-1)
         beam_final = elegant_read_beam(evolution_folder + os.fsdecode(files[-1]))
         beam_final.set_qs(self.beam0_charge_sign*beam_final.qs())      #########
         dQdzdx_final, zs_final, xs_final = beam_final.phase_space_density(beam_final.zs, beam_final.xs)
@@ -793,9 +793,8 @@ class InterstageElegant(Interstage):
             # get beam for this frame
             beam = elegant_read_beam(evolution_folder + os.fsdecode(file_list[i]))
             beam.set_qs(self.beam0_charge_sign*beam.qs())      #########
-            #beam = self.get_beam(i)
             
-            # plot emittance evolution
+            # plot mean energy evolution
             ss.append(beam.location)
             Emeans.append(beam.energy())
             axs[0,0].cla()
@@ -804,9 +803,14 @@ class InterstageElegant(Interstage):
             axs[0,0].set_xlabel('Position in interstage [m]')
             axs[0,0].set_ylabel('Mean energy [GeV]')
             axs[0,0].set_xlim(beam_init.location,beam_final.location)
-            axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
+            #axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
+            axs[0,0].set_ylim(beam_init.energy()*0.9e-9, beam_final.energy()*1.1e-9)
             axs[0,0].xaxis.tick_top()
             axs[0,0].xaxis.set_label_position('top')
+
+            # Plot lattice elements
+            if i == 0:
+                self.plot_element_lengths(ypos=0.0, height=0.15, ax=axs[0,0].twinx())
             
             # plot emittance and bunch length evolution
             emitns.append(beam.norm_emittance_x()) # TODO: update to normalized amplitude
@@ -937,7 +941,7 @@ class InterstageElegant(Interstage):
             beam = elegant_read_beam(evolution_folder + os.fsdecode(file_list[i]))
             beam.set_qs(self.beam0_charge_sign*beam.qs())      #########
             
-            # plot emittance evolution
+            # plot mean energy evolution
             ss.append(beam.location)
             Emeans.append(beam.energy())
             axs[0,0].cla()
@@ -946,9 +950,14 @@ class InterstageElegant(Interstage):
             axs[0,0].set_xlabel('Position in interstage [m]')
             axs[0,0].set_ylabel('Mean energy [GeV]')
             axs[0,0].set_xlim(beam_init.location,beam_final.location)
-            axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
+            #axs[0,0].set_ylim(0,beam_final.energy()*1.1e-9)
+            axs[0,0].set_ylim(beam_init.energy()*0.9e-9, beam_final.energy()*1.1e-9)
             axs[0,0].xaxis.tick_top()
             axs[0,0].xaxis.set_label_position('top')
+
+            # Plot lattice elements
+            if i == 0:
+                self.plot_element_lengths(ypos=0.0, height=0.15, ax=axs[0,0].twinx())
             
             # plot emittance and bunch length evolution
             emitns.append(beam.norm_emittance_x()) # TODO: update to normalized amplitude
@@ -1052,10 +1061,10 @@ class InterstageElegant(Interstage):
         max_sig_xp_beam = elegant_read_beam(evolution_folder + os.fsdecode(files[max_sig_xp_index]))
         _, _, pxs0 = max_sig_xp_beam.phase_space_density(max_sig_xp_beam.xs, max_sig_xp_beam.pxs)
         
-        dQdx0, _ = max_sig_beam.projected_density(max_sig_beam.xs, bins=xs0)
-        #dQdx0, _ = beam_init.projected_density(max_sig_beam.xs, bins=xs0)
-        #dQdpx0, _ = beam_init.projected_density(max_sig_beam.pxs, bins=pxs0)
-        dQdpx0, _ = max_sig_xp_beam.projected_density(max_sig_xp_beam.pxs, bins=pxs0)
+        #dQdx0, _ = max_sig_beam.projected_density(max_sig_beam.xs, bins=xs0)
+        #dQdpx0, _ = max_sig_xp_beam.projected_density(max_sig_xp_beam.pxs, bins=pxs0)
+        dQdx0, _ = max_sig_xp_beam.projected_density(max_sig_xp_beam.xs, bins=xs0)
+        dQdpx0, _ = max_sig_beam.projected_density(max_sig_beam.pxs, bins=pxs0)
         
         # get final beam
         beam_final = elegant_read_beam(evolution_folder + os.fsdecode(files[-1]))
@@ -1065,7 +1074,6 @@ class InterstageElegant(Interstage):
         dQdpx_final, _ = beam_final.projected_density(beam_final.pxs, bins=pxs0)
         
         # calculate limits
-        #pxlim = max(max(-pxs0.min(), pxs0.max()), max(-pxs_final.min(), pxs_final.max()))
         pxlim = np.max(np.abs(pxs0))
         
         # prepare centroid arrays
@@ -1100,6 +1108,10 @@ class InterstageElegant(Interstage):
             axs[0,0].yaxis.set_minor_formatter(mticker.NullFormatter())
             axs[0,0].xaxis.tick_top()
             axs[0,0].xaxis.set_label_position('top')
+
+            # Plot lattice elements
+            if i == 0:
+                self.plot_element_lengths(ypos=0.0, height=0.15, ax=axs[0,0].twinx())
             
             # plot beam size and divergence evolution
             sigxs.append(beam.beam_size_x())
@@ -1147,7 +1159,7 @@ class InterstageElegant(Interstage):
             axs[1,1].fill(-np.concatenate((dQdpx, np.zeros(dQdpx.size)))*1e9/(1e-6*SI.c/SI.e), np.concatenate((pxs2, np.flip(pxs2)))*1e-6*SI.c/SI.e, alpha=af, color=col1)
             axs[1,1].plot(-dQdpx*1e9/(1e-6*SI.c/SI.e), pxs2*1e-6*SI.c/SI.e, color=col1)
             axs[1,1].set_ylim([-pxlim*1e-6*SI.c/SI.e, pxlim*1e-6*SI.c/SI.e])
-            axs[1,1].set_xlim([0, max([max(-dQdpx0), max(-dQdpx_final)])*1e9/(1e-6*SI.c/SI.e)])
+            axs[1,1].set_xlim([0, max([max(-dQdpx0), max(-dQdpx_final)])*1e9/(1e-6*SI.c/SI.e)*1.2])
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
@@ -1162,12 +1174,11 @@ class InterstageElegant(Interstage):
             axs[2,1].plot(x0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
             axs[2,1].set_xlabel('Centroid offset [$\mathrm{\mu}$m]')
             axs[2,1].set_ylabel('Centroid angle [$\mathrm{\mu}$rad]')
-            #axs[2,1].set_xlim(min(-max(x0s)*1.1,-0.1*sigxs[0])*1e6, max(max(x0s)*1.1,0.1*sigxs[0])*1e6)
-            #axs[2,1].set_ylim(min(-max(xp0s)*1.1,-0.1*sigxps[0])*1e6, max(max(xp0s)*1.1,0.1*sigxps[0])*1e6)
             axs[2,1].set_xlim(min(self.evolution.x_offset)*1e6*1.1, max(self.evolution.x_offset)*1e6*1.1)
             axs[2,1].set_ylim(min(self.evolution.x_angle)*1e6*1.1, max(self.evolution.x_angle)*1e6*1.1)
             axs[2,1].yaxis.tick_right()
             axs[2,1].yaxis.set_label_position('right')
+            
             return cax
         
         # make all frames
@@ -1178,6 +1189,162 @@ class InterstageElegant(Interstage):
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
         filename = plot_path + 'phasespace_x' + '.gif'
+        animation.save(filename, writer="pillow", fps=10)
+
+        # hide the figure
+        plt.close()
+
+        return filename
+
+
+    # Animate the longitudinal phase space
+    def animate_lps(self, evolution_folder, rel_energy_window=0.06):
+
+        files = sorted(os.listdir(evolution_folder))
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        # get initial beam
+        beam_init = elegant_read_beam(evolution_folder + os.fsdecode(files[0]))
+        beam_init.set_qs(self.beam0_charge_sign*beam_init.qs())      #########
+        
+        max_sig_E_index = np.argmax(self.evolution.rel_energy_spread)
+        max_sig_E_beam = elegant_read_beam(evolution_folder + os.fsdecode(files[max_sig_E_index]))
+        _, _, Es0 = max_sig_E_beam.phase_space_density(max_sig_E_beam.zs, max_sig_E_beam.Es)
+        
+        dQdzdE0, zs0, Es0 = max_sig_E_beam.density_lps()
+        Is0, ts_ = max_sig_E_beam.current_profile(bins=zs0/SI.c)
+        dQdE0, Es_ = max_sig_E_beam.energy_spectrum(bins=Es0)
+
+        # get final beam
+        beam_final = elegant_read_beam(evolution_folder + os.fsdecode(files[-1]))
+        beam_final.set_qs(self.beam0_charge_sign*beam_final.qs())      #########
+        Is_final, _ = beam_final.current_profile(bins=zs0/SI.c)
+        dQdE_final, _ = beam_final.energy_spectrum(bins=Es0)
+
+        # nominal energies
+        Es_nom = self.nom_energy
+
+        # calculate limits
+        E_lim_max = np.max(np.abs(Es0))
+        E_lim_min = np.min(np.abs(Es0))
+        
+        # prepare centroid arrays
+        z0s = []
+        deltas = []
+        sigzs = []
+        sigdeltas = []
+        ss = []
+        Emeans = []
+
+        # set the colors and transparency
+        col0 = "#cedeeb"
+        col1 = "tab:blue"
+        
+        # frame function
+        def frameFcn(i, file_list):
+
+            # get beam for this frame
+            beam = elegant_read_beam(evolution_folder + os.fsdecode(file_list[i]))
+            beam.set_qs(self.beam0_charge_sign*beam.qs())      #########
+            
+            # plot mean energy evolution
+            ss.append(beam.location)
+            Emeans.append(beam.energy())
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
+            axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
+            axs[0,0].set_xlabel('Position in interstage [m]')
+            axs[0,0].set_ylabel('Mean energy [GeV]')
+            axs[0,0].set_xlim(beam_init.location,beam_final.location)
+            axs[0,0].set_ylim(beam_init.energy()*0.9e-9, beam_final.energy()*1.1e-9)
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+
+            # Plot lattice elements
+            if i == 0:
+                self.plot_element_lengths(ypos=0.0, height=0.15, ax=axs[0,0].twinx())
+            
+            # plot energy spread and bunch length evolution
+            sigzs.append(beam.bunch_length())
+            sigdeltas.append(beam.rel_energy_spread())
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigzs)*1e6, np.array(sigdeltas)*1e2, '-', color=col0)
+            axs[0,1].plot(sigzs[-1]*1e6, sigdeltas[-1]*1e2, 'o', color=col1)
+            axs[0,1].set_ylim(min([min(sigdeltas)*0.8e2, 1e-1]), max([max(sigdeltas)*1.2e2, 10]))
+            axs[0,1].set_xlim(min([min(sigzs)*0.9e6, sigzs[0]*0.7e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.3e6]))
+            axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Energy spread [%]')
+            axs[0,1].set_yscale('log')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            
+            # plot LPS
+            axs[1,0].cla()
+            #Ebins = Es_nom*np.linspace(1-rel_energy_window, 1+rel_energy_window, 2*Es0.size)
+            Ebins = np.linspace(E_lim_min, E_lim_max, 2*Es0.size)
+            dQdzdE, zs, Es = beam.phase_space_density(beam.zs, beam.Es, hbins=zs0, vbins=Ebins)
+            cax = axs[1,0].pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto', clim=[0, abs(dQdzdE).max()*1e15])
+            axs[1,0].set_ylabel('Energy [GeV]')
+            axs[1,0].set_title('Longitudinal phase space')
+            axs[1,0].set_ylim([E_lim_min/1e9, E_lim_max/1e9])
+            
+            # plot current profile
+            axs[2,0].cla()
+            af = 0.15
+            Is, ts = beam.current_profile(bins=zs0/SI.c)
+            axs[2,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
+            axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
+            axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
+            axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
+            axs[2,0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$I$ [kA]')
+            
+            # plot energy spectrum
+            dQdE, Es2 = beam.energy_spectrum(bins=Ebins)
+            deltas2 = Es2/Es_nom-1
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdE, np.zeros(dQdE.size)))*1e18, np.concatenate((deltas2, np.flip(deltas2)))*100, alpha=af, color=col1)
+            axs[1,1].plot(-dQdE*1e18, deltas2*100)
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].set_ylabel('Rel. energy [%]')
+            #axs[1,1].set_ylim([-rel_energy_window*100, rel_energy_window*100])
+            axs[1,1].set_ylim([(E_lim_min/Es_nom-1)*100, (E_lim_max/Es_nom-1)*100])
+            axs[1,1].set_xlim([0, max(-dQdE)*1.1e18])
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel('dQ/dE [nC/GeV]')
+            
+            # plot E and z centroid evolution
+            z0s.append(beam.z_offset())
+            deltas.append(beam.energy()/Es_nom-1)
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(z0s)*1e6, np.array(deltas)*100, '-', color=col0)
+            axs[2,1].plot(z0s[-1]*1e6, deltas[-1]*100, 'o', color=col1)
+            #axs[2,1].set_ylim([-rel_energy_window*0.5e2, rel_energy_window*0.5e2])
+            axs[2,1].set_ylim([(E_lim_min/Es_nom-1)*100, (E_lim_max/Es_nom-1)*100])
+            axs[2,1].set_xlim([(z0s[0]-sigzs[0]/2)*1e6, (z0s[0]+sigzs[0]/2)*1e6])
+            axs[2,1].set_xlabel('$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel('Energy offset [%]')
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+
+            return cax
+
+        # make all frames
+        animation = FuncAnimation(fig, partial(frameFcn, file_list=files), frames=range(len(files)), repeat=False, interval=100)
+        
+
+        # save the animation as a GIF
+        plot_path = self.run_path + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'lps_shot' + '.gif'
         animation.save(filename, writer="pillow", fps=10)
 
         # hide the figure
@@ -1246,12 +1413,10 @@ class InterstageElegant(Interstage):
         nsig = 4
         
         tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
-        deltaedges = np.linspace(-0.1, 0.1, num_bins)
-        deltaedges = (np.max(self.evolution.rel_energy_spread)*nsig + (beam0.energy()-self.nom_energy))*np.linspace(-1, 1, num_bins)
+        #deltaedges = np.linspace(-0.1, 0.1, num_bins)
+        deltaedges = (np.max(self.evolution.rel_energy_spread)*nsig + abs(beam0.energy()-self.nom_energy)/self.nom_energy) * np.linspace(-1, 1, num_bins)
         xedges = (nsig*np.max(self.evolution.beam_size_x) + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
-        #xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*np.max(self.evolution.beam_size_y) + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
-        #yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
         E0s = self.nom_energy*np.ones(len(files))
         xpedges = (nsig*np.max(np.abs(self.evolution.divergence_x)) + abs(beam0.x_angle()))*np.linspace(-1, 1, num_bins)
         #ypedges = (nsig*np.max(np.abs(self.evolution.y_angle)) + abs(beam0.y_angle()))*np.linspace(-1, 1, num_bins)
@@ -1317,3 +1482,41 @@ class InterstageElegant(Interstage):
                 os.makedirs(plot_path)
             filename = plot_path + 'waterfalls' + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+
+    
+    def plot_rectangle(self, xpos, length, ypos=0.25, height=0.5, color='blue', ax=None):
+        if ax is None:
+            ax = plt.gca()
+    
+        rectangle = Rectangle((xpos, ypos), length, height, color=color, alpha=0.5)
+        ax.add_patch(rectangle)
+        return rectangle
+
+    
+    def plot_element_lengths(self, ypos=0.25, height=0.5, ax=None):
+        ls = self.element_lengths
+
+        # Calculate cumulative lengths
+        cumulative_lengths = np.cumsum(ls)
+        
+        # Create plot
+        if ax is None:
+            fig, ax = plt.subplots()
+            fig.set_figwidth(20)
+            fig.set_figheight(1)
+        self.plot_rectangle(xpos=cumulative_lengths[0], length=ls[1], ypos=ypos, height=height, color='red', ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[2], length=ls[3], ypos=ypos, height=height, ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[4], length=ls[5], ypos=ypos, height=height, color='orange', ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[6], length=ls[7], ypos=ypos, height=height, color='orange', ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[8], length=ls[9], ypos=ypos, height=height, color='purple', ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[10], length=ls[11], ypos=ypos, height=height, color='orange', ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[12], length=ls[13], ypos=ypos, height=height, color='orange', ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[14], length=ls[15], ypos=ypos, height=height, ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[16], length=ls[17], ypos=ypos, height=height, color='red', ax=ax)
+        self.plot_rectangle(xpos=cumulative_lengths[17], length=ls[18], ypos=ypos, height=height, color='white', ax=ax)
+        ax.set_xlim(0, cumulative_lengths[-1])
+        ax.set_ylim(0, 1)
+        ax.set_xlabel('s [m]')
+        ax.set_yticks([])
+        ax.set_yticklabels([])
+        
