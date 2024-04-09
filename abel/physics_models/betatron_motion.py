@@ -151,12 +151,12 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
             g = gs(y_next, a_next, A, B, C, D)
             #Use multistep formula with k=1 to evolve the particles to next time step.
             mat += dz*(2/3*a_next + 1/3*a_present) - 1/6*dz**2*g
-            
+            dz_sq = dz**2
             for i in range(1,n-1):
                 # Get derivatives of present time
                 a_present = acc_func(mat, A, B, C, D)
                 fs[i%2] = a_present # store the present acceleration values for use in next timestep
-                a_prev = fs[(i+1)%2] # get the accelerations from the previous timestep
+                a_prev = fs[(i-1)%2] # get the accelerations from the previous timestep
                 
                 #get derivatives at next timestep
                 y_next = mat + a_present*dz
@@ -166,7 +166,7 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
                 g = gs(y_next, a_next, A, B, C, D)
                 
                 # Use multistep formula with k=2 to evolve the particles            
-                mat += dz*(29/48*a_next + 5/12*a_present- 1/48*a_prev) - 1/8*dz**2*g
+                mat += dz*(29/48*a_next + 5/12*a_present- 1/48*a_prev) - 1/8*dz_sq*g
                 
                 
         result[j] = mat
@@ -216,7 +216,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 200
+    n_per_beta = 150
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
