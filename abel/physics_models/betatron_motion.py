@@ -216,7 +216,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 150
+    n_per_beta = 200
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
