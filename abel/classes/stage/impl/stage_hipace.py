@@ -499,16 +499,13 @@ class StageHipace(Stage):
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.8)
 
-        gs = fig.add_gridspec(3,1)
+        gs = fig.add_gridspec(2,1)
         ax1 = fig.add_subplot(gs[0,:])
         ax2 = fig.add_subplot(gs[1,:])
-        ax3 = fig.add_subplot(gs[2,:])
         ax1.grid()
         ax2.grid()
-        ax3.grid()
         
         ax1.set_xticks([])
-        ax2.set_xticks([])     
         
         col0 = "tab:gray"
         col1 = "tab:blue"
@@ -521,20 +518,13 @@ class StageHipace(Stage):
         ax1.set_ylabel('Energy (GeV)')
         ax1.set_xlim(long_limits)
 
-        # plot charge
-        ax2.plot(self.test_particle_evolution.location, -self.test_particle_evolution.charge[0] * np.ones(self.test_particle_evolution.location.shape) * 1e9, ':', color=col0)
-        ax2.plot(self.test_particle_evolution.location, -self.test_particle_evolution.charge * 1e9, color=col1)
-        ax2.set_ylabel('Charge (nC)')
-        ax2.set_xlim(long_limits)
-        
-
         # plot transverse offset
-        ax3.plot(self.test_particle_evolution.location, np.zeros(self.test_particle_evolution.location.shape), ':', color=col0)
-        ax3.plot(self.test_particle_evolution.location, self.test_particle_evolution.y*1e6, color=col2)  
-        ax3.plot(self.test_particle_evolution.location, self.test_particle_evolution.x*1e6, color=col1)
-        ax3.set_ylabel('Transverse offset (um)')
-        ax3.set_xlabel(long_label)
-        ax3.set_xlim(long_limits)
+        ax2.plot(self.test_particle_evolution.location, np.zeros(self.test_particle_evolution.location.shape), ':', color=col0)
+        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.y*1e6, color=col2)  
+        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.x*1e6, color=col1)
+        ax2.set_ylabel('Transverse offset (um)')
+        ax2.set_xlabel(long_label)
+        ax2.set_xlim(long_limits)
         
         plt.show()
         return fig, self.test_particle_evolution.energy
