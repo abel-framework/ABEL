@@ -22,8 +22,8 @@ def larmor_formula(s, xp, yp, gammas):
 
     return z, P
 
-def mean_larmor_formula(s, n0, gammas, rx, ry):
-    gamma0 = gammas[0]
+def mean_larmor_formula(s, n0, gammas, rx, ry, z):
+    gammas
     kp = pp.k_p(n0)
     k_beta = kp/np.sqrt(2*gammas)
     const = SI.e**2 * SI.c / 12 / np.pi / SI.epsilon_0
