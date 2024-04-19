@@ -198,7 +198,7 @@ def parallel_process(particle_list, A_list, Q_list, B, C, D, n, dz, n_cores, Q_t
 def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_evolution):
     # Constants
     #Ezs = Es/L #eV/m = J/e/m = V/m
-    n_cores = max(1,min(16, round(len(x0)/10000)))
+    n_cores = 7#max(1,min(16, round(len(x0)/10000)))
     #print("Number of cores:", n_cores)
     
     #Ezs = dgamma_ds*SI.m_e*SI.c**2/SI.e #eV/m = J/e/m = V/m
@@ -216,7 +216,7 @@ def evolve_betatron_motion(qs, x0, y0, ux0, uy0, L, gamma, dgamma_ds, kp, save_e
     #Find the smallest wavelength of oscillations to resolve
     beta_matched = np.sqrt(2*gamma)/kp # Vector
     lambda_beta = min(2*np.pi*beta_matched) # Vector
-    n_per_beta = 250
+    n_per_beta = 300
     
     #Find the appropriate ammount of steps to resolve each oscillation    
     n = round(L/lambda_beta * n_per_beta)
