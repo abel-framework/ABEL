@@ -504,6 +504,7 @@ class StageHipace(Stage):
         ax2 = fig.add_subplot(gs[1,:])
         ax1.grid()
         ax2.grid()
+        fig.suptitle('Test Particle Evolution')
         
         ax1.set_xticks([])
         
@@ -520,11 +521,12 @@ class StageHipace(Stage):
 
         # plot transverse offset
         ax2.plot(self.test_particle_evolution.location, np.zeros(self.test_particle_evolution.location.shape), ':', color=col0)
-        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.y*1e6, color=col2)  
-        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.x*1e6, color=col1)
+        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.x*1e6, color=col1, label = 'x')
+        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.y*1e6, color=col2, label = 'y')  
         ax2.set_ylabel('Transverse offset (um)')
         ax2.set_xlabel(long_label)
         ax2.set_xlim(long_limits)
+        ax2.legend()
         
         plt.show()
         return fig, self.test_particle_evolution.energy

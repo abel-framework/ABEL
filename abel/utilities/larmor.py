@@ -23,13 +23,12 @@ def larmor_formula(s, xp, yp, gammas):
     return z, P
 
 def mean_larmor_formula(s, n0, gammas, rx, ry):
-    gammas
-    kp = pp.k_p(n0)
+    wp = np.sqrt(n0*SI.e**2/SI.m_e/SI.epsilon_0)
+    kp = wp/SI.c
     k_beta = kp/np.sqrt(2*gammas)
-    const = SI.e**2 * SI.c / 12 / np.pi / SI.epsilon_0
-    P = 1/SI.c * const * s * np.power(gammas,4) * np.power(k_beta,4) * (rx**2 + ry**2) # [J/m]
+    E_loss = SI.e**2*s/12/np.pi/SI.epsilon_0*(gammas*k_beta)**4*(rx**2+ry**2)
 
-    return s, P
+    return s, E_loss
 
 
 
