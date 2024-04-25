@@ -93,16 +93,16 @@ class Stage(Trackable):
 
     
     def plot_evolution(self):
-        plt.rcParams.update({'font.size': 13})
+        plt.rcParams.update({'font.size': 16})
         # extract wakefield if not already existing
         if not hasattr(self.evolution, 'location'):
             print('No evolution calculated')
             return
 
         # preprate plot
-        fig, axs = plt.subplots(2,3)
-        fig.set_figwidth(CONFIG.plot_fullwidth_default*1.2)
-        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        fig, axs = plt.subplots(2,1, figsize=(16,9))
+        #fig.set_figwidth(CONFIG.plot_fullwidth_default*1.2)
+        #fig.set_figheight(CONFIG.plot_width_default*0.8)
         col0 = "tab:gray"
         col1 = "tab:blue"
         col2 = "tab:orange"
@@ -113,20 +113,26 @@ class Stage(Trackable):
         axs[0,0].plot(self.evolution.location, self.evolution.energy / 1e9, color=col1)
         axs[0,0].set_ylabel('Energy [GeV]')
         axs[0,0].set_xlim(long_limits)
+        axs[0,0].set_ylim(10435, 10460)
 
         # plot charge
-        axs[0,1].plot(self.evolution.location, -self.evolution.charge[0] * np.ones(self.evolution.location.shape) * 1e9, ':', color=col0)
-        axs[0,1].plot(self.evolution.location, -self.evolution.charge * 1e9, color=col1)
-        axs[0,1].set_ylabel('Charge [nC]')
-        axs[0,1].set_xlim(long_limits)
-        axs[0,1].set_ylim(0, -self.evolution.charge[0] * 1.3 * 1e9)
+        #axs[0,1].plot(self.evolution.location, -self.evolution.charge[0] * np.ones(self.evolution.location.shape) * 1e9, ':', color=col0)
+        #axs[0,1].plot(self.evolution.location, -self.evolution.charge * 1e9, color=col1)
+        #axs[0,1].set_ylabel('Charge [nC]')
+        #axs[0,1].set_xlim(long_limits)
+        #axs[0,1].set_ylim(0, -self.evolution.charge[0] * 1.3 * 1e9)
         
         # plot normalized emittance
-        axs[0,2].plot(self.evolution.location, self.evolution.emit_ny*1e6, color=col2)
-        axs[0,2].plot(self.evolution.location, self.evolution.emit_nx*1e6, color=col1)
-        axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
-        axs[0,2].set_xlim(long_limits)
-        axs[0,2].set_yscale('log')
+        axs[0,1].plot(self.evolution.location, self.evolution.emit_nx*1e6, color=col1, label=r'$\varepsilon_{\mathrm{n}x}$')
+        axs[0,1].plot(self.evolution.location, self.evolution.emit_ny*1e6, color=col2, label=r'$\varepsilon_{\mathrm{n}y}$')
+        axs[0,1].plot(self.evolution.location, np.ones(self.evolution.emit_ny.size)*self.evolution.emit_ny[0]*1e6, ':',\
+                      label = 'Nominal value', color = col0)
+        axs[0,1].plot(self.evolution.location, np.ones(self.evolution.emit_nx.size)*self.evolution.emit_nx[0]*1e6, ':',\
+                     color = col0)
+        axs[0,1].set_ylabel('Emittance, rms [mm mrad]')
+        axs[0,1].set_xlim(long_limits)
+        axs[0,1].set_yscale('log')
+        axs[0,1].legend()
         
         # plot energy spread
         axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)
@@ -135,20 +141,21 @@ class Stage(Trackable):
         axs[1,0].set_xlim(long_limits)
         
         # plot beam size
-        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_y*1e6, color=col2)
-        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_x*1e6, color=col1)
-        axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
-        axs[1,2].set_xlabel(long_label)
-        axs[1,2].set_xlim(long_limits)
-        axs[1,2].set_yscale('log')
-
-        # plot transverse offset
-        axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)
-        axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)  
-        axs[1,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
-        axs[1,1].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
+        axs[1,1].plot(self.evolution.location, self.evolution.beam_size_x*1e6, color=col1, label='$\sigma_x$')
+        axs[1,1].plot(self.evolution.location, self.evolution.beam_size_y*1e6, color=col2, label='$\sigma_y$')
+        axs[1,1].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
         axs[1,1].set_xlabel(long_label)
         axs[1,1].set_xlim(long_limits)
+        axs[1,1].set_yscale('log')
+        axs[1,1].legend()
+
+        # plot transverse offset
+        #axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)
+        #axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)  
+        #axs[1,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
+        #axs[1,1].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
+        #axs[1,1].set_xlabel(long_label)
+        #axs[1,1].set_xlim(long_limits)
         
         plt.show()
         return fig
