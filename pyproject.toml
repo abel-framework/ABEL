@@ -1,0 +1,36 @@
+[build-system]
+# See https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ABEL"
+version = "1.0"
+
+dependencies = [
+   #"numpy",
+   #"matplotlib"
+]
+requires-python = ">= 3"
+
+authors = [
+  {name = "Carl Andreas Lindstrøm", email = "c.a.lindstrom@fys.uio.no"},
+  {name = "Ben Chen"},
+  {name = "Ole Gunnar Finnerud"},
+  {name = "Kyrre Sjobak"},
+  {name = "Daniel Kalvik"}
+]
+readme = "README.md"
+#license = {text="LGPL3+"}
+
+#[tool.setuptools]
+#package-dir = {"" = "Python"}
+
+#[tool.setuptools.packages.find]
+#where = ["Python"]
+
+#[tool.setuptools.package-data]
+#CLICopti.celldatabase = ["*.dat",]
+
+#[tool.setuptools.package-data]
+#CLICopti = ["*.txt", "*.rst", "*.dat"]
