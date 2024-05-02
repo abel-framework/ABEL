@@ -14,7 +14,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         output_period = int(num_steps)
         
     # locate template file
-    filename_input_template = CONFIG.abel_path + 'abel/apis/hipace/input_template'
+    filename_input_template = os.path.join(os.path.dirname(__file__), 'input_template')
 
     # prepare plasma components (based on ion motion)
     if ion_motion:
@@ -80,7 +80,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
 def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num_tasks_per_node=8):
     
     # locate template file
-    filename_job_script_template = CONFIG.abel_path + 'abel/apis/hipace/job_script_template'
+    filename_job_script_template = os.path.join(os.path.dirname(__file__), 'job_script_template')
     
     # set the partition based on the number of nodes and tasks
     if num_nodes == 1 and num_tasks_per_node < 8:

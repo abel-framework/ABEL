@@ -38,9 +38,3 @@ readme = "README.md"
 
 #[tool.setuptools.packages.find]
 #where = ["Python"]
-
-#[tool.setuptools.package-data]
-#CLICopti.celldatabase = ["*.dat",]
-
-#[tool.setuptools.package-data]
-#CLICopti = ["*.txt", "*.rst", "*.dat"]

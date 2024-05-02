@@ -58,7 +58,7 @@ class InteractionPointGuineaPig(InteractionPoint):
         os.mkdir(tmpfolder)
     
         # make lattice file from template
-        inputfile_template = CONFIG.abel_path + 'abel/apis/guineapig/templates/inputdeck_simple.dat'
+        inputfile_template = os.path.join(os.path.dirname(abel.apis.guineapig.guineapig_api.__file__), 'templates', 'inputdeck_simple.dat')
         inputfile = tmpfolder + '/inputdeck_simple.dat'
         with open(inputfile_template, 'r') as fin, open(inputfile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
