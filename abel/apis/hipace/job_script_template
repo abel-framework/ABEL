@@ -26,5 +26,9 @@ chmod +x ./select_gpu
 
 CPU_BIND="map_cpu:49,57,17,25,1,9,33,41"
 
+#Don't touch the next line, it is used by the
+# local runner to find the input filename
+# filename_input "$filename_input"
+
 srun --cpu-bind=$${CPU_BIND} ./select_gpu $$PROJECT/software/hipace/build/bin/hipace $filename_input
 rm -rf ./select_gpu
