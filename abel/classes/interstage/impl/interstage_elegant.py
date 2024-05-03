@@ -193,7 +193,7 @@ class InterstageElegant(Interstage):
                   'path_to_beam_centroid_file': path_beam_centroid_file,
                   'path_to_uncoupled_Twiss_parameter_output_file': path_twiss_parameter_file}
 
-        runfile_template = CONFIG.abel_path + 'abel/apis/elegant/templates/runscript_interstage.ele'
+        runfile_template = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'runscript_interstage.ele')
         with open(runfile_template, 'r') as fin, open(tmpfile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
@@ -232,7 +232,8 @@ class InterstageElegant(Interstage):
             self.apl_field_map = data
         
         # make lattice file from template
-        lattice_template = CONFIG.abel_path + 'abel/apis/elegant/templates/lattice_interstage.lte'
+        lattice_template = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'lattice_interstage.lte')
+
         if save_evolution:
             num_watches = 5
             watch_disabled = False

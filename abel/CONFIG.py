@@ -35,9 +35,6 @@ class CONFIG:
     
     ## ABEL DIRECTORIES
     
-    # path to ABEL directory
-    abel_path = str.replace(os.path.abspath(__file__), 'abel/' + os.path.basename(__file__), '')
-    
     # path to tracking data directory
     run_data_path = 'run_data/'
     
