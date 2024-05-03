@@ -1473,8 +1473,8 @@ class InterstageElegant(Interstage):
         #yps = bins[5]
         #c5 = axs[5].pcolor(locations, yps*1e6, -densityYp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         #cbar5 = fig.colorbar(c5, ax=axs[5])
-        #axs[5].set_ylabel('Vertical angle [$\mathrm{\mu}$rad]')
-        #cbar5.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$rad]')
+        #axs[5].set_ylabel(r'Vertical angle [$\mathrm{\mu}$rad]')
+        #cbar5.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$rad]')
         
         plt.show()
         if save_fig:
