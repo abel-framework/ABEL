@@ -4,7 +4,7 @@ import abel.utilities.colors as cmaps
 class CONFIG:
 
     # select cluster
-    cluster_name = 'your_cluster_here' # lumi/betzy/heplab/etc.
+    cluster_name = 'LOCAL' # lumi/betzy/LOCAL/etc.
     
     if cluster_name == 'lumi':
         project_name = 'your_project_number_here'
@@ -17,11 +17,12 @@ class CONFIG:
         #project_name = 'nn11003k'
         partition_name_standard = ''
         partition_name_small = ''
-    else: 
+    elif cluster_name == 'LOCAL':
         project_name = ''
         partition_name_standard = ''
         partition_name_small = ''
-        
+    else:
+        raise ValueError('cluster_name in CONFIG must be one of the valid options')
     
     ## ABEL STANDARD VALUES
     
@@ -47,6 +48,7 @@ class CONFIG:
     # common software path
     software_path = '/your/project/path/here/'
     #software_path = '/project/project_465000445/software/'
+    #software_path = '/home/kyrsjo/code'
     
     # path to ELEGANT directory
     elegant_use_container = True
@@ -61,7 +63,8 @@ class CONFIG:
         elegant_rpnflag = ' -rpnDefns=' + CONFIG.elegant_path + 'defns.rpn'
     
     # path to HiPACE++ directory
-    hipace_path = software_path + 'hipace/'
+    hipace_path = os.path.join(software_path, 'hipace')
+    hipace_binary = os.path.join(hipace_path,'build/bin/hipace')
     
     # path to GUINEA-PIG directory
     guineapig_path = software_path + 'guinea-pig/bin/'

@@ -103,19 +103,85 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     with open(filename_job_script_template, 'r') as fin, open(filename_job_script, 'w') as fout:
         results = Template(fin.read()).substitute(inputs)
         fout.write(results)
-        
+        #print(results)
+
     # make executable
     Path(filename_job_script).chmod(0o0777)
 
 
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
+
+    #Extract runfolder from job script name
+    if runfolder == None:
+        runfolder = os.path.dirname(filename_job_script)
+
+    #Run HIPACE++
+    if CONFIG.cluster_name == 'LOCAL':
+        _hipace_run_local(filename_job_script, runfolder, quiet=False)
+    else:
+        _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False)
     
-    # make run folder automatically from job script folder
-    if runfolder is None:
-        runfolder = str.replace(filename_job_script, os.path.basename(filename_job_script), '')
-        filename_job_script = os.path.basename(filename_job_script)
+    # when finished, load the beam and driver
+    filename = os.path.join(runfolder, "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps)))
+    print("Filename=",filename)
+    try:
+        beam = Beam.load(filename, beam_name='beam')
+    except:
+        beam = None
+    driver = Beam.load(filename, beam_name='driver')
     
+    return beam, driver
+
+def _hipace_run_local(filename_job_script, runfolder, quiet=False):
+    "Helper for running HiPACE++ on the local machine. Returns when job is complete."
+
+    if not quiet:
+        print(f"Running HiPACE locally in folder '{runfolder}'...")
+
+    #Get the input filename out of the job script
+    # This could probably be solved in a better way,
+    # but that would requiring reformulating the SLURM logic a bit.
+    filename_input = None
+    with open(filename_job_script, 'r') as fin:
+        inLines = fin.readlines()
+        for line in inLines:
+            ls = line.strip()
+            if ls.startswith('#'):
+                lss = ls.split()
+                if len(lss) < 3:
+                    continue
+                if lss[1] == 'filename_input':
+                    if not ((lss[2].startswith('"') or lss[2].startswith("'")) and \
+                            (lss[2].endswith('"') or lss[2].endswith("'"))):
+                        raise ValueError('Unexpected format in job script, found line "'+line+'" but unable to parse')
+                    if filename_input != None:
+                        raise RuntimeError('Double find of input filename?')
+
+                    filename_input = lss[2][1:-1]
+    if filename_input == None:
+        raise RuntimeError('Did not find the input filename in the hipace job file')
+
+    import time
+    start_time = time.time()
+    #Run HIPACE
+    process = subprocess.Popen([CONFIG.hipace_binary,filename_input], cwd=runfolder,\
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, \
+                               close_fds=True, bufsize=1, universal_newlines=True )
+    for line in iter(process.stdout.readline, ''):
+        #TODO: respect 'quiet' flag
+        print(line.rstrip())
+    process.stdout.close()
+    returncode = process.wait()
+
+    print(f'HiPace complete, returncode = {returncode}, execution time={time.time()-start_time : .1f} [s]')
+    if returncode != 0:
+        raise RuntimeError('Errors during HiPace simulation')
+
+
+def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
+    "Helper for running HiPACE++ on a batch system using SLURM. Returns when job is complete."
+
     # run system command
     cmd = 'cd ' + runfolder + ' && sbatch ' + filename_job_script
     if quiet:
@@ -186,13 +252,3 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
         # wait for some time
         wait_time = 3 # [s]
         time.sleep(wait_time)
-    
-    # when finished, load the beam and driver
-    filename = runfolder + "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps))
-    try:
-        beam = Beam.load(filename, beam_name='beam')
-    except:
-        beam = None
-    driver = Beam.load(filename, beam_name='driver')
-    
-    return beam, driver
