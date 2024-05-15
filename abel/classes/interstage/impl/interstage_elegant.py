@@ -9,6 +9,7 @@ from functools import partial
 import scipy.constants as SI
 from string import Template
 from types import SimpleNamespace
+import abel
 from abel import CONFIG, Interstage, Beam
 from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
 from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion
