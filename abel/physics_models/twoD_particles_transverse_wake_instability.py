@@ -198,7 +198,7 @@ def twoD_transverse_wake_instability_particles(beam, offsets, tr_momenta, plasma
             plt.plot(zs_sorted, bubble_radius*1e6, 'b', label='Bubble radius')
             plt.plot(zs_sorted, -bubble_radius*1e6, 'b')
             plt.xlabel(r'$s$ [$\mathrm{m}$]')
-            plt.ylabel('Transverse axis $\mathrm{\mu}$m]')
+            plt.ylabel(r'Transverse axis $\mathrm{\mu}$m]')
             plt.legend()
             plt.title('Diagnostic plot for the moment beam coming into contact with bubble boundary')
             raise Exception('Beam came into contact with bubble boundary!')

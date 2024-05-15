@@ -193,7 +193,7 @@ class InterstageElegant(Interstage):
                   'path_to_beam_centroid_file': path_beam_centroid_file,
                   'path_to_uncoupled_Twiss_parameter_output_file': path_twiss_parameter_file}
 
-        runfile_template = CONFIG.abel_path + 'abel/apis/elegant/templates/runscript_interstage.ele'
+        runfile_template = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'runscript_interstage.ele')
         with open(runfile_template, 'r') as fin, open(tmpfile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
@@ -232,7 +232,8 @@ class InterstageElegant(Interstage):
             self.apl_field_map = data
         
         # make lattice file from template
-        lattice_template = CONFIG.abel_path + 'abel/apis/elegant/templates/lattice_interstage.lte'
+        lattice_template = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'lattice_interstage.lte')
+
         if save_evolution:
             num_watches = 5
             watch_disabled = False
@@ -517,7 +518,7 @@ class InterstageElegant(Interstage):
         axs[0,0].plot(s_centroids, (s_centroids-s_offset)*1e6, color=col1, marker='x')
         #axs[0,0].plot(s, z_offset*1e6, color='red')  # No need to use this, as ELEGANT can output this faster.
         axs[0,0].set_xlabel(long_label)
-        axs[0,0].set_ylabel('Longitudinal offset [$\mathrm{\mu}$m]')
+        axs[0,0].set_ylabel(r'Longitudinal offset [$\mathrm{\mu}$m]')
 
         axs[1,0].plot(s, rel_energy_spreads*100, color=col1)
         axs[1,0].set_xlabel(long_label)
@@ -542,7 +543,7 @@ class InterstageElegant(Interstage):
 
         axs[1,1].plot(s, bunch_lengths*1e6, color=col1)
         axs[1,1].set_xlabel(long_label)
-        axs[1,1].set_ylabel('Bunch length [$\mathrm{\mu}$m]')
+        axs[1,1].set_ylabel(r'Bunch length [$\mathrm{\mu}$m]')
 
         axs[2,1].plot(s_centroids, np.zeros(x_angle.shape), ':', color=col0)
         axs[2,1].plot(s_centroids, x_angle*1e6, color=col1, marker='x', label=r'$\langle x\' \rangle$')
@@ -550,7 +551,7 @@ class InterstageElegant(Interstage):
         #axs[2,1].plot(s, xp_offset_beam*1e6, color='red')
         #axs[2,1].plot(s, yp_offset_beam*1e6, color='black')
         axs[2,1].set_xlabel(long_label)
-        axs[2,1].set_ylabel('Angular offset [$\mathrm{\mu}$rad]')
+        axs[2,1].set_ylabel(r'Angular offset [$\mathrm{\mu}$rad]')
         axs[2,1].legend()
 
         axs[0,2].plot(s, np.ones(len(norm_emittance_xs))*norm_emittance_xs[0]*1e6, ':', color=col0, label='Nominal value')
@@ -566,10 +567,10 @@ class InterstageElegant(Interstage):
         #axs[1,2].plot(s, (Es_nom[0]/Es_nom)**(1/4)*beam_size_ys[0]*1e6, ':', color=col0)
         axs[1,2].plot(s, np.ones(beam_size_xs.shape)*beam_size_xs[0]*1e6, ':', color=col0, label='Nominal value')
         axs[1,2].plot(s, np.ones(beam_size_ys.shape)*beam_size_ys[0]*1e6, ':', color=col0)
-        axs[1,2].plot(s, beam_size_xs*1e6, color=col1, label='$\sigma_x$')
-        axs[1,2].plot(s, beam_size_ys*1e6, color=col2, label='$\sigma_y$')
+        axs[1,2].plot(s, beam_size_xs*1e6, color=col1, label=r'$\sigma_x$')
+        axs[1,2].plot(s, beam_size_ys*1e6, color=col2, label=r'$\sigma_y$')
         axs[1,2].set_xlabel(long_label)
-        axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
+        axs[1,2].set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
         axs[1,2].set_yscale('log')
         axs[1,2].legend()
 
@@ -579,7 +580,7 @@ class InterstageElegant(Interstage):
         #axs[2,2].plot(s, x_offset_beam*1e6, color='red')
         #axs[2,2].plot(s, y_offset_beam*1e6, color='black')
         axs[2,2].set_xlabel(long_label)
-        axs[2,2].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
+        axs[2,2].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
         #axs[2,2].set_yscale('log')
         axs[2,2].legend()
 
@@ -822,7 +823,7 @@ class InterstageElegant(Interstage):
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, beam_final.bunch_length()*0.8e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.2e6]))
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
-            axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_xlabel(r'Bunch length [$\mathrm{\mu}$m]')
             axs[0,1].set_ylabel('Norm. emittance\n[mm mrad]')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
@@ -835,7 +836,7 @@ class InterstageElegant(Interstage):
             dQdzdx, zs, xs = beam.phase_space_density(beam.zs, beam.xs, hbins=zs0, vbins=xs0)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(zs*1e6, xs*1e6, -dQdzdx, cmap=CONFIG.default_cmap, shading='auto')
-            axs[1,0].set_ylabel("Transverse offset, $x$ [$\mathrm{\mu}$m]")
+            axs[1,0].set_ylabel(r"Transverse offset, $x$ [$\mathrm{\mu}$m]")
             axs[1,0].set_title('Horizontal sideview (top view)')
             
             # plot current profile
@@ -846,7 +847,7 @@ class InterstageElegant(Interstage):
             axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
             axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
-            axs[2,0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
             axs[2,0].set_ylabel('$I$ [kA]')
             
             # plot position projection
@@ -859,8 +860,8 @@ class InterstageElegant(Interstage):
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel("$dQ/dx$ [nC/$\mathrm{\mu}$m]")
-            axs[1,1].set_ylabel("$x$ [$\mathrm{\mu}$m]")
+            axs[1,1].set_xlabel(r"$dQ/dx$ [nC/$\mathrm{\mu}$m]")
+            axs[1,1].set_ylabel(r"$x$ [$\mathrm{\mu}$m]")
             
             # plot centroid evolution
             z0s.append(beam.z_offset())
@@ -869,8 +870,8 @@ class InterstageElegant(Interstage):
             axs[2,1].cla()
             axs[2,1].plot(np.array(z0s)*1e6, np.array(x0s)*1e6, '-', color=col0)
             axs[2,1].plot(z0s[-1]*1e6, x0s[-1]*1e6, 'o', color=col1)
-            axs[2,1].set_xlabel('$z$ offset [$\mathrm{\mu}$m]')
-            axs[2,1].set_ylabel('$x$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_xlabel(r'$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel(r'$x$ offset [$\mathrm{\mu}$m]')
             axs[2,1].set_xlim(min([min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, max([max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
             #axs[2,1].set_ylim(min(-max(x0s)*1.1,-0.1*sigxs[0])*1e6, max(max(x0s)*1.1,0.1*sigxs[0])*1e6)
             axs[2,1].set_ylim(min(self.evolution.x_offset)*1e6*1.1, max(self.evolution.x_offset)*1e6*1.1)
@@ -969,7 +970,7 @@ class InterstageElegant(Interstage):
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, beam_final.bunch_length()*0.8e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.2e6]))
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
-            axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_xlabel(r'Bunch length [$\mathrm{\mu}$m]')
             axs[0,1].set_ylabel('Norm. emittance\n[mm mrad]')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
@@ -982,7 +983,7 @@ class InterstageElegant(Interstage):
             dQdzdxp, zs, xps = beam.phase_space_density(beam.zs, beam.xps, hbins=zs0, vbins=xps0)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(zs*1e6, xps*1e6, -dQdzdxp, cmap=CONFIG.default_cmap, shading='auto')
-            axs[1,0].set_ylabel("Transverse angle, $x\'$ [$\mathrm{\mu}$rad]")
+            axs[1,0].set_ylabel(r"Transverse angle, $x\'$ [$\mathrm{\mu}$rad]")
             axs[1,0].set_title('Horizontal angle sideview')
             
             # plot current profile
@@ -993,7 +994,7 @@ class InterstageElegant(Interstage):
             axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
             axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
-            axs[2,0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
             axs[2,0].set_ylabel('$I$ [kA]')
             
             # plot angle projection
@@ -1006,8 +1007,8 @@ class InterstageElegant(Interstage):
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel("$dQ/dx\'$ [nC/$\mathrm{\mu}$rad]")
-            axs[1,1].set_ylabel("$x\'$ [$\mathrm{\mu}$rad]")
+            axs[1,1].set_xlabel(r"$dQ/dx\'$ [nC/$\mathrm{\mu}$rad]")
+            axs[1,1].set_ylabel(r"$x\'$ [$\mathrm{\mu}$rad]")
             
             # plot centroid evolution
             z0s.append(beam.z_offset())
@@ -1015,8 +1016,8 @@ class InterstageElegant(Interstage):
             axs[2,1].cla()
             axs[2,1].plot(np.array(z0s)*1e6, np.array(xp0s)*1e6, '-', color=col0)
             axs[2,1].plot(z0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
-            axs[2,1].set_xlabel('$z$ offset [$\mathrm{\mu}$m]')
-            axs[2,1].set_ylabel('$x\'$ offset [$\mathrm{\mu}$rad]')
+            axs[2,1].set_xlabel(r'$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel(r'$x\'$ offset [$\mathrm{\mu}$rad]')
             axs[2,1].set_xlim(min([min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, max([max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
             axs[2,1].set_ylim(min(self.evolution.x_angle)*1e6*1.1, max(self.evolution.x_angle)*1e6*1.1)
             axs[2,1].yaxis.tick_right()
@@ -1125,7 +1126,7 @@ class InterstageElegant(Interstage):
             axs[0,1].set_xlim(beam_init.beam_size_x()*0.8e6, max_sig_beam.beam_size_x()*1.2e6)
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
-            axs[0,1].set_xlabel('Beam size [$\mathrm{\mu}$m]')
+            axs[0,1].set_xlabel(r'Beam size [$\mathrm{\mu}$m]')
             axs[0,1].set_ylabel('Divergence [mrad]')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
@@ -1150,8 +1151,8 @@ class InterstageElegant(Interstage):
             axs[2,0].plot(xs2*1e6, -dQdx*1e3, color=col1)
             axs[2,0].set_xlim([min(xs0)*1e6, max(xs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-dQdx0), max(-dQdx_final)])*1.2e3])
-            axs[2,0].set_xlabel('Transverse position, $x$ [$\mathrm{\mu}$m]')
-            axs[2,0].set_ylabel('$dQ/dx$ [nC/$\mathrm{\mu}$m]')
+            axs[2,0].set_xlabel(r'Transverse position, $x$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel(r'$dQ/dx$ [nC/$\mathrm{\mu}$m]')
             
             # plot angular projection
             dQdpx, pxs2 = beam.projected_density(beam.pxs, bins=pxs0)
@@ -1163,7 +1164,7 @@ class InterstageElegant(Interstage):
             axs[1,1].yaxis.tick_right()
             axs[1,1].yaxis.set_label_position('right')
             axs[1,1].xaxis.set_label_position('top')
-            axs[1,1].set_xlabel("$dQ/dp_x$ [nC c/MeV]")
+            axs[1,1].set_xlabel(r"$dQ/dp_x$ [nC c/MeV]")
             axs[1,1].set_ylabel("Momentum, $p_x$ [MeV/c]")
             
             # plot centroid evolution
@@ -1172,8 +1173,8 @@ class InterstageElegant(Interstage):
             axs[2,1].cla()
             axs[2,1].plot(np.array(x0s)*1e6, np.array(xp0s)*1e6, '-', color=col0)
             axs[2,1].plot(x0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
-            axs[2,1].set_xlabel('Centroid offset [$\mathrm{\mu}$m]')
-            axs[2,1].set_ylabel('Centroid angle [$\mathrm{\mu}$rad]')
+            axs[2,1].set_xlabel(r'Centroid offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel(r'Centroid angle [$\mathrm{\mu}$rad]')
             axs[2,1].set_xlim(min(self.evolution.x_offset)*1e6*1.1, max(self.evolution.x_offset)*1e6*1.1)
             axs[2,1].set_ylim(min(self.evolution.x_angle)*1e6*1.1, max(self.evolution.x_angle)*1e6*1.1)
             axs[2,1].yaxis.tick_right()
@@ -1276,7 +1277,7 @@ class InterstageElegant(Interstage):
             axs[0,1].plot(sigzs[-1]*1e6, sigdeltas[-1]*1e2, 'o', color=col1)
             axs[0,1].set_ylim(min([min(sigdeltas)*0.8e2, 1e-1]), max([max(sigdeltas)*1.2e2, 10]))
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, sigzs[0]*0.7e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.3e6]))
-            axs[0,1].set_xlabel('Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_xlabel(r'Bunch length [$\mathrm{\mu}$m]')
             axs[0,1].set_ylabel('Energy spread [%]')
             axs[0,1].set_yscale('log')
             axs[0,1].yaxis.tick_right()
@@ -1302,7 +1303,7 @@ class InterstageElegant(Interstage):
             axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
             axs[2,0].set_xlim([min(zs0)*1e6, max(zs0)*1e6])
             axs[2,0].set_ylim([0, max([max(-Is0), max(-Is_final)])*1.3e-3])
-            axs[2,0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
             axs[2,0].set_ylabel('$I$ [kA]')
             
             # plot energy spectrum
@@ -1329,7 +1330,7 @@ class InterstageElegant(Interstage):
             #axs[2,1].set_ylim([-rel_energy_window*0.5e2, rel_energy_window*0.5e2])
             axs[2,1].set_ylim([(E_lim_min/Es_nom-1)*100, (E_lim_max/Es_nom-1)*100])
             axs[2,1].set_xlim([(z0s[0]-sigzs[0]/2)*1e6, (z0s[0]+sigzs[0]/2)*1e6])
-            axs[2,1].set_xlabel('$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_xlabel(r'$z$ offset [$\mathrm{\mu}$m]')
             axs[2,1].set_ylabel('Energy offset [%]')
             axs[2,1].yaxis.tick_right()
             axs[2,1].yaxis.set_label_position('right')
@@ -1433,7 +1434,7 @@ class InterstageElegant(Interstage):
         ts = bins[0]
         c0 = axs[0].pcolor(locations, ts*SI.c*1e6, -Is/1e3, cmap=CONFIG.default_cmap, shading='auto')
         cbar0 = fig.colorbar(c0, ax=axs[0])
-        axs[0].set_ylabel('Longitudinal position [$\mathrm{\mu}$m]')
+        axs[0].set_ylabel(r'Longitudinal position [$\mathrm{\mu}$m]')
         cbar0.ax.set_ylabel('Beam current [kA]')
         #axs[0].set_title('Shot ' + str(shot+1))
         
@@ -1449,22 +1450,22 @@ class InterstageElegant(Interstage):
         xs = bins[2]
         c2 = axs[2].pcolor(locations, xs*1e6, -densityX*1e3, cmap=CONFIG.default_cmap, shading='auto')
         cbar2 = fig.colorbar(c2, ax=axs[2])
-        axs[2].set_ylabel('Horizontal position [$\mathrm{\mu}$m]')
-        cbar2.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$m]')
+        axs[2].set_ylabel(r'Horizontal position [$\mathrm{\mu}$m]')
+        cbar2.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
         
         densityY = waterfalls[3]
         ys = bins[3]
         c3 = axs[3].pcolor(locations, ys*1e6, -densityY*1e3, cmap=CONFIG.default_cmap, shading='auto')
         cbar3 = fig.colorbar(c3, ax=axs[3])
-        axs[3].set_ylabel('Vertical position [$\mathrm{\mu}$m]')
-        cbar3.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$m]')
+        axs[3].set_ylabel(r'Vertical position [$\mathrm{\mu}$m]')
+        cbar3.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
 
         densityXp = waterfalls[4]
         xps = bins[4]
         c4 = axs[4].pcolor(locations, xps*1e6, -densityXp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         cbar4 = fig.colorbar(c4, ax=axs[4])
-        axs[4].set_ylabel('Horizontal angle [$\mathrm{\mu}$rad]')
-        cbar4.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$rad]')
+        axs[4].set_ylabel(r'Horizontal angle [$\mathrm{\mu}$rad]')
+        cbar4.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$rad]')
 
         axs[4].set_xlabel('Location along interstage [m]')
 
@@ -1472,8 +1473,8 @@ class InterstageElegant(Interstage):
         #yps = bins[5]
         #c5 = axs[5].pcolor(locations, yps*1e6, -densityYp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         #cbar5 = fig.colorbar(c5, ax=axs[5])
-        #axs[5].set_ylabel('Vertical angle [$\mathrm{\mu}$rad]')
-        #cbar5.ax.set_ylabel('Charge density [nC/$\mathrm{\mu}$rad]')
+        #axs[5].set_ylabel(r'Vertical angle [$\mathrm{\mu}$rad]')
+        #cbar5.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$rad]')
         
         plt.show()
         if save_fig:

@@ -1,0 +1,4 @@
+include abel/apis/elegant/templates/*.lte
+include abel/apis/elegant/templates/*.ele
+include abel/apis/guineapig/templates/*.dat
+include abel/apis/hipace/*_template
