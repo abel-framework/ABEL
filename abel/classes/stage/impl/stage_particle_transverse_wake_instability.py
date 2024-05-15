@@ -688,7 +688,7 @@ class StagePrtclTransWakeInstability(Stage):
             
         Returns
         ----------
-        bubble_radius: [m] 1D array 
+        bubble_radius: [m] 1D float array 
             Plasma bubble radius over the simulation box.
         """
 
@@ -1031,8 +1031,7 @@ class StagePrtclTransWakeInstability(Stage):
             cbar_ax = fig.add_axes([.85, .15, .03, .75])
         else:
             #ax = axes[0]  # TODO: adjust colourbar axes
-            #cbar_ax = axes[1]
-            
+            #cbar_ax = axes[1]            
             ax = axes
             cbar_ax = None
 
