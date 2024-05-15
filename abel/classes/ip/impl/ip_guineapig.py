@@ -2,6 +2,7 @@ import uuid, os
 import numpy as np
 import scipy.constants as SI
 from string import Template
+import abel
 from abel import InteractionPoint, CONFIG
 from abel.apis.guineapig.guineapig_api import guineapig_run
 
