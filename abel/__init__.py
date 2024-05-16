@@ -24,6 +24,7 @@ from .classes.spectrometer.spectrometer import *
 
 from .classes.RFlinac.RFlinac import *
 from .classes.RFlinac.impl.RFlinac_CLICG import *
+from .classes.RFlinac.impl.RFlinac_CLIC502 import *
 
 from .classes.beamline.impl.linac import *
 from .classes.beamline.impl.experiment import *
