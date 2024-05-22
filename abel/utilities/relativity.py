@@ -54,7 +54,7 @@ def velocity2gamma(v):
 def proper_velocity2gamma(u):
     return np.sign(u) * np.sqrt(1+(u/SI.c)**2)
 
-# convert proper velocity to energy
+# convert proper velocity to momentum [eV/c]
 def proper_velocity2momentum(u):
     return gamma2momentum(proper_velocity2gamma(u))
 
