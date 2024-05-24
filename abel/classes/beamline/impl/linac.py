@@ -323,6 +323,7 @@ class Linac(Beamline):
         axs[0,2].set_xlabel(long_label)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_yscale('log')
+        axs[0,2].set_ylim([0.7e6*min(emnxs.min(), emnys.min()), 1.4e6*max(emnxs.max(), emnys.max())])
         
         #axs[1,2].plot(long_axis, np.sqrt(Es_nom/Es_nom[0])*betaxs[0]*1e3, ':', color=col0)
         axs[1,2].plot(long_axis, sigxs*1e6, color=col1)
@@ -1006,12 +1007,12 @@ class Linac(Beamline):
             axs[0,0].xaxis.set_label_position('top')
             
             # plot emittance and bunch length evolution
-            emitns.append(beam.norm_emittance_x()) # TODO: update to normalized amplitude
+            emitns.append(beam.norm_emittance_y()) # TODO: update to normalized amplitude
             sigzs.append(beam.bunch_length())
             axs[0,1].cla()
             axs[0,1].plot(np.array(sigzs)*1e6, np.array(emitns)*1e6, '-', color=col0)
             axs[0,1].plot(sigzs[-1]*1e6, emitns[-1]*1e6, 'o', color=col1)
-            axs[0,1].set_ylim(min([min(emitns)*0.9e6, beam_final.norm_emittance_x()*0.8e6]), max([max(emitns)*1.1e6, emitns[0]*1.2e6]))
+            axs[0,1].set_ylim(min([min(emitns)*0.9e6, beam_final.norm_emittance_y()*0.8e6]), max([max(emitns)*1.1e6, emitns[0]*1.2e6]))
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, beam_final.bunch_length()*0.8e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.2e6]))
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')

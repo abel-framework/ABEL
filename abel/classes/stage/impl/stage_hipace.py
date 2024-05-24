@@ -3,6 +3,7 @@ from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_
 from abel.utilities.plasma_physics import *
 from abel.utilities.relativity import energy2gamma
 import scipy.constants as SI
+import scipy.stats as spstats
 from matplotlib import pyplot as plt
 import numpy as np
 import os, shutil, uuid, copy
@@ -17,7 +18,7 @@ import read_insitu_diagnostics
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -28,6 +29,7 @@ class StageHipace(Stage):
         self.num_cell_xy = num_cell_xy
         self.driver_only = driver_only
         self.plasma_density_from_file = plasma_density_from_file
+        self.save_drivers = save_drivers
 
         # physics flags
         self.ion_motion = ion_motion
@@ -99,7 +101,8 @@ class StageHipace(Stage):
         if self.driver_only:
             box_min_z = driver0.z_offset() + driver0.bunch_length() - np.max([2*np.pi/k_p(self.plasma_density), 2.1*blowout_radius(self.plasma_density, driver0.peak_current())])
         else:
-            box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+            box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length() 
+        box_min_z = box_min_z - 1.5/k_p(self.plasma_density)
         box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
         box_range_z = [box_min_z, box_max_z]
         
@@ -154,6 +157,17 @@ class StageHipace(Stage):
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
 
+
+        ## SAVE DRIVERS TO FILE
+        if self.save_drivers:
+            driver0.stage_number = beam0.stage_number
+            driver0.location = 0.0
+            driver0.trackable_number = 0
+            self.save_driver_to_file(driver0, runnable)
+            driver.stage_number = beam0.stage_number
+            driver.location = self.get_length()
+            driver.trackable_number = 1
+            self.save_driver_to_file(driver, runnable)
         
         ## ADD METADATA
         
@@ -185,32 +199,96 @@ class StageHipace(Stage):
     def __extract_evolution(self, tmpfolder, beam0, runnable):
 
         insitu_path = tmpfolder + 'diags/insitu/'
-        
-        if not self.driver_only:
+
+        bunches = ['beam','driver']
+
+        for bunch in bunches:
+
+            # skip for beam if driver only
+            if bunch == 'beam' and self.driver_only:
+                continue
             
-            insitu_file = insitu_path + 'reduced_beam.*.txt'
-                
             # extract in-situ data
+            insitu_file = insitu_path + 'reduced_' + bunch + '.*.txt'
             all_data = read_insitu_diagnostics.read_file(insitu_file)
             average_data = all_data['average']
             
             # store variables
-            self.evolution.location = beam0.location + all_data['time']*SI.c
-            self.evolution.charge = read_insitu_diagnostics.total_charge(all_data)
-            self.evolution.energy = read_insitu_diagnostics.energy_mean_eV(all_data)
-            self.evolution.z = average_data['[z]']
-            self.evolution.x = average_data['[x]']
-            self.evolution.y = average_data['[y]']
-            self.evolution.xp = average_data['[ux]']/average_data['[uz]']
-            self.evolution.yp = average_data['[uy]']/average_data['[uz]']
-            self.evolution.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
-            self.evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
-            self.evolution.beam_size_x = read_insitu_diagnostics.position_std(average_data, direction='x')
-            self.evolution.beam_size_y = read_insitu_diagnostics.position_std(average_data, direction='y')
-            self.evolution.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
-            self.evolution.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
-            self.evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
-            # TODO: add angular momentum and normalized amplitude
+            evol = SimpleNamespace()
+            evol.slices = SimpleNamespace()
+            
+            evol.location = beam0.location + all_data['time']*SI.c
+            evol.charge = read_insitu_diagnostics.total_charge(all_data)
+            evol.energy = read_insitu_diagnostics.energy_mean_eV(all_data)
+            evol.z = average_data['[z]']
+            evol.x = average_data['[x]']
+            evol.y = average_data['[y]']
+            evol.xp = average_data['[ux]']/average_data['[uz]']
+            evol.yp = average_data['[uy]']/average_data['[uz]']
+            evol.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
+            evol.rel_energy_spread = evol.energy_spread/evol.energy
+            evol.beam_size_x = read_insitu_diagnostics.position_std(average_data, direction='x')
+            evol.beam_size_y = read_insitu_diagnostics.position_std(average_data, direction='y')
+            evol.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
+            evol.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
+            evol.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
+            
+            # beta functions (temporary fix)
+            evol.beta_x = evol.beam_size_x**2*(evol.energy/0.5109989461e6)/evol.emit_nx # TODO: improve with x-x' correlations instead of x-px
+            evol.beta_y = evol.beam_size_y**2*(evol.energy/0.5109989461e6)/evol.emit_ny # TODO: improve with y-y' correlations instead of y-py
+
+            # slice parameters
+            slice_mask = abs(read_insitu_diagnostics.per_slice_charge(all_data)[0,:]) > SI.e
+            evol.slices.charge = read_insitu_diagnostics.per_slice_charge(all_data)[:,slice_mask]
+            evol.slices.energy = read_insitu_diagnostics.energy_mean_eV(all_data, per_slice=True)[:,slice_mask]
+            evol.slices.z = all_data['[z]'][:,slice_mask]
+            evol.slices.x = all_data['[x]'][:,slice_mask]
+            evol.slices.y = all_data['[y]'][:,slice_mask]
+            evol.slices.xp = all_data['[ux]'][:,slice_mask]/all_data['[uz]'][:,slice_mask]
+            evol.slices.yp = all_data['[uy]'][:,slice_mask]/all_data['[uz]'][:,slice_mask]
+            evol.slices.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data, per_slice=True)[:,slice_mask]
+            evol.slices.rel_energy_spread = evol.slices.energy_spread/evol.slices.energy
+            evol.slices.beam_size_x = read_insitu_diagnostics.position_std(all_data, direction='x')[:,slice_mask]
+            evol.slices.beam_size_y = read_insitu_diagnostics.position_std(all_data, direction='y')[:,slice_mask]
+            evol.slices.bunch_length = read_insitu_diagnostics.position_std(all_data, direction='z')[:,slice_mask]
+            evol.slices.emit_nx = read_insitu_diagnostics.emittance_x(all_data)[:,slice_mask]
+            evol.slices.emit_ny = read_insitu_diagnostics.emittance_y(all_data)[:,slice_mask]
+
+            # energy spectrum
+            calculate_spectral_info = False
+            evol.peak_spectral_density = np.empty_like(evol.location)
+            evol.energy_spread_fwhm = np.empty_like(evol.location)
+            evol.rel_energy_spread_fwhm = np.empty_like(evol.location)
+            if calculate_spectral_info:
+                for step in range(len(evol.location)):
+                    Es = np.linspace(np.min(evol.energy[step]-5*evol.energy_spread[step]), np.max(evol.energy[step]+5*evol.energy_spread[step]), 500)
+                    dQ_dE = np.zeros_like(Es)
+                    for i in range(len(evol.slices.charge[step,:])):
+                        dQ_dE_slice = spstats.norm.pdf(Es, loc=evol.slices.energy[step,i], scale=evol.slices.energy_spread[step,i])
+                        Q_slice = np.trapz(dQ_dE_slice, x=Es)
+                        if abs(Q_slice) > 0:
+                            dQ_dE_slice = dQ_dE_slice*evol.slices.charge[step,i]/np.trapz(dQ_dE_slice, x=Es)
+                            dQ_dE += dQ_dE_slice
+                                    
+                    dQ_dE_max = np.max(abs(dQ_dE))
+                    evol.peak_spectral_density[step] = dQ_dE_max
+                    evol.energy_spread_fwhm[step] = np.max(Es[abs(dQ_dE) > dQ_dE_max*0.5]) - np.min(Es[abs(dQ_dE) > dQ_dE_max*0.5])
+            else:
+                evol.peak_spectral_density[:] = np.nan
+                evol.energy_spread_fwhm[:] = np.nan
+            
+            evol.rel_energy_spread_fwhm = evol.energy_spread_fwhm/evol.energy
+            
+            # assign it
+            if bunch == 'beam':
+                self.evolution.beam = evol
+            elif bunch == 'driver':
+                self.evolution.driver = evol
+            
+            # TODO: add divergences
+            # TODO: add beta functions, alpha functions
+            # TODO: add angular momentum 
+            # TODO: add normalized amplitude
 
         # delete or move data
         if self.keep_data:

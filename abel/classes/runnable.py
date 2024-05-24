@@ -1,6 +1,6 @@
 from abc import ABC
 from abel import CONFIG, Beam
-import os, shutil, time, sys
+import os, shutil, time, sys, csv
 from datetime import datetime
 from joblib import Parallel, delayed
 from joblib_progress import joblib_progress
@@ -129,7 +129,7 @@ class Runnable(ABC):
     def run_data(self, shot=None):
         shot_path = self.shot_path(shot)
         if os.path.exists(shot_path):
-            filenames = [shot_path + f for f in os.listdir(shot_path) if (os.path.isfile(os.path.join(shot_path, f)) and not f.endswith('.obj'))]
+            filenames = [shot_path + f for f in os.listdir(shot_path) if (os.path.isfile(os.path.join(shot_path, f)) and f.startswith('beam_') and not f.endswith('.obj'))]
             filenames.sort()
             return filenames
         else:
@@ -334,5 +334,34 @@ class Runnable(ABC):
 
     def plot_waterfall_y(self, index=-1):
         self.plot_waterfall(Beam.transverse_profile_y, scale=1e-3, label='y (mm)', index=index)
+
+
+
+    def save_function_data(self, fcn, filename=None):
+        
+        # extract values
+        val_mean = np.empty(self.num_steps)
+        val_std = np.empty(self.num_steps)
+        for step in range(self.num_steps):
+            
+            # get values for this step
+            val_output = np.empty(self.num_shots_per_step)
+            for shot_in_step in range(self.num_shots_per_step):
+                val_output[shot_in_step] = fcn(self[step,shot_in_step])
+                
+            # get step mean and error
+            val_mean[step] = np.mean(val_output)
+            val_std[step] = np.std(val_output)
+
+        # default filename
+        if filename is None:
+            filename = self.run_name + '.csv'
+
+        # write data
+        data = [self.vals, val_mean, val_std]
+        with open(filename, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(data)
+        
         
     

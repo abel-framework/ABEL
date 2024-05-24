@@ -20,8 +20,14 @@ class Stage(Trackable):
         self.plasma_density = plasma_density
         self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
+
+        self.stage_number = None
         
         self.evolution = SimpleNamespace()
+        self.evolution.beam = SimpleNamespace()
+        self.evolution.beam.slices = SimpleNamespace()
+        self.evolution.driver = SimpleNamespace()
+        self.evolution.driver.slices = SimpleNamespace()
         
         self.efficiency = SimpleNamespace()
         
@@ -91,62 +97,124 @@ class Stage(Trackable):
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
 
-    
-    def plot_evolution(self):
+    def save_driver_to_file(self, driver, runnable):
+        driver.save(runnable, beam_name='driver_stage' + str(driver.stage_number+1))
 
+    
+    def save_evolution_to_file(self, bunch='beam'):
+    
+        # select bunch
+        if bunch == 'beam':
+            evol = self.evolution.beam
+        elif bunch == 'driver':
+            evol = self.evolution.driver
+
+        # arrange numbers into a matrix
+        matrix = np.empty((len(evol.location),14))
+        matrix[:,0] = evol.location
+        matrix[:,1] = evol.charge
+        matrix[:,2] = evol.energy
+        matrix[:,3] = evol.x
+        matrix[:,4] = evol.y
+        matrix[:,5] = evol.rel_energy_spread
+        matrix[:,6] = evol.rel_energy_spread_fwhm
+        matrix[:,7] = evol.beam_size_x
+        matrix[:,8] = evol.beam_size_y
+        matrix[:,9] = evol.emit_nx
+        matrix[:,10] = evol.emit_ny
+        matrix[:,11] = evol.beta_x
+        matrix[:,12] = evol.beta_y
+        matrix[:,13] = evol.peak_spectral_density
+
+        # save to CSV file
+        filename = bunch + '_evolution.csv'
+        np.savetxt(filename, matrix, delimiter=',')
+        
+    
+    def plot_driver_evolution(self):
+        self.plot_evolution(bunch='driver')
+    
+    def plot_evolution(self, bunch='beam'):
+
+        # select bunch
+        if bunch == 'beam':
+            evol = self.evolution.beam
+        elif bunch == 'driver':
+            evol = self.evolution.driver
+            
         # extract wakefield if not already existing
-        if not hasattr(self.evolution, 'location'):
+        if not hasattr(evol, 'location'):
             print('No evolution calculated')
             return
 
         # preprate plot
-        fig, axs = plt.subplots(2,3)
+        fig, axs = plt.subplots(3,3)
         fig.set_figwidth(CONFIG.plot_fullwidth_default)
         fig.set_figheight(CONFIG.plot_width_default*0.8)
         col0 = "tab:gray"
         col1 = "tab:blue"
         col2 = "tab:orange"
         long_label = 'Location [m]'
-        long_limits = [min(self.evolution.location), max(self.evolution.location)]
+        long_limits = [min(evol.location), max(evol.location)]
 
         # plot energy
-        axs[0,0].plot(self.evolution.location, self.evolution.energy / 1e9, color=col1)
+        axs[0,0].plot(evol.location, evol.energy / 1e9, color=col1)
         axs[0,0].set_ylabel('Energy [GeV]')
         axs[0,0].set_xlim(long_limits)
 
         # plot charge
-        axs[0,1].plot(self.evolution.location, -self.evolution.charge[0] * np.ones(self.evolution.location.shape) * 1e9, ':', color=col0)
-        axs[0,1].plot(self.evolution.location, -self.evolution.charge * 1e9, color=col1)
+        axs[0,1].plot(evol.location, -evol.charge[0] * np.ones(evol.location.shape) * 1e9, ':', color=col0)
+        axs[0,1].plot(evol.location, -evol.charge * 1e9, color=col1)
         axs[0,1].set_ylabel('Charge [nC]')
         axs[0,1].set_xlim(long_limits)
-        axs[0,1].set_ylim(0, -self.evolution.charge[0] * 1.3 * 1e9)
+        axs[0,1].set_ylim(0, -evol.charge[0] * 1.3 * 1e9)
         
         # plot normalized emittance
-        axs[0,2].plot(self.evolution.location, self.evolution.emit_ny*1e6, color=col2)
-        axs[0,2].plot(self.evolution.location, self.evolution.emit_nx*1e6, color=col1)
+        axs[0,2].plot(evol.location, evol.emit_ny*1e6, color=col2)
+        axs[0,2].plot(evol.location, evol.emit_nx*1e6, color=col1)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_xlim(long_limits)
         
         # plot energy spread
-        axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)
+        axs[1,0].plot(evol.location, evol.rel_energy_spread*1e2, color=col1)
         axs[1,0].set_ylabel('Energy spread, rms [%]')
         axs[1,0].set_xlabel(long_label)
         axs[1,0].set_xlim(long_limits)
         
         # plot beam size
-        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_y*1e6, color=col2)
-        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_x*1e6, color=col1)
+        axs[1,2].plot(evol.location, evol.beam_size_y*1e6, color=col2)
+        axs[1,2].plot(evol.location, evol.beam_size_x*1e6, color=col1)
         axs[1,2].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
         axs[1,2].set_xlabel(long_label)
         axs[1,2].set_xlim(long_limits)
-
+        
         # plot transverse offset
-        axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)
-        axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)  
-        axs[1,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
+        axs[1,1].plot(evol.location, np.zeros(evol.location.shape), ':', color=col0)
+        axs[1,1].plot(evol.location, evol.y*1e6, color=col2)  
+        axs[1,1].plot(evol.location, evol.x*1e6, color=col1)
         axs[1,1].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
         axs[1,1].set_xlabel(long_label)
         axs[1,1].set_xlim(long_limits)
+        
+        # plot beta function
+        axs[2,0].plot(evol.location, evol.beta_y*1e3, color=col2)  
+        axs[2,0].plot(evol.location, evol.beta_x*1e3, color=col1)
+        axs[2,0].set_ylabel('Beta function [mm]')
+        axs[2,0].set_xlabel(long_label)
+        axs[2,0].set_xlim(long_limits)
+        axs[2,0].set_yscale('log')
+        
+        # plot fwhm energy spread
+        axs[2,1].plot(evol.location, evol.rel_energy_spread_fwhm*1e2, color=col1)
+        axs[2,1].set_ylabel('Energy spread, fwhm [%]')
+        axs[2,1].set_xlabel(long_label)
+        axs[2,1].set_xlim(long_limits)
+
+        # plot peak spectral density
+        axs[2,2].plot(evol.location, evol.peak_spectral_density*1e18, color=col1)
+        axs[2,2].set_ylabel('Peak spectral density [pC/MeV]')
+        axs[2,2].set_xlabel(long_label)
+        axs[2,2].set_xlim(long_limits)
         
         plt.show()
 
