@@ -3,7 +3,6 @@ import numpy as np
 
 defaultUnitE = 'eV'
 
-
 # convert Lorentz beta to Lorentz gamma
 def beta2gamma(beta):
     return np.sign(beta)/np.sqrt(1-beta**2)
@@ -29,14 +28,14 @@ def gamma2velocity(gamma):
 def gamma2proper_velocity(gamma):
     return abs(gamma) * gamma2velocity(gamma)
 
-# convert Lorentz gamma to momentum [eV/c]
-def gamma2momentum(gamma):
-    p = SI.m_e * gamma2proper_velocity(gamma)
+# convert Lorentz gamma to momentum [kg m/s]
+def gamma2momentum(gamma, m=SI.m_e):
+    p = m * gamma2proper_velocity(gamma)
     return p
 
 # convert Lorentz gamma to kinetic energy
-def gamma2energy(gamma, unit = defaultUnitE):
-    E = gamma * (SI.m_e * SI.c**2)
+def gamma2energy(gamma, unit=defaultUnitE, m=SI.m_e):
+    E = gamma * (m * SI.c**2)
     if unit == defaultUnitE:
         E =  E / SI.e
     return E
@@ -54,25 +53,24 @@ def velocity2gamma(v):
 def proper_velocity2gamma(u):
     return np.sign(u) * np.sqrt(1+(u/SI.c)**2)
 
-# convert proper velocity to momentum [eV/c]
+# convert proper velocity to momentum [kg m/s]
 def proper_velocity2momentum(u):
     return gamma2momentum(proper_velocity2gamma(u))
 
 # convert proper velocity to energy
-def proper_velocity2energy(u, unit=defaultUnitE):
-    return gamma2energy(proper_velocity2gamma(u), unit)
+def proper_velocity2energy(u, unit=defaultUnitE, m=SI.m_e):
+    return gamma2energy(proper_velocity2gamma(u), unit=unit, m=m)
 
 
-# convert momentum [eV/c] to Lorentz gamma
-def momentum2gamma(p):
-    return np.sign(p) * np.sqrt((p / (SI.m_e * SI.c))**2 + 1) 
-    #np.sign(p) * np.sqrt(1+(p / (SI.m_e * SI.c))**2)
+# convert momentum [kg m/s] to Lorentz gamma
+def momentum2gamma(p, m=SI.m_e):
+    return np.sign(p) * np.sqrt((p / (m * SI.c))**2 + 1)
+    
+# convert momentum [kg m/s] to proper velocity
+def momentum2proper_velocity(p, m=SI.m_e):
+    return p / m
 
-# convert momentum [eV/c] to proper velocity
-def momentum2proper_velocity(p):
-    return p / SI.m_e
-
-# convert momentum to energy [eV/c]
+# convert momentum [kg m/s] to energy [eV]
 def momentum2energy(p):
     return gamma2energy(momentum2gamma(p))
 
@@ -82,12 +80,12 @@ def energy2beta(E, unit=defaultUnitE):
     return gamma2beta(energy2gamma(E, unit))
 
 # convert kinetic energy [eV] to Lorentz gamma
-def energy2gamma(E, unit=defaultUnitE):
+def energy2gamma(E, unit=defaultUnitE, m=SI.m_e):
     if unit == defaultUnitE:
         E = E * SI.e
-    return E / (SI.m_e * SI.c**2)
+    return E / (m * SI.c**2)
 
 # convert energy to proper velocity
-def energy2proper_velocity(E, unit=defaultUnitE):
-    return gamma2proper_velocity(energy2gamma(E, unit))
+def energy2proper_velocity(E, unit=defaultUnitE, m=SI.m_e):
+    return gamma2proper_velocity(energy2gamma(E, unit=unit, m=m))
 

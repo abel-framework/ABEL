@@ -19,7 +19,8 @@ dependencies = [
    "matplotlib",
    "pyqtgraph",
    "Wake-T",
-   "ocelot@git+https://github.com/ocelot-collab/ocelot.git"
+   "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
+   "RF-Track"
 ]
 requires-python = ">= 3"
 

@@ -141,3 +141,13 @@ dmypy.json
 abel/CONFIG.py
 abel/CONFIG.py
 abel/CONFIG.py
+examples/FACETII_slice_instability_stages_interstages.ipynb
+examples/HALHFv3_optimise.ipynb
+examples/HALHFv3_scans.ipynb
+examples/InterstageElegant_tests.ipynb
+examples/plot_Er.png
+examples/test_transverse_electric_field_solver.ipynb
+examples/transverse_electric_field_solver_benchmarks.ipynb
+examples/Untitled.ipynb
+examples/RF-Track_test.ipynb
+abel/CONFIG.py
