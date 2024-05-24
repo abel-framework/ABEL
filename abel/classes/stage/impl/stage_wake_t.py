@@ -14,7 +14,6 @@ class StageWakeT(Stage):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source)
         
-        #self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
         self.num_cell_xy = num_cell_xy
         self.keep_data = keep_data
@@ -43,8 +42,10 @@ class StageWakeT(Stage):
         # make longitudinal box range
         num_sigmas = 6
         #box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        box_min_z = driver0.z_offset() - 2.8 * blowout_radius(self.plasma_density, driver0.peak_current())
-        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
+        R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
+        box_min_z = driver0.z_offset() - 3.3 * R_blowout
+        #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
+        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
@@ -147,6 +148,9 @@ class StageWakeT(Stage):
         Ez0, metadata0_Ez = ts.get_field(field='E', coord='z', iteration=min(ts.iterations), plot=False)
         self.initial.plasma.wakefield.Ezs = Ez0
         self.initial.plasma.wakefield.Ezs_metadata = metadata0_Ez
+        Bz0, metadata0_Bz = ts.get_field(field='B', coord='z', iteration=min(ts.iterations), plot=False)
+        self.initial.plasma.wakefield.Bzs = Bz0
+        self.initial.plasma.wakefield.Bzs_metadata = metadata0_Bz
         Ex0, metadata0_Ex = ts.get_field(field='E', coord='x', iteration=min(ts.iterations), plot=False)
         self.initial.plasma.wakefield.Exs = Ex0
         self.initial.plasma.wakefield.Exs_metadata = metadata0_Ex
@@ -155,7 +159,7 @@ class StageWakeT(Stage):
         self.initial.plasma.wakefield.Bxs_metadata = metadata0_Bx
         Ey0, metadata0_Ey = ts.get_field(field='E', coord='y', iteration=min(ts.iterations), plot=False)
         self.initial.plasma.wakefield.Eys = Ey0
-        self.initial.plasma.wakefield.Ey_metadata = metadata0_Ey
+        self.initial.plasma.wakefield.Eys_metadata = metadata0_Ey
         By0, metadata0_By = ts.get_field(field='B', coord='y', iteration=min(ts.iterations), plot=False)
         self.initial.plasma.wakefield.Bys = By0
         self.initial.plasma.wakefield.Bys_metadata = metadata0_By
@@ -164,6 +168,9 @@ class StageWakeT(Stage):
         Ez, metadata_Ez = ts.get_field(field='E', coord='z', iteration=max(ts.iterations), plot=False)
         self.final.plasma.wakefield.Ezs = Ez
         self.final.plasma.wakefield.Ezs_metadata = metadata_Ez
+        Bz, metadata_Bz = ts.get_field(field='B', coord='z', iteration=max(ts.iterations), plot=False)
+        self.final.plasma.wakefield.Bzs = Bz
+        self.final.plasma.wakefield.Bzs_metadata = metadata_Bz
         Ex, metadata_Ex = ts.get_field(field='E', coord='x', iteration=max(ts.iterations), plot=False)
         self.final.plasma.wakefield.Exs = Ex
         self.final.plasma.wakefield.Exs_metadata = metadata_Ex

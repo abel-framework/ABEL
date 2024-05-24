@@ -70,6 +70,51 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
     
     return xs, xps, ys, yps
 
+
+# generate trace space from geometric emittance and twiss parameters for a beam symmetrised in 6D
+def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, bunch_length, energy_spread, L=0):
+
+    # calculate beam size, divergence and correlation
+    sigx = np.sqrt(epsilon_x * beta_x)
+    sigy = np.sqrt(epsilon_y * beta_y)
+    sigxp = np.sqrt(epsilon_x * (1 + alpha_x**2) / beta_x)
+    sigyp = np.sqrt(epsilon_y * (1 + alpha_y**2) / beta_y)
+    rho_x = - alpha_x / np.sqrt(1 + alpha_x**2)
+    rho_y = - alpha_y / np.sqrt(1 + alpha_y**2)
+
+    # make underlying Gaussian variables
+    N_actual = round(N/8)
+    us_x = np.random.normal(size=N_actual*2)
+    vs_x = np.random.normal(size=N_actual*2)
+    us_y = np.random.normal(size=N_actual*2)
+    vs_y = np.random.normal(size=N_actual*2)
+    zs = np.random.normal(scale=bunch_length, size=N_actual)
+    Es = np.random.normal(scale=energy_spread, size=N_actual)
+
+    # do symmetrization
+    us_x  = np.concatenate((us_x, -us_x, us_x, -us_x))
+    vs_x = np.concatenate((vs_x, -vs_x, vs_x, -vs_x))
+    us_y  = np.concatenate((us_y, us_y, -us_y, -us_y))
+    vs_y = np.concatenate((vs_y, vs_y, -vs_y, -vs_y))
+    zs = np.concatenate((-zs, zs))
+    zs = np.tile(zs, 4)
+    Es = np.concatenate((-Es, Es))
+    Es = np.tile(Es, 4)
+    
+    # angular momentum correlations
+    ratio = L/np.sqrt(epsilon_x*epsilon_y)
+    rho_L = np.sqrt(1 + ratio**2)
+    
+    # particle positions
+    xs = sigx*(us_x + ratio*vs_y)/np.sqrt(rho_L)
+    ys = sigy*(us_y - ratio*vs_x)/np.sqrt(rho_L)
+    
+    # particle angles
+    xps = (sigxp*us_x*rho_x + sigxp*vs_x*np.sqrt(1 - rho_x**2))*np.sqrt(rho_L)
+    yps = (sigyp*us_y*rho_y + sigyp*vs_y*np.sqrt(1 - rho_y**2))*np.sqrt(rho_L)
+    
+    return xs, xps, ys, yps, zs, Es
+
     
 # general focusing transfer matrix (quadrupole and drift)
 def Rmat(l, k=0, plasmalens=True):
@@ -259,10 +304,10 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False):
     # dispersion evolution up to fourth order
     if not fast:
         evolution[0,:] = ss
-        evolution[1,:] = (-xs[:,4] + 8*xs[:,3] - 8*xs[:,1] + xs[:,0])/(12*delta)
-        evolution[2,:] = (-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2)
-        evolution[3,:] = (xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3)
-        evolution[4,:] = (xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4
+        evolution[1,:] = (-xs[:,4] + 8*xs[:,3] - 8*xs[:,1] + xs[:,0])/(12*delta)  # First order
+        evolution[2,:] = (-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2)  # Second order
+        evolution[3,:] = (xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3)  # Third order
+        evolution[4,:] = (xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4  # Fourth orderz
 
     # return dispersions
     DDx = (-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2)

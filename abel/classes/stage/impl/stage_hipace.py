@@ -322,7 +322,7 @@ class StageHipace(Stage):
         self.initial.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
         self.initial.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
 
-        # extract initial plasma density
+        # extract final plasma density
         rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=max(ts.iterations))
         self.final.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
         self.final.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)

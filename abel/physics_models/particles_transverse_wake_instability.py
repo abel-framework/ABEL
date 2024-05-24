@@ -46,12 +46,13 @@ from joblib_progress import joblib_progress
 
 from abel.classes.beam import *
 #from abel.utilities.relativity import energy2gamma
-from abel.utilities.relativity import momentum2gamma
+from abel.utilities.relativity import momentum2gamma, velocity2gamma
 from abel.utilities.plasma_physics import k_p
 
 
 #def wakefunc_Stupakov(xi_lead, xi_ref, a):
 #    return 2/(np.pi*eps0*a**4)*np.abs(xi_lead - xi_ref)  # [V/Cm^2]
+
 
 
 # ==================================================
@@ -74,6 +75,7 @@ def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble
     # Update momenta
     tr_momenta = tr_momenta + tr_force*time_step
     return tr_momenta
+
 
 
 # ==================================================
@@ -103,6 +105,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
     return tr_momenta
 
 
+
 # ==================================================
 # Single pass integration of (Stupakov's wake function)
 def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, enable_radiation_reaction=True):
@@ -119,8 +122,8 @@ def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_rad
     # Calculate the wakefield on each macroparticle
     wakefields = np.zeros(len(zs_sorted))
     
-    #for idx_particle in range(len(zs_sorted)-2, -1, -1):
-    #    wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
+    for idx_particle in range(len(zs_sorted)-2, -1, -1):
+        wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
 
     # Calculate the total transverse force on macroparticles
     tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
@@ -182,10 +185,11 @@ def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_rad
 #    return offsets
 
 
+
 # ==================================================
 def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, enable_radiation_reaction=True, show_prog_bar=True):
     
-    energies = beam.Es()
+    #energies = beam.Es()
     xs = beam.xs()
     ys = beam.ys()
     zs = beam.zs()
@@ -202,11 +206,12 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     pxs_sorted = pxs[indices]
     pys_sorted = pys[indices]
     pzs_sorted = pzs[indices]
-    energs_sorted = energies[indices]
+    #energs_sorted = energies[indices]
     weights_sorted = weights[indices]
 
     # Filter out particles that have too small energies
-    bool_indices = (energs_sorted > 7.0*m_e*c**2/e)  # Corresponds to 0.99c.  TODO: do this using pzs_sorted instead.
+    #bool_indices = (energs_sorted > 7.0*m_e*c**2/e)  # Corresponds to 0.99c.  TODO: do this using pzs_sorted instead.
+    bool_indices = (pzs_sorted > velocity2gamma(0.99*c)*m_e*c*0.99)  # Corresponds to 0.99c.
     zs_sorted = zs_sorted[bool_indices]
     xs_sorted = xs_sorted[bool_indices]
     ys_sorted = ys_sorted[bool_indices]
@@ -223,9 +228,17 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
     skin_depth = 1/k_p(plasma_density)  # [m] 1/kp, plasma skin depth.
     #gammas = energy2gamma(energies)  # Initial Lorentz factor for each particle.
     #beta_func = c/e*np.sqrt(2* np.mean(gammas) *eps0*m_e/plasma_density)  # [m] matched beta function.
-    beta_func = c/e*np.sqrt(2* beam.gamma() *eps0*m_e/plasma_density)  # [m] matched beta function.
+    beta_func = c/e*np.sqrt(2* beam.gamma() * eps0*m_e/plasma_density)  # [m] matched beta function.
     beta_wave_length = 2*np.pi*beta_func  # [m] betatron wavelength.
     time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
+    num_time_steps = np.ceil(stage_length/(c*time_step))
+    time_step = stage_length/(c*num_time_steps)
+    
+    #print(time_step)
+    #print(num_time_steps*c*time_step)
+    #print(c*time_step)
+    #print(stage_length-c*time_step)
+    #print(stage_length)
     
     
     ############# Beam propagation through the plasma cell #############
@@ -237,36 +250,24 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         pbar = tqdm(total=100)
         pbar.set_description('0%')
 
-    while prop_length < stage_length:
+    while prop_length < stage_length-0.5*c*time_step:
 
         # ============= Apply filters =============
-        # Filter out particles that diverge too much for small angle approximation
+        # Filter out particles that have too small energies
+        bool_indices = (pzs_sorted > velocity2gamma(0.99*c)*m_e*c*0.99)  # Corresponds to 0.99c.
+        zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
+        
+        # Filter out particles that diverge too much for applying small angle approximation
         bool_indices = (np.abs(pxs_sorted/pzs_sorted) < 50e-3)
-        zs_sorted = zs_sorted[bool_indices]
-        xs_sorted = xs_sorted[bool_indices]
-        ys_sorted = ys_sorted[bool_indices]
-        pxs_sorted = pxs_sorted[bool_indices]
-        pys_sorted = pys_sorted[bool_indices]
-        pzs_sorted = pzs_sorted[bool_indices]
-        #energs_sorted = energs_sorted[bool_indices]
-        weights_sorted = weights_sorted[bool_indices]
-        Ez = Ez[bool_indices]
-        bubble_radius = bubble_radius[bool_indices]
+        zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
 
         bool_indices = (np.abs(pys_sorted/pzs_sorted) < 50e-3)
-        zs_sorted = zs_sorted[bool_indices]
-        xs_sorted = xs_sorted[bool_indices]
-        ys_sorted = ys_sorted[bool_indices]
-        pxs_sorted = pxs_sorted[bool_indices]
-        pys_sorted = pys_sorted[bool_indices]
-        pzs_sorted = pzs_sorted[bool_indices]
-        #energs_sorted = energs_sorted[bool_indices]
-        weights_sorted = weights_sorted[bool_indices]
-        Ez = Ez[bool_indices]
-        bubble_radius = bubble_radius[bool_indices]
+        zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
 
-        Fx = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
-        Fy = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
+        # Filter out particles that collide into bubble
+        tot_offsets_sqr = xs_sorted**2 + ys_sorted**2
+        bool_indices = (np.sqrt(tot_offsets_sqr) - bubble_radius <= 0)
+        zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
         
         
         # ============= Drift of beam =============
@@ -294,8 +295,10 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         pxs_sorted = results[0]
         pys_sorted = results[1]
 
-        #Ez = -3.2e9*np.ones(len(pzs_sorted))  # Overload with constant field to see how this affects instability. # <-###################################################
-
+        #Ez = -3.35e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
+        #Ez = -3.20e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
+        #Ez = -2.0e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ######################
+        
         # Update longitudinal momenta.
         if enable_radiation_reaction:
             pzs_sorted = pzs_sorted - (e*Ez + m_e*c**2 * 1.87863e-15 * (1/skin_depth)**4/4 * gammas**2 * tot_offsets_sqr)*time_step
@@ -315,19 +318,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
         #ys_sorted = RK4(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, ys_sorted, pys_sorted, Ez, pzs_sorted)
         #time_step_count = time_step_count + 1
         #prop_length = prop_length + c*time_step
-
         
-        # ============= Filter out particles that collide into bubble =============
-        bool_indices = (np.sqrt(tot_offsets_sqr) - bubble_radius <= 0)
-        zs_sorted = zs_sorted[bool_indices]
-        xs_sorted = xs_sorted[bool_indices]
-        ys_sorted = ys_sorted[bool_indices]
-        pxs_sorted = pxs_sorted[bool_indices]
-        pys_sorted = pys_sorted[bool_indices]
-        pzs_sorted = pzs_sorted[bool_indices]
-        weights_sorted = weights_sorted[bool_indices]
-        Ez = Ez[bool_indices]
-        bubble_radius = bubble_radius[bool_indices]
         
         # Progress bar
         if show_prog_bar is True:
@@ -335,10 +326,17 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
             pbar.set_description(f"Instability tracking {round(prop_length/stage_length*100,2)}%")
         
         
-    #=============  =============
+    ############# End of loop #############
+    
+    # ============= Filter out particles that collide into bubble =============
+    tot_offsets_sqr = xs_sorted**2 + ys_sorted**2
+    bool_indices = (np.sqrt(tot_offsets_sqr) - bubble_radius <= 0)
+    zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, _, _ = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
+
+    # Progress bar
     if show_prog_bar is True:
         pbar.close()
-
+        
     # Initialise ABEL Beam object
     beam_out = Beam()
         
@@ -352,3 +350,20 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
                             pzs=pzs_sorted)
     
     return beam_out
+
+
+
+# ==================================================
+def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius):
+    zs_sorted = zs_sorted[bool_indices]
+    xs_sorted = xs_sorted[bool_indices]
+    ys_sorted = ys_sorted[bool_indices]
+    pxs_sorted = pxs_sorted[bool_indices]
+    pys_sorted = pys_sorted[bool_indices]
+    pzs_sorted = pzs_sorted[bool_indices]
+    #energs_sorted = energs_sorted[bool_indices]
+    weights_sorted = weights_sorted[bool_indices]
+    Ez = Ez[bool_indices]
+    bubble_radius = bubble_radius[bool_indices]
+
+    return zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius

@@ -3,10 +3,10 @@ import numpy as np
 from abel import CONFIG, Beam
 import scipy.constants as SI
 from abel.utilities.relativity import gamma2energy, energy2gamma
+import matplotlib.pyplot as plt
 
 def elegant_read_beam(filename, tmpfolder=None):
-    
-    # create temporary stream file and folder
+
     make_new_tmpfolder = tmpfolder is None
     if make_new_tmpfolder:
         tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
@@ -18,7 +18,7 @@ def elegant_read_beam(filename, tmpfolder=None):
     
     # extract charge
     try:
-        Q = float(subprocess.check_output([CONFIG.elegant_exec + 'sdds2stream ' + filename + ' -parameter=Charge'], shell=True))
+        Q = float(subprocess.check_output([CONFIG.elegant_exec + 'sdds2stream ' + filename + ' -parameter=Charge'], shell=True))  ######## Charge sign not set correctly?
     except:
         return None
     
@@ -73,7 +73,7 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
     # add metadata
     with open(filename, 'r') as f:
         lines = f.readlines()
-        
+
         line1 = 2
         lines.insert(line1, '&parameter name=SVNVersion, description="SVN version number", type=string, &end\n')
         lines.insert(line1, '&parameter name=IDSlotsPerBunch, description="Number of particle ID slots reserved to a bunch", type=long, &end\n')
@@ -89,7 +89,7 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
         lines.insert(line2, ' '+str(beam.charge())+'\n')
         lines.insert(line2, ' '+str(energy2gamma(beam.energy()))+'\n')
         lines.insert(line2, str(1)+'\n')
-        
+    
         with open(filename, 'w') as f:
             f.write("".join(lines))
         
@@ -101,9 +101,11 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
     if make_new_tmpfolder:
         shutil.rmtree(tmpfolder)
     
+    return filename
+    
     
 def elegant_run(filename, beam0, inputbeamfile, outputbeamfile, envars={}, quiet=False, run_from_container=False, tmpfolder=None):
-    
+
     # convert incoming beam object to temporary SDDS file
     elegant_write_beam(beam0, inputbeamfile, tmpfolder=tmpfolder)
 
@@ -129,32 +131,34 @@ def elegant_run(filename, beam0, inputbeamfile, outputbeamfile, envars={}, quiet
     return beam
 
 
-def elegant_apl_fieldmap2D(tau_lens, filename, lensdim_x=5e-3, lensdim_y=1e-3, tmpfolder=None):
+def elegant_apl_fieldmap2D(tau_lens, filename, lensdim_x=5e-3, lensdim_y=1e-3, lens_x_offset=0.0, lens_y_offset=0.0, tmpfolder=None):
     
     # transverse dimensions
-    xs = np.linspace(-lensdim_x, lensdim_x, 1001)
+    #xs = np.linspace(-lensdim_x, lensdim_x, 1001)
+    xs = np.linspace(-lensdim_x, lensdim_x, 2001)
     ys = np.linspace(-lensdim_y, lensdim_y, 201)
     
-    # create temporary CSV file and folder
     make_new_tmpfolder = tmpfolder is None
     if make_new_tmpfolder:
         tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
         os.mkdir(tmpfolder)
-    tmpfile = tmpfolder + '/map_' + str(uuid.uuid4()) + '.csv'
+    #tmpfile = tmpfolder + '/map_' + str(uuid.uuid4()) + '.csv'
+    tmpfile = tmpfolder + '/Bmap.csv'
     
     # create map
     Bmap = np.zeros((len(xs)*len(ys), 4));
+    
     for i in range(len(xs)):
-        x = xs[i]
+        x = xs[i]   
         for j in range(len(ys)):
             y = ys[j]
             
-            Bx = (y + x*y*tau_lens)
-            By = -(x + ((x**2 + y**2)/2)*tau_lens)
+            Bx = ((y+lens_y_offset) + (x+lens_x_offset) * (y+lens_y_offset) * tau_lens)
+            By = -((x+lens_x_offset) + (( (x+lens_x_offset)**2 + (y+lens_y_offset)**2 )/2)*tau_lens)
             
             index = i + j*len(xs)
             Bmap[index,:] = [x, y, Bx, By]
-    
+            
     # filename
     np.savetxt(tmpfile, Bmap, delimiter=',')
     
@@ -165,8 +169,10 @@ def elegant_apl_fieldmap2D(tau_lens, filename, lensdim_x=5e-3, lensdim_y=1e-3, t
                                                                         ' -columnData=name=By,type=double,unit=T', shell=True)
     
     # delete temporary CSV file and folder
-    os.remove(tmpfile)
-    if make_new_tmpfolder:
-        shutil.rmtree(tmpfolder)
-    
+    #os.remove(tmpfile)
+    #if make_new_tmpfolder:
+    #    shutil.rmtree(tmpfolder)
+
     return filename
+
+

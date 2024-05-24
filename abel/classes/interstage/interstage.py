@@ -1,12 +1,14 @@
 from abc import abstractmethod
 from matplotlib import patches
 from abel import Trackable
+from types import SimpleNamespace
 
 class Interstage(Trackable):
     
     @abstractmethod
     def __init__(self):
-        pass
+        self.evolution = SimpleNamespace()
+        #pass
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
