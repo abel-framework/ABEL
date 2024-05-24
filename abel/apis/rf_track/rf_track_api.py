@@ -2,6 +2,7 @@ import scipy.constants as SI
 import numpy as np
 import RF_Track as RFT
 from RF_Track import SpaceCharge_Field, Bunch6dT
+from abel import Beam
 #from abel.utilities.relativity import momentum2energy
 
 
@@ -60,8 +61,8 @@ def rft_beam2abel_beam(beam_rft):
 
     # Set the phase space
     beam.set_phase_space(xs=xs_rft/1e3, ys=ys_rft/1e3, zs=zs_rft/1e3, 
-                         pxs=pxs_rft/1e6*SI.e/SI.c, pys=pys_rft*1e6*SI.e/SI.c, 
-                         pzs=pzs_rft/1e6*SI.e/SI.c, 
+                         pxs=pxs_rft*1e6*SI.e/SI.c, pys=pys_rft*1e6*SI.e/SI.c, 
+                         pzs=pzs_rft*1e6*SI.e/SI.c, 
                          Q=tot_charge, weightings=weightings)
     return beam
 
