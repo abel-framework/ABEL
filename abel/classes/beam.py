@@ -46,7 +46,7 @@ class Beam():
         del self[np.isnan(self).any(axis=1)]
         
     # set phase space
-    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None):
+    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None, particle_mass=SI.m_e):
         
         # make empty phase space
         num_particles = len(xs)
@@ -87,6 +87,9 @@ class Beam():
         
         # ids
         self.__phasespace[7,:] = np.arange(num_particles)
+
+        # single particle mass [kg]
+        self.particle_mass = particle_mass
        
     
     # addition operator (add two beams using the + operator)
