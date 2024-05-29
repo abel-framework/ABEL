@@ -3,6 +3,9 @@ from matplotlib import patches
 from abel import Trackable
 
 class BeamDeliverySystem(Trackable):
+
+    def __init__(self):
+        self.cost_per_length = 0.05e6 # [ILCU/m]
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
@@ -10,6 +13,9 @@ class BeamDeliverySystem(Trackable):
     @abstractmethod
     def get_length(self):
         pass
+
+    def get_cost(self):
+        return self.get_length() * self.cost_per_length
     
     @abstractmethod
     def get_nom_energy(self):

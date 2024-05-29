@@ -12,9 +12,12 @@ from abel.utilities.plasma_physics import k_p
 from matplotlib.colors import LogNorm
 from types import SimpleNamespace
 
-import sys
-sys.path.append(CONFIG.hipace_path + '/tools')
-import read_insitu_diagnostics
+try:
+    import sys
+    sys.path.append(CONFIG.hipace_path + '/tools')
+    import read_insitu_diagnostics
+except:
+    print('Could not import HiPACE++ tools')
 
 class StageHipace(Stage):
     

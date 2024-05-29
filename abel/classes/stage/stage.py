@@ -49,6 +49,8 @@ class Stage(Trackable):
         self.final.plasma.wakefield = SimpleNamespace()
         self.final.plasma.wakefield.onaxis = SimpleNamespace()
 
+        self.cost_per_length = 0.2e6 # [ILCU/m]
+
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -57,6 +59,9 @@ class Stage(Trackable):
     
     def get_length(self):
         return self.length
+
+    def get_cost(self):
+        return self.get_length() * self.cost_per_length
     
     def get_nom_energy_gain(self):
         return self.nom_energy_gain

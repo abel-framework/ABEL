@@ -1,4 +1,4 @@
-from abel import Beam, Beamline, Source, Stage, Interstage, BeamDeliverySystem, CONFIG
+from abel import Beam, Linac, Source, DriverComplex, Stage, Interstage, BeamDeliverySystem, CONFIG
 import scipy.constants as SI
 import copy, os
 from datetime import datetime
@@ -7,11 +7,12 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import ticker as mticker
 
-class Linac(Beamline):
+class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, stage=None, interstage=None, bds=None, num_stages=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False):
+    def __init__(self, source=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         self.source = source
+        self.driver_complex = driver_complex
         self.stage = stage
         self.interstage = interstage
         self.bds = bds
@@ -21,7 +22,7 @@ class Linac(Beamline):
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
         
-        super().__init__()
+        super().__init__(bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
         
     
     # assemble the trackables
@@ -29,6 +30,8 @@ class Linac(Beamline):
         
         # check element classes
         assert(isinstance(self.source, Source))
+        if self.driver_complex is not None:
+            assert(isinstance(self.driver_complex, DriverComplex))
         if self.stage is not None:
             assert(isinstance(self.stage, Stage))
         if self.interstage is not None:
@@ -42,13 +45,36 @@ class Linac(Beamline):
         if self.last_interstage is not None:
             assert(isinstance(self.last_interstage, Interstage))
 
+        # get or set the driver complex
+        if self.driver_complex is not None:
+            if self.stage is not None:
+                self.stage.driver_source = self.driver_complex
+        else:
+            if self.stage is not None and isinstance(self.stage.driver_source, DriverComplex):
+                self.driver_complex = self.stage.driver_source
+        
+        # set the number of drivers required
+        if self.driver_complex is not None:
+            self.driver_complex.num_drivers = self.num_stages
+            
+            # set the rep rate of the driver complex
+            if self.num_bunches_in_train is not None and self.rep_rate_trains is not None:
+                
+                # driver source rep rate (one driver per stage)
+                self.driver_complex.source.rep_rate = self.num_bunches_in_train*self.rep_rate_trains*self.num_stages
+                
+                # driver rf accelerator rep rate (one driver per stage)
+                self.driver_complex.rf_accelerator.num_bunches_in_train = self.num_bunches_in_train*self.num_stages
+                self.driver_complex.rf_accelerator.rep_rate_trains = self.rep_rate_trains
+                self.driver_complex.rf_accelerator.bunch_separation = self.bunch_separation/self.num_stages
+        
         # set default number of stages
         if self.num_stages is None:
             if self.stage is not None:
                 self.num_stages = 1
             else:
                 self.num_stages = 0
-            
+
         # prepare for multiplication of stages and interstages
         self.stages = [None]*self.num_stages
         self.interstages = [None]*max(0,self.num_stages-1)
@@ -72,6 +98,11 @@ class Linac(Beamline):
                     stage_instance = self.stage
                 else:
                     stage_instance = copy.deepcopy(self.stage)
+                    
+                # reassign the same driver complex
+                if self.driver_complex is not None:
+                    stage_instance.driver_source = self.driver_complex
+                    
                 self.trackables[1+2*i] = stage_instance
                 self.stages[i] = stage_instance
 
@@ -146,15 +177,16 @@ class Linac(Beamline):
             Es = np.append(Es, E)
         return Es
     
-    def effective_gradient(self):
-        return self.nom_energy()/self.get_length()
-    
     def energy_usage(self):
+        
         if self.trackables is None:
             self.assemble_trackables()
         Etot = self.source.energy_usage()
-        for stage in self.stages:
-            Etot += stage.energy_usage()
+        if self.driver_complex is not None:
+            Etot += self.driver_complex.energy_usage()
+        else:
+            for stage in self.stages:
+                Etot += stage.energy_usage()
         return Etot
     
     def energy_efficiency(self):
@@ -182,6 +214,24 @@ class Linac(Beamline):
         if self.trackables is None:                                                    
             self.assemble_trackables()                                                 
         self.interstages[interstage_num].set_lens_offset(lens_x_offset, lens_y_offset)
+
+
+    ## COST
+
+    def get_cost(self):
+
+        # cost of all the components (trackables)
+        cost = super().get_cost()
+
+        # add the driver complex cost
+        if self.driver_complex is not None:
+            cost += self.driver_complex.get_cost()
+
+            # add tunnel cost for the driver complex
+            cost += self.driver_complex.get_length() * self.cost_per_length_tunnel
+        
+        return cost
+        
     
     ## PLOT EVOLUTION
     

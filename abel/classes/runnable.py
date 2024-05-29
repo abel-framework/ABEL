@@ -8,69 +8,25 @@ import joblib.parallel
 import collections
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib import colors
+from matplotlib import cm
 import dill as pickle
 import functools
 import inspect
+import abel.utilities.colors as cmaps
 
 class Runnable(ABC):
-    
-    # run simulation
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=None, overwrite=True, parallel=False, max_cores=16): 
-        # TODO: implement overwrite_from=(trackable)
-        
-        # define run name (generate if not given)
-        if run_name is None:
-            self.run_name = 'run_' + datetime.now().strftime('%Y%m%d_%H%M%S')
-        else:
-            self.run_name = run_name
-        
-        # default verbosity
-        if verbose is None:
-            verbose = not parallel
-        
-        # save variables
-        self.num_shots = num_shots
-        self.savedepth = savedepth
-        self.verbose = verbose
-        self.overwrite = overwrite
-        
-        # make base folder and clear tracking directory
-        if self.overwrite or not os.path.exists(self.run_path()):
-            self.clear_run_data()
-        
-        # perform shots (in parallel or series)
-        if parallel:
-            
-            # recalculate number of cores used
-            num_cores = min(max_cores, num_shots)
-            
-            # perform parallel tracking
-            with joblib_progress('Tracking shots ('+str(num_cores)+' in parallel)', num_shots):
-                Parallel(n_jobs=num_cores)(delayed(self.perform_shot)(shot) for shot in range(num_shots))
-                time.sleep(0.1) # hack to allow printing progress
-            
-        else:   
-            
-            # perform in-series tracking
-            for shot in range(num_shots):
-                self.perform_shot(shot)
-        
-        # return final beam from first shot
-        self.__dict__.update(self[0].__dict__)
-        return self.final_beam
-    
     
     # shot tracking function (to be repeated)
     def perform_shot(self, shot):
         
-        # set current shot
         self.shot = shot
+        self.step = self.steps[shot]
         
         # apply scan function if it exists
-        if self.is_scan():
-            self.step = self.steps[shot]
-            self.scan_fcn(self, self.vals_full[shot])
-            #self.scan_fcn = None
+        if self.scan_fcn is not None:
+            vals_all = np.repeat(self.vals,self.num_shots_per_step)
+            self.scan_fcn(self, vals_all[shot])
         
         # check if object exists
         if not self.overwrite and os.path.exists(self.object_path(shot)):
@@ -90,11 +46,87 @@ class Runnable(ABC):
 
             # save object to file
             self.save()
+
+    
+    ## SCAN FUNCTIONALITY
+    
+    def is_scan(self):
+        return self.scan_fcn is not None
+      
+    # scan function
+    def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
+
+        # define run name (generate if not given)
+        if run_name is None:
+            self.run_name = "scan_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+        else:
+            self.run_name = run_name
+
+        self.overwrite = overwrite
+        self.verbose = verbose
+        self.savedepth = savedepth
+        
+        # default verbosity
+        if self.verbose is None:
+            self.verbose = not parallel
+        
+        # set scan values
+        self.scan_fcn = fcn
+        self.vals = vals
+        self.steps = np.repeat(range(len(vals)), num_shots_per_step)
+        self.num_steps = len(vals)
+        self.num_shots_per_step = num_shots_per_step
+        self.num_shots = self.num_steps*self.num_shots_per_step
+        self.label = label
+        self.scale = scale
+
+        # define what shots to perform
+        shots_to_perform = np.arange(self.num_shots)
+        if step_filter is not None:
+            shots_to_perform = shots_to_perform[np.isin(self.steps, step_filter)]
+        else:
+            # make base folder and clear tracking directory
+            if self.overwrite or not os.path.exists(self.run_path()):
+                self.clear_run_data()
+
+        # perform shots (in parallel or series)
+        if parallel:
+            
+            # recalculate number of cores used
+            num_cores = min(max_cores, len(shots_to_perform))
+            
+            # perform parallel tracking
+            with joblib_progress('Tracking shots ('+str(num_cores)+' in parallel)', len(shots_to_perform)):
+                Parallel(n_jobs=num_cores)(delayed(self.perform_shot)(shot) for shot in shots_to_perform)
+                time.sleep(0.05) # hack to allow printing progress
+            
+        else:   
+            
+            # perform in-series tracking
+            for shot in shots_to_perform:
+                self.perform_shot(shot)
+        
+        # return final beam from first shot
+        self.__dict__.update(self.load(shot=shots_to_perform[0]).__dict__)
+        return self.final_beam
+
+    
+    # run simulation
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16): 
+        
+        # define run name (generate if not given)
+        if run_name is None:
+            run_name = 'run_' + datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # perform a scan with only one step
+        beam = self.scan(run_name=run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
+        return beam
+    
     
     
     # generate run folder
     def run_path(self):
-        return CONFIG.run_data_path + self.run_name + '/'
+            return CONFIG.run_data_path + self.run_name + '/'
     
     
     # generate object path
@@ -111,15 +143,18 @@ class Runnable(ABC):
     # load object from file
     def load(self, shot=None):
         with open(self.object_path(shot), 'rb') as loadfile:
-            obj = pickle.load(loadfile)
-            return obj
+            try:
+                obj = pickle.load(loadfile)
+                return obj
+            except:
+                return None
     
     
     # generate track path
     def shot_path(self, shot=None):
         if shot is None:
             shot = self.shot
-        if hasattr(self, 'steps'):
+        if self.is_scan(): # if a scan
             step = self.steps[shot]
             shot_in_step = np.mod(shot, self.num_shots_per_step)
             return self.run_path() + 'step_' + str(step).zfill(3) + '_shot_' + str(shot_in_step).zfill(3) + '/'
@@ -203,36 +238,6 @@ class Runnable(ABC):
     def final_beam(self):
         return self.get_beam(-1)
 
-
-    # Apply beam_func to every shot and calculate the mean and standard deviation through shots_beamfunc_vals()
-    def shots_mean_std(self, beam_fcn, clean=False, beam_index=-1):
-        input_list = inspect.signature(beam_fcn).parameters
-        if 'clean' in input_list:  # Check if the input list contains clean.
-            vals = self.shots_beamfunc_vals(lambda obj, clean : beam_fcn(obj.get_beam(index=beam_index), clean), clean)
-            
-        else:
-            vals = self.shots_beamfunc_vals(lambda obj : beam_fcn(obj.get_beam(index=beam_index)))
-
-        val_mean = np.mean(vals)
-        val_std = np.std(vals)
-        return val_mean, val_std
-
-    
-    # Apply fcn to every shot
-    def shots_beamfunc_vals(self, fcn, clean=False):
-            
-        # get values for all shots
-        fcn_outputs = np.empty(self.num_shots)
-            
-        for shot in range(self.num_shots):
-            input_list = inspect.signature(fcn).parameters
-            if 'clean' in input_list:  # Check if the input list contains clean.
-                fcn_outputs[shot] = fcn(self[shot], clean=clean)
-            else:
-                fcn_outputs[shot] = fcn(self[shot])
-        
-        return fcn_outputs
-
     
     ## Support for Bayesian optimisation through Ax.optimize
     
@@ -252,80 +257,88 @@ class Runnable(ABC):
         return functools.reduce(_getattr, [self] + attr.split('.'))
     
     
-    ## SCAN FUNCTIONALITY
-    
-    def is_scan(self):
-        return hasattr(self, 'scan_fcn')
-        
-    # scan function
-    def scan(self, run_name=None, fcn=None, vals=None, label=None, scale=1, num_shots_per_step=1, savedepth=2, verbose=None, overwrite=True, parallel=False, max_cores=16):
 
-        # define run name (generate if not given)
-        if run_name is None:
-            self.run_name = "scan_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-        else:
-            self.run_name = run_name
+
+    ## BAYESIAN OPTIMIZATION
+
+    def optimize(self, run_name=None, parameters=None, merit_fcn=None, label=None, num_shots_per_step=1, num_steps=50, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
+
+        # initialize the step
+        self.step = 0
         
-        # default verbosity
-        if verbose is None:
-            verbose = not parallel
-        
-        # set scan values
-        self.scan_fcn = fcn
-        self.vals = vals
-        self.vals_full = np.repeat(vals,num_shots_per_step)
-        self.steps = np.repeat(range(len(vals)),num_shots_per_step)
-        self.num_steps = len(vals)
-        self.num_shots_per_step = num_shots_per_step
-        self.num_shots = self.num_steps*self.num_shots_per_step
-        self.label = label
-        self.scale = scale
+        # save the merit function
+        self.merit_fcn = merit_fcn
         
         # perform run
-        beam = self.run(run_name=self.run_name, num_shots=self.num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
-        
-        return beam
+        def evaluation_function(params):
+            
+            # set the parameters
+            opt_fcn = lambda obj, _: obj.set_parameters(params)
+            
+            # run the simulations
+            self.scan(run_name=run_name, fcn=opt_fcn, vals=np.arange(num_steps), step_filter=self.step, num_shots_per_step=num_shots_per_step, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores, label=label)
+            
+            # evaluate the merit function
+            vals = np.empty(self.num_steps)
+            for shot_in_step in range(self.num_shots_per_step):
+                vals[shot_in_step] = self.merit_fcn(self[self.step, shot_in_step])
 
+            # take mean value
+            val_mean = np.nanmean(vals)
+
+            # iterate the optimzation step
+            self.step += 1
+            
+            return val_mean
+        
+        # perform optimization
+        from ax import optimize as bayes_opt
+        best_parameters, best_values, experiment, model = bayes_opt(
+            parameters = parameters,
+            evaluation_function = evaluation_function,
+            minimize = True,
+            total_trials = num_steps
+        )
+        
+        return best_parameters, best_values
     
     
     # Extract mean and standard deviation value of beam parameters across a scan
-    def extract_scan_mean_std(self, beam_fcn, clean=False, index=-1):
-        input_list = inspect.signature(beam_fcn).parameters
-        if 'clean' in input_list:  # Check if the input list contains clean.
-            val_mean, val_std = self.scan_extract_function(lambda obj, clean : beam_fcn(obj.get_beam(index=index), clean), clean)
-        else:
-            val_mean, val_std = self.scan_extract_function(lambda obj : beam_fcn(obj.get_beam(index=index)))
+    def extract_beam_function(self, beam_fcn, index=-1):
+        val_mean, val_std = self.extract_function(lambda obj : beam_fcn(obj.get_beam(index=index)))
         return val_mean, val_std
             
-    def scan_extract_function(self, fcn, clean=False):
-        
-        # extract values
+    def extract_function(self, fcn):
+
+        # prepare the arrays
         val_mean = np.empty(self.num_steps)
         val_std = np.empty(self.num_steps)
-        for step in range(self.num_steps):
+        
+        # extract values
+        if self.is_scan():
             
-            # get values for this step
-            val_output = np.empty(self.num_shots_per_step)
-            for shot_in_step in range(self.num_shots_per_step):
+            for step in range(self.num_steps):
                 
-                input_list = inspect.signature(fcn).parameters
-                if 'clean' in input_list:  # Check if the input list contains clean.
-                    val_output[shot_in_step] = fcn(self[step, shot_in_step], clean=clean)
-                else:
+                # get values for this step
+                val_output = np.empty(self.num_shots_per_step)
+                for shot_in_step in range(self.num_shots_per_step):
                     val_output[shot_in_step] = fcn(self[step, shot_in_step])
-                
-            # get step mean and error
-            val_mean[step] = np.mean(val_output)
-            val_std[step] = np.std(val_output)
-
+                    
+                # get step mean and error
+                val_mean[step] = np.mean(val_output)
+                val_std[step] = np.std(val_output)
+        
         return val_mean, val_std
 
 
+    
+    ## PLOT FUNCTIONS
+
     # plot value of beam parameters across a scan
-    def plot_function(self, fcn, clean=False, label=None, scale=1, xscale='linear', yscale='linear'):
+    def plot_function(self, fcn, label=None, scale=1, xscale='linear', yscale='linear'):
         
         # extract values
-        val_mean, val_std = self.scan_extract_function(fcn, clean)
+        val_mean, val_std = self.extract_function(fcn)
         
         if not hasattr(self, 'scale'):
             self.scale = 1
@@ -345,12 +358,8 @@ class Runnable(ABC):
 
     
     # plot value of beam parameters across a scan
-    def plot_beam_function(self, beam_fcn, clean=False, index=-1, label=None, scale=1, xscale='linear', yscale='linear'):
-        input_list = inspect.signature(beam_fcn).parameters
-        if 'clean' in input_list:  # Check if the input list contains clean.
-            self.plot_function(lambda obj, clean : beam_fcn(obj.get_beam(index=index), clean), clean, label=label, scale=scale, xscale=xscale, yscale=yscale)
-        else:
-            self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale)
+    def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear'):
+        self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale)
 
     def plot_energy(self, index=-1):
         self.plot_beam_function(Beam.energy, scale=1e9, label='Energy [GeV]', index=index)
@@ -359,14 +368,22 @@ class Runnable(ABC):
         self.plot_beam_function(Beam.rel_energy_spread, scale=1e-2, label='Energy spread, rms [%]', index=index)
 
     def plot_charge(self, index=-1):
-        self.plot_beam_function(Beam.charge, scale=1e-9, label='Charge [nC]', index=index)
+        self.plot_beam_function(Beam.abs_charge, scale=1e-9, label='Charge [nC]', index=index)
 
     def plot_beam_size_x(self, index=-1):
         self.plot_beam_function(Beam.beam_size_x, scale=1e-3, label='Beam size, x [mm rms]', index=index)
 
     def plot_beam_size_y(self, index=-1):
         self.plot_beam_function(Beam.beam_size_y, scale=1e-3, label='Beam size, y [mm rms]', index=index)
+    
+    def plot_offset_x(self, index=-1):
+        self.plot_beam_function(Beam.x_offset, scale=1e-3, label='Offset, x [mm]', index=index)
+
+    def plot_offset_y(self, index=-1):
+        self.plot_beam_function(Beam.y_offset, scale=1e-3, label='Offset, y [mm]', index=index)
         
+
+    ## PLOT WATERFALLS
     
     def plot_waterfall(self, proj_fcn, label=None, scale=1, index=-1):
 
@@ -413,6 +430,56 @@ class Runnable(ABC):
     def plot_waterfall_y(self, index=-1):
         self.plot_waterfall(Beam.transverse_profile_y, scale=1e-3, label='y (mm)', index=index)
 
+
+    ## PLOT CORRELATIONS
+    
+    def plot_correlation(self, xfcn, yfcn, xlabel=None, ylabel=None, xscaling=1, yscaling=1, xscale='linear', yscale='linear', equal_axes=False):
+        
+        # extract values
+        valx_mean, valx_std = self.extract_function(xfcn)
+        valy_mean, valy_std = self.extract_function(yfcn)
+        
+        if not hasattr(self, 'scale'):
+            self.scale = 1
+        if not hasattr(self, 'label'):
+            self.label = ''
+            
+        # plot evolution
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        
+        # create a scatter plot
+        cmap = cmaps.FLASHForward_nowhite
+        sc = ax.scatter(valx_mean,valy_mean, s=0, c=self.vals/self.scale, cmap=cmap)
+
+        # create colorbar according to the scatter plot
+        clb = fig.colorbar(sc)
+        
+        # convert scan value to a color tuple using the colormap used for scatter
+        norm = colors.Normalize(vmin=min(self.vals/self.scale), vmax=max(self.vals/self.scale), clip=True)
+        mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
+        cols = np.array([(mapper.to_rgba(v)) for v in self.vals/self.scale])
+    
+        for x, y, ex, ey, color in zip(valx_mean/xscaling, valy_mean/yscaling, abs(valx_std/xscaling), abs(valy_std/yscaling), cols):
+            ax.errorbar(x, y, xerr=ex, yerr=ey, capsize=5, color=color)
+        clb.ax.set_ylabel(self.label)
+        if equal_axes:
+            ax.axis('equal')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_xscale(xscale)
+        ax.set_yscale(yscale)
+        
+        
+    def plot_beam_correlation(self, beam_xfcn, beam_yfcn, index=-1, xlabel=None, ylabel=None, xscaling=1, yscaling=1, xscale='linear', yscale='linear', equal_axes=False):
+        self.plot_correlation(lambda obj: beam_xfcn(obj.get_beam(index=index)), lambda obj: beam_yfcn(obj.get_beam(index=index)), xlabel=xlabel, ylabel=ylabel, xscaling=xscaling, yscaling=yscaling, xscale=xscale, yscale=yscale, equal_axes=equal_axes)
+
+    def plot_correlation_offsets(self):
+        self.plot_beam_correlation(Beam.x_offset, Beam.y_offset, xscaling=1e-3, yscaling=1e-3, xlabel='Offset, x (mm)', ylabel='Offset, y (mm)', equal_axes=True)
+
+    
+    ## SAVE TO FILE
     
     def save_function_data(self, fcn, filename=None):
         
@@ -432,7 +499,7 @@ class Runnable(ABC):
 
         # default filename
         if filename is None:
-            filename = self.run_name + '.csv'
+            filename = 'output_' + self.run_name + '_' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.csv'
 
         # write data
         data = [self.vals, val_mean, val_std]

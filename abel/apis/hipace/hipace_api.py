@@ -112,11 +112,11 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
 
-    #Extract runfolder from job script name
+    # extract runfolder from job script name
     if runfolder == None:
         runfolder = os.path.dirname(filename_job_script)
 
-    #Run HIPACE++
+    # run HIPACE++
     if CONFIG.cluster_name == 'LOCAL':
         _hipace_run_local(filename_job_script, runfolder, quiet=False)
     else:
@@ -124,7 +124,7 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     
     # when finished, load the beam and driver
     filename = os.path.join(runfolder, "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps)))
-    print("Filename=",filename)
+    
     try:
         beam = Beam.load(filename, beam_name='beam')
     except:
@@ -132,6 +132,7 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     driver = Beam.load(filename, beam_name='driver')
     
     return beam, driver
+
 
 def _hipace_run_local(filename_job_script, runfolder, quiet=False):
     "Helper for running HiPACE++ on the local machine. Returns when job is complete."
@@ -183,7 +184,7 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
     "Helper for running HiPACE++ on a batch system using SLURM. Returns when job is complete."
 
     # run system command
-    cmd = 'cd ' + runfolder + ' && sbatch ' + filename_job_script
+    cmd = 'cd ' + runfolder + ' && sbatch ' + os.path.basename(filename_job_script)
     if quiet:
         subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
     else:

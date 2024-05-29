@@ -8,7 +8,7 @@ import scipy.constants as SI
 class Source(Trackable):
     
     @abstractmethod
-    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0):
+    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0, rep_rate=None):
         
         self.length = length
         self.energy = energy
@@ -32,6 +32,10 @@ class Source(Trackable):
         self.jitter.xp = 0
         self.jitter.yp = 0
         self.jitter.E = 0
+
+        self.rep_rate = rep_rate
+
+        self.cost = 9.4e6 # [ILCU]
     
     
     @abstractmethod
@@ -66,18 +70,29 @@ class Source(Trackable):
             return self.energy/self.accel_gradient
         else:
             return self.length
-    
+
+    def get_cost(self):
+        return self.cost
+        
     def get_energy(self):
         return self.energy
-        
+    
     def energy_efficiency(self):
         return self.wallplug_efficiency
     
     def get_charge(self):
         return self.charge
+
+    def get_average_beam_current(self):
+        if self.rep_rate is not None:
+            return self.get_charge() * self.rep_rate
     
     def energy_usage(self):
         return self.get_energy()*abs(self.get_charge())/self.energy_efficiency()
+
+    def wallplug_power(self):
+        if self.rep_rate is not None:
+            return self.energy_usage() * self.rep_rate
     
     def survey_object(self):
         rect = patches.Rectangle((0, -0.5), self.get_length(), 1)

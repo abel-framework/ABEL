@@ -4,6 +4,7 @@ import numpy as np
 import os, copy
 from matplotlib import lines
 from datetime import datetime
+from types import SimpleNamespace
 
 class Collider(Runnable):
     
@@ -14,13 +15,67 @@ class Collider(Runnable):
         self.ip = ip
         
         self.cost_per_length = 2e5 # [LCU/m]
-        self.cost_per_energy = 0.15/3.6e6 # [LCU/J]
-        self.targetIntegratedLuminosity = 1e46 # [m^-2] or 1/ab
-    
+        self.cost_per_energy = 0.2/(3600*1000)# ILCU/J (0.2 ILCU per kWh)
+        self.target_integrated_luminosity = 1e46 # [m^-2] or 1/ab
+
+        # cost overheads
+        self.overheads = SimpleNamespace()
+        self.overheads.design_and_development = 0.1
+        self.overheads.controls_and_cabling = 0.15
+        self.overheads.installation_and_commissioning = 0.15
+        self.overheads.management_inspection = 0.12
+        self.overheads.construction = self.overheads.design_and_development + self.overheads.controls_and_cabling + self.overheads.installation_and_commissioning + self.overheads.management_inspection
+
+        # power overhead
+        self.overheads.power = 0.25
+
+        # maintenance costs
+        self.maintenance_labor_per_construction_cost = 100/1e9 # [FTE/ILCU/year] # people required for maintaining the machine
+        self.cost_per_labor = 0.07e6 # [ILCU/FTE] 
+        self.uptime_percentage = 0.7
+
+        # emissions
+        self.emissions_per_tunnel_length = 6.38 # [ton CO2e/m] from 6.38 kton/km (CLIC estimate)
+        self.emissions_per_energy_usage = 20/(1e9*3600) # [ton CO2e/J] from 20 ton/GWh
+        self.cost_carbon_tax_per_emissions = 800 # [ILCU per ton CO2e] 800 from European Investment Bank estimate for 2050
+            
+     # assemble the trackables
+    def assemble_trackables(self):
+        
+        # check element classes, then assign
+        if hasattr(self, 'linac') and self.linac1 is None:
+            self.linac1 = self.linac
+
+        # copy second arm if undefined
+        if self.linac2 is None:
+            self.linac2 = copy.deepcopy(self.linac1)
+
+        # check type
+        assert(isinstance(self.linac1, Linac))
+        assert(isinstance(self.linac2, Linac))
+        assert(isinstance(self.ip, InteractionPoint))
+
+        # assign bunch train pattern
+        self.linac1.bunch_separation = self.bunch_separation
+        self.linac1.num_bunches_in_train = self.num_bunches_in_train
+        self.linac1.rep_rate_trains = self.rep_rate_trains
+        self.linac2.bunch_separation = self.bunch_separation
+        self.linac2.num_bunches_in_train = self.num_bunches_in_train
+        self.linac2.rep_rate_trains = self.rep_rate_trains
+
+        # assemble the linacs
+        self.linac1.assemble_trackables()
+        self.linac2.assemble_trackables()
+        
     
     # calculate energy usage (per bunch crossing)
     def energy_usage(self):
-        return self.linac1.energy_usage() + self.linac2.energy_usage()
+        return (self.linac1.energy_usage() + self.linac2.energy_usage()) * (1+self.overheads.power)
+
+    # calculate wallplug power
+    def wallplug_power(self):
+        return (self.linac1.wallplug_power() + self.linac2.wallplug_power()) * (1+self.overheads.power)
+        
     
     # full luminosity per crossing [m^-2]
     def full_luminosity_per_crossing(self):
@@ -49,45 +104,121 @@ class Collider(Runnable):
     # peak luminosity per power [m^-2/J]
     def peak_luminosity_per_power(self):
         return self.peak_luminosity_per_crossing() / self.energy_usage()
+
+    def peak_luminosity(self):
+        return self.peak_luminosity_per_power() * self.wallplug_power()
     
     # integrated energy usage (to reach target integrated luminosity)
     def integrated_energy_usage(self):
         return self.target_integrated_luminosity / self.peak_luminosity_per_power()
-    
-    # integrated cost of energy
-    def running_cost(self):
-        return self.integrated_energy_usage() * self.cost_per_energy
-      
+       
     # total length of linacs (TODO: add driver production length)
-    def total_length(self):
+    def total_tunnel_length(self):
         Ltot = self.linac1.get_length() + self.linac2.get_length()
         if hasattr(self.linac1.stage, 'driver_source'):
             Ltot += self.linac1.stage.driver_source.get_length()
         return Ltot
+
+    
+    def integrated_runtime(self, in_years=False):
+        runtime = self.target_integrated_luminosity / self.peak_luminosity()
+        if in_years:
+            runtime = runtime/(365*24*3600)
+        return runtime
+
+    def programme_duration(self, in_years=False):
+        return self.integrated_runtime(in_years) / self.uptime_percentage
+
+    # integrated cost of energy
+    def energy_cost(self):
+        return self.integrated_energy_usage() * self.cost_per_energy
       
     # cost of construction
     def construction_cost(self):
-        return self.total_length() * self.cost_per_length
+        return self.linac1.get_cost() + self.linac2.get_cost() + self.ip.get_cost()
+
+    # construction overhead costs
+    def overhead_cost(self):
+        return self.overhead_cost_design_and_development() + self.overhead_cost_controls_and_cabling() + self.overhead_cost_installation_and_commissioning() + self.overhead_cost_management_inspection()
+    def overhead_cost_design_and_development(self):
+        return self.construction_cost() * self.overheads.design_and_development
+    def overhead_cost_controls_and_cabling(self):
+        return self.construction_cost() * self.overheads.controls_and_cabling
+    def overhead_cost_installation_and_commissioning(self):
+        return self.construction_cost() * self.overheads.installation_and_commissioning
+    def overhead_cost_management_inspection(self):
+        return self.construction_cost() * self.overheads.management_inspection
+
+    # total project cost / ITF cost (US accounting): construction + overhead
+    def total_project_cost(self):
+        return self.construction_cost() + self.overhead_cost()
+
+    # required labor force for maintenance (FTEs/year)
+    def maintenance_labor(self):
+        return self.maintenance_labor_per_construction_cost * self.construction_cost()
+        
+    def maintenance_cost(self):
+        return self.maintenance_labor() * self.cost_per_labor * self.programme_duration(in_years=True)
+
+    def construction_emissions(self):        
+        return self.total_tunnel_length() * self.emissions_per_tunnel_length
+        
+    def energy_emissions(self):        
+        return self.integrated_energy_usage() * self.emissions_per_energy_usage
+
+    def total_emissions(self):
+        return self.construction_emissions() + self.energy_emissions()
+        
+    def carbon_tax_cost(self):
+        return self.total_emissions() * self.cost_carbon_tax_per_emissions
+
+    def get_cost(self):
+        return self.construction_cost()
     
     # total cost of construction and running
-    def total_cost(self):
-        return self.construction_cost() + self.running_cost()
+    def full_programme_cost(self, include_carbon_tax=False):
+        fpc = self.total_project_cost() + self.energy_cost() + self.maintenance_cost()
+        if include_carbon_tax:
+            fpc += self.carbon_tax_cost()
+        return fpc
+    
+    def print_cost(self):
+        print('-- COSTS ----------------------------------------')
+        print('>> Construction costs:                 {:.2f} BILCU'.format(self.construction_cost()/1e9))
+        print('   -- Linac #1:               {:.0f} MILCU'.format(self.linac1.get_cost()/1e6))
+        print('   -- Linac #2:               {:.0f} MILCU'.format(self.linac2.get_cost()/1e6))
+        print('   -- Interaction point:      {:.0f} MILCU'.format(self.ip.get_cost()/1e6))
+        print('>> Overhead costs:                     {:.2f} BILCU'.format(self.overhead_cost()/1e9))
+        print('   -- Design/development:     {:.0f} MILCU'.format(self.overhead_cost_design_and_development()/1e6))
+        print('   -- Constrols/cabling:      {:.0f} MILCU'.format(self.overhead_cost_controls_and_cabling()/1e6))
+        print('   -- Install/commission:     {:.0f} MILCU'.format(self.overhead_cost_installation_and_commissioning()/1e6))
+        print('   -- Management/inspection:  {:.0f} MILCU'.format(self.overhead_cost_management_inspection()/1e6))
+        print('>> Operating costs ({:.1f} TWh):          {:.2f} BILCU'.format(self.integrated_energy_usage()/(1e12*3600), self.energy_cost()/1e9))
+        print('>> Maintenance ({:.0f} FTEs, {:.0f} yrs):      {:.2f} BILCU'.format(self.maintenance_labor(), self.programme_duration(in_years=True), self.maintenance_cost()/1e9))
+        print('>> Carbon tax ({:.0f} kton CO2e):         {:.2f} BILCU'.format(self.total_emissions()/1e3, self.carbon_tax_cost()/1e9))
+        print('   -- Construction ({:.0f} kton): {:.0f} MILCU'.format(self.construction_emissions()/1e3, self.construction_emissions()*self.cost_carbon_tax_per_emissions/1e6))
+        print('   -- Operation ({:.0f} kton):   {:.0f} MILCU'.format(self.energy_emissions()/1e3, self.energy_emissions()*self.cost_carbon_tax_per_emissions/1e6))
+        print('-------------------------------------------------')
+        print('>> Construction cost (EU accounting):  {:.2f} BILCU'.format(self.construction_cost()/1e9))
+        print('>> Total project cost (US accounting): {:.2f} BILCU'.format(self.total_project_cost()/1e9))
+        print('>> Full programme cost:                {:.2f} BILCU'.format(self.full_programme_cost()/1e9))
+        print('>> Full programme cost (+ carbon tax): {:.2f} BILCU'.format(self.full_programme_cost(include_carbon_tax=True)/1e9))
+        print('-------------------------------------------------')
+        
+    def print_emissions(self):
+        print('-- EMISSIONS ------------------------------------')
+        print('>> Construction emissions ({:.1f} km): {:.0f} kton CO2e'.format(self.total_tunnel_length()/1e3, self.construction_emissions()/1e3))
+        print('>> Operation emissions ({:.1f} TWh):   {:.0f} kton CO2e'.format(self.integrated_energy_usage()/(1e12*3600), self.energy_emissions()/1e3))
+        print('-------------------------------------------------')
+        print('>> Total emissions:                 {:.0f} kton CO2e'.format(self.total_emissions()/1e3))
+        print('-------------------------------------------------')
     
     
     # overwrite run function
     def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=False, overwrite_ip=False, parallel=False, max_cores=16):
-        
-        # check element classes, then assign
-        if hasattr(self, 'linac') and self.linac1 is None:
-            self.linac1 = self.linac
-        
-        # copy second arm if undefined
-        if self.linac2 is None:
-            self.linac2 = copy.deepcopy(self.linac1)
-            
-        assert(isinstance(self.linac1, Linac))
-        assert(isinstance(self.linac2, Linac))
-        assert(isinstance(self.ip, InteractionPoint))
+
+        # instantiate the trackables
+        self.assemble_trackables()
         
         # define run name (generate if not given)
         if run_name is None:

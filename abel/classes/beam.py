@@ -853,8 +853,14 @@ class Beam():
         self.set_ys((self.ys()-y_offset)*mag + y_offset)
         self.set_uxs((self.uxs()-ux_offset)/mag + ux_offset)
         self.set_uys((self.uys()-uy_offset)/mag + uy_offset)
-        
-        
+
+    
+    # transport in a drift
+    def transport(self, L):
+        self.set_xs(self.xs() + L*self.xps())
+        self.set_ys(self.ys() + L*self.yps())
+
+    
     def flip_transverse_phase_spaces(self, flip_momenta=True, flip_positions=False):
         if flip_momenta:
             self.set_uxs(-self.uxs())

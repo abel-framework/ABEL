@@ -32,11 +32,17 @@ class Trackable(ABC):
     @abstractmethod
     def get_length(self):
         pass
+
     
     # abbreviation of the get_length() function
     def __len__(self):
         return self.get_length()
+
     
+    # cost of the trackable element
+    def get_cost(self):
+        return 0
+        
     
     # object for survey plotting
     @abstractmethod

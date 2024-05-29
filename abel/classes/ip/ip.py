@@ -3,6 +3,9 @@ from abel import Runnable, Event, Beam
 import os
 
 class InteractionPoint(Runnable):
+
+    def __init__(self):
+        self.cost = 50e6 # [ILCU]
     
     # run simulation
     def run(self, runnable1, runnable2, run_name=None, all_by_all=False, verbose=True, overwrite=False):
@@ -69,13 +72,16 @@ class InteractionPoint(Runnable):
     
     
     # get tracking data
-    #def run_data(self, shot_name=None):
-    #    files = [self.run_path() + "/" + f for f in os.listdir(self.run_path()) if (os.path.isfile(os.path.join(self.run_path(), f)) and not ".DS_Store" in f)]
-    #    files.sort()
-    #    if shot_name is not None:
-    #        files = [f for f in files if shot_name in f]
-    #    return files
+    def run_data(self, shot_name=None):
+        files = [self.run_path() + f + "/event.h5" for f in os.listdir(self.run_path())]
+        files.sort()
+        if shot_name is not None:
+            files = [f for f in files if shot_name in f]
+        return files
+
     
+    def get_cost(self):
+        return self.cost
     
     # interact
     @abstractmethod
