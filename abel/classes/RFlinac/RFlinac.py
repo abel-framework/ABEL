@@ -53,7 +53,7 @@ class RFlinac(abel.Trackable):
 
         """
 
-        #Initializing the RFstructure
+        #Finalizing the RFstructure initialization
         if RF_structure == None:
             raise ValueError("Must set RF structure; this is typically done from an implementing daugther class")
         self._RF_structure = RF_structure
@@ -82,8 +82,11 @@ class RFlinac(abel.Trackable):
         elif gradient == None:
             self.set_voltage_total(voltage_total)
 
-        self.beam_pulse_length = beam_pulse_length
-        self.beam_current      = beam_current
+        if self.beam_pulse_length == None:
+            raise ValueError("Must set beam pulse length")
+
+        self.beam_pulse_length = self.set_beam_pulse_length(beam_pulse_length)
+        self.beam_current      = self.set_beam_current(beam_current)
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         #TODO: Check current etc.
@@ -102,46 +105,7 @@ class RFlinac(abel.Trackable):
 
     ## RF structure model ##
 
-    def set_beam_current(self, beam_current : float) -> None:
-        "Set the beam current of the structure [A]"
-        self.beam_current = beam_current
-
-    def set_beam_pulse_length(self, beam_pulse_length : float) -> None:
-        "Set the beam pulse length (=length of RF pulse flat top) [s] for the RF structures"
-        self.beam_pulse_length = beam_pulse_length
-
-    def get_beam_pulse_length(self) -> float:
-        "Gets the beam pulse length (=length of RF pulse flat top) [s] for the RF structues"
-        return self.beam_pulse_length
-
-    def set_gradient(self,gradient : float) -> None:
-        "Set the accelerating gradient of the structures [V/m]"
-        self.gradient = gradient
-        self.voltage_structure = gradient*self._RF_structure.getL()
-        self.voltage_total     = self.voltage_structure * self.num_structures
-
-    def set_voltage_total(self,voltage_total : float) -> None:
-        "Set the total accelerating voltage [V] of the RFlinac"
-        self.voltage_total = voltage_total
-        self.voltage_structure = voltage_total / self.num_structures
-        self.gradient = self.voltage_structure / self.get_structure_length()
-
-    def get_voltage_total(self) -> float:
-        "Gets the total accelerating voltage of the RFlinac object [V]"
-        return self.voltage_total
-
-    def get_voltage_structure(self) -> float:
-        "Gets the accelerating voltage of a single RF structure [V]"
-        return self.voltage_structure
-
-    def get_structure_power(self) -> float:
-        "Get the peak power [W] required for a single RF structure in the given configuration."
-        if self.beam_current == 0.0:
-            P = self._RF_structure.getPowerUnloaded(self.voltage_structure)
-        else:
-            P = self._RF_structure.getPowerLoaded(self.voltage_structure, self.beam_current)
-        return P
-
+    # RFlinac geometry
     def get_structure_length(self) -> float:
         "Gets the length of each individual RF structure [m]"
         return self._RF_structure.getL()
@@ -159,25 +123,88 @@ class RFlinac(abel.Trackable):
         return (self._RF_structure.getTrise() + self.get_t_fill() + self.beam_pulse_length) * \
             self.get_structure_power()
 
+    # RF pulse parameters
+
+    def set_gradient(self,gradient : float) -> None:
+        "Set the accelerating gradient of the structures [V/m]"
+        self.gradient = gradient
+        self.voltage_structure = gradient*self._RF_structure.getL()
+        self.voltage_total     = self.voltage_structure * self.num_structures
+
+    def get_gradient(self) -> float:
+        return self.gradient
+
+    def set_voltage_total(self,voltage_total : float) -> None:
+        "Set the total accelerating voltage [V] of the RFlinac"
+        self.voltage_total = voltage_total
+        self.voltage_structure = voltage_total / self.num_structures
+        self.gradient = self.voltage_structure / self.get_structure_length()
+
+    def get_voltage_total(self) -> float:
+        "Gets the total accelerating voltage of the RFlinac object [V]"
+        return self.voltage_total
+
+    def get_voltage_structure(self) -> float:
+        "Gets the accelerating voltage of a single RF structure [V]"
+        return self.voltage_structure
+
+    def set_beam_current(self, beam_current : float) -> None:
+        "Set the beam current of the linac [A]"
+        self.beam_current = beam_current
+
+    def get_beam_current(self) -> float:
+        "Sets the beam current of the linac [A]"
+        return self.beam_current
+
+    def get_structure_power(self) -> float:
+        "Get the peak power [W] required for a single RF structure in the given configuration."
+        if self.beam_current == 0.0:
+            P = self._RF_structure.getPowerUnloaded(self.voltage_structure)
+        else:
+            P = self._RF_structure.getPowerLoaded(self.voltage_structure, self.beam_current)
+        return P
+
     def get_RF_efficiency(self) -> float:
-        "Get the RF->beam efficiency as a number between 0 and 1"
+        "Get the RF->beam efficiency as a number between 0 and 1, including the effect due to pulse shape"
         return self._RF_structure.getTotalEfficiency(self.get_structure_power(), self.beam_current, self.beam_pulse_length)
+
+    def get_RF_efficiency_flattop(self) -> float:
+        "Get the RF->beam efficiency as a number between 0 and 1, ignoring the fill time etc."
+        return self._RF_structure.getFlattopEfficiency(self.get_structure_power(), self.beam_current)
+
+    def set_beam_pulse_length(self, beam_pulse_length : float) -> None:
+        "Set the beam pulse length (=length of RF pulse flat top) [s] for the RF structures"
+        self.beam_pulse_length = beam_pulse_length
+
+    def get_beam_pulse_length(self) -> float:
+        "Gets the beam pulse length (=length of RF pulse flat top) [s] for the RF structues"
+        return self.beam_pulse_length
 
     def get_t_fill(self) -> float:
         "Get the filling time of the structure, i.e. the time for a signal to propagate through the whole structure."
         return self._RF_structure.getTfill()
 
     def get_pulse_length_total(self) -> float:
-        if self.beam_pulse_length == None:
-            raise ValueError("Must set beam pulse length")
         return 2 * (self._RF_structure.getTrise() + self._RF_structure.getTfill()) \
                  + self.beam_pulse_length
 
     def get_max_pulse_length(self) -> float:
-        "Calculates the max beam_pulse_length before exceeding gradient limits"
-        return self._RF_structure.getMaxAllowableBeamTime_dT(self.get_structure_power(), self.beam_current, useLoadedField=False)
+        "Calculates the max beam_pulse_length before exceeding gradient limits, given power and beam_current"
+        return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), self.get_beam_current())
 
+    def set_pulse_length_max(self) -> float:
+        "Sets the pulse length to the maximally achievable given the currently selected gradient and beam current"
+        self.set_beam_pulse_length( self.get_max_pulse_length() )
+        return self.get_beam_pulse_length()
 
+    def get_gradient_max(self) -> float:
+        "Calculates the max gradient (and thus voltage) before exceeding breakdown limts, given the currently selected pulse length and beam current"
+        return self._RF_structure.getMaxAllowablePower_beamTimeFixed(self.get_beam_current(), self.get_beam_pulse_length())
+
+    def set_gradient_max(self) -> float:
+        "Sets the gradient to the maximally achievable given the currently selected pulse length and beam current"
+        self.set_gradient( self.get_gradient_max() )
+        return self.get_gradient()
 
     ## PLOTS ##
 
