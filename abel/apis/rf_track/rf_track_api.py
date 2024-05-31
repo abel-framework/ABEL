@@ -23,7 +23,7 @@ def abel_beam2rft_beam(beam):
     weightings_abel = beam.weightings()
 
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
-    ms_abel = particle_mass * weightings_abel  # [MeV/c^2].
+    ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
 
     # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ]
     phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
@@ -55,7 +55,7 @@ def rft_beam2abel_beam(beam_rft):
     weightings = phase_space_rft[:,7]
     tot_charge = np.sum(phase_space_rft[:,6] * weightings)*SI.e
     
-    particle_masses = phase_space_rft[:,8]/weightings  # [MeV/c^2]
+    particle_masses = phase_space_rft[:,8]  # [MeV/c^2]
     if np.abs(particle_masses.min()/particle_masses.max() - 1) > 1e-5:
         warnings.warn('The RF-Track beam contains different single particle masses.')
     
@@ -103,5 +103,9 @@ def get_rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, n
     # Evaluate the electric field at the sorted coordinates so that the fields are sorted according to zs
     E_fields_beam, B_fields_beam = sc_fields_obj.get_field(xs_sorted, ys_sorted, zs_sorted, np.zeros(len(xs_sorted)))
 
-    return E_fields_beam, B_fields_beam
+    xs_sorted = xs_sorted/1e3  # [m]
+    ys_sorted = ys_sorted/1e3  # [m]
+    zs_sorted = zs_sorted/1e3  # [m]
+
+    return E_fields_beam, B_fields_beam, xs_sorted, ys_sorted, zs_sorted
 

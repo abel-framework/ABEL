@@ -40,7 +40,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_radiation_reaction=True):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=True):
         """
         Parameters
         ----------
@@ -102,7 +102,9 @@ class StagePrtclTransWakeInstability(Stage):
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
         self.interstage_dipole_field = None
         self.ramp_beta_mag = ramp_beta_mag
+        self.enable_tr_instability = enable_tr_instability 
         self.enable_radiation_reaction = enable_radiation_reaction
+        self.enable_ion_motion = enable_ion_motion
         
         self.interstages_enabled = False
         self.show_prog_bar = True
@@ -341,7 +343,7 @@ class StagePrtclTransWakeInstability(Stage):
             
         else:
             
-            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, enable_radiation_reaction=self.enable_radiation_reaction, show_prog_bar=self.show_prog_bar)
+            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, enable_tr_instability=self.enable_tr_instability, enable_radiation_reaction=self.enable_radiation_reaction, enable_ion_motion=self.enable_ion_motion, show_prog_bar=self.show_prog_bar)
             
         
         #print('After instability tracking')
