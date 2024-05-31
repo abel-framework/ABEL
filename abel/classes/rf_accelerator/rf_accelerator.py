@@ -50,9 +50,6 @@ class RFAccelerator(abel.Trackable):
         rep_rate_trains : float
             The repetition rate of the beam & RF pulses
 
-        beam_current : float
-            The average current during the beam pulse [A].
-
         """
 
         #We assume that the implementer constructor has ran, so that the RFstructure is ready
@@ -85,7 +82,7 @@ class RFAccelerator(abel.Trackable):
         #if self.beam_pulse_length == None:
         #    raise ValueError("Must set beam pulse length")
 
-        if self.bunch_separation==None:
+        if bunch_separation==None:
             #TODO: Check that this correspods to an integer number of 1/frequency
             raise ValueError("Must set bunch separation")
 
@@ -94,8 +91,9 @@ class RFAccelerator(abel.Trackable):
         self.num_bunches_in_train = num_bunches_in_train
         self.rep_rate_trains = rep_rate_trains # [Hz]
 
-        self.beam_pulse_length = self.set_beam_pulse_length(self.train_duration())
-        self.beam_current      = self.set_beam_current(beam_current)
+        #TODO - Legacy, need to merge
+        #self.beam_pulse_length = self.set_beam_pulse_length(self.train_duration())
+        #self.beam_current      = self.set_beam_current(beam_current)
 
         #TODO
         self.cost_per_length = 0.22e6 # [ILCU/m] not including klystrons (ILC is 0.24e6 with power)

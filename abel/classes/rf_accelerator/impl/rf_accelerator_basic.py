@@ -41,8 +41,8 @@ class RFAcceleratorBasic(RFAccelerator):
         "Get the RF frequency of the RF structures [1/s]"
         return self.cavity_frequency
 
-    # energy usage per shot
     def energy_usage(self):
+        "Energy usage per shot"
 
         # TODO: something is wrong with the energy usage
 
