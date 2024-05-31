@@ -32,6 +32,11 @@ from .classes.beamline.impl.experiment.experiment import Experiment
 from .classes.beamline.impl.experiment.impl.experiment_pwfa import ExperimentPWFA
 from .classes.beamline.impl.experiment.impl.experiment_apl import ExperimentAPL
 
+from .classes.RFlinac.RFlinac import *
+from .classes.RFlinac.impl.RFlinac_CLICG import *
+from .classes.RFlinac.impl.RFlinac_CLIC502 import *
+
+
 from .classes.collider.collider import Collider
 
 from .classes.source.impl.source_basic import *
