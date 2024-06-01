@@ -111,24 +111,58 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 def calc_tr_momenta(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=True):
     
     a = bubble_radius + 0.75*skin_depth
-    dzs = np.diff(zs_sorted)
-    wakefields = np.zeros(len(zs_sorted))
+    dzs = np.diff(zs_sorted)  # zs_sorted[i+1]-zs_sorted[i]. zs_sorted increases towards larger indicies. I.e. coincide with beam head at the end of the array.
 
-    # Calculate the derivative of the wakefield (Stupakov's wake function)
-    dwakefields_dz_contribs = np.flip(2 / (np.pi * eps0 * a**4) * -e * weights_sorted * offsets)
-    dwakefields_dz_contribs[0] = 0
-    dwakefields_dz = np.cumsum(dwakefields_dz_contribs)  # Cumulative sum from 1st to last element.
+    # ============= Calculate the derivative of the wakefield (Stupakov's wake function) =============
+    dwakefields_dz_contribs = 2 / (np.pi * eps0 * a**4) * -e * weights_sorted * offsets
+    dwakefields_dz_contribs[-1] = 0  # Set the contribution from the beam head to 0.
+    
+    #dwakefields_dz_contribs = np.flip(dwakefields_dz_contribs)  # Flip the array so that the contributions now start from the beam head (lower indicies)
+    #dwakefields_dz = np.cumsum(dwakefields_dz_contribs)  # Cumulative sum from 1st to last element, i.e. from beam head to beam tail. Contributions from beam head at lower indicies
+
+    # Cumulative sum from last to first element, i.e. from beam head to beam tail. This results in a reversed order where contributions from beam head are placed at the start of the dwakefields_dz array
+    dwakefields_dz = np.cumsum(dwakefields_dz_contribs[::-1])
+    
+    # Flip the array to coincide with beam head placed at the end of the array like all the other beam arrays
     dwakefields_dz = np.flip(dwakefields_dz)
 
+
+    # ============= Calculate the transverse wakefield =============
     if enable_tr_instability:
         # Calculate the wakefield on each macroparticle
+        wakefields1 = np.zeros(len(zs_sorted))
         for idx_particle in range(len(zs_sorted)-2, -1, -1):
-            wakefields[idx_particle] = wakefields[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
+            wakefields1[idx_particle] = wakefields1[idx_particle+1] + dzs[idx_particle] * dwakefields_dz[idx_particle+1]
 
-    # Calculate the total transverse force on macroparticles
+        
+
+        # Cumulative sum from last to first element, i.e. from beam head to beam tail. This results in a reversed order where contributions from beam head are placed at the start of the array
+        #wakefields = np.cumsum(dzs[::-1] * dwakefields_dz[::-1][1:])
+        wakefields = np.cumsum( (dzs * dwakefields_dz[:-1])[::-1] )
+
+        # Flip the array to coincide with beam head placed at the end of the array like all the other beam arrays
+        wakefields = np.flip(wakefields)
+        
+    
+        ##wakefields = np.cumsum(dzs * dwakefields_dz[1:])  # Wakefields start from the beam head (lower indicies).
+
+        # Insert 0 at beam head wakefield
+        wakefields = np.insert(arr=wakefields, obj=-1, values=0.0)
+
+        #wakefields = wakefields1
+
+        if np.allclose(wakefields1, wakefields, rtol=1e-5, atol=1e-10):            
+            raise ValueError(np.sum(wakefields1-wakefields), np.sum( np.abs((wakefields1-wakefields)/np.min(wakefields1[np.abs(wakefields1)>0]) ) ))
+
+
+
+
+
+    
+    # ============= Calculate the total transverse force on macroparticles =============
     tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
     
-    # Update momenta
+    # ============= Include radiation reaction if chosen and update momenta =============
     if enable_radiation_reaction:
         # Backward differentiation option (implicit method)
         denominators = 1 + c*1.87863e-15 * time_step * (1/skin_depth)**2/2 * (1+(1/skin_depth)**2/2*gammas*tot_offsets_sqr)
