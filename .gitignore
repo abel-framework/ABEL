@@ -137,9 +137,9 @@ dmypy.json
 # OPAL specific
 *rundata/
 *run_data/
-*examples/
+abel/examples/*
 .temp/
-abel/CONFIG.py
+CONFIG.py
 examples/FACETII_slice_instability_stages_interstages.ipynb
 examples/HALHFv3_optimise.ipynb
 examples/HALHFv3_scans.ipynb
@@ -150,3 +150,6 @@ examples/transverse_electric_field_solver_benchmarks.ipynb
 examples/Untitled.ipynb
 examples/RF-Track_test.ipynb
 examples/rf_track_vs_hipace.ipynb
+abel/CONFIG.py
+/examples/
+
