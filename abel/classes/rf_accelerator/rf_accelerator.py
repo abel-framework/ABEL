@@ -58,8 +58,7 @@ class RFAccelerator(abel.Trackable):
         #Setting up RFlinac geometry
         if num_structures == 1 and length == None:
             #Use a single RF structure, RF linac length = structure length
-            self.get_RF_structure_length()
-            #self.length = self._RF_structure.getL()
+            self.length = self.get_RF_structure_length()
             self.num_structures = 1
         elif length==None or num_structures==None:
             raise ValueError("Must specify both linac total length `length` and number of RF structures `num_structures` so that fill factor can be calculated")

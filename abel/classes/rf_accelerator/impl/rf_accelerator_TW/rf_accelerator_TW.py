@@ -34,15 +34,14 @@ class RFAccelerator_TW(abel.RFAccelerator):
         if RF_structure == None:
             raise ValueError("Must set RF structure; this is typically done from an implementing daugther class")
         self._RF_structure = RF_structure
-        self._RF_structure.calc_g_integrals(1000)
+        self._num_integration_points = None
+        self.set_num_integration_points(1000)
 
         #TODO: Handle these + {bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None} correctly
         self.beam_pulse_length = beam_pulse_length
         self.beam_current = beam_current
 
         super().__init__(length,num_structures,gradient,voltage_total, bunch_separation=6/12e9, num_bunches_in_train=1, rep_rate_trains=None)
-
-        #TODO: 
 
     #Implement required abstract methods
 
@@ -60,6 +59,12 @@ class RFAccelerator_TW(abel.RFAccelerator):
         return self.get_structure_pulse_energy() * self.get_num_structures()
 
     # CLICopti-based modelling
+
+    def set_num_integration_points(self,N : int):
+        self._num_integration_points = N
+        self._RF_structure.calc_g_integrals(self._num_integration_points)
+    def get_num_integration_points(self):
+        return self._num_integration_points
 
     def get_structure_pulse_energy(self) -> float:
         "Get the energy requirements for a single pulse for one structure"
