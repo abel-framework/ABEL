@@ -21,7 +21,8 @@ class RFAccelerator_TW(abel.RFAccelerator):
     @abstractmethod
     def __init__(self, RF_structure, length=None, num_structures=None, gradient=None, voltage_total=None, beam_pulse_length=None,beam_current=0.0):
         """
-        Initializes a rf_accelerator_TW object. Also accepts same arguments rf_accelerator
+        Initializes a rf_accelerator_TW object.
+        Accepts same arguments rf_accelerator + an RF_structure CLICopti object.
 
         Parameters
         ----------
