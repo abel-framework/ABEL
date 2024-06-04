@@ -51,7 +51,10 @@ from .classes.interstage.impl.interstage_elegant import *
 from .classes.interstage.impl.interstage_ocelot import *
 from .classes.plasma_lens.impl.plasma_lens_basic import *
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import *
-from .classes.rf_accelerator.impl.rf_accelerator_basic import *
+from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
+from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW import RFAccelerator_TW
+from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLICG import RFAccelerator_TW_CLICG
+from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLIC502 import RFAccelerator_TW_CLIC502
 from .classes.driver_complex.impl.driver_complex_basic import *
 from .classes.bds.impl.bds_basic import *
 from .classes.bds.impl.bds_fbt import *
