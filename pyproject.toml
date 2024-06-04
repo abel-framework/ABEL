@@ -16,10 +16,13 @@ dependencies = [
    "openpmd-viewer",
    "joblib",
    "joblib-progress",
+   "dill",
    "matplotlib",
+   "PyQt6",
    "pyqtgraph",
    "Wake-T",
-   "ocelot@git+https://github.com/ocelot-collab/ocelot.git"
+   "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
+   "ax-platform"
 ]
 requires-python = ">= 3"
 

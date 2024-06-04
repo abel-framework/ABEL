@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from abel import Runnable, Event, Beam
 import os
+import numpy as np
 
 class InteractionPoint(Runnable):
 
@@ -8,7 +9,7 @@ class InteractionPoint(Runnable):
         self.cost = 50e6 # [ILCU]
     
     # run simulation
-    def run(self, runnable1, runnable2, run_name=None, all_by_all=False, verbose=True, overwrite=False):
+    def run(self, runnable1, runnable2, run_name=None, all_by_all=False, verbose=True, overwrite=False, step_filter=None):
         
         # define run name (generate if not given)
         if run_name is None:
@@ -22,42 +23,58 @@ class InteractionPoint(Runnable):
         else:
             if overwrite:
                 self.clear_run_data()
+
+        shots_to_perform = np.arange(runnable1.num_shots)
+        if step_filter is not None:
+            shots_to_perform = shots_to_perform[np.isin(runnable1.steps, step_filter)]
         
         # perform tracking
-        for shot1 in range(runnable1.num_shots):
-            self.shot1 = shot1
+        for shot1 in shots_to_perform:
+            self.shot1 = int(shot1)
             
             # get first beam
-            beam1 = runnable1[shot1].final_beam
+            try:
+                beam1 = runnable1.load(self.shot1).final_beam
+            except:
+                continue
             
             # do shot-by-shot or all-shots-by-all-shots?
             if all_by_all:
-                shots2 = range(runnable2.num_shots)
+                shots2 = np.arange(runnable2.num_shots)
+                step_filter2 = runnable1[self.shot1].step
+                shots2 = shots2[np.isin(runnable2.steps, step_filter2)]
             else:
-                shots2 = [shot1]
+                shots2 = [self.shot1]
             
             # go through events
             for shot2 in shots2:
-                self.shot2 = shot2
+                self.shot2 = int(shot2)
                 
                 # load or run event
                 files = self.run_data()
-                if files:
+                if self.shot_path()+'event.h5' in files:
                     event = Event.load(files[0], load_beams=False)
                     if verbose:
-                        print(f">> EVENT {shot1+1}-{shot2+1} already exists.")
+                        print(f">> EVENT {self.shot1+1}-{self.shot2+1} already exists.")
                 else:
                     
                     # get second beam
-                    beam2 = runnable2[shot2].final_beam
+                    try:
+                        beam2 = runnable2[self.shot2].final_beam
+                    except:
+                        continue
+                           
+                    # the step has to be the same
+                    if runnable1[self.shot1].step != runnable2[self.shot2].step:
+                        continue
                     
                     # get event
                     event = self.interact(beam1, beam2)
                     event.save(self)
                     
                     if verbose:
-                        print(f">> EVENT {shot1+1}-{shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
-        
+                        print(f">> EVENT {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
+                    
         # return event from last interaction
         return event
     

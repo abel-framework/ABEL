@@ -12,10 +12,10 @@ from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius
 class Stage(Trackable):
     
     @abstractmethod
-    def __init__(self, length, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=1):
+    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=1):
 
         # common variables
-        self.length = length
+        self.nom_accel_gradient = nom_accel_gradient
         self.nom_energy_gain = nom_energy_gain
         self.plasma_density = plasma_density
         self.driver_source = driver_source
@@ -58,13 +58,19 @@ class Stage(Trackable):
         return super().track(beam, savedepth, runnable, verbose)
     
     def get_length(self):
-        return self.length
+        if hasattr(self, 'length') and self.length is not None:
+            self.nom_accel_gradient = self.nom_energy_gain/self.length
+            self.length = None
+        return self.nom_energy_gain/self.nom_accel_gradient
 
     def get_cost(self):
         return self.get_length() * self.cost_per_length
     
     def get_nom_energy_gain(self):
         return self.nom_energy_gain
+
+    def get_nom_accel_gradient(self):
+        return self.nom_accel_gradient
 
     def matched_beta_function(self, energy):
         return beta_matched(self.plasma_density, energy)*self.ramp_beta_mag
