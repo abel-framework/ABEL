@@ -9,10 +9,13 @@ from types import SimpleNamespace
 class Collider(Runnable):
     
     # constructor
-    def __init__(self, linac1=None, linac2=None, ip=None):
+    def __init__(self, linac1=None, linac2=None, ip=None, com_energy=None, energy_asymmetry=None):
+        
         self.linac1 = linac1
         self.linac2 = linac2
         self.ip = ip
+        self.com_energy = com_energy
+        self.energy_asymmetry = energy_asymmetry
         
         self.cost_per_length = 2e5 # [LCU/m]
         self.cost_per_energy = 0.2/(3600*1000)# ILCU/J (0.2 ILCU per kWh)
@@ -55,6 +58,38 @@ class Collider(Runnable):
         assert(isinstance(self.linac2, Linac))
         assert(isinstance(self.ip, InteractionPoint))
 
+        # set c.o.m. energy and energy asymmetry (or linac energies)
+        #if self.linac1.get_nom_energy() is None and self.linac2.get_nom_energy() is None:
+        #    self.linac1.nom_energy = self.com_energy/2 * self.energy_asymmetry
+        #    self.linac2.nom_energy = self.com_energy/2 / self.energy_asymmetry
+        #elif self.linac1.get_nom_energy() is not None and self.linac2.get_nom_energy() is None:
+        #    self.energy_asymmetry = 2*self.linac1.nom_energy/self.com_energy
+        #    self.linac2.nom_energy = self.com_energy/2 / self.energy_asymmetry
+        #elif self.linac1.get_nom_energy() is None and self.linac2.get_nom_energy() is not None:
+        #    self.energy_asymmetry = 1/(2*self.linac2.nom_energy/self.com_energy)
+        #    self.linac1.nom_energy = self.com_energy/2 * self.energy_asymmetry
+        #else:
+        #    self.com_energy = self.get_com_energy()
+        #    self.energy_asymmetry = self.get_energy_asymmetry()
+
+        if self.com_energy is not None:
+            if self.energy_asymmetry is not None:
+                self.linac1.nom_energy = self.com_energy/2 * self.energy_asymmetry
+                self.linac2.nom_energy = self.com_energy/2 / self.energy_asymmetry
+            elif self.linac1.get_nom_energy() is not None:
+                self.energy_asymmetry = 2*self.linac1.get_nom_energy()/self.com_energy
+                self.linac2.nom_energy = self.com_energy/2 / self.energy_asymmetry
+            elif self.linac2.get_nom_energy() is not None:
+                self.energy_asymmetry = 1/(2*self.linac2.nom_energy/self.com_energy)
+                self.linac1.nom_energy = self.com_energy/2 * self.energy_asymmetry
+            else:
+                self.energy_asymmetry = 1
+                self.linac1.nom_energy = self.com_energy/2
+                self.linac2.nom_energy = self.com_energy/2
+        else:
+            self.com_energy = self.get_com_energy()
+            self.energy_asymmetry = self.get_energy_asymmetry()
+
         # assign bunch train pattern
         self.linac1.bunch_separation = self.bunch_separation
         self.linac1.num_bunches_in_train = self.num_bunches_in_train
@@ -67,7 +102,13 @@ class Collider(Runnable):
         self.linac1.assemble_trackables()
         self.linac2.assemble_trackables()
         
-    
+
+    def get_com_energy(self):
+        return 2 * np.sqrt(self.linac1.get_nom_energy() * self.linac2.get_nom_energy())
+
+    def get_energy_asymmetry(self):
+        return np.sqrt(self.linac1.get_nom_energy() / self.linac2.get_nom_energy())
+        
     # calculate energy usage (per bunch crossing)
     def energy_usage(self):
         return (self.linac1.energy_usage() + self.linac2.energy_usage()) * (1+self.overheads.power)
@@ -212,42 +253,54 @@ class Collider(Runnable):
         print('-------------------------------------------------')
         print('>> Total emissions:                 {:.0f} kton CO2e'.format(self.total_emissions()/1e3))
         print('-------------------------------------------------')
-    
-    
-    # overwrite run function
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=True, overwrite=False, overwrite_ip=False, parallel=False, max_cores=16):
 
-        # instantiate the trackables
-        self.assemble_trackables()
+
+    # shot tracking function (to be repeated)
+    def perform_shot(self, shot):
         
-        # define run name (generate if not given)
-        if run_name is None:
-            self.run_name = "collider_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.shot = shot
+        self.step = self.steps[shot]
+        shot_in_step = np.mod(self.shot, self.num_shots_per_step)
+        
+        # apply scan function if it exists
+        if self.scan_fcn is not None:
+            vals_all = np.repeat(self.vals,self.num_shots_per_step)
+            self.scan_fcn(self, vals_all[shot])
+        
+        # check if object exists
+        if not self.overwrite and os.path.exists(self.object_path(shot)):
+            print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
+            
         else:
-            self.run_name = run_name
-        
-        # make base folder and clear tracking directory
-        if not os.path.exists(self.run_path()):
-            os.makedirs(self.run_path())
-        
-        # run first linac arm
-        if verbose:
-            print(">> LINAC #1")
-        beam1 = self.linac1.run(self.run_name + "/linac1", num_shots=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
-        
-        # run second linac arm
-        if verbose:
-            print(">> LINAC #2")
-        beam2 = self.linac2.run(self.run_name + "/linac2", num_shots=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite)
-        
-        # simulate collisions
-        if verbose:
-            print(">> INTERACTION POINT")
-        event = self.ip.run(self.linac1, self.linac2, self.run_name + "/ip", all_by_all=True, overwrite=(overwrite or overwrite_ip))
-        
-        # return beams from first shot
-        return beam1, beam2
     
+            # instantiate the trackables
+            self.assemble_trackables()
+            
+            # clear the shot folder
+            self.clear_run_data(shot)
+
+            # run tracking
+            if self.num_shots > 1 and self.verbose:
+                print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
+            
+            # run first linac arm
+            if self.verbose:
+                print(">> LINAC #1")
+            self.linac1.scan(self.run_name + "/linac1", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=self.shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            
+            # run second linac arm
+            if self.verbose:
+                print(">> LINAC #2")
+            self.linac2.scan(self.run_name + "/linac2", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=self.shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            
+            # simulate collisions
+            if self.verbose:
+                print(">> INTERACTION POINT")
+            event = self.ip.run(self.linac1, self.linac2, self.run_name + "/ip", all_by_all=True, overwrite=False, step_filter=self.step)
+            
+            # save object to file
+            self.save()
+
     
     # plot the distribution of luminosity per power
     def plot_luminosity_per_power(self):

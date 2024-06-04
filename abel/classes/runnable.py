@@ -41,8 +41,8 @@ class Runnable(ABC):
             if self.num_shots > 1 and self.verbose:
                 print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
 
-            #if overwrite_from is None: # TODO
-            beam = self.track(beam=None, savedepth=self.savedepth, runnable=self, verbose=self.verbose)
+            # if overwrite_from is None: # TODO
+            self.track(beam=None, savedepth=self.savedepth, runnable=self, verbose=self.verbose)
 
             # save object to file
             self.save()
@@ -54,14 +54,14 @@ class Runnable(ABC):
         return self.scan_fcn is not None
       
     # scan function
-    def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
+    def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
 
         # define run name (generate if not given)
         if run_name is None:
             self.run_name = "scan_" + datetime.now().strftime("%Y%m%d_%H%M%S")
         else:
             self.run_name = run_name
-
+        
         self.overwrite = overwrite
         self.verbose = verbose
         self.savedepth = savedepth
@@ -79,15 +79,24 @@ class Runnable(ABC):
         self.num_shots = self.num_steps*self.num_shots_per_step
         self.label = label
         self.scale = scale
+        
+        # make temp folder and run path if not existing
+        if not os.path.exists(CONFIG.temp_path):
+            os.makedirs(CONFIG.temp_path, exist_ok=True)
+        if not os.path.exists(self.run_path()):
+            os.makedirs(self.run_path(), exist_ok=True)
 
+        # make base folder and clear tracking directory
+        if step_filter == 0:
+            if self.overwrite or not os.path.exists(self.run_path()):
+                self.clear_run_data()
+            
         # define what shots to perform
         shots_to_perform = np.arange(self.num_shots)
         if step_filter is not None:
             shots_to_perform = shots_to_perform[np.isin(self.steps, step_filter)]
-        else:
-            # make base folder and clear tracking directory
-            if self.overwrite or not os.path.exists(self.run_path()):
-                self.clear_run_data()
+        elif shot_filter is not None:
+            shots_to_perform = shots_to_perform[np.isin(shots_to_perform, shot_filter)]
 
         # perform shots (in parallel or series)
         if parallel:
@@ -108,7 +117,7 @@ class Runnable(ABC):
         
         # return final beam from first shot
         self.__dict__.update(self.load(shot=shots_to_perform[0]).__dict__)
-        return self.final_beam
+        #return self.final_beam
 
     
     # run simulation
@@ -116,17 +125,23 @@ class Runnable(ABC):
         
         # define run name (generate if not given)
         if run_name is None:
-            run_name = 'run_' + datetime.now().strftime('%Y%m%d_%H%M%S')
+            self.run_name = 'run_' + datetime.now().strftime('%Y%m%d_%H%M%S')
+        else:
+            self.run_name = run_name
 
+        if overwrite:
+            self.clear_run_data()
+            overwrite = False
+            
         # perform a scan with only one step
-        beam = self.scan(run_name=run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
-        return beam
+        self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
+        #return beam
     
     
     
     # generate run folder
     def run_path(self):
-            return CONFIG.run_data_path + self.run_name + '/'
+        return CONFIG.run_data_path + self.run_name + '/'
     
     
     # generate object path
@@ -221,7 +236,7 @@ class Runnable(ABC):
     def get_beam(self, index, shot=None):
         if shot is None:
             if hasattr(self, 'shot') and self.shot is not None:
-                shot = self.shot
+                shot = int(self.shot)
             else:
                 shot = 0
         filenames = self.run_data(shot)
@@ -263,6 +278,16 @@ class Runnable(ABC):
 
     def optimize(self, run_name=None, parameters=None, merit_fcn=None, label=None, num_shots_per_step=1, num_steps=50, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
 
+        # define run name (generate if not given)
+        if run_name is None:
+            self.run_name = "optimization_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+        else:
+            self.run_name = run_name
+        
+        if overwrite:
+            self.clear_run_data()
+            overwrite = False
+            
         # initialize the step
         self.step = 0
         
@@ -276,7 +301,7 @@ class Runnable(ABC):
             opt_fcn = lambda obj, _: obj.set_parameters(params)
             
             # run the simulations
-            self.scan(run_name=run_name, fcn=opt_fcn, vals=np.arange(num_steps), step_filter=self.step, num_shots_per_step=num_shots_per_step, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores, label=label)
+            self.scan(run_name=self.run_name, fcn=opt_fcn, vals=np.arange(num_steps), step_filter=self.step, num_shots_per_step=num_shots_per_step, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores, label=label)
             
             # evaluate the merit function
             vals = np.empty(self.num_steps)
@@ -285,7 +310,7 @@ class Runnable(ABC):
 
             # take mean value
             val_mean = np.nanmean(vals)
-
+            
             # iterate the optimzation step
             self.step += 1
             

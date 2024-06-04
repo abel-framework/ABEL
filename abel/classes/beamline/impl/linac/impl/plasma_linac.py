@@ -9,7 +9,7 @@ from matplotlib import ticker as mticker
 
 class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, source=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         self.source = source
         self.driver_complex = driver_complex
@@ -20,6 +20,7 @@ class PlasmaLinac(Linac):
         self.last_stage = last_stage
         self.last_interstage = last_interstage
         self.num_stages = num_stages
+        self.nom_energy = nom_energy
         self.alternate_interstage_polarity = alternate_interstage_polarity
         
         super().__init__(bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
@@ -75,6 +76,11 @@ class PlasmaLinac(Linac):
             else:
                 self.num_stages = 0
 
+        if self.nom_energy is None:
+            self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
+        else:
+            self.stage.nom_energy_gain = (self.nom_energy - self.source.energy) / self.num_stages
+        
         # prepare for multiplication of stages and interstages
         self.stages = [None]*self.num_stages
         self.interstages = [None]*max(0,self.num_stages-1)
@@ -163,8 +169,11 @@ class PlasmaLinac(Linac):
     
     ## ENERGY CONSIDERATIONS
     
-    def nom_energy(self):
-        return max(self.nom_stage_energies())
+    def get_nom_energy(self):
+        if self.nom_energy is not None:
+            return self.nom_energy
+        else:
+            return max(self.nom_stage_energies())
     
     def nom_stage_energies(self):
         E = 0

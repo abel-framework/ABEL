@@ -12,7 +12,7 @@ class Linac(Beamline):
         super().__init__()
 
     @abstractmethod
-    def nom_energy(self):
+    def get_nom_energy(self):
         pass
 
     def rep_rate_average(self):

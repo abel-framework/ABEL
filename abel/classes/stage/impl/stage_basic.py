@@ -2,9 +2,9 @@ from abel import Stage
 
 class StageBasic(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1):
         
-        super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
+        super().__init__(nom_accel_gradient, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -14,7 +14,7 @@ class StageBasic(Stage):
         beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # betatron oscillations
-        beam.apply_betatron_motion(self.length, self.plasma_density, self.nom_energy_gain, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+        beam.apply_betatron_motion(self.get_length(), self.plasma_density, self.nom_energy_gain, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
         
         # accelerate beam
         beam.set_Es(beam.Es() + self.nom_energy_gain)
