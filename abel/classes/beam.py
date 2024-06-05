@@ -368,7 +368,7 @@ class Beam():
             alpha_y = -covy[1,0]/emgy
         return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
         
-    def peak_density(self):
+    def peak_density(self):  # TODO: this is only valid for Gaussian beams.
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
     def peak_current(self):
@@ -660,7 +660,7 @@ class Beam():
 
 
     # ==================================================
-    def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0):
+    def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0, tolerance=5.0):
         """
         Calculate slice Ex and Ey for the entire beam by solving the Poisson equations for Ex and Ey slice by slice.
 
@@ -697,7 +697,6 @@ class Beam():
         # Check if the selected simulation boundaries are significantly larger than the beam extent
         xs = self.xs()
         ys = self.ys()
-        tolerance = 5.0
         
         if np.abs(x_box_min/xs.min()) < tolerance or np.abs(y_box_min/ys.min()) < tolerance or np.abs(x_box_max/xs.max()) < tolerance or np.abs(y_box_max/ys.max()) < tolerance:
             raise ValueError('Simulation box size is too small compared to beam size.')

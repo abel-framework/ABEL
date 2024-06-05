@@ -74,7 +74,7 @@ def rft_beam2abel_beam(beam_rft):
 
 
 # ==================================================
-def get_rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=4):
+def get_rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=4, sort_zs=False):
     
     if num_z_cells is None:
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
@@ -94,11 +94,16 @@ def get_rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, n
     ys = abel_beam.ys()*1e3  # [mm]
     zs = abel_beam.zs()*1e3  # [mm]
 
-    # Sort the beam arrays based on zs
-    indices = np.argsort(zs)
-    zs_sorted = zs[indices]  # [mm]
-    xs_sorted = xs[indices]
-    ys_sorted = ys[indices]
+    # Sort the arrays based on zs.
+    if sort_zs:        
+        indices = np.argsort(zs)
+        zs_sorted = zs[indices]
+        xs_sorted = xs[indices]
+        ys_sorted = ys[indices]
+    else:
+        zs_sorted = zs
+        xs_sorted = xs
+        ys_sorted = ys
 
     # Evaluate the electric field at the sorted coordinates so that the fields are sorted according to zs
     E_fields_beam, B_fields_beam = sc_fields_obj.get_field(xs_sorted, ys_sorted, zs_sorted, np.zeros(len(xs_sorted)))
