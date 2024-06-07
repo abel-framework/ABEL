@@ -20,54 +20,13 @@ class PlasmaLinac(Linac):
         self.last_stage = last_stage
         self.last_interstage = last_interstage
         self.num_stages = num_stages
-        self.nom_energy = nom_energy
         self.alternate_interstage_polarity = alternate_interstage_polarity
         
-        super().__init__(bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
+        super().__init__(nom_energy, num_bunches_in_train, bunch_separation, rep_rate_trains)
         
     
     # assemble the trackables
     def assemble_trackables(self):
-        
-        # check element classes
-        assert(isinstance(self.source, Source))
-        if self.driver_complex is not None:
-            assert(isinstance(self.driver_complex, DriverComplex))
-        if self.stage is not None:
-            assert(isinstance(self.stage, Stage))
-        if self.interstage is not None:
-            assert(isinstance(self.interstage, Interstage))
-        if self.bds is not None:
-            assert(isinstance(self.bds, BeamDeliverySystem) or isinstance(self.bds, Interstage))
-        if self.first_stage is not None:
-            assert(isinstance(self.first_stage, Stage))
-        if self.last_stage is not None:
-            assert(isinstance(self.last_stage, Stage))
-        if self.last_interstage is not None:
-            assert(isinstance(self.last_interstage, Interstage))
-
-        # get or set the driver complex
-        if self.driver_complex is not None:
-            if self.stage is not None:
-                self.stage.driver_source = self.driver_complex
-        else:
-            if self.stage is not None and isinstance(self.stage.driver_source, DriverComplex):
-                self.driver_complex = self.stage.driver_source
-        
-        # set the number of drivers required
-        if self.driver_complex is not None:
-            self.driver_complex.num_drivers = self.num_stages
-            
-            # set the rep rate of the driver complex
-            if self.num_bunches_in_train is not None and self.rep_rate_trains is not None:
-                
-                # driver source rep rate (one driver per stage)
-                self.driver_complex.source.rep_rate = self.num_bunches_in_train*self.rep_rate_trains*self.num_stages
-                
-                # driver rf accelerator rep rate (one driver per stage)
-                self.driver_complex.rf_accelerator.num_bunches_in_train = self.num_bunches_in_train*self.num_stages
-                self.driver_complex.rf_accelerator.rep_rate_trains = self.rep_rate_trains
-                self.driver_complex.rf_accelerator.bunch_separation = self.bunch_separation/self.num_stages
         
         # set default number of stages
         if self.num_stages is None:
@@ -76,25 +35,64 @@ class PlasmaLinac(Linac):
             else:
                 self.num_stages = 0
 
+        # figure out the nominal energy gain if not set
         if self.nom_energy is None:
             self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
         else:
             self.stage.nom_energy_gain = (self.nom_energy - self.source.energy) / self.num_stages
         
-        # prepare for multiplication of stages and interstages
-        self.stages = [None]*self.num_stages
-        self.interstages = [None]*max(0,self.num_stages-1)
+        # get or set the driver complex
+        if self.driver_complex is not None:
+
+            # check type
+            assert(isinstance(self.driver_complex, DriverComplex))
+
+            # set as stage driver
+            if self.stage is not None:
+                self.stage.driver_source = self.driver_complex
+                
+        else:
+            if self.stage is not None and isinstance(self.stage.driver_source, DriverComplex):
+                self.driver_complex = self.stage.driver_source
         
-        # declare list of trackables
-        self.trackables = [None] * (1 + self.num_stages + max(0,self.num_stages-1) + int(self.bds is not None))
+        # set the number of drivers required
+        if self.driver_complex is not None:
+            self.driver_complex.num_drivers = self.num_stages
+            
+            # set the rep rate of the driver complex (different to the main beam)
+            if self.num_bunches_in_train is not None and self.rep_rate_trains is not None:
+                
+                # driver complex rep rate (one driver per stage)
+                self.driver_complex.num_bunches_in_train = self.num_bunches_in_train*self.num_stages
+                self.driver_complex.bunch_separation = self.bunch_separation/self.num_stages
+                self.driver_complex.rep_rate_trains = self.rep_rate_trains
+        
+        # declare list of trackables, stages and interstages
+        self.trackables = []
+        self.stages = []
+        self.interstages = []
         
         # add source
-        self.trackables[0] = self.source
+        assert(isinstance(self.source, Source))
+        self.trackables.append(self.source)
         
         # add stages and interstages
         if self.stage is not None:
-            for i in range(self.num_stages):
 
+            # check types
+            assert(isinstance(self.stage, Stage))
+            if self.first_stage is not None:
+                assert(isinstance(self.first_stage, Stage))
+            if self.last_stage is not None:
+                assert(isinstance(self.last_stage, Stage))
+            if self.interstage is not None:
+                assert(isinstance(self.interstage, Interstage))
+            if self.last_interstage is not None:
+                assert(isinstance(self.last_interstage, Interstage))
+                    
+            # instantiate many stages
+            for i in range(self.num_stages):
+                
                 # add stages
                 if i == 0 and self.first_stage is not None:
                     stage_instance = self.first_stage
@@ -109,8 +107,8 @@ class PlasmaLinac(Linac):
                 if self.driver_complex is not None:
                     stage_instance.driver_source = self.driver_complex
                     
-                self.trackables[1+2*i] = stage_instance
-                self.stages[i] = stage_instance
+                self.trackables.append(stage_instance)
+                self.stages.append(stage_instance)
 
                 # add interstages
                 if (self.interstage is not None) and (i < self.num_stages-1):
@@ -122,8 +120,8 @@ class PlasmaLinac(Linac):
                         interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
                     if self.alternate_interstage_polarity:
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
-                    self.trackables[2+2*i] = interstage_instance
-                    self.interstages[i] = interstage_instance
+                    self.trackables.append(interstage_instance)
+                    self.interstages.append(interstage_instance)
             
             # populate first/last stage properties
             if self.first_stage is None:
@@ -133,47 +131,33 @@ class PlasmaLinac(Linac):
                     
         # add beam delivery system
         if self.bds is not None:
-            if self.bds.nom_energy is None:
-                self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
-            self.trackables[max(1,2*self.num_stages)] = self.bds
+            
+            # check type
+            assert(isinstance(self.bds, BeamDeliverySystem) or isinstance(self.bds, Interstage))
 
+            # set the nominal energy and length
+            self.bds.length = None
+            self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+            self.bds.length = self.bds.get_length()
 
-    # Sets parameters to nested attributess in the Linac object
-    #def set_parameters(self, parameters):
-    #    """
-    #    Inputs
-    #    ----------
-    #    parameters: list 
-    #        Each element is a dictionary containing keys 'name', 'type', 'bounds' etc.
-    #    """
-    #    
-    #    for param in parameters:
-    #
-    #        # Split the name by '.' to access nested attributes
-    #        attr_names = param['name'].split('.')
-    #        
-    #        # Get the last attribute name and its value
-    #        param_name = attr_names[-1]
-    #        attr_value = param['bounds'][0]  # Assuming you want to use the lower bound of the range...
-    #        
-    #        obj = self
-    #        
-    #        # Iterate over the attribute names except the last one to get the object to which the attribute should be set
-    #        for name in attr_names[:-1]: 
-    #            obj = getattr(obj, name)
-    #    
-    #        # Set the attribute
-    #        setattr(obj, param_name, attr_value)
-#
+            # add to trackables
+            self.trackables.append(self.bds)
+        
+        # set the bunch train pattern etc.
+        super().assemble_trackables()
 
+    
+    # survey object
+        
+    def survey_object(self):
+        "Survey objects for the plasma linac (adds the driver complex)"
+        objs = super().survey_object()
+        if self.driver_complex is not None:
+            return objs, (self.driver_complex.survey_object(), 1)
+        else:
+            return objs
     
     ## ENERGY CONSIDERATIONS
-    
-    def get_nom_energy(self):
-        if self.nom_energy is not None:
-            return self.nom_energy
-        else:
-            return max(self.nom_stage_energies())
     
     def nom_stage_energies(self):
         E = 0
@@ -198,7 +182,7 @@ class PlasmaLinac(Linac):
                 Etot += stage.energy_usage()
         return Etot
     
-    def energy_efficiency(self):
+    def get_energy_efficiency(self):
         Etot_beam = self.final_beam.total_energy()
         return Etot_beam/self.energy_usage()
 
@@ -225,22 +209,35 @@ class PlasmaLinac(Linac):
         self.interstages[interstage_num].set_lens_offset(lens_x_offset, lens_y_offset)
 
 
-    ## COST
-
-    def get_cost(self):
-
-        # cost of all the components (trackables)
-        cost = super().get_cost()
-
-        # add the driver complex cost
+    # cost
+    
+    def get_cost_breakdown(self):
+        "Cost breakdown for the plasma linac [ILC units]"
+        
+        breakdown = []
+        
         if self.driver_complex is not None:
-            cost += self.driver_complex.get_cost()
+            breakdown.append(self.driver_complex.get_cost_breakdown())
+            
+        breakdown.append(self.source.get_cost_breakdown())
 
-            # add tunnel cost for the driver complex
-            cost += self.driver_complex.get_length() * self.cost_per_length_tunnel
-        
-        return cost
-        
+        stage_costs = 0
+        for stage in self.stages:
+            stage_costs += stage.get_cost()
+        breakdown.append((f"Plasma stages ({self.num_stages}x)", stage_costs))
+
+        interstage_costs = 0
+        for interstage in self.interstages:
+            interstage_costs += interstage.get_cost()
+        breakdown.append(('Interstages', interstage_costs))
+
+        if self.bds is not None:
+            breakdown.append(self.bds.get_cost_breakdown())
+
+        breakdown.append(self.get_cost_breakdown_civil_construction())
+
+        return ('Plasma linac', breakdown)
+
     
     ## PLOT EVOLUTION
     

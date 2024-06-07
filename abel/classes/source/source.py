@@ -1,14 +1,15 @@
 from abc import abstractmethod
 from matplotlib import patches
-from abel import Trackable
+from abel.classes.trackable import Trackable
+from abel.classes.cost_modeled import CostModeled
 from types import SimpleNamespace
 import numpy as np
 import scipy.constants as SI
 
-class Source(Trackable):
+class Source(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0, rep_rate=None):
+    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
         
         self.length = length
         self.energy = energy
@@ -32,10 +33,11 @@ class Source(Trackable):
         self.jitter.xp = 0
         self.jitter.yp = 0
         self.jitter.E = 0
+        
+        self.num_bunches_in_train = num_bunches_in_train
+        self.bunch_separation = bunch_separation
+        self.rep_rate_trains = rep_rate_trains
 
-        self.rep_rate = rep_rate
-
-        self.cost = 9.4e6 # [ILCU]
     
     
     @abstractmethod
@@ -57,6 +59,12 @@ class Source(Trackable):
         beam.set_zs(beam.zs() + np.random.normal(scale=self.jitter.z))
         beam.set_Es(beam.Es() + np.random.normal(scale=self.jitter.E))
 
+        # set the bunch train pattern
+        if self.num_bunches_in_train is not None:
+            beam.num_bunches_in_train = self.num_bunches_in_train
+        if self.bunch_separation is not None:
+            beam.bunch_separation = self.bunch_separation
+        
         # set metadata
         beam.location = 0
         beam.stage_number = 0
@@ -71,8 +79,10 @@ class Source(Trackable):
         else:
             return self.length
 
-    def get_cost(self):
-        return self.cost
+    
+    def get_cost_breakdown(self):
+        return ('Source', CostModeled.cost_per_source)
+        
         
     def get_energy(self):
         return self.energy
@@ -83,9 +93,15 @@ class Source(Trackable):
     def get_charge(self):
         return self.charge
 
+    def get_rep_rate_average(self):
+        if self.num_bunches_in_train is not None and self.rep_rate_trains is not None:
+            return self.num_bunches_in_train * self.rep_rate_trains
+        else:
+            return None
+    
     def get_average_beam_current(self):
-        if self.rep_rate is not None:
-            return self.get_charge() * self.rep_rate
+        if self.get_rep_rate_average() is not None:
+            return self.get_charge() * self.get_rep_rate_average()
     
     def energy_usage(self):
         return self.get_energy()*abs(self.get_charge())/self.energy_efficiency()
@@ -95,6 +111,15 @@ class Source(Trackable):
             return self.energy_usage() * self.rep_rate
     
     def survey_object(self):
-        rect = patches.Rectangle((0, -0.5), self.get_length(), 1)
-        return rect
+        #rect = patches.Rectangle((0, -0.5), self.get_length(), 1)
+        #return rect
+
+        npoints = 10
+        x_points = np.linspace(0, self.get_length(), npoints)
+        y_points = np.linspace(0, 0, npoints)
+        final_angle = 0 
+        label = 'Source'
+        color = 'black'
+        return x_points, y_points, final_angle, label, color
+        
     

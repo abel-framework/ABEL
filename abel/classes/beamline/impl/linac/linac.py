@@ -3,24 +3,18 @@ from abel import Beamline
 
 class Linac(Beamline):
     
-    def __init__(self, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, nom_energy=None, num_bunches_in_train=None, bunch_separation=None, rep_rate_trains=None):
         
-        self.bunch_separation = bunch_separation
-        self.num_bunches_in_train = num_bunches_in_train
-        self.rep_rate_trains = rep_rate_trains
-        
-        super().__init__()
+        # set bunch pattern
+        super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
 
-    @abstractmethod
+        self.nom_energy = nom_energy
+        
+
     def get_nom_energy(self):
-        pass
-
-    def rep_rate_average(self):
-        if self.rep_rate_trains is not None and self.num_bunches_in_train is not None:
-            return self.rep_rate_trains*self.num_bunches_in_train
-        else:
-            return None  
+        return self.nom_energy
+        
     
-    def effective_gradient(self):
-        return self.nom_energy()/self.get_length()
+    def get_effective_gradient(self):
+        return self.get_nom_energy()/self.get_length()
     

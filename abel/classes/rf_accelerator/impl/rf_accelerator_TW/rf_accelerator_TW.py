@@ -46,11 +46,11 @@ class RFAccelerator_TW(abel.RFAccelerator):
 
     #Implement required abstract methods
 
-    def get_RF_structure_length(self) -> float:
+    def get_rf_structure_length(self) -> float:
         "Gets the length of each individual RF structure [m]"
         return self._RF_structure.getL()
 
-    def get_RF_frequency(self) -> float:
+    def get_rf_frequency(self) -> float:
         "Get the RF frequency of the RF structures [1/s]"
         return self._RF_structure.getOmega()*2*np.pi
 

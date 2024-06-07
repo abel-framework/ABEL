@@ -23,8 +23,10 @@ from .classes.interstage.interstage import Interstage
 from .classes.rf_accelerator.rf_accelerator import RFAccelerator
 from .classes.bds.bds import BeamDeliverySystem
 from .classes.spectrometer.spectrometer import Spectrometer
-from .classes.driver_complex.driver_complex import DriverComplex
+from .classes.damping_ring.damping_ring import DampingRing
+from .classes.turnaround.turnaround import Turnaround
 
+from .classes.beamline.impl.driver_complex import DriverComplex
 from .classes.beamline.impl.linac.linac import Linac
 from .classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from .classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
@@ -55,7 +57,8 @@ from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
 from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW import RFAccelerator_TW
 from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLICG import RFAccelerator_TW_CLICG
 from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLIC502 import RFAccelerator_TW_CLIC502
-from .classes.driver_complex.impl.driver_complex_basic import *
+from .classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
+from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.bds.impl.bds_basic import *
 from .classes.bds.impl.bds_fbt import *
 from .classes.spectrometer.impl.spectrometer_facet_ocelot import *

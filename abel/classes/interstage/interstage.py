@@ -1,15 +1,15 @@
 from abc import abstractmethod
 from matplotlib import patches
-from abel import Trackable
+from abel.classes.trackable import Trackable
+from abel.classes.cost_modeled import CostModeled
 from types import SimpleNamespace
+import numpy as np
 
-class Interstage(Trackable):
+class Interstage(Trackable, CostModeled):
     
     @abstractmethod
     def __init__(self):
         self.evolution = SimpleNamespace()
-        
-        self.cost_per_length = 0.1e6 # [ILCU/m]
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
@@ -18,11 +18,19 @@ class Interstage(Trackable):
     def get_length(self):
         pass
     
-    def get_cost(self):
-        return self.get_length() * self.cost_per_length
+    def get_cost_breakdown(self):
+        return ('Interstage', self.get_length() * CostModeled.cost_per_length_interstage)
     
     def survey_object(self):
-        rect = patches.Rectangle((0, -0.05), self.get_length(), 0.1)
-        rect.set_facecolor = 'k'
-        return rect
+        #rect = patches.Rectangle((0, -0.05), self.get_length(), 0.1)
+        #rect.set_facecolor = 'k'
+        #return rect
+        
+        npoints = 10
+        x_points = np.linspace(0, self.get_length(), npoints)
+        y_points = np.linspace(0, 0, npoints)
+        final_angle = 0 
+        label = 'Interstage'
+        color = 'orange'
+        return x_points, y_points, final_angle, label, color
         

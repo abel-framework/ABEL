@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from matplotlib import patches
 from abel import Trackable, CONFIG
+from abel.classes.cost_modeled import CostModeled
 from abel.utilities.plasma_physics import beta_matched
 import numpy as np
 import scipy.constants as SI
@@ -9,10 +10,10 @@ from types import SimpleNamespace
 from matplotlib.colors import LogNorm
 from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius
 
-class Stage(Trackable):
+class Stage(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=1):
+    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=1, length=None):
 
         # common variables
         self.nom_accel_gradient = nom_accel_gradient
@@ -20,6 +21,7 @@ class Stage(Trackable):
         self.plasma_density = plasma_density
         self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
+        self.length = length
 
         self.stage_number = None
         
@@ -49,8 +51,6 @@ class Stage(Trackable):
         self.final.plasma.wakefield = SimpleNamespace()
         self.final.plasma.wakefield.onaxis = SimpleNamespace()
 
-        self.cost_per_length = 0.2e6 # [ILCU/m]
-
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -58,15 +58,18 @@ class Stage(Trackable):
         return super().track(beam, savedepth, runnable, verbose)
     
     def get_length(self):
-        if hasattr(self, 'length') and self.length is not None:
+        if self.length is not None:
             self.nom_accel_gradient = self.nom_energy_gain/self.length
             self.length = None
         return self.nom_energy_gain/self.nom_accel_gradient
 
-    def get_cost(self):
-        return self.get_length() * self.cost_per_length
+    def get_cost_breakdown(self):
+        return ('Plasma stage', self.get_length() * CostModeled.cost_per_length_plasma_stage)
     
     def get_nom_energy_gain(self):
+        if self.nom_energy_gain is None:
+            self.nom_energy_gain = self.nom_accel_gradient*self.length
+            self.length = None
         return self.nom_energy_gain
 
     def get_nom_accel_gradient(self):
@@ -394,5 +397,14 @@ class Stage(Trackable):
 
     
     def survey_object(self):
-        return patches.Rectangle((0, -1), self.get_length(), 2)
+        #return patches.Rectangle((0, -1), self.get_length(), 2)
+        
+        npoints = 10
+        x_points = np.linspace(0, self.get_length(), npoints)
+        y_points = np.linspace(0, 0, npoints)
+        final_angle = 0 
+        label = 'Plasma stage'
+        color = 'red'
+        return x_points, y_points, final_angle, label, color
+        
     

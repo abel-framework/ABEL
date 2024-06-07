@@ -1,4 +1,9 @@
-from abel import Runnable, Linac, BeamDeliverySystem, InteractionPoint, Event
+from abel.classes.runnable import Runnable
+from abel.classes.cost_modeled import CostModeled
+from abel.classes.event import Event
+from abel.classes.beamline.impl.linac.linac import Linac
+from abel.classes.bds.bds import BeamDeliverySystem
+from abel.classes.ip.ip import InteractionPoint
 from matplotlib import pyplot as plt
 import numpy as np
 import os, copy
@@ -6,7 +11,7 @@ from matplotlib import lines
 from datetime import datetime
 from types import SimpleNamespace
 
-class Collider(Runnable):
+class Collider(Runnable, CostModeled):
     
     # constructor
     def __init__(self, linac1=None, linac2=None, ip=None, com_energy=None, energy_asymmetry=None):
@@ -57,21 +62,7 @@ class Collider(Runnable):
         assert(isinstance(self.linac1, Linac))
         assert(isinstance(self.linac2, Linac))
         assert(isinstance(self.ip, InteractionPoint))
-
-        # set c.o.m. energy and energy asymmetry (or linac energies)
-        #if self.linac1.get_nom_energy() is None and self.linac2.get_nom_energy() is None:
-        #    self.linac1.nom_energy = self.com_energy/2 * self.energy_asymmetry
-        #    self.linac2.nom_energy = self.com_energy/2 / self.energy_asymmetry
-        #elif self.linac1.get_nom_energy() is not None and self.linac2.get_nom_energy() is None:
-        #    self.energy_asymmetry = 2*self.linac1.nom_energy/self.com_energy
-        #    self.linac2.nom_energy = self.com_energy/2 / self.energy_asymmetry
-        #elif self.linac1.get_nom_energy() is None and self.linac2.get_nom_energy() is not None:
-        #    self.energy_asymmetry = 1/(2*self.linac2.nom_energy/self.com_energy)
-        #    self.linac1.nom_energy = self.com_energy/2 * self.energy_asymmetry
-        #else:
-        #    self.com_energy = self.get_com_energy()
-        #    self.energy_asymmetry = self.get_energy_asymmetry()
-
+        
         if self.com_energy is not None:
             if self.energy_asymmetry is not None:
                 self.linac1.nom_energy = self.com_energy/2 * self.energy_asymmetry
@@ -113,9 +104,12 @@ class Collider(Runnable):
     def energy_usage(self):
         return (self.linac1.energy_usage() + self.linac2.energy_usage()) * (1+self.overheads.power)
 
+    def power_overhead(self):
+        return (self.linac1.wallplug_power() + self.linac2.wallplug_power()) * self.overheads.power
+        
     # calculate wallplug power
     def wallplug_power(self):
-        return (self.linac1.wallplug_power() + self.linac2.wallplug_power()) * (1+self.overheads.power)
+        return self.linac1.wallplug_power() + self.linac2.wallplug_power() + self.power_overhead()
         
     
     # full luminosity per crossing [m^-2]
@@ -155,29 +149,38 @@ class Collider(Runnable):
        
     # total length of linacs (TODO: add driver production length)
     def total_tunnel_length(self):
-        Ltot = self.linac1.get_length() + self.linac2.get_length()
-        if hasattr(self.linac1.stage, 'driver_source'):
-            Ltot += self.linac1.stage.driver_source.get_length()
+        Ltot = 0
+        for linac in [self.linac1, self.linac2]:
+            Ltot += linac.get_length()
+            if hasattr(linac, 'driver_complex'):
+                Ltot += linac.driver_complex.get_length()
+            if hasattr(linac, 'damping_ring'):
+                Ltot += linac.damping_ring.get_circumference()
         return Ltot
 
+    # run time
     
-    def integrated_runtime(self, in_years=False):
+    def integrated_runtime(self, in_years=False) -> float:
+        "Total integrated run time of the collider to gather enough data [s]/[years]"
         runtime = self.target_integrated_luminosity / self.peak_luminosity()
         if in_years:
             runtime = runtime/(365*24*3600)
         return runtime
 
     def programme_duration(self, in_years=False):
+        "Total programme duration, also accounting for downtime [s]/[years]"
         return self.integrated_runtime(in_years) / self.uptime_percentage
 
-    # integrated cost of energy
+    # costs
+    
     def energy_cost(self):
+        "Integrated cost of energy [ILC units]"
         return self.integrated_energy_usage() * self.cost_per_energy
-      
-    # cost of construction
+        
     def construction_cost(self):
+        "Cost of construction [ILC units]"
         return self.linac1.get_cost() + self.linac2.get_cost() + self.ip.get_cost()
-
+    
     # construction overhead costs
     def overhead_cost(self):
         return self.overhead_cost_design_and_development() + self.overhead_cost_controls_and_cabling() + self.overhead_cost_installation_and_commissioning() + self.overhead_cost_management_inspection()
@@ -189,9 +192,9 @@ class Collider(Runnable):
         return self.construction_cost() * self.overheads.installation_and_commissioning
     def overhead_cost_management_inspection(self):
         return self.construction_cost() * self.overheads.management_inspection
-
-    # total project cost / ITF cost (US accounting): construction + overhead
+    
     def total_project_cost(self):
+        "Total project cost / ITF cost (US accounting) [ILC units]"
         return self.construction_cost() + self.overhead_cost()
 
     # required labor force for maintenance (FTEs/year)
@@ -213,8 +216,29 @@ class Collider(Runnable):
     def carbon_tax_cost(self):
         return self.total_emissions() * self.cost_carbon_tax_per_emissions
 
-    def get_cost(self):
-        return self.construction_cost()
+    def get_cost_breakdown_construction(self):
+        breakdown = []
+        breakdown.append(self.linac1.get_cost_breakdown())
+        breakdown.append(self.linac2.get_cost_breakdown())
+        breakdown.append(self.ip.get_cost_breakdown())
+        return ('Construction', breakdown)
+        
+    def get_cost_breakdown_overheads(self):
+        breakdown = []
+        breakdown.append(('Design/development', self.overhead_cost_design_and_development()))
+        breakdown.append(('Constrols/cabling', self.overhead_cost_controls_and_cabling()))
+        breakdown.append(('Installation/commissioning', self.overhead_cost_installation_and_commissioning()))
+        breakdown.append(('Management/inspection', self.overhead_cost_management_inspection()))
+        return ('Overheads', breakdown)
+    
+    def get_cost_breakdown(self):
+        breakdown = []
+        breakdown.append(self.get_cost_breakdown_construction())
+        breakdown.append(self.get_cost_breakdown_overheads())
+        breakdown.append(('Energy', self.energy_cost()))
+        breakdown.append(('Maintenance', self.maintenance_cost()))
+        breakdown.append(('Carbon tax', self.carbon_tax_cost()))
+        return ('Collider', breakdown)
     
     # total cost of construction and running
     def full_programme_cost(self, include_carbon_tax=False):
@@ -222,36 +246,21 @@ class Collider(Runnable):
         if include_carbon_tax:
             fpc += self.carbon_tax_cost()
         return fpc
+
     
-    def print_cost(self):
-        print('-- COSTS ----------------------------------------')
-        print('>> Construction costs:                 {:.2f} BILCU'.format(self.construction_cost()/1e9))
-        print('   -- Linac #1:               {:.0f} MILCU'.format(self.linac1.get_cost()/1e6))
-        print('   -- Linac #2:               {:.0f} MILCU'.format(self.linac2.get_cost()/1e6))
-        print('   -- Interaction point:      {:.0f} MILCU'.format(self.ip.get_cost()/1e6))
-        print('>> Overhead costs:                     {:.2f} BILCU'.format(self.overhead_cost()/1e9))
-        print('   -- Design/development:     {:.0f} MILCU'.format(self.overhead_cost_design_and_development()/1e6))
-        print('   -- Constrols/cabling:      {:.0f} MILCU'.format(self.overhead_cost_controls_and_cabling()/1e6))
-        print('   -- Install/commission:     {:.0f} MILCU'.format(self.overhead_cost_installation_and_commissioning()/1e6))
-        print('   -- Management/inspection:  {:.0f} MILCU'.format(self.overhead_cost_management_inspection()/1e6))
-        print('>> Operating costs ({:.1f} TWh):          {:.2f} BILCU'.format(self.integrated_energy_usage()/(1e12*3600), self.energy_cost()/1e9))
-        print('>> Maintenance ({:.0f} FTEs, {:.0f} yrs):      {:.2f} BILCU'.format(self.maintenance_labor(), self.programme_duration(in_years=True), self.maintenance_cost()/1e9))
-        print('>> Carbon tax ({:.0f} kton CO2e):         {:.2f} BILCU'.format(self.total_emissions()/1e3, self.carbon_tax_cost()/1e9))
-        print('   -- Construction ({:.0f} kton): {:.0f} MILCU'.format(self.construction_emissions()/1e3, self.construction_emissions()*self.cost_carbon_tax_per_emissions/1e6))
-        print('   -- Operation ({:.0f} kton):   {:.0f} MILCU'.format(self.energy_emissions()/1e3, self.energy_emissions()*self.cost_carbon_tax_per_emissions/1e6))
-        print('-------------------------------------------------')
-        print('>> Construction cost (EU accounting):  {:.2f} BILCU'.format(self.construction_cost()/1e9))
-        print('>> Total project cost (US accounting): {:.2f} BILCU'.format(self.total_project_cost()/1e9))
-        print('>> Full programme cost:                {:.2f} BILCU'.format(self.full_programme_cost()/1e9))
-        print('>> Full programme cost (+ carbon tax): {:.2f} BILCU'.format(self.full_programme_cost(include_carbon_tax=True)/1e9))
-        print('-------------------------------------------------')
-        
     def print_emissions(self):
         print('-- EMISSIONS ------------------------------------')
         print('>> Construction emissions ({:.1f} km): {:.0f} kton CO2e'.format(self.total_tunnel_length()/1e3, self.construction_emissions()/1e3))
         print('>> Operation emissions ({:.1f} TWh):   {:.0f} kton CO2e'.format(self.integrated_energy_usage()/(1e12*3600), self.energy_emissions()/1e3))
         print('-------------------------------------------------')
         print('>> Total emissions:                 {:.0f} kton CO2e'.format(self.total_emissions()/1e3))
+        print('-------------------------------------------------')
+
+    def print_power(self):
+        print(f"-- POWER {'_'.ljust(38,'-')}")
+        print('>> Overhead:                    {:.0f} MW'.format(self.power_overhead()/1e6))
+        print('-------------------------------------------------')
+        print('>> Total power:                 {:.0f} MW'.format(self.wallplug_power()/1e6))
         print('-------------------------------------------------')
 
 
@@ -300,6 +309,93 @@ class Collider(Runnable):
             
             # save object to file
             self.save()
+
+    
+    # plot survey    
+    
+    def plot_survey(self, save_fig=False):
+        "Plot the layout of the collider"
+        
+        # setup figure
+        fig, ax = plt.subplots()
+        fig.set_figwidth(20)
+        fig.set_figheight(4)
+        ax.set_xlabel('x [m]')
+        ax.set_ylabel('y [m]')
+        ax.axis('equal')
+        
+        # initialize parameters
+        labels = []
+        for i, linac in enumerate([self.linac1, self.linac2]):
+            
+            x = 0
+            y = 0
+            angle = (i+1) * np.pi
+            
+            # get and iterate through objects
+            objs = linac.survey_object()
+            
+            # extract secondary objects
+            second_objs = None
+            connect_to = None
+            if len(objs)==2 and isinstance(objs[1], tuple):
+                second_objs = objs[1][0]
+                connect_to = objs[1][1]
+                objs = objs[0]
+    
+            objs.reverse()
+            for j, obj in enumerate(objs):
+    
+                xs0, ys0, final_angle, label, color = obj
+                xs0 -= xs0[-1]
+                ys0 -= ys0[-1]
+                angle = angle + final_angle
+                
+                xs = x + xs0*np.cos(angle) + ys0*np.sin(angle)
+                ys = y - xs0*np.sin(angle) + ys0*np.cos(angle)
+                
+                if label in labels:
+                    label = None
+                else:
+                    labels.append(label)
+                ax.plot(xs, ys, '-', color=color, label=label, linewidth=2)
+
+                # add secondary objects
+                if connect_to == len(objs)-j-1:
+                    x2 = x
+                    y2 = y
+                    angle2 = angle
+                    
+                    # get and iterate through objects
+                    second_objs.reverse()
+                    for second_obj in second_objs:
+            
+                        xs0_2, ys0_2, final_angle2, label, color = second_obj
+                        
+                        xs0_2 -= xs0_2[-1]
+                        ys0_2 -= ys0_2[-1]
+                        angle2 = angle2 + final_angle2
+            
+                        xs2 = x2 + xs0_2*np.cos(angle2) + ys0_2*np.sin(angle2)
+                        ys2 = y2 - xs0_2*np.sin(angle2) + ys0_2*np.cos(angle2)
+                        
+                        x2 = xs2[0]
+                        y2 = ys2[0]
+                        
+                        if label in labels:
+                            label = None
+                        else:
+                            labels.append(label)
+                        ax.plot(xs2, ys2, '-', color=color, label=label, linewidth=2)
+                    
+                x = xs[0]
+                y = ys[0]
+            
+        # add interaction point
+        ax.plot([0], [0], 'k*', label='IP', markersize=10)
+        
+        ax.legend(loc='upper left', ncol=4, reverse=True)
+        plt.show()
 
     
     # plot the distribution of luminosity per power

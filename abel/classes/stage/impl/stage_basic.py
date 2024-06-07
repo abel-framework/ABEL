@@ -14,10 +14,10 @@ class StageBasic(Stage):
         beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # betatron oscillations
-        beam.apply_betatron_motion(self.get_length(), self.plasma_density, self.nom_energy_gain, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+        beam.apply_betatron_motion(self.get_length(), self.plasma_density, self.get_nom_energy_gain(), x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
         
         # accelerate beam
-        beam.set_Es(beam.Es() + self.nom_energy_gain)
+        beam.set_Es(beam.Es() + self.get_nom_energy_gain())
         
         # apply plasma-density down ramp (magnify beta function)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)

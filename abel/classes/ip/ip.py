@@ -1,12 +1,10 @@
 from abc import abstractmethod
 from abel import Runnable, Event, Beam
+from abel.classes.cost_modeled import CostModeled
 import os
 import numpy as np
 
-class InteractionPoint(Runnable):
-
-    def __init__(self):
-        self.cost = 50e6 # [ILCU]
+class InteractionPoint(Runnable, CostModeled):
     
     # run simulation
     def run(self, runnable1, runnable2, run_name=None, all_by_all=False, verbose=True, overwrite=False, step_filter=None):
@@ -97,8 +95,8 @@ class InteractionPoint(Runnable):
         return files
 
     
-    def get_cost(self):
-        return self.cost
+    def get_cost_breakdown(self):
+        return ('Interaction point', CostModeled.cost_per_ip)
     
     # interact
     @abstractmethod

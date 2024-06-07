@@ -14,7 +14,7 @@ class BeamDeliverySystemBasic(BeamDeliverySystem):
     
     def get_length(self):
         if self.length is None:
-            return np.sqrt(self.nom_energy/500e9)*2250 # [m] scaled from ILC
+            return np.sqrt(self.get_nom_energy()/500e9)*2250 # [m] scaled from ILC
         else:
             return self.length
     

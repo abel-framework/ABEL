@@ -1,18 +1,21 @@
 from abc import abstractmethod
-from abel import Beamline, Linac, Spectrometer, CONFIG
+from abel.CONFIG import CONFIG
+from abel.classes.beamline.beamline import Beamline
+from abel.classes.beamline.impl.linac.linac import Linac
+from abel.classes.spectrometer.spectrometer import Spectrometer
 import numpy as np
 from matplotlib import pyplot as plt
 import warnings
 
 class Experiment(Beamline):
     
-    def __init__(self, linac=None, component=None, spectrometer=None):
+    def __init__(self, linac=None, component=None, spectrometer=None, num_bunches_in_train=1, bunch_separation=0, rep_rate_trains=10):
+        super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
+        
         self.linac = linac
         self.component = component
         self.spectrometer = spectrometer
         
-        super().__init__()
-
     
     
     # assemble the trackables
@@ -24,6 +27,9 @@ class Experiment(Beamline):
         
         # run beamline constructor
         self.trackables = [self.linac, self.component, self.spectrometer]
+        
+        # set the bunch train pattern etc.
+        super().assemble_trackables()
 
     
     def energy_usage(self):

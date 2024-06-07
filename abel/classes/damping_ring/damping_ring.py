@@ -1,0 +1,68 @@
+from abc import abstractmethod
+from matplotlib import patches
+import numpy as np
+from abel.classes.trackable import Trackable
+from abel.classes.cost_modeled import CostModeled
+
+class DampingRing(Trackable, CostModeled):
+    
+    @abstractmethod
+    def __init__(self, nom_energy=None, emit_nx_target=None, emit_ny_target=None, bunch_separation_in_ring=None, num_bunches_in_train=None, rep_rate_trains=None, num_rings=1):
+
+        self.nom_energy = nom_energy
+        self.emit_nx_target = emit_nx_target
+        self.emit_ny_target = emit_ny_target
+        
+        self.bunch_separation_in_ring = bunch_separation_in_ring
+        self.num_bunches_in_train = num_bunches_in_train
+        self.rep_rate_trains = rep_rate_trains
+
+        self.num_rings = num_rings
+        
+
+    
+    @abstractmethod   
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        return super().track(beam, savedepth, runnable, verbose)
+
+    @abstractmethod 
+    def get_length(self):
+        pass
+    
+    def get_nom_energy(self):
+        return self.nom_energy 
+
+    @abstractmethod 
+    def get_damping_time(self):
+        pass
+
+    @abstractmethod 
+    def get_circumference(self): # not the same as get_length
+        pass
+
+    
+    def get_cost_breakdown(self):
+        breakdown = []
+        breakdown.append(('Ring components', self.get_circumference() * CostModeled.cost_per_length_damping_ring))
+        breakdown.append(('Civil construction', self.get_circumference() * CostModeled.cost_per_length_tunnel))
+        return ('Damping ring', breakdown)
+
+    
+    @abstractmethod 
+    def energy_usage(self):
+        pass
+    
+    def survey_object(self):
+        #return patches.Circle((0, self.get_circumference()/(2*np.pi)), self.get_circumference()/(2*np.pi)) # make into semicircle or droplet shape
+
+        thetas = np.linspace(0, 2*np.pi, 200)
+        radius = self.get_circumference()/(2*np.pi)
+        x_points = radius*np.sin(thetas)
+        y_points = -radius*(1-np.cos(thetas))
+            
+        final_angle = 0
+        label = 'Damping ring'
+        color = 'green'
+        return x_points, y_points, final_angle, label, color
+        
+    

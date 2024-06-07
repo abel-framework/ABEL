@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 
 from abc import abstractmethod
+from matplotlib import patches
+from abel.classes.trackable import Trackable
+from abel.classes.cost_modeled import CostModeled
 
-import abel
+import numpy as np
+from matplotlib import pyplot as plt
 
-import matplotlib
-import matplotlib.pyplot as plt
-
-class RFAccelerator(abel.Trackable):
+class RFAccelerator(Trackable, CostModeled):
     """
     Class modelling a RF linac, typically used for drivers or injectors.
     It's an abstract class, meant to be superseeded by a specific RFlinac implementation, relating to a structure type and how it is modelled.
     """
 
     @abstractmethod
-    def __init__(self, length=None, num_structures=None, gradient=None, voltage_total=None,  bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
+    def __init__(self, length=None, structure_length=None, nom_accel_gradient=None, nom_energy_gain=None, fill_factor=None, rf_frequency=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
         """
         Initialize the rf_accelerator base class.
         This can interface an underlying RF structure model including power requirements, and costs.
@@ -29,15 +30,15 @@ class RFAccelerator(abel.Trackable):
             The length of the entire linac [m], including drift space etc. between structures
             Must be specified
 
-        num_structures : int
-            The number of RF structures in the linac.
+        structure_length : float
+            The length of the RF structure.
             Must be specified.
 
-        gradient : float
+        nom_accel_gradient : float
             The accelerating gradient in the linac RF structures [V/m].
             Either this or voltage_total must be specified.
 
-        voltage_total : float
+        nom_energy_gain : float
             The total accelerating voltage (e.g. the energy gain) of the RF structures [V].
             Either this or gradient must be specified.
 
@@ -51,146 +52,143 @@ class RFAccelerator(abel.Trackable):
             The repetition rate of the beam & RF pulses
 
         """
+        
+        # set bunch pattern
+        super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
+        
+        self.nom_energy_gain = nom_energy_gain
+        self.nom_accel_gradient = nom_accel_gradient
+        self.length = length
+        self.fill_factor = fill_factor
+        self.rf_frequency = rf_frequency
+        self.structure_length = structure_length
+        
+        # default settings
+        self.num_structures_per_klystron = 1.0
+        self.efficiency_wallplug_to_rf = 0.55
 
-        #We assume that the implementer constructor has ran, so that the RFstructure is ready
-        # and can be used to define the linac
-
-        #Setting up RFlinac geometry
-        if num_structures == 1 and length == None:
-            #Use a single RF structure, RF linac length = structure length
-            self.length = self.get_RF_structure_length()
-            self.num_structures = 1
-        elif length==None or num_structures==None:
-            raise ValueError("Must specify both linac total length `length` and number of RF structures `num_structures` so that fill factor can be calculated")
-        else:
-            self.length = length
-            self.num_structures = int(num_structures)
-
-        self.fill_factor = self.num_structures * self.get_RF_structure_length() / self.length
-        if self.fill_factor > 1:
-            raise ValueError(f"Fill factor = {self.fill_factor} > 1, this is not physically possible")
-
-        #Setting RF pulse parameters
-        if gradient == None and voltage_total == None:
-            raise ValueError("Must specify gradient or voltage")
-        elif voltage_total == None:
-            self.set_gradient(gradient)
-        elif gradient == None:
-            self.set_voltage_total(voltage_total)
-
-        #if self.beam_pulse_length == None:
-        #    raise ValueError("Must set beam pulse length")
-
-        #if bunch_separation==None:
-        #    #TODO: Check that this correspods to an integer number of 1/frequency
-        #    raise ValueError("Must set bunch separation")
-
-        # bunch train pattern
-        self.bunch_separation = bunch_separation # [s]
-        self.num_bunches_in_train = num_bunches_in_train
-        self.rep_rate_trains = rep_rate_trains # [Hz]
-
-        #TODO need to merge
-        #self.beam_pulse_length = self.set_beam_pulse_length(self.train_duration())
-        #self.beam_current      = self.set_beam_current(beam_current)
-
-        #TODO
-        self.cost_per_length = 0.22e6 # [ILCU/m] not including klystrons (ILC is 0.24e6 with power)
-
-    #Implement stuff from Trackable
+    
+    # implement stuff from Trackable
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        
         #TODO: Check current etc.
-        beam.set_Es(beam.Es()+self.voltage_total)
+        beam.set_Es(beam.Es() + self.get_nom_energy_gain())
+        
         return super().track(beam, savedepth, runnable, verbose)
-
+    
     def get_length(self):
-        return self.length
+        if self.length is None:
+            return self.get_nom_energy_gain()/self.get_nom_accel_gradient()
+        else:
+            return self.length
 
+    def get_fill_factor(self):
+        if self.fill_factor is not None:
+            return self.fill_factor
+        else:
+            return self.get_num_structures() * self.get_structure_length() / self.get_length()
+    
+        
     def survey_object(self):
-        #return super().survey_object()
-        #TODO: This was copied from source; maybe it would be a decent default implementation too?
-        rect = matplotlib.patches.Rectangle((0, -1), self.get_length(), 2)
-        return rect
+        #return patches.Rectangle((0, -1), self.get_length(), 2)
+        
+        npoints = 10
+        x_points = np.linspace(0, self.get_length(), npoints)
+        y_points = np.linspace(0, 0, npoints)
+        final_angle = 0 
+        label = 'RF accelerator'
+        color = 'blue'
+        return x_points, y_points, final_angle, label, color
 
-    #Define and implement RFaccelerator specifics
-
-    # RFlinac geometry
-    @abstractmethod
-    def get_RF_structure_length(self) -> float:
+    
+    # define and implement RFaccelerator specifics
+    
+    def get_structure_length(self) -> float:
         "Gets the length of each individual RF structure [m]"
-        return np.nan
+        return self.structure_length
 
     def get_num_structures(self) -> int:
         "Gets the number of individual RF structures [m]"
-        return self.num_structures
+        return int(round(self.get_fill_factor()*self.get_length()/self.get_structure_length()))
 
+    
     # RF pulse parameters
 
-    def set_gradient(self,gradient : float) -> None:
+    def set_gradient(self, nom_accel_gradient : float) -> None:
         "Set the accelerating gradient of the structures [V/m]"
-        self.gradient = gradient
-        self.voltage_structure = gradient*self.get_RF_structure_length()
-        self.voltage_total     = self.voltage_structure * self.num_structures
+        self.nom_accel_gradient = nom_accel_gradient
+        self.voltage_structure = gradient*self.get_structure_length()
+        self.nom_energy_gain     = self.voltage_structure * self.get_num_structures()
 
-    def get_gradient(self) -> float:
-        return self.gradient
+    def get_nom_accel_gradient(self) -> float:
+        if self.nom_accel_gradient is not None:
+            return self.nom_accel_gradient
+        else:
+            return self.nom_energy_gain/self.length
 
-    def set_voltage_total(self,voltage_total : float) -> None:
+    def set_nom_energy_gain(self,nom_energy_gain : float) -> None:
         "Set the total accelerating voltage [V] of the RFlinac"
-        self.voltage_total = voltage_total
-        self.voltage_structure = voltage_total / self.num_structures
-        self.gradient = self.voltage_structure / self.get_structure_length()
+        self.nom_energy_gain = nom_energy_gain
+        self.voltage_structure = nom_energy_gain / self.get_num_structures()
+        self.nom_accel_gradient = self.voltage_structure / self.get_structure_length()
 
-    def get_voltage_total(self) -> float:
-        "Gets the total accelerating voltage of the whole RFaccelerator object [V]"
-        return self.voltage_total
     def get_nom_energy_gain(self) -> float:
-        "Alias of get_voltage_total"
-        return self.get_voltage_total()
+        "Gets the total accelerating voltage of the whole RFaccelerator object [eV]"
+        return self.nom_energy_gain
+        
+    def get_voltage_total(self) -> float:
+        "Alias of get_nom_energy_gain [V]"
+        return self.get_nom_energy_gain()
 
     def get_voltage_structure(self) -> float:
         "Gets the accelerating voltage of a single RF structure [V]"
-        return self.voltage_structure
+        return self.get_nom_energy_gain() / self.get_num_structures()
 
-    # Time structure of pulse and beam
+    def get_gradient_structure(self) -> float:
+        "Gets the accelerating gradient in the structures [V/m]"
+        return self.get_voltage_structure() / self.get_structure_length()
 
-    @abstractmethod
-    def get_RF_frequency(self):
+    # time structure of pulse and beam
+    
+    def get_rf_frequency(self):
         "Get the RF frequency of the RF structures [1/s]"
-        return np.nan
-
-    def rep_rate_average(self):
-        "Average repetition rate of bunches [1/s]"
-        return self.num_bunches_in_train * self.rep_rate_trains
-
-    def rep_rate_intratrain(self):
-        "Bunch rate [1/s]"
-        if self.bunch_separation is not None:
-            return 1/self.bunch_separation
-        else:
-            return None
-
-    def train_duration(self):
-        #TODO: Consolidate with beam_pulse_length and fact that bunch_separation is now mandatory
-        if self.bunch_separation is not None:
-            return self.bunch_separation * (self.num_bunches_in_train-1)
-        else:
-            return None
+        return self.rf_frequency
+    
 
     # Energy use and costing
 
     @abstractmethod
-    def energy_usage(self):
-        "Calculate the energy usage (per pulse or per bunch?) [unit]"
+    def energy_usage(self) -> float:
+        "Calculate the energy usage per bunch [J]"
         pass
 
-    def wallplug_power(self):
-        "Calculate the "
-        return self.energy_usage() * self.rep_rate_average()
+    def wallplug_power(self) -> float:
+        "Calculate the wall-plug power [W]"
+        return self.energy_usage() * self.get_rep_rate_average()
 
-    # Cost model
+    def get_klystron_average_power(self):
+        "Calculate the average power per klystron [W]"
+        return self.wallplug_power() / self.get_num_klystrons()
+        
+    def get_num_klystrons(self) -> int:
+        "Get number of klystrons"
+        return int(np.ceil(self.get_num_structures()/self.num_structures_per_klystron))
 
-    def get_cost(self):
-        "Cost of the rf_accelerator [ILC units]"
-        return self.get_length() * self.cost_per_length
+    # costs
+
+    def get_cost_structures(self):
+        "Cost of the RF structures [ILC units]"
+        return self.get_length() * CostModeled.cost_per_length_rf_structure
+
+    def get_cost_klystrons(self):
+        "Cost of the klystrons and modulators [ILC units]"
+        return self.get_num_klystrons() * CostModeled.cost_per_klystron(self.get_num_klystrons(), self.get_rf_frequency(), self.get_klystron_average_power())
+        
+    def get_cost_breakdown(self):
+        "Breakdown of costs"
+        breakdown = []
+        breakdown.append((f"RF structures ({self.get_num_structures()}x)", self.get_cost_structures()))
+        breakdown.append((f"Klystrons and modulators ({self.get_num_klystrons()}x)", self.get_cost_klystrons()))
+        return ('RF accelerator', breakdown)
+        
