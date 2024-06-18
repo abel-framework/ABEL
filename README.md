@@ -10,4 +10,4 @@ varying levels of complexity, for fast optimization.
    If you want to be able to modify ABEL without uninstalling and reinstalling, you can run `pip install -e path-to-abel`, and the `abel`
    folder in your local clone will effectively be put into your `$PYTHONPATH`.
 
-To remove abel, run `pip uninstall abel`.
+To remove ABEL, run `pip uninstall abel`.
