@@ -15,7 +15,7 @@ class RFAccelerator(Trackable, CostModeled):
     """
 
     @abstractmethod
-    def __init__(self, length=None, structure_length=None, nom_accel_gradient=None, nom_energy_gain=None, fill_factor=None, rf_frequency=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
+    def __init__(self, length=None, structure_length=None, num_structures=None, nom_energy_gain=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
         """
         Initialize the rf_accelerator base class.
         This can interface an underlying RF structure model including power requirements, and costs.
@@ -34,9 +34,8 @@ class RFAccelerator(Trackable, CostModeled):
             The length of the RF structure.
             Must be specified.
 
-        nom_accel_gradient : float
-            The accelerating gradient in the linac RF structures [V/m].
-            Either this or voltage_total must be specified.
+        num_structures : int
+            The number of RF structures in the RFaccelerator
 
         nom_energy_gain : float
             The total accelerating voltage (e.g. the energy gain) of the RF structures [V].
@@ -54,27 +53,31 @@ class RFAccelerator(Trackable, CostModeled):
         """
         
         # set bunch pattern
-        super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
+        super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
         #Initialize variables through property setters
         #
         #Internally, we use self._length, self._num_structures, and self._structure_length to keep track of the geometry;
         # and self.nom_energy_gain to keep track of RF voltage.
-        # The RF frequency is also kept separately in self._rf_freqquency, and might be interact with the structure length in some subclasses.
         # The properties nom_accel_gradient, fill_factor, voltage_structure, and gradient_structure are calculated from these
-        #If we try to set any parameter directly, we easily end up with inconsistencies and infinite recursions, or very complex logic.
+        #If we try to set all the parameter directly without a well-defined set of variables,
+        # we easily end up with inconsistencies and infinite recursions, or very complex logic.
+        # Here we just set these "basic" parameters, use the property setters/getters to get to the other ones.
 
-        #TODO: Detect and avoid double-setting of factors
-        self.nom_energy_gain    = nom_energy_gain
-        self.nom_accel_gradient = nom_accel_gradient
         self.length             = length
-        self.fill_factor        = fill_factor
-        self.rf_frequency       = rf_frequency
-        self.structure_length   = structure_length
+
+        if not hasattr(self, "_structure_length"):
+            #If already handled by daughter class, don't try to set again
+            # E.g in rf_accelerator_TW, the structure_length is a computed parameter
+            # and cannot be set directly.
+            self.structure_length   = structure_length
+        self.num_structures     = num_structures
+
+        self.nom_energy_gain    = nom_energy_gain
 
         # default settings
         self.num_structures_per_klystron = 1.0
-        self.efficiency_wallplug_to_rf = 0.55
+        self.efficiency_wallplug_to_rf   = 0.55
 
     #-----------------------------------------#
     # Properties related to voltage and power #
@@ -85,6 +88,8 @@ class RFAccelerator(Trackable, CostModeled):
         """
         The total nominal accelerating voltage [eV] of the RFAccelerator;
         """
+        if self._nom_energy_gain is None:
+            raise RFAcceleratorInitializationException("nom_energy_gain not yet initialized")
         return self._nom_energy_gain
     @nom_energy_gain.setter
     def nom_energy_gain(self,nom_energy_gain : float):
@@ -144,6 +149,8 @@ class RFAccelerator(Trackable, CostModeled):
         Note: Changing the length does not modify the nom_energy_gain or num_structures, but the gradient and fill_factor is implicitly changed.
         Set length_constgradfill instead for changing the length of the linac so that the gradient is constant.
         """
+        if self._length is None:
+            raise RFAcceleratorInitializationException("length not yet initialized")
         return self._length
     @length.setter
     def length(self,length : float):
@@ -172,6 +179,8 @@ class RFAccelerator(Trackable, CostModeled):
         On setting, it changes the num_structures, rounding down but not below 1,
         which means that setting and reading back the fill_factor might not give exactly the same answer.
         """
+        #TODO: Can get this over 1 by setting num_structures, length, and structure length badly.
+        # Should probably send a warning if this is the case.
         return self.num_structures * self.structure_length / self.length
     @fill_factor.setter
     def fill_factor(self,fill_factor : float):
@@ -182,9 +191,12 @@ class RFAccelerator(Trackable, CostModeled):
             ns = 1
         self.num_structures = ns
 
+    #structure_length overridden by RFAccelerator_TW
     @property
     def structure_length(self) -> float:
         "The length of each individual RF structure [m]"
+        if self._structure_length is None:
+            raise RFAcceleratorInitializationException("structure_length not yet initialized")
         return self._structure_length
     @structure_length.setter
     def structure_length(self, structure_length : float):
@@ -193,14 +205,20 @@ class RFAccelerator(Trackable, CostModeled):
     @property
     def num_structures(self) -> int:
         "The number of individual RF structures. Must be >= 1"
+        if self._num_structures is None:
+            raise RFAcceleratorInitializationException("num_structures not yet initialized")
         return self._num_structures
     @num_structures.setter
     def num_structures(self,num_structures : int):
+        if num_structures is None:
+            self._num_structures = num_structures
+            return
         num_structures = int(num_structures)
         if num_structures < 1:
             raise ValueError("num_structures must be >=1")
         self._num_structures = num_structures
 
+    #rf_frequency overridden by RFAccelerator_TW
     @property
     def rf_frequency(self) -> float:
         "The RF frequency of the RF structures [1/s]"
@@ -221,7 +239,7 @@ class RFAccelerator(Trackable, CostModeled):
         return super().track(beam, savedepth, runnable, verbose)
     
     def get_length(self):
-        "Returns the linac physical length [m], using the RFaccelerator length property (implicitly a getter)"
+        "Returns the linac physical length [m], using the RFaccelerator length property"
         return self.length
 
     def survey_object(self):
@@ -236,7 +254,7 @@ class RFAccelerator(Trackable, CostModeled):
         return x_points, y_points, final_angle, label, color
 
     #---------------------------------------------#
-    # Implement abstract methods from CostModeled #
+    # Methods for energy use modelling            #
     #=============================================#
 
     @abstractmethod
@@ -254,9 +272,11 @@ class RFAccelerator(Trackable, CostModeled):
         
     def get_num_klystrons(self) -> int:
         "Get number of klystrons"
-        return int(np.ceil(self.get_num_structures()/self.num_structures_per_klystron))
+        return int(np.ceil(self.num_structures/self.num_structures_per_klystron))
 
-    # costs
+    #---------------------------------------------#
+    # Methods for cost modelling                  #
+    #=============================================#
 
     def get_cost_structures(self):
         "Cost of the RF structures [ILC units]"
@@ -264,7 +284,7 @@ class RFAccelerator(Trackable, CostModeled):
 
     def get_cost_klystrons(self):
         "Cost of the klystrons and modulators [ILC units]"
-        return self.get_num_klystrons() * CostModeled.cost_per_klystron(self.get_num_klystrons(), self.get_rf_frequency(), self.get_klystron_average_power())
+        return self.get_num_klystrons() * CostModeled.cost_per_klystron(self.get_num_klystrons(), self.rf_frequency, self.get_klystron_average_power())
         
     def get_cost_breakdown(self):
         "Breakdown of costs"
@@ -272,4 +292,7 @@ class RFAccelerator(Trackable, CostModeled):
         breakdown.append((f"RF structures ({self.get_num_structures()}x)", self.get_cost_structures()))
         breakdown.append((f"Klystrons and modulators ({self.get_num_klystrons()}x)", self.get_cost_klystrons()))
         return ('RF accelerator', breakdown)
-        
+
+class RFAcceleratorInitializationException(Exception):
+    "An Exception class that is raised when trying to access a uninitialized field"
+    pass

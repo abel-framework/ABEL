@@ -10,6 +10,7 @@ import CLICopti
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.constants as SI
 
 class RFAccelerator_TW(abel.RFAccelerator):
     """
@@ -19,7 +20,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
     for generating different structure geometries.
     """
     @abstractmethod
-    def __init__(self, RF_structure, length=None, num_structures=None, gradient=None, voltage_total=None, beam_pulse_length=None,beam_current=0.0):
+    def __init__(self, RF_structure, length=None, num_structures=None, nom_energy_gain=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
         """
         Initializes a rf_accelerator_TW object.
         Accepts same arguments rf_accelerator + an RF_structure CLICopti object.
@@ -38,28 +39,43 @@ class RFAccelerator_TW(abel.RFAccelerator):
         self._num_integration_points = None
         self.set_num_integration_points(1000)
 
-        #TODO: Handle these + {bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None} correctly
-        self.beam_pulse_length = beam_pulse_length
-        self.beam_current = beam_current
+        #Set for not-handling in base class
+        self._structure_length = None
 
-        super().__init__(length,num_structures,gradient,voltage_total, bunch_separation=6/12e9, num_bunches_in_train=1, rep_rate_trains=None)
+        #Initialize it
+        self._beam_charge = None
 
-    #Implement required abstract methods
+        super().__init__(length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain, \
+                         bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
 
-    def get_rf_structure_length(self) -> float:
+    #---------------------------------------------------------------------#
+    # Override some of the properties from the parent class RFAccelerator #
+    #=====================================================================#
+
+    @property
+    def structure_length(self) -> float:
         "Gets the length of each individual RF structure [m]"
         return self._RF_structure.getL()
+    @structure_length.setter
+    def structure_length(self, structure_length : float):
+        #This is derived from the number of cells, the phase advance, and the frequency
+        raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
 
-    def get_rf_frequency(self) -> float:
-        "Get the RF frequency of the RF structures [1/s]"
+    @property
+    def rf_frequency(self) -> float:
+        "The RF frequency of the RF structures [1/s]"
         return self._RF_structure.getOmega()*2*np.pi
+    @rf_frequency.setter
+    def rf_frequency(self, rf_frequency):
+        raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
 
     def energy_usage(self):
-        "Energy usage per shot"
-        #TODO: Include klystron efficiency!
-        return self.get_structure_pulse_energy() * self.get_num_structures()
+        "Energy usage per bunch [J]"
+        return self.get_structure_pulse_energy() * self.get_num_structures() * self.efficiency_wallplug_to_rf / self.num_bunches_in_train
 
-    # CLICopti-based modelling
+    #---------------------------------------------------------------------#
+    # CLICopti-based modelling                                            #
+    #=====================================================================#
 
     def set_num_integration_points(self,N : int):
         self._num_integration_points = N
@@ -73,16 +89,50 @@ class RFAccelerator_TW(abel.RFAccelerator):
         #      which assumes a drive beam driven pulse in that pulse end is a mirror of the start,
         #      and that the pusle shape can be easily "reorganized" to a square pulse.
         #      As long as Tfill is short, this doesn't matter.
-        return (self._RF_structure.getTrise() + self.get_t_fill() + self.beam_pulse_length) * \
+        return (self._RF_structure.getTrise() + self.get_t_fill() + self.get_beam_pulse_length()) * \
             self.get_structure_power()
 
-    def set_beam_current(self, beam_current : float) -> None:
-        "Set the beam current of the linac [A]"
-        self.beam_current = beam_current
+    @property
+    def beam_charge(self) -> float:
+        """
+        The total charge of the beam [C]
+        Can be set directly for power calculations,
+          or implicitly by track()
+        """
+        if self._beam_charge is None:
+            raise abel.RFAcceleratorInitializationException("Beam charge not initialized")
+        return self._beam_charge
+    @beam_charge.setter
+    def beam_charge(self,beam_charge : float):
+        self._beam_charge = beam_charge
 
-    def get_beam_current(self) -> float:
-        "Sets the beam current of the linac [A]"
-        return self.beam_current
+    @property
+    def bunch_charge(self) -> float:
+        """
+        The total charge of one bunch [C]
+        Calculated from beam_charge and num_bunches_in_train
+        When set, only beam_charge is changed
+        """
+        return self.beam_charge/self.num_bunches_in_train
+    @bunch_charge.setter
+    def bunch_charge(self, bunch_charge : float):
+        self.beam_charge = bunch_charge*self.num_bunches_in_train
+
+    @property
+    def beam_current(self) -> float:
+        """
+        The beam current of the linac [A].
+        Calculated from bunch_charge and get_beam_pulse_length()
+        When set, only beam_charge is changed.
+        When the number of bunches is train duration is 0 (num bunches = 1),
+        the beam_current is effectively 0 for e.g. beam loading purposes.
+        """
+        if self.get_beam_pulse_length() == 0.0:
+            return 0.0
+        return self.beam_charge / self.get_beam_pulse_length()
+    @beam_current.setter
+    def beam_current(self, beam_current : float) -> None:
+        self.beam_charge = beam_current * self.get_beam_pulse_length()
 
     def get_structure_power(self) -> float:
         "Get the peak power [W] required for a single RF structure in the given configuration."
@@ -93,20 +143,33 @@ class RFAccelerator_TW(abel.RFAccelerator):
         return P
 
     def get_RF_efficiency(self) -> float:
-        "Get the RF->beam efficiency as a number between 0 and 1, including the effect due to pulse shape"
-        return self._RF_structure.getTotalEfficiency(self.get_structure_power(), self.beam_current, self.beam_pulse_length)
+        """
+        Get the RF->beam efficiency as a number between 0 and 1, including the effect due to pulse shape
+        Calculated with different methods depending on wehter num_bunches_in_train = 1 or > 1.
+        """
+        if self.get_beam_pulse_length() == 0.0:
+            return self.voltage_structure*self.beam_charge / self.get_structure_pulse_energy()
+        else:
+            return self._RF_structure.getTotalEfficiency(self.get_structure_power(), self.beam_current, self.get_beam_pulse_length())
 
     def get_RF_efficiency_flattop(self) -> float:
         "Get the RF->beam efficiency as a number between 0 and 1, ignoring the fill time etc."
         return self._RF_structure.getFlattopEfficiency(self.get_structure_power(), self.beam_current)
 
-    def set_beam_pulse_length(self, beam_pulse_length : float) -> None:
-        "Set the beam pulse length (=length of RF pulse flat top) [s] for the RF structures"
-        self.beam_pulse_length = beam_pulse_length
-
     def get_beam_pulse_length(self) -> float:
-        "Gets the beam pulse length (=length of RF pulse flat top) [s] for the RF structues"
-        return self.beam_pulse_length
+        """
+        Gets the beam pulse length (=length of RF pulse flat top) [s] for the RF structues,
+        or 0.0 if the bunch separation is not set
+        """
+        if self.bunch_separation is None:
+            if self.num_bunches_in_train != 1:
+                #TODO Move this to trackable
+                raise ValueError("Invalid bunch separation but multiple bunches!")
+            return 0.0
+        bpl = self.get_train_duration()
+        if bpl is None:
+            raise abel.RFAcceleratorInitializationException("trackable.get_train_duration returned None")
+        return bpl
 
     def get_t_fill(self) -> float:
         "Get the filling time of the structure, i.e. the time for a signal to propagate through the whole structure."
@@ -114,20 +177,21 @@ class RFAccelerator_TW(abel.RFAccelerator):
 
     def get_pulse_length_total(self) -> float:
         return 2 * (self._RF_structure.getTrise() + self._RF_structure.getTfill()) \
-                 + self.beam_pulse_length
+                 + self.get_beam_pulse_length()
 
     def get_max_pulse_length(self) -> float:
         "Calculates the max beam_pulse_length before exceeding gradient limits, given power and beam_current"
-        return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), self.get_beam_current())
+        return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), self.beam_current)
 
     def set_pulse_length_max(self) -> float:
         "Sets the pulse length to the maximally achievable given the currently selected gradient and beam current"
+        #Obsolete, set_beam_pulse_length is dead. Change the number of bunches from upstream instead!
         self.set_beam_pulse_length( self.get_max_pulse_length() )
         return self.get_beam_pulse_length()
 
     def get_gradient_max(self) -> float:
         "Calculates the max gradient (and thus voltage) before exceeding breakdown limts, given the currently selected pulse length and beam current"
-        return self._RF_structure.getMaxAllowablePower_beamTimeFixed(self.get_beam_current(), self.get_beam_pulse_length())
+        return self._RF_structure.getMaxAllowablePower_beamTimeFixed(self.beam_current, self.get_beam_pulse_length())
 
     def set_gradient_max(self) -> float:
         "Sets the gradient to the maximally achievable given the currently selected pulse length and beam current"
@@ -153,7 +217,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
     def plot_power_profile(self) -> float:
         t = np.linspace(0,self.get_pulse_length_total(), 100)
         P = self._RF_structure.getP_t(t, self.get_structure_power(),\
-                                         self.beam_pulse_length,\
+                                         self.get_beam_pulse_length(),\
                                          self.beam_current )
 
         plt.subplots()

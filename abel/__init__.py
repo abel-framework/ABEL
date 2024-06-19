@@ -20,7 +20,7 @@ from .classes.source.source import Source
 from .classes.stage.stage import Stage
 from .classes.plasma_lens.plasma_lens import PlasmaLens
 from .classes.interstage.interstage import Interstage
-from .classes.rf_accelerator.rf_accelerator import RFAccelerator
+from .classes.rf_accelerator.rf_accelerator import RFAccelerator, RFAcceleratorInitializationException
 from .classes.bds.bds import BeamDeliverySystem
 from .classes.spectrometer.spectrometer import Spectrometer
 from .classes.damping_ring.damping_ring import DampingRing
