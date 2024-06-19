@@ -56,43 +56,177 @@ class RFAccelerator(Trackable, CostModeled):
         # set bunch pattern
         super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
         
-        self.nom_energy_gain = nom_energy_gain
+        #Initialize variables through property setters
+        #
+        #Internally, we use self._length, self._num_structures, and self._structure_length to keep track of the geometry;
+        # and self.nom_energy_gain to keep track of RF voltage.
+        # The RF frequency is also kept separately in self._rf_freqquency, and might be interact with the structure length in some subclasses.
+        # The properties nom_accel_gradient, fill_factor, voltage_structure, and gradient_structure are calculated from these
+        #If we try to set any parameter directly, we easily end up with inconsistencies and infinite recursions, or very complex logic.
+
+        #TODO: Detect and avoid double-setting of factors
+        self.nom_energy_gain    = nom_energy_gain
         self.nom_accel_gradient = nom_accel_gradient
-        self.length = length
-        self.fill_factor = fill_factor
-        self.rf_frequency = rf_frequency
-        self.structure_length = structure_length
-        
+        self.length             = length
+        self.fill_factor        = fill_factor
+        self.rf_frequency       = rf_frequency
+        self.structure_length   = structure_length
+
         # default settings
         self.num_structures_per_klystron = 1.0
         self.efficiency_wallplug_to_rf = 0.55
 
-    
-    # implement stuff from Trackable
+    #-----------------------------------------#
+    # Properties related to voltage and power #
+    #=========================================#
+
+    @property
+    def nom_energy_gain(self) -> float:
+        """
+        The total nominal accelerating voltage [eV] of the RFAccelerator;
+        """
+        return self._nom_energy_gain
+    @nom_energy_gain.setter
+    def nom_energy_gain(self,nom_energy_gain : float):
+        self._nom_energy_gain = nom_energy_gain
+
+    @property
+    def voltage_total(self) -> float:
+        "Alias of RFAccelerator.nom_energy_gain"
+        return self.nom_energy_gain
+    @voltage_total.setter
+    def voltage_total(self,voltage_total : float):
+        self.nom_energy_gain = voltage_total
+
+    @property
+    def nom_accel_gradient(self) -> float:
+        """
+        The nominal accelerating gradient of the whole linac [V/m], ignoring that some of it is "empty" space due to fill_factor.
+        On setting, it changes the nom_energy_gain
+        Note: the gradient of the structures, e.g. the 100e6 V/m quoted for CLIC structures, are given by gradient_structure.
+        """
+        return self.voltage_structure/self.length
+    @nom_accel_gradient.setter
+    def nom_accel_gradient(self,nom_accel_gradient : float):
+        self.nom_energy_gain = nom_accel_gradient*self.length
+
+    @property
+    def voltage_structure(self) -> float:
+        """
+        The accelerating voltage of a single RF structure [V].
+        On setting, it changes the nom_energy_gain.
+        """
+        return self.nom_energy_gain / self.num_structures
+    @voltage_structure.setter
+    def voltage_structure(self,voltage_structure : float):
+        self.nom_energy_gain = voltage_structure*self.num_structures
+
+    @property
+    def gradient_structure(self) -> float:
+        """
+        The accelerating gradient in the structures [V/m], excluding the "empty" space due to fill_factor.
+        On setting, it changes the structure voltage which changes the nom_energy_gain
+        """
+        return self.voltage_structure / self.structure_length
+    @gradient_structure.setter
+    def gradient_structure(self,gradient_structure : float):
+        self.voltage_structure = gradient_structure*self.structure_length
+
+
+    #--------------------------------#
+    # Properties related to geometry #
+    #================================#
+
+    @property
+    def length(self) -> float:
+        """
+        The total length of the RFlinac [m], including the empty space between structures.
+        Note: Changing the length does not modify the nom_energy_gain or num_structures, but the gradient and fill_factor is implicitly changed.
+        Set length_constgradfill instead for changing the length of the linac so that the gradient is constant.
+        """
+        return self._length
+    @length.setter
+    def length(self,length : float):
+        self._length = length
+
+    @property
+    def length_constgradfill(self) -> float:
+        """
+        Alternative name for length.
+        Setting this keeps the nom_accel_gradient and fill_factor constant, modifying the total voltage and fill factor.
+        """
+        return self._length
+    @length_constgradfill.setter
+    def length_constgradfill(self,length : float):
+        g0 = self.nom_accel_gradient
+        f0 = self.fill_factor
+        self._length = length
+        self.nom_accel_gradient = g0
+        self.fill_factor = f0
+
+    @property
+    def fill_factor(self) -> float:
+        """
+        The fill factor of the RFAccelerator, a number > 0 and <= 1, defined as
+        the fraction of the linac occupied by active RF accelerating structures.
+        On setting, it changes the num_structures, rounding down but not below 1,
+        which means that setting and reading back the fill_factor might not give exactly the same answer.
+        """
+        return self.num_structures * self.structure_length / self.length
+    @fill_factor.setter
+    def fill_factor(self,fill_factor : float):
+        if fill_factor > 1.0 or fill_factor <= 0.0:
+            raise ValueError("Invalid fill_factor outside the half-open interval (0.0,1.0].")
+        ns = int(np.floor(fill_factor * self.length / self.structure_length))
+        if ns == 0:
+            ns = 1
+        self.num_structures = ns
+
+    @property
+    def structure_length(self) -> float:
+        "The length of each individual RF structure [m]"
+        return self._structure_length
+    @structure_length.setter
+    def structure_length(self, structure_length : float):
+        self._structure_length = structure_length
+
+    @property
+    def num_structures(self) -> int:
+        "The number of individual RF structures. Must be >= 1"
+        return self._num_structures
+    @num_structures.setter
+    def num_structures(self,num_structures : int):
+        num_structures = int(num_structures)
+        if num_structures < 1:
+            raise ValueError("num_structures must be >=1")
+        self._num_structures = num_structures
+
+    @property
+    def rf_frequency(self) -> float:
+        "The RF frequency of the RF structures [1/s]"
+        return self._rf_frequency
+    @rf_frequency.setter
+    def rf_frequency(self,rf_frequency : float):
+        self._rf_frequency = rf_frequency
+
+    #-------------------------------------------#
+    # Implement abstract methods from Trackable #
+    #===========================================#
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
         #TODO: Check current etc.
-        beam.set_Es(beam.Es() + self.get_nom_energy_gain())
+        beam.set_Es(beam.Es() + self.nom_energy_gain)
         
         return super().track(beam, savedepth, runnable, verbose)
     
     def get_length(self):
-        if self.length is None:
-            return self.get_nom_energy_gain()/self.get_nom_accel_gradient()
-        else:
-            return self.length
+        "Returns the linac physical length [m], using the RFaccelerator length property (implicitly a getter)"
+        return self.length
 
-    def get_fill_factor(self):
-        if self.fill_factor is not None:
-            return self.fill_factor
-        else:
-            return self.get_num_structures() * self.get_structure_length() / self.get_length()
-    
-        
     def survey_object(self):
         #return patches.Rectangle((0, -1), self.get_length(), 2)
-        
+
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
         y_points = np.linspace(0, 0, npoints)
@@ -101,62 +235,9 @@ class RFAccelerator(Trackable, CostModeled):
         color = 'blue'
         return x_points, y_points, final_angle, label, color
 
-    
-    # define and implement RFaccelerator specifics
-    
-    def get_structure_length(self) -> float:
-        "Gets the length of each individual RF structure [m]"
-        return self.structure_length
-
-    def get_num_structures(self) -> int:
-        "Gets the number of individual RF structures [m]"
-        return int(round(self.get_fill_factor()*self.get_length()/self.get_structure_length()))
-
-    
-    # RF pulse parameters
-
-    def set_gradient(self, nom_accel_gradient : float) -> None:
-        "Set the accelerating gradient of the structures [V/m]"
-        self.nom_accel_gradient = nom_accel_gradient
-        self.voltage_structure = gradient*self.get_structure_length()
-        self.nom_energy_gain     = self.voltage_structure * self.get_num_structures()
-
-    def get_nom_accel_gradient(self) -> float:
-        if self.nom_accel_gradient is not None:
-            return self.nom_accel_gradient
-        else:
-            return self.nom_energy_gain/self.length
-
-    def set_nom_energy_gain(self,nom_energy_gain : float) -> None:
-        "Set the total accelerating voltage [V] of the RFlinac"
-        self.nom_energy_gain = nom_energy_gain
-        self.voltage_structure = nom_energy_gain / self.get_num_structures()
-        self.nom_accel_gradient = self.voltage_structure / self.get_structure_length()
-
-    def get_nom_energy_gain(self) -> float:
-        "Gets the total accelerating voltage of the whole RFaccelerator object [eV]"
-        return self.nom_energy_gain
-        
-    def get_voltage_total(self) -> float:
-        "Alias of get_nom_energy_gain [V]"
-        return self.get_nom_energy_gain()
-
-    def get_voltage_structure(self) -> float:
-        "Gets the accelerating voltage of a single RF structure [V]"
-        return self.get_nom_energy_gain() / self.get_num_structures()
-
-    def get_gradient_structure(self) -> float:
-        "Gets the accelerating gradient in the structures [V/m]"
-        return self.get_voltage_structure() / self.get_structure_length()
-
-    # time structure of pulse and beam
-    
-    def get_rf_frequency(self):
-        "Get the RF frequency of the RF structures [1/s]"
-        return self.rf_frequency
-    
-
-    # Energy use and costing
+    #---------------------------------------------#
+    # Implement abstract methods from CostModeled #
+    #=============================================#
 
     @abstractmethod
     def energy_usage(self) -> float:
