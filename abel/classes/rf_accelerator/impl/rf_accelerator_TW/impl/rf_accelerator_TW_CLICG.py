@@ -26,5 +26,5 @@ class RFAccelerator_TW_CLICG(abel.RFAccelerator_TW):
         if self.R05:
             tit += "_R05"
         tit += f", N={self.num_rf_cells}"
-        tit += f", f0={self.f0:.1f} [GHz]"
+        tit += f", f0={self.rf_frequency:.1f} [GHz]"
         return tit

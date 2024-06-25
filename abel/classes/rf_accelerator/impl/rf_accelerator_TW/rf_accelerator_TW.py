@@ -233,7 +233,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
         tit += "\n"
         tit += f"V={self.voltage_structure/1e6:.1f} [MV]"
         tit += f", I={self.beam_current:.1f} [A]"
-        tit += f", <G>={self.gradient/1e6:.1f} [MV/m]"
+        tit += f", <G>={self.gradient_structure/1e6:.1f} [MV/m]"
         return tit
 
     @abstractmethod
