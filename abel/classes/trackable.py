@@ -12,6 +12,21 @@ class Trackable(ABC):
         self.num_bunches_in_train = num_bunches_in_train
         self.rep_rate_trains = rep_rate_trains # [Hz]
 
+        self._name = None
+
+
+      
+    @property
+    def name(self):
+        if self._name is None:
+            return type(self).__name__
+        else:
+            return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
     
     # time structure functions
     

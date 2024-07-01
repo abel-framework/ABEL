@@ -18,8 +18,10 @@ class DampingRing(Trackable, CostModeled):
         self.rep_rate_trains = rep_rate_trains
 
         self.num_rings = num_rings
-        
 
+        self.name = 'Damping ring'
+      
+    
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -45,7 +47,7 @@ class DampingRing(Trackable, CostModeled):
         breakdown = []
         breakdown.append(('Ring components', self.get_circumference() * CostModeled.cost_per_length_damping_ring))
         breakdown.append(('Civil construction', self.get_circumference() * CostModeled.cost_per_length_tunnel))
-        return ('Damping ring', breakdown)
+        return (self.name, breakdown)
 
     
     @abstractmethod 
@@ -61,7 +63,7 @@ class DampingRing(Trackable, CostModeled):
         y_points = -radius*(1-np.cos(thetas))
             
         final_angle = 0
-        label = 'Damping ring'
+        label = self.name
         color = 'green'
         return x_points, y_points, final_angle, label, color
         

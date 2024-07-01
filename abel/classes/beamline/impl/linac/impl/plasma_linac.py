@@ -1,4 +1,4 @@
-from abel import Beam, Linac, Source, DriverComplex, Stage, Interstage, BeamDeliverySystem, CONFIG
+from abel import Beam, Linac, Source, DriverComplex, RFAccelerator, Stage, Interstage, BeamDeliverySystem, CONFIG
 import scipy.constants as SI
 import copy, os
 from datetime import datetime
@@ -9,9 +9,10 @@ from matplotlib import ticker as mticker
 
 class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         self.source = source
+        self.rf_injector = rf_injector
         self.driver_complex = driver_complex
         self.stage = stage
         self.interstage = interstage
@@ -21,6 +22,10 @@ class PlasmaLinac(Linac):
         self.last_interstage = last_interstage
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
+
+        self.optimize_driver_energy = True
+
+        self.name = 'Plasma linac'
         
         super().__init__(nom_energy, num_bunches_in_train, bunch_separation, rep_rate_trains)
         
@@ -34,12 +39,12 @@ class PlasmaLinac(Linac):
                 self.num_stages = 1
             else:
                 self.num_stages = 0
-
+        
         # figure out the nominal energy gain if not set
         if self.nom_energy is None:
             self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
         else:
-            self.stage.nom_energy_gain = (self.nom_energy - self.source.energy) / self.num_stages
+            self.stage.nom_energy_gain = (self.nom_energy - self.source.get_nom_energy()) / self.num_stages
         
         # get or set the driver complex
         if self.driver_complex is not None:
@@ -75,7 +80,13 @@ class PlasmaLinac(Linac):
         # add source
         assert(isinstance(self.source, Source))
         self.trackables.append(self.source)
-        
+
+        # add rf injector
+        if self.rf_injector is not None:
+            assert(isinstance(self.rf_injector, RFAccelerator))
+            self.rf_injector.name = 'RF injector'
+            self.trackables.append(self.rf_injector)
+            
         # add stages and interstages
         if self.stage is not None:
 
@@ -136,12 +147,19 @@ class PlasmaLinac(Linac):
             assert(isinstance(self.bds, BeamDeliverySystem) or isinstance(self.bds, Interstage))
 
             # set the nominal energy and length
-            self.bds.length = None
-            self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
-            self.bds.length = self.bds.get_length()
+            if self.bds.length is None or self.bds.length == 0:
+                self.bds.length = None
+                self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+                self.bds.length = self.bds.get_length()
 
             # add to trackables
             self.trackables.append(self.bds)
+
+        # optimize the driver energy
+        if self.optimize_driver_energy:
+            if self.driver_complex is not None:
+                self.driver_complex.nom_energy = self.stage.nom_energy_gain/self.stage.transformer_ratio
+                self.driver_complex.assemble_trackables()
         
         # set the bunch train pattern etc.
         super().assemble_trackables()
@@ -164,7 +182,7 @@ class PlasmaLinac(Linac):
         Es = np.array([]);
         for trackable in self.trackables:
             if isinstance(trackable, Source):
-                E += trackable.get_energy()
+                E += trackable.get_nom_energy()
             elif isinstance(trackable, Stage):
                 E += trackable.get_nom_energy_gain()
             Es = np.append(Es, E)
@@ -216,16 +234,17 @@ class PlasmaLinac(Linac):
         
         breakdown = []
         
+        breakdown.append(self.source.get_cost_breakdown())
+        breakdown.append(self.rf_injector.get_cost_breakdown())
+
         if self.driver_complex is not None:
             breakdown.append(self.driver_complex.get_cost_breakdown())
-            
-        breakdown.append(self.source.get_cost_breakdown())
-
+        
         stage_costs = 0
         for stage in self.stages:
             stage_costs += stage.get_cost()
         breakdown.append((f"Plasma stages ({self.num_stages}x)", stage_costs))
-
+        
         interstage_costs = 0
         for interstage in self.interstages:
             interstage_costs += interstage.get_cost()
@@ -236,7 +255,7 @@ class PlasmaLinac(Linac):
 
         breakdown.append(self.get_cost_breakdown_civil_construction())
 
-        return ('Plasma linac', breakdown)
+        return (self.name, breakdown)
 
     
     ## PLOT EVOLUTION
