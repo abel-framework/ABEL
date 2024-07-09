@@ -79,7 +79,7 @@ class RFAccelerator(Trackable, CostModeled):
         self.num_structures_per_klystron = 1.0
         self.efficiency_wallplug_to_rf   = 0.55
 
-		self.name = 'RF accelerator'
+        self.name = 'RF accelerator'
 
     #-----------------------------------------#
     # Properties related to voltage and power #
