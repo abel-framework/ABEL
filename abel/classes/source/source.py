@@ -33,6 +33,8 @@ class Source(Trackable, CostModeled):
         self.jitter.xp = 0
         self.jitter.yp = 0
         self.jitter.E = 0
+
+        self.is_polarized = False
         
         self.num_bunches_in_train = num_bunches_in_train
         self.bunch_separation = bunch_separation
@@ -81,23 +83,26 @@ class Source(Trackable, CostModeled):
 
     
     def get_cost_breakdown(self):
-        return ('Source', CostModeled.cost_per_source)
+        if self.is_polarized:
+            if self.charge < 0:
+                return ('Polarized electron source', CostModeled.cost_per_source_polarized_electrons)
+            else:
+                return ('Polarized positron source', CostModeled.cost_per_source_polarized_positrons)
+        else:
+            return ('Source', CostModeled.cost_per_source)
         
         
     def get_energy(self):
         return self.energy
+
+    def get_nom_energy(self):
+        return self.get_energy()
     
     def energy_efficiency(self):
         return self.wallplug_efficiency
     
     def get_charge(self):
         return self.charge
-
-    def get_rep_rate_average(self):
-        if self.num_bunches_in_train is not None and self.rep_rate_trains is not None:
-            return self.num_bunches_in_train * self.rep_rate_trains
-        else:
-            return None
     
     def get_average_beam_current(self):
         if self.get_rep_rate_average() is not None:
@@ -111,9 +116,6 @@ class Source(Trackable, CostModeled):
             return self.energy_usage() * self.rep_rate
     
     def survey_object(self):
-        #rect = patches.Rectangle((0, -0.5), self.get_length(), 1)
-        #return rect
-
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
         y_points = np.linspace(0, 0, npoints)

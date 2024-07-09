@@ -51,6 +51,8 @@ class Stage(Trackable, CostModeled):
         self.final.plasma.wakefield = SimpleNamespace()
         self.final.plasma.wakefield.onaxis = SimpleNamespace()
 
+        self.name = 'Plasma stage'
+
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -64,7 +66,10 @@ class Stage(Trackable, CostModeled):
         return self.nom_energy_gain/self.nom_accel_gradient
 
     def get_cost_breakdown(self):
-        return ('Plasma stage', self.get_length() * CostModeled.cost_per_length_plasma_stage)
+        breakdown = []
+        breakdown.append(('Plasma cell', self.get_length() * CostModeled.cost_per_length_plasma_stage))
+        breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
+        return (self.name, breakdown)
     
     def get_nom_energy_gain(self):
         if self.nom_energy_gain is None:
@@ -83,6 +88,10 @@ class Stage(Trackable, CostModeled):
     
     def energy_efficiency(self):
         return self.efficiency
+
+    #@abstractmethod   # TODO: calculate the dumped power and use it for the dump cost model.
+    def dumped_power(self):
+        return None
 
     
     def calculate_efficiency(self, beam0, driver0, beam, driver):

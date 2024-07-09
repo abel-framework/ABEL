@@ -34,33 +34,45 @@ class HALHFv2(Collider):
         driver_complex = DriverComplex()
         driver_complex.source = driver_source
         driver_complex.rf_accelerator = driver_accel
-        driver_complex.turnaround = TurnaroundBasic()
-        
-        # define stage
-        stage = StageBasic()
-        stage.driver_source = driver_complex
-        stage.nom_accel_gradient = 1.04e9 # [m]
-        stage.plasma_density = 1e21 # [m^-3]
-        stage.ramp_beta_mag = 5
+        #driver_complex.turnaround = TurnaroundBasic()
         
         # define beam
         esource = SourceBasic()
         esource.charge = -1e10 * SI.e # [C]
-        esource.energy = 5e9 # [eV]
+        esource.energy = 76e6 # [eV]
         esource.rel_energy_spread = 0.01
-        esource.bunch_length = 18e-6 # [m]
-        esource.z_offset = -34e-6 # [m]
         esource.emit_nx, esource.emit_ny = self.energy_asymmetry**2*10e-6, self.energy_asymmetry**2*0.035e-6 # [m rad]
-        esource.beta_x = stage.matched_beta_function(esource.energy)
-        esource.beta_y = esource.beta_x
         esource.num_particles = 5000
         esource.wallplug_efficiency = 0.1
         esource.accel_gradient = 23.5e6 # [V/m]
+        esource.is_polarized = True
+        
+        # define stage
+        stage = StageBasic()
+        stage.driver_source = driver_complex
+        stage.nom_accel_gradient = 1e9 # [m]
+        #stage.plasma_density = 1e21 # [m^-3]
+        stage.ramp_beta_mag = 5
+        stage.optimize_plasma_density(source=esource)
+
+        # define rest of beam
+        esource.bunch_length = 18e-6 # [m]
+        esource.z_offset = -34e-6 # [m]
+        esource.beta_x = stage.matched_beta_function(esource.energy)
+        esource.beta_y = esource.beta_x
+        
+        # electron injector
+        einjector = RFAcceleratorBasic()
+        einjector.nom_accel_gradient = 25e6 # [V/m]
+        einjector.nom_energy_gain = 5e9 - esource.energy # [eV]
+        einjector.rf_frequency = 3e9
+        einjector.structure_length = 5
+        einjector.peak_power_klystron = 50e6
         
         # define interstage
         interstage = InterstageBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 1 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.dipole_length = lambda E: 1.2 * np.sqrt(E/10e9) # [m(eV)]
         interstage.dipole_field = 0.5 # [T]
         
         # define electron BDS
@@ -72,6 +84,7 @@ class HALHFv2(Collider):
         elinac = PlasmaLinac()
         elinac.driver_complex = driver_complex
         elinac.source = esource
+        elinac.rf_injector = einjector
         elinac.stage = stage
         elinac.interstage = interstage
         elinac.bds = ebds
@@ -90,17 +103,23 @@ class HALHFv2(Collider):
         psource.num_particles = esource.num_particles
         psource.wallplug_efficiency = esource.wallplug_efficiency
         psource.accel_gradient = esource.accel_gradient
+        psource.is_polarized = True
         
         # define RF accelerator
         paccel = RFAcceleratorBasic()
         paccel.nom_accel_gradient = 32.4e6 # [V/m]
         paccel.structure_length = 2 # [m]
+        paccel.rf_frequency = 3e9
+        paccel.structure_length = 5
+        paccel.peak_power_klystron = 50e6
         
         # injector
         pinjector = RFAcceleratorBasic()
         pinjector.nom_energy_gain = 2.80e9 # [V/m]
         pinjector.nom_accel_gradient = paccel.nom_accel_gradient
-        pinjector.structure_length = paccel.structure_length
+        pinjector.rf_frequency = 3e9
+        pinjector.structure_length = 5
+        pinjector.peak_power_klystron = 50e6
         
         # damping ring
         pdamping_ring = DampingRingBasic()
@@ -121,7 +140,7 @@ class HALHFv2(Collider):
         plinac.bds = pbds
 
         # define interaction point
-        ip = InteractionPointGuineaPig()
+        ip = InteractionPointBasic()
         
         # define collider (with two different linacs)
         self.linac1 = elinac

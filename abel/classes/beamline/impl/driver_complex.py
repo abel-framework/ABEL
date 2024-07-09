@@ -9,9 +9,10 @@ class DriverComplex(Beamline):
     
     def __init__(self, source=None, rf_accelerator=None, turnaround=None, nom_energy=None, num_drivers=None, num_bunches_in_train=None, bunch_separation=None, rep_rate_trains=None):
 
-        super().__init__(nom_energy, num_bunches_in_train, bunch_separation, rep_rate_trains)
+        super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
         
         self.num_drivers = num_drivers
+        self.nom_energy = None
         
         self.source = source
         self.rf_accelerator = rf_accelerator
@@ -32,7 +33,10 @@ class DriverComplex(Beamline):
         self.trackables.append(self.rf_accelerator)
         
         # set nominal energy
-        self.nom_energy = self.source.get_energy() + self.rf_accelerator.get_nom_energy_gain() 
+        if self.nom_energy is None:
+            self.nom_energy = self.source.get_energy() + self.rf_accelerator.get_nom_energy_gain() 
+        else:
+            self.rf_accelerator.nom_energy_gain = self.nom_energy - self.source.get_energy()
         
         if self.turnaround is not None:
             assert(isinstance(self.turnaround, Turnaround))
@@ -46,6 +50,11 @@ class DriverComplex(Beamline):
     def energy_usage(self):
         return self.source.energy_usage() + self.rf_accelerator.energy_usage()
 
+    def get_charge(self):
+        return self.source.get_charge()
+
+    def get_nom_energy(self):
+        return self.nom_energy
     
     def get_cost_breakdown(self):
         "Cost breakdown for the driver complex [ILC units]"

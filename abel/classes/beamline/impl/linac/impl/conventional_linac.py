@@ -16,6 +16,8 @@ class ConventionalLinac(Linac):
         self.turnaround = turnaround
         self.bds = bds
         
+        self.name = 'RF linac'
+        
         super().__init__(nom_energy, num_bunches_in_train, bunch_separation, rep_rate_trains)
 
     
@@ -24,8 +26,7 @@ class ConventionalLinac(Linac):
         
         # declare list of trackables
         self.trackables = []
-        #self.trackables = [None] * (2 + int(self.bds is not None))
-
+        
         # add source
         assert(isinstance(self.source, Source))
         self.trackables.append(self.source)
@@ -33,6 +34,7 @@ class ConventionalLinac(Linac):
         # add RF injector (optional)
         if self.rf_injector is not None:
             assert(isinstance(self.rf_injector, RFAccelerator))
+            self.rf_injector.name = 'RF injector'
             self.trackables.append(self.rf_injector)
 
         # add damping ring (optional)
@@ -67,9 +69,12 @@ class ConventionalLinac(Linac):
         # add beam delivery system
         if self.bds is not None:
             assert(isinstance(self.bds, BeamDeliverySystem))
-            self.bds.length = None
-            self.bds.nom_energy = self.get_nom_energy()
-            self.bds.length = self.bds.get_length()
+
+            # TODO: set to nominal if not already set to a length
+            if self.bds.length is None or self.bds.length == 0:
+                self.bds.length = None
+                self.bds.nom_energy = self.get_nom_energy()
+                self.bds.length = self.bds.get_length()
             self.trackables.append(self.bds)
 
         # set the bunch train pattern etc.
@@ -107,7 +112,7 @@ class ConventionalLinac(Linac):
         breakdown = []
         breakdown.append(self.source.get_cost_breakdown())
         if self.rf_injector is not None:
-            breakdown.append(('RF injector', self.rf_injector.get_cost()))
+            breakdown.append((self.rf_injector.get_cost_breakdown()))
         if self.damping_ring is not None:
             breakdown.append(self.damping_ring.get_cost_breakdown())
         breakdown.append(self.rf_accelerator.get_cost_breakdown())
@@ -117,5 +122,5 @@ class ConventionalLinac(Linac):
             breakdown.append(self.bds.get_cost_breakdown())
         breakdown.append(self.get_cost_breakdown_civil_construction())
         
-        return ('RF linac', breakdown)
+        return (self.name, breakdown)
     

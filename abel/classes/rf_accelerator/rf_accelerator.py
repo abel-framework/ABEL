@@ -79,6 +79,8 @@ class RFAccelerator(Trackable, CostModeled):
         self.num_structures_per_klystron = 1.0
         self.efficiency_wallplug_to_rf   = 0.55
 
+		self.name = 'RF accelerator'
+
     #-----------------------------------------#
     # Properties related to voltage and power #
     #=========================================#
@@ -263,12 +265,20 @@ class RFAccelerator(Trackable, CostModeled):
         pass
 
     def wallplug_power(self) -> float:
-        "Calculate the wall-plug power [W]"
-        return self.energy_usage() * self.get_rep_rate_average()
+        "Calculate the wall-plug power total [W]"
+        return self.wallplug_power_cooling() + self.wallplug_power_klystrons()
 
-    def get_klystron_average_power(self):
+    def wallplug_power_cooling(self) -> float:
+        "Calculate the wall-plug power for cooling [W]"
+        return self.energy_usage_cooling() * self.get_rep_rate_average()
+
+    def wallplug_power_klystrons(self) -> float:
+        "Calculate the wall-plug power for klystrons [W]"
+        return self.energy_usage_klystrons() * self.get_rep_rate_average()
+
+    def get_klystron_average_power(self) -> float:
         "Calculate the average power per klystron [W]"
-        return self.wallplug_power() / self.get_num_klystrons()
+        return self.wallplug_power_klystrons() / self.get_num_klystrons()
         
     def get_num_klystrons(self) -> int:
         "Get number of klystrons"
@@ -278,9 +288,10 @@ class RFAccelerator(Trackable, CostModeled):
     # Methods for cost modelling                  #
     #=============================================#
 
+    @abstractmethod
     def get_cost_structures(self):
         "Cost of the RF structures [ILC units]"
-        return self.get_length() * CostModeled.cost_per_length_rf_structure
+        pass
 
     def get_cost_klystrons(self):
         "Cost of the klystrons and modulators [ILC units]"
@@ -290,9 +301,10 @@ class RFAccelerator(Trackable, CostModeled):
         "Breakdown of costs"
         breakdown = []
         breakdown.append((f"RF structures ({self.get_num_structures()}x)", self.get_cost_structures()))
-        breakdown.append((f"Klystrons and modulators ({self.get_num_klystrons()}x)", self.get_cost_klystrons()))
-        return ('RF accelerator', breakdown)
+        breakdown.append((f"Klystrons and modulators ({self.get_num_klystrons()}x, {round(self.get_klystron_average_power()/1e3,0)} kW avg per)", self.get_cost_klystrons()))
+        return (self.name, breakdown)
 
 class RFAcceleratorInitializationException(Exception):
     "An Exception class that is raised when trying to access a uninitialized field"
     pass
+
