@@ -110,7 +110,7 @@ class RFAccelerator(Trackable, CostModeled):
         On setting, it changes the nom_energy_gain
         Note: the gradient of the structures, e.g. the 100e6 V/m quoted for CLIC structures, are given by gradient_structure.
         """
-        return self.voltage_structure/self.length
+        return self.nom_energy_gain/self.length
     @nom_accel_gradient.setter
     def nom_accel_gradient(self,nom_accel_gradient : float):
         self.nom_energy_gain = nom_accel_gradient*self.length
