@@ -198,7 +198,9 @@ class RFAccelerator_TW(abel.RFAccelerator):
         self.set_gradient( self.get_gradient_max() )
         return self.get_gradient()
 
-    ## PLOTS ##
+    #---------------------------------------------------------------------#
+    # Plots (CLICopti-based)                                              #
+    #=====================================================================#
 
     def plot_gradient_profile(self) -> float:
         z = self._RF_structure.getZ_all()
@@ -240,3 +242,11 @@ class RFAccelerator_TW(abel.RFAccelerator):
     def make_structure_title(self) -> str:
         "Make a 'personalized' title for the implementing RF structure"
         return f"{type(self._RF_structure).__name__}, V={self.voltage_structure/1e6:.1f} [MV]"
+
+    #---------------------------------------------#
+    # Methods for cost modelling                  #
+    #=============================================#
+
+    def get_cost_structures(self):
+        "Cost of the RF structures [ILC units]"
+        return 500e3 #Rough number from memory (KNS)
