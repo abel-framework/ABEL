@@ -53,6 +53,44 @@ class RFAccelerator_TW(abel.RFAccelerator):
         
         self.set_num_integration_points(self.get_num_integration_points())
 
+    def _checkType_or_getOld(self, r, name, typeWanted=float, nameInCLICopti=None, scaleFromCLICopti=None, firstCall=False):
+        """
+        Helper for _make_structure() in the child classes.
+        If r is None return the old value from self._RFstructure,
+        otherwise check data type and if possible/needed convert and scale.
+        """
+
+        if nameInCLICopti == None:
+            nameInCLICopti = name
+
+        if firstCall == True and r == None:
+            raise ValueError("Must set " + name + " on first initialization")
+        if r == None and firstCall == False:
+            r = getattr(self._RF_structure, nameInCLICopti)
+            if scaleFromCLICopti != None:
+                r *= scaleFromCLICopti
+            return r
+
+        if type(r) != typeWanted:
+            if typeWanted == float:
+                if type(r) == int:
+                    r = float(r)
+                else:
+                    raise TypeError(name + " must be a float (can convert ints)")
+            elif typeWanted == int:
+                if type(r) != int:
+                    raise TypeError(name + " must be an int")
+            else:
+                raise TypeError("typeWanted must be float or int, got " + str(typeWanted))
+        return r
+
+    @abstractmethod
+    def _make_structure(self, num_rf_cells=None, rf_frequency=None):
+        """
+        Method used by subclasses to (re)generate the _RF_structure object.
+        Several arguments are generally provided, at least num_rf_cells [int] and rf_frequency [Hz].
+        """
+        raise NotImplementedError("Must be implemented in child classes")
     #---------------------------------------------------------------------#
     # Override some of the properties from the parent class RFAccelerator #
     #=====================================================================#
@@ -70,12 +108,10 @@ class RFAccelerator_TW(abel.RFAccelerator):
     @property
     def rf_frequency(self) -> float:
         "The RF frequency of the RF structures [Hz]"
-        #return self._RF_structure.getOmega()/(2*np.pi)
         return self._RF_structure.getF0()
     @rf_frequency.setter
     def rf_frequency(self, rf_frequency):
-        #This might be overridden in some subclasses
-        raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
+        self._make_structure(rf_frequency=rf_frequency)
 
     def energy_usage(self):
         "Energy usage per bunch [J]"
@@ -91,11 +127,14 @@ class RFAccelerator_TW(abel.RFAccelerator):
         return self._RF_structure.N
     @num_rf_cells.setter
     def num_rf_cells(self, num_rf_cells : int):
-        #This might be overridden in some subclasses
-        raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
+        if type(num_rf_cells) != int:
+            raise TypeError("num_rf_cells must be an integer")
+        self._make_structure(num_rf_cells=num_rf_cells)
 
 
     def set_num_integration_points(self,N : int):
+        if type(N) != int:
+            raise TypeError("Number of integration points must be an integer")
         self._num_integration_points = N
         self._RF_structure.calc_g_integrals(self._num_integration_points)
     def get_num_integration_points(self):

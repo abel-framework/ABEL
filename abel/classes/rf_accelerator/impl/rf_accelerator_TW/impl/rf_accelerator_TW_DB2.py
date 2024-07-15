@@ -49,52 +49,25 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
                  d_n=0.160233420548558, d_n_delta=0.040208386429788*2,
                  length=None, num_structures=None, nom_energy_gain=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
 
-        structure = self._make_structure(num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency, constructurCalling=True)
+        structure = self._make_structure(num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency, constructorCalling=True)
 
         super().__init__(RF_structure=structure, \
                          length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain, \
                          bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
 
-    def _make_structure(self, num_rf_cells=None, a_n=None, a_n_delta=None, d_n=None, d_n_delta=None, rf_frequency=None, constructurCalling=False):
+    def _make_structure(self, num_rf_cells=None, a_n=None, a_n_delta=None, d_n=None, d_n_delta=None, rf_frequency=None, constructorCalling=False):
         """
         (re)Initialize the underlying structure object.
         On first call, must set all arguments, on subsequent calls they can be set individually to change parameters.
         If constructorCalling is False, then finalize the initialization in RFAccelerator_TW (use True when calling from child class constructor).
         """
 
-        def checkType_or_getOld(r, name, typeWanted=float, nameInCLICopti=None, scaleFromCLICopti=None):
-            "Return the old value if r is None, otherwise check data type and if possible/needed convert"
-
-            if nameInCLICopti == None:
-                nameInCLICopti = name
-
-            if constructurCalling == True and r == None:
-                raise ValueError("Must set " + name + " on first initialization")
-            if r == None and constructurCalling == False:
-                r = getattr(self._RF_structure, nameInCLICopti)
-                if scaleFromCLICopti != None:
-                    r *= scaleFromCLICopti
-                return r
-
-            if type(r) != typeWanted:
-                if typeWanted == float:
-                    if type(r) == int:
-                        r = float(r)
-                    else:
-                        raise TypeError(name + " must be a float (can convert ints)")
-                elif typeWanted == int:
-                    if type(r) != int:
-                        raise TypeError(name + " must be an int")
-                else:
-                    raise TypeError("typeWanted must be float or int, got " + str(typeWanted))
-            return r
-
-        num_rf_cells = checkType_or_getOld(num_rf_cells, "num_rf_cells", typeWanted=int, nameInCLICopti="N")
-        a_n          = checkType_or_getOld(a_n,          "a_n")
-        a_n_delta    = checkType_or_getOld(a_n_delta,    "a_n_delta")
-        d_n          = checkType_or_getOld(d_n,          "d_n")
-        d_n_delta    = checkType_or_getOld(d_n_delta,    "d_n_delta")
-        rf_frequency = checkType_or_getOld(rf_frequency, "rf_frequency", nameInCLICopti="f0_scaleto", scaleFromCLICopti=1e9)
+        num_rf_cells = self._checkType_or_getOld(num_rf_cells, "num_rf_cells", typeWanted=int, nameInCLICopti="N",                 firstCall=constructorCalling)
+        a_n          = self._checkType_or_getOld(a_n,          "a_n",                                                              firstCall=constructorCalling)
+        a_n_delta    = self._checkType_or_getOld(a_n_delta,    "a_n_delta",                                                        firstCall=constructorCalling)
+        d_n          = self._checkType_or_getOld(d_n,          "d_n",                                                              firstCall=constructorCalling)
+        d_n_delta    = self._checkType_or_getOld(d_n_delta,    "d_n_delta",                                                        firstCall=constructorCalling)
+        rf_frequency = self._checkType_or_getOld(rf_frequency, "rf_frequency", nameInCLICopti="f0_scaleto", scaleFromCLICopti=1e9, firstCall=constructorCalling)
 
         #print("Making new structure, parameters:", num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency)
 
@@ -102,7 +75,7 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
             RFAccelerator_TW_DB2.database,
             num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency/1e9)
 
-        if not constructurCalling:
+        if not constructorCalling:
             self._initialize_RF_structure(structure)
 
         return structure
@@ -134,14 +107,6 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
     @d_n_delta.setter
     def d_n_delta(self,d_n_delta : float):
         self._make_structure(d_n_delta=d_n_delta)
-
-    @property
-    def rf_frequency(self) -> float:
-        "The RF frequency of the RF structures [Hz]"
-        return self._RF_structure.getF0()
-    @rf_frequency.setter
-    def rf_frequency(self, rf_frequency):
-        self._make_structure(rf_frequency=rf_frequency)
 
     # For plots etc
 
