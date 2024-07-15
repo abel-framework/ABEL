@@ -220,7 +220,7 @@ class RFAccelerator(Trackable, CostModeled):
             raise ValueError("num_structures must be >=1")
         self._num_structures = num_structures
 
-    #rf_frequency overridden by RFAccelerator_TW
+    #rf_frequency is overridden by RFAccelerator_TW, which manages it through the CLICopti object
     @property
     def rf_frequency(self) -> float:
         "The RF frequency of the RF structures [1/s]"

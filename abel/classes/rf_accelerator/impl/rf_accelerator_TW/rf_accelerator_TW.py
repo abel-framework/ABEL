@@ -32,21 +32,26 @@ class RFAccelerator_TW(abel.RFAccelerator):
             The underlying AccelStructure object, typically provided by the implementing subclass.
             Must be specified.
         """
-        #Finalizing the RFstructure initialization
-        if RF_structure == None:
-            raise ValueError("Must set RF structure; this is typically done from an implementing daugther class")
-        self._RF_structure = RF_structure
-        self._num_integration_points = None
-        self.set_num_integration_points(1000)
+
+        self._num_integration_points = 1000
+        self._initialize_RF_structure(RF_structure)
 
         #Set for not-handling in base class
         self._structure_length = None
 
-        #Initialize it
+        #Initialize the beam_charge to None, i.e. get it in track()
         self._beam_charge = None
 
         super().__init__(length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain, \
                          bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
+
+    def _initialize_RF_structure(self, RF_structure):
+        "Finalizing the RFstructure initialization, to be called by __init__ or by subclasses as needed"
+        if RF_structure == None:
+            raise ValueError("Must set RF structure; this is typically done from an implementing daugther class")
+        self._RF_structure = RF_structure
+        
+        self.set_num_integration_points(self.get_num_integration_points())
 
     #---------------------------------------------------------------------#
     # Override some of the properties from the parent class RFAccelerator #
@@ -58,15 +63,18 @@ class RFAccelerator_TW(abel.RFAccelerator):
         return self._RF_structure.getL()
     @structure_length.setter
     def structure_length(self, structure_length : float):
+        #This might be overridden in some subclasses
         #This is derived from the number of cells, the phase advance, and the frequency
         raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
 
     @property
     def rf_frequency(self) -> float:
-        "The RF frequency of the RF structures [1/s]"
-        return self._RF_structure.getOmega()*2*np.pi
+        "The RF frequency of the RF structures [Hz]"
+        #return self._RF_structure.getOmega()/(2*np.pi)
+        return self._RF_structure.getF0()
     @rf_frequency.setter
     def rf_frequency(self, rf_frequency):
+        #This might be overridden in some subclasses
         raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
 
     def energy_usage(self):
@@ -76,6 +84,16 @@ class RFAccelerator_TW(abel.RFAccelerator):
     #---------------------------------------------------------------------#
     # CLICopti-based modelling                                            #
     #=====================================================================#
+
+    @property
+    def num_rf_cells(self) -> int:
+        "The number of RF structure cells"
+        return self._RF_structure.N
+    @num_rf_cells.setter
+    def num_rf_cells(self, num_rf_cells : int):
+        #This might be overridden in some subclasses
+        raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
+
 
     def set_num_integration_points(self,N : int):
         self._num_integration_points = N
@@ -172,15 +190,16 @@ class RFAccelerator_TW(abel.RFAccelerator):
         return bpl
 
     def get_t_fill(self) -> float:
-        "Get the filling time of the structure, i.e. the time for a signal to propagate through the whole structure."
+        "Get the filling time [s] of the structure, i.e. the time for a signal to propagate through the whole structure."
         return self._RF_structure.getTfill()
 
     def get_pulse_length_total(self) -> float:
+        "Get the total RF pulse length [s], including rise time, filling time, beam time, and rampdown (drive-beam style)"
         return 2 * (self._RF_structure.getTrise() + self._RF_structure.getTfill()) \
                  + self.get_beam_pulse_length()
 
     def get_max_pulse_length(self) -> float:
-        "Calculates the max beam_pulse_length before exceeding gradient limits, given power and beam_current"
+        "Calculates the max beam_pulse_length [s] before exceeding gradient limits, given power and beam_current"
         return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), self.beam_current)
 
     def set_pulse_length_max(self) -> float:
