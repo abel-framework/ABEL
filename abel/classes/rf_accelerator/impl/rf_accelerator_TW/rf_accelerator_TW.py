@@ -48,6 +48,9 @@ class RFAccelerator_TW(abel.RFAccelerator):
         self.bunch_separation       = None # [s]
         self.num_bunches_in_train   = None # [-]
 
+        #Set this to true to always optimize the gradient, number of structures, and overall length on track()
+        self.autoOptimize = True
+
         super().__init__(length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain)
 
     def __str__(self):
@@ -136,6 +139,11 @@ class RFAccelerator_TW(abel.RFAccelerator):
         self._average_current_train = np.fabs(beam.average_current_train())
         self._num_bunches_in_train = beam.num_bunches_in_train
         self._bunch_charge = beam.abs_charge()
+
+        if self.autoOptimize:
+            #Given the target energy gain, current, and pulse length,
+            # set the max gradient and the minimum linac length
+            self.optimize_linac_geometry_and_gradient()
 
         return super().track(beam, savedepth, runnable, verbose)
 
@@ -312,14 +320,39 @@ class RFAccelerator_TW(abel.RFAccelerator):
         else:
             return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), self.average_current_train)
 
-    def get_gradient_max(self) -> float:
-        "Calculates the max gradient (and thus voltage) before exceeding breakdown limts, given the currently selected pulse length and beam current"
-        return self._RF_structure.getMaxAllowablePower_beamTimeFixed(self.average_current_train, self.train_duration)
+    def get_structure_voltage_max(self) -> float:
+        "Calculates the maximum structure voltage before exceeding breakdown limts, given the currently selected pulse length and beam current"
+        Vmax = None
+        if self.num_bunches_in_train == 1:
+            Pmax = self._RF_structure.getMaxAllowablePower_beamTimeFixed(0.0, self.train_duration)
+            Vmax = self._RF_structure.getVoltageUnoaded(Pmax)
+        else:
+            Pmax = self._RF_structure.getMaxAllowablePower_beamTimeFixed(self.average_current_train, self.train_duration)
+            Vmax = self._RF_structure.getVoltageLoaded(Pmax, self.average_current_train)
+        return Vmax
+    
+    def optimize_linac_geometry_and_gradient(self,fill_factor=1.0):
+        """
+        Find the right structure voltage using get_structure_voltage_max(), then set the number of structures
+        and the overall linac length so that the total energy gain is respected.
 
-    def set_gradient_max(self) -> float:
-        "Sets the gradient to the maximally achievable given the currently selected pulse length and beam current"
-        self.set_gradient( self.get_gradient_max() )
-        return self.get_gradient()
+        Returns (Vmax, Vstruct, Ntotal_int)
+        """
+        #Get the maximum possible voltage
+        Vmax = self.get_structure_voltage_max()
+        #TODO: Handle Vmax = 0.0
+        Vtotal = self.nom_energy_gain
+        Ntotal = Vtotal/Vmax
+        
+        Ntotal_int = int(np.ceil(Ntotal))
+        Vstruct    = Vtotal/Ntotal_int
+
+        length=Ntotal_int*self.structure_length/fill_factor
+
+        #Save it
+        self.length          = length
+        self.num_structures  = Ntotal_int
+        return (Vmax, Vstruct, Ntotal_int)
 
     #---------------------------------------------------------------------#
     # Plots (CLICopti-based)                                              #
