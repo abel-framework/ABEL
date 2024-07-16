@@ -15,7 +15,7 @@ class RFAccelerator(Trackable, CostModeled):
     """
 
     @abstractmethod
-    def __init__(self, length=None, structure_length=None, num_structures=None, nom_energy_gain=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
+    def __init__(self, length=None, structure_length=None, num_structures=None, nom_energy_gain=None):
         """
         Initialize the rf_accelerator base class.
         This can interface an underlying RF structure model including power requirements, and costs.
@@ -31,8 +31,8 @@ class RFAccelerator(Trackable, CostModeled):
             Must be specified
 
         structure_length : float
-            The length of the RF structure.
-            Must be specified.
+            The length of the RF structure [m].
+            Must be specified. Might be calculated in subclass from e.g. num RF cells.
 
         num_structures : int
             The number of RF structures in the RFaccelerator
@@ -40,21 +40,11 @@ class RFAccelerator(Trackable, CostModeled):
         nom_energy_gain : float
             The total accelerating voltage (e.g. the energy gain) of the RF structures [V].
             Either this or gradient must be specified.
-
-        bunch_separation : float
-            The separation of bunches during the beam pulse [s]
-
-        num_bunches_in_train : int
-            The number of bunches in the beam pulse
-
-        rep_rate_trains : float
-            The repetition rate of the beam & RF pulses
-
         """
-        
-        # set bunch pattern
-        super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
-        
+
+        #Force them all to None/uninitialized
+        super().__init__(num_bunches_in_train=None, bunch_separation=None, rep_rate_trains=None)
+
         #Initialize variables through property setters
         #
         #Internally, we use self._length, self._num_structures, and self._structure_length to keep track of the geometry;
@@ -64,13 +54,15 @@ class RFAccelerator(Trackable, CostModeled):
         # we easily end up with inconsistencies and infinite recursions, or very complex logic.
         # Here we just set these "basic" parameters, use the property setters/getters to get to the other ones.
 
-        self.length             = length
+        self.length = length
 
         if not hasattr(self, "_structure_length"):
-            #If already handled by daughter class, don't try to set again
-            # E.g in rf_accelerator_TW, the structure_length is a computed parameter
+            #If already handled by daughter class, don't try to set again;
+            # This is indicated by setting _structure_length to None before calling this __init__().
+            # E.g in rf_accelerator_TW, the structure_length is a computed parameter (from number of rf cells),
             # and cannot be set directly.
             self.structure_length   = structure_length
+
         self.num_structures     = num_structures
 
         self.nom_energy_gain    = nom_energy_gain
@@ -80,6 +72,12 @@ class RFAccelerator(Trackable, CostModeled):
         self.efficiency_wallplug_to_rf   = 0.55
 
         self.name = 'RF accelerator'
+
+    def __str__(self):
+        "Print info"
+        s = f"{self.name}: Length={self.length:.1f}[m], L_struct={self.structure_length*1e3:.0f}[mm], N={self.num_structures}, fill={self.fill_factor*100:.3f}[%], " + \
+            f"Egain={self.nom_energy_gain/1e9:.3f} [GV], gradient_structure={self.gradient_structure/1e6:.1f}[MV/m], rf_frequency={self.rf_frequency/1e9}[GHz]"
+        return s
 
     #-----------------------------------------#
     # Properties related to voltage and power #
@@ -193,10 +191,11 @@ class RFAccelerator(Trackable, CostModeled):
             ns = 1
         self.num_structures = ns
 
-    #structure_length overridden by RFAccelerator_TW
     @property
     def structure_length(self) -> float:
         "The length of each individual RF structure [m]"
+        #Note: structure_length overridden by RFAccelerator_TW,
+        #      which calculates it from num_rf_cells
         if self._structure_length is None:
             raise RFAcceleratorInitializationException("structure_length not yet initialized")
         return self._structure_length
@@ -234,10 +233,16 @@ class RFAccelerator(Trackable, CostModeled):
     #===========================================#
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        
-        #TODO: Check current etc.
+        #Check that beam is bunch frequency is subharmonic of RF frequency
+        if beam.num_bunches_in_train > 1:
+            harm = self.rf_frequency/beam.bunch_frequency()
+            harmdiff = harm % 1.0
+            if harmdiff > 0.5:
+                harmdiff = 1.0-harmdiff
+            if harmdiff > 0.01:
+                raise ValueError(f"Harmonic mismatch too large: rf_frequency={self.rf_frequency/1e9:.2f}[GHz], bunch_frequency={beam.bunch_frequency()/1e9:.2f}[GHz], harm={harm:.3f}")
+
         beam.set_Es(beam.Es() + self.nom_energy_gain)
-        
         return super().track(beam, savedepth, runnable, verbose)
     
     def get_length(self):

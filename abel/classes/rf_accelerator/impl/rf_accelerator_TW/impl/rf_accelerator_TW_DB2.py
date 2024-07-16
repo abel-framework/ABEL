@@ -3,6 +3,8 @@
 import CLICopti
 import abel
 
+import matplotlib.pyplot as plt
+
 class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
     """
     Class implementing an RF structure generated from Database v2,
@@ -14,7 +16,7 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
     ===========
 
     num_rf_cells : int
-    Number of accelerating cells in the modelled RF structure
+        The number of accelerating cells in the modelled RF structure
 
     rf_frequency : float
         The frequency the structure is operating at [Hz]
@@ -35,7 +37,7 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
         Difference in d_n of first cell and last cell,
         i.e. positive d_n_delta means that the first cell has a thicker iris.
 
-     length, num_structures, nom_energy_gain, bunch_separation, num_bunches_in_train, rep_rate_trains :
+     length, num_structures, nom_energy_gain :
         See `RFAccelerator` class.
     """
 
@@ -47,13 +49,12 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
                  rf_frequency=default_frequency,
                  a_n=0.110022947942206, a_n_delta=0.016003337882503*2,
                  d_n=0.160233420548558, d_n_delta=0.040208386429788*2,
-                 length=None, num_structures=None, nom_energy_gain=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
+                 length=None, num_structures=None, nom_energy_gain=None):
 
         structure = self._make_structure(num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency, constructorCalling=True)
 
         super().__init__(RF_structure=structure, \
-                         length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain, \
-                         bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
+                         length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain)
 
     def _make_structure(self, num_rf_cells=None, a_n=None, a_n_delta=None, d_n=None, d_n_delta=None, rf_frequency=None, constructorCalling=False):
         """
@@ -117,3 +118,23 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
         tit += f", a_n={self.a_n:.3f} delta={self.a_n_delta:.3f}"
         tit += f", d_n={self.d_n:.3f} delta={self.d_n_delta:.3f}"
         return tit
+    
+    def plot_database_points(self, bgData=None):
+        "Plot the cell parameters in the database"
+        pointsGrid,_ = self.database.getGrid_meshgrid()
+
+        plt.scatter(pointsGrid[0],pointsGrid[1], marker='*', color='red')
+        plt.xlabel(r'$a/\lambda$')
+        plt.ylabel(r'$d/h$')
+
+        c1 = self._RF_structure.getCellFirst()
+        c2 = self._RF_structure.getCellMid()
+        c3 = self._RF_structure.getCellLast()
+        a_n = (c1.a_n, c2.a_n, c3.a_n)
+        d_n = (c1.d_n, c2.d_n, c3.d_n)
+
+        plt.plot(a_n, d_n, 's')
+        plt.annotate("",(a_n[0],d_n[0]), (a_n[1],d_n[1]),arrowprops=dict(arrowstyle="->"))
+        plt.annotate("",(a_n[1],d_n[1]), (a_n[2],d_n[2]),arrowprops=dict(arrowstyle="->"))
+
+

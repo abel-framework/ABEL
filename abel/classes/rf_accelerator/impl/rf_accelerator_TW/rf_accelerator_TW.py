@@ -20,7 +20,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
     for generating different structure geometries.
     """
     @abstractmethod
-    def __init__(self, RF_structure, length=None, num_structures=None, nom_energy_gain=None, bunch_separation=None, num_bunches_in_train=1, rep_rate_trains=None):
+    def __init__(self, RF_structure, length=None, num_structures=None, nom_energy_gain=None):
         """
         Initializes a rf_accelerator_TW object.
         Accepts same arguments rf_accelerator + an RF_structure CLICopti object.
@@ -39,11 +39,22 @@ class RFAccelerator_TW(abel.RFAccelerator):
         #Set for not-handling in base class
         self._structure_length = None
 
-        #Initialize the beam_charge to None, i.e. get it in track()
-        self._beam_charge = None
+        #Initialize the average_current_train and train_duration to None,
+        # and get it from Beam once in track().
+        # Can also be manually specified.
+        # For consistency, it follows how Beam does it even if average current + pulse length
+        # is more fundamental for CLICopti modelling.
+        self.bunch_charge           = None # [C]
+        self.bunch_separation       = None # [s]
+        self.num_bunches_in_train   = None # [-]
 
-        super().__init__(length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain, \
-                         bunch_separation=bunch_separation, num_bunches_in_train=num_bunches_in_train, rep_rate_trains=rep_rate_trains)
+        super().__init__(length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain)
+
+    def __str__(self):
+        s = abel.RFAccelerator.__str__(self)
+        s += f", " + \
+             f"bunch_charge={self._bunch_charge}[C], bunch_separation={self._bunch_separation}[s], num_bunches_in_train={self._num_bunches_in_train}"
+        return s
 
     def _initialize_RF_structure(self, RF_structure):
         "Finalizing the RFstructure initialization, to be called by __init__ or by subclasses as needed"
@@ -81,7 +92,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
                 if type(r) != int:
                     raise TypeError(name + " must be an int")
             else:
-                raise TypeError("typeWanted must be float or int, got " + str(typeWanted))
+                raise TypeError("For autoconverting, typeWanted must be float or int, got " + str(typeWanted))
         return r
 
     @abstractmethod
@@ -91,18 +102,19 @@ class RFAccelerator_TW(abel.RFAccelerator):
         Several arguments are generally provided, at least num_rf_cells [int] and rf_frequency [Hz].
         """
         raise NotImplementedError("Must be implemented in child classes")
-    #---------------------------------------------------------------------#
-    # Override some of the properties from the parent class RFAccelerator #
-    #=====================================================================#
+
+    #---------------------------------------------------------------------------------#
+    # Override some of the properties and methods from the parent class RFAccelerator #
+    #=================================================================================#
 
     @property
     def structure_length(self) -> float:
         "Gets the length of each individual RF structure [m]"
+        #This is related to the number of cells, the phase advance, and the frequency
         return self._RF_structure.getL()
     @structure_length.setter
     def structure_length(self, structure_length : float):
-        #This might be overridden in some subclasses
-        #This is derived from the number of cells, the phase advance, and the frequency
+        #Indirectly possible through num_rf_cells.setter
         raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
 
     @property
@@ -117,9 +129,121 @@ class RFAccelerator_TW(abel.RFAccelerator):
         "Energy usage per bunch [J]"
         return self.get_structure_pulse_energy() * self.get_num_structures() * self.efficiency_wallplug_to_rf / self.num_bunches_in_train
 
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        
+        #Store data used for power-flow modelling
+        self._train_duration = beam.train_duration()
+        self._average_current_train = np.fabs(beam.average_current_train())
+        self._num_bunches_in_train = beam.num_bunches_in_train
+        self._bunch_charge = beam.abs_charge()
+
+        return super().track(beam, savedepth, runnable, verbose)
+
     #---------------------------------------------------------------------#
     # CLICopti-based modelling                                            #
     #=====================================================================#
+
+    ## Manage caching of average_current_train [A], train_duration [s], num_bunches_in_train [int], and bunch_charge [C]
+    # Stored like this confusing mess since average_current_train an train_duration are the most important parameters
+
+    def _ensureFloat(self,r, ensurePos=False) -> float:
+        "Little helper function, allowing None or float, autoconverting int to float. If ensurePos is True, then only allow r>0.0."
+        if r == None:
+            return r
+        if type(r) == int:
+            #quietly convert int to float
+            r = float(r)
+        if type(r) != float:
+            raise TypeError("must be float, int, or None")
+        if ensurePos and r < 0.0:
+            raise ValueError("must be >= 0.0")
+        return r
+
+    @property
+    def bunch_charge(self) -> float:
+        """The total charge of one bunch [C]"""
+        if self._bunch_charge == None:
+            raise abel.RFAcceleratorInitializationException("bunch_charge not yet initialized")
+        return self._bunch_charge
+    @bunch_charge.setter
+    def bunch_charge(self, bunch_charge : float):
+        self._bunch_charge = self._ensureFloat(bunch_charge)
+
+    @property
+    def bunch_separation(self) -> float:
+        "The time [s] between each bunch"
+        if self._bunch_separation == None:
+            raise abel.RFAcceleratorInitializationException("bunch_separation not yet initialized")
+        return self._bunch_separation
+    @bunch_separation.setter
+    def bunch_separation(self, bunch_separation : float):
+        self._bunch_separation = self._ensureFloat(bunch_separation,True)
+    
+    @property
+    def num_bunches_in_train(self) -> int:
+        """
+        The number of bunches in the train.
+        When 1, train_duration is 0.0 and average_current_train is None / undefined.
+        """
+        if self._num_bunches_in_train == None:
+            raise abel.RFAcceleratorInitializationException("num_bunches_in_train not yet initialized")
+        return self._num_bunches_in_train
+    @num_bunches_in_train.setter
+    def num_bunches_in_train(self, num_bunches_in_train : int):
+        if num_bunches_in_train == None:
+            self._num_bunches_in_train = None
+            return
+        if type(num_bunches_in_train) != int:
+            raise TypeError("num_bunches_in_train must be int or None")
+        if num_bunches_in_train <= 0:
+            raise ValueError("num_bunches_in_train must be > 0")
+        self._num_bunches_in_train = num_bunches_in_train
+
+    @property
+    def bunch_frequency(self) -> float:
+        if self.num_bunches_in_train == 1:
+            raise ValueError("Bunch frequency undefined when num_bunches_in_train == 1")
+            return None
+        return 1.0/self.bunch_separation
+    @bunch_frequency.setter
+    def bunch_frequency(self, bunch_frequency):
+        raise NotImplementedError("Cannot directly set bunch_frequency")
+    
+    @property
+    def train_duration(self) -> float:
+        """
+        The train duration [s] = beam pulse length [s] = length of RF pulse flat top length [s] for the RF structures.
+        0.0 for single-bunch trains.
+        Normally populated from Beam in track() but can be set directly for calculator use.
+        """
+        if self.num_bunches_in_train == 1:
+            return 0.0 
+        return self.bunch_separation*(self.num_bunches_in_train-1)
+    @train_duration.setter
+    def train_duration(self, train_duration : float):
+        raise NotImplementedError("Cannot directly set train_duration")
+    
+    @property
+    def average_current_train(self) -> float:
+        """
+        The beam current of the linac [A].
+        """
+        return self.bunch_charge*self.bunch_frequency
+    @average_current_train.setter
+    def average_current_train(self, average_current_train : float) -> None:
+        raise NotImplementedError("Cannot directly set average_current_train")
+
+    @property
+    def beam_charge(self) -> float:
+        """
+        The total charge of the beam [C]
+        """
+        if self._bunch_charge != None and self._num_bunches_in_train != None:
+            return self._bunch_charge*self._num_bunches_in_train
+        raise abel.RFAcceleratorInitializationException("Beam charge not initialized")
+    @beam_charge.setter
+    def beam_charge(self,beam_charge : float):
+        raise NotImplementedError("Cannot set beam_charge directly")
 
     @property
     def num_rf_cells(self) -> int:
@@ -130,7 +254,6 @@ class RFAccelerator_TW(abel.RFAccelerator):
         if type(num_rf_cells) != int:
             raise TypeError("num_rf_cells must be an integer")
         self._make_structure(num_rf_cells=num_rf_cells)
-
 
     def set_num_integration_points(self,N : int):
         if type(N) != int:
@@ -146,57 +269,15 @@ class RFAccelerator_TW(abel.RFAccelerator):
         #      which assumes a drive beam driven pulse in that pulse end is a mirror of the start,
         #      and that the pusle shape can be easily "reorganized" to a square pulse.
         #      As long as Tfill is short, this doesn't matter.
-        return (self._RF_structure.getTrise() + self.get_t_fill() + self.get_beam_pulse_length()) * \
+        return (self._RF_structure.getTrise() + self.get_t_fill() + self.train_duration) * \
             self.get_structure_power()
-
-    @property
-    def beam_charge(self) -> float:
-        """
-        The total charge of the beam [C]
-        Can be set directly for power calculations,
-          or implicitly by track()
-        """
-        if self._beam_charge is None:
-            raise abel.RFAcceleratorInitializationException("Beam charge not initialized")
-        return self._beam_charge
-    @beam_charge.setter
-    def beam_charge(self,beam_charge : float):
-        self._beam_charge = beam_charge
-
-    @property
-    def bunch_charge(self) -> float:
-        """
-        The total charge of one bunch [C]
-        Calculated from beam_charge and num_bunches_in_train
-        When set, only beam_charge is changed
-        """
-        return self.beam_charge/self.num_bunches_in_train
-    @bunch_charge.setter
-    def bunch_charge(self, bunch_charge : float):
-        self.beam_charge = bunch_charge*self.num_bunches_in_train
-
-    @property
-    def beam_current(self) -> float:
-        """
-        The beam current of the linac [A].
-        Calculated from bunch_charge and get_beam_pulse_length()
-        When set, only beam_charge is changed.
-        When the number of bunches is train duration is 0 (num bunches = 1),
-        the beam_current is effectively 0 for e.g. beam loading purposes.
-        """
-        if self.get_beam_pulse_length() == 0.0:
-            return 0.0
-        return self.beam_charge / self.get_beam_pulse_length()
-    @beam_current.setter
-    def beam_current(self, beam_current : float) -> None:
-        self.beam_charge = beam_current * self.get_beam_pulse_length()
 
     def get_structure_power(self) -> float:
         "Get the peak power [W] required for a single RF structure in the given configuration."
-        if self.beam_current == 0.0:
+        if self.num_bunches_in_train == 1:
             P = self._RF_structure.getPowerUnloaded(self.voltage_structure)
         else:
-            P = self._RF_structure.getPowerLoaded(self.voltage_structure, self.beam_current)
+            P = self._RF_structure.getPowerLoaded(self.voltage_structure, self.average_current_train)
         return P
 
     def get_RF_efficiency(self) -> float:
@@ -204,29 +285,16 @@ class RFAccelerator_TW(abel.RFAccelerator):
         Get the RF->beam efficiency as a number between 0 and 1, including the effect due to pulse shape
         Calculated with different methods depending on wehter num_bunches_in_train = 1 or > 1.
         """
-        if self.get_beam_pulse_length() == 0.0:
+        if self.num_bunches_in_train == 1:
             return self.voltage_structure*self.beam_charge / self.get_structure_pulse_energy()
         else:
-            return self._RF_structure.getTotalEfficiency(self.get_structure_power(), self.beam_current, self.get_beam_pulse_length())
+            return self._RF_structure.getTotalEfficiency(self.get_structure_power(), self.average_current_train, self.train_duration)
 
     def get_RF_efficiency_flattop(self) -> float:
         "Get the RF->beam efficiency as a number between 0 and 1, ignoring the fill time etc."
-        return self._RF_structure.getFlattopEfficiency(self.get_structure_power(), self.beam_current)
-
-    def get_beam_pulse_length(self) -> float:
-        """
-        Gets the beam pulse length (=length of RF pulse flat top) [s] for the RF structues,
-        or 0.0 if the bunch separation is not set
-        """
-        if self.bunch_separation is None:
-            if self.num_bunches_in_train != 1:
-                #TODO Move this to trackable
-                raise ValueError("Invalid bunch separation but multiple bunches!")
-            return 0.0
-        bpl = self.get_train_duration()
-        if bpl is None:
-            raise abel.RFAcceleratorInitializationException("trackable.get_train_duration returned None")
-        return bpl
+        if self.average_current_train == None:
+            raise ValueError("Undefined for single bunch trains")
+        return self._RF_structure.getFlattopEfficiency(self.get_structure_power(), self.average_current_train)
 
     def get_t_fill(self) -> float:
         "Get the filling time [s] of the structure, i.e. the time for a signal to propagate through the whole structure."
@@ -235,21 +303,18 @@ class RFAccelerator_TW(abel.RFAccelerator):
     def get_pulse_length_total(self) -> float:
         "Get the total RF pulse length [s], including rise time, filling time, beam time, and rampdown (drive-beam style)"
         return 2 * (self._RF_structure.getTrise() + self._RF_structure.getTfill()) \
-                 + self.get_beam_pulse_length()
+                 + self.train_duration
 
-    def get_max_pulse_length(self) -> float:
-        "Calculates the max beam_pulse_length [s] before exceeding gradient limits, given power and beam_current"
-        return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), self.beam_current)
-
-    def set_pulse_length_max(self) -> float:
-        "Sets the pulse length to the maximally achievable given the currently selected gradient and beam current"
-        #Obsolete, set_beam_pulse_length is dead. Change the number of bunches from upstream instead!
-        self.set_beam_pulse_length( self.get_max_pulse_length() )
-        return self.get_beam_pulse_length()
+    def get_pulse_length_max(self) -> float:
+        "Calculates the max train duration [s] before exceeding gradient limits, given power and average_current_train [A]"
+        if self.num_bunches_in_train == 1:
+            return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), 0.0)
+        else:
+            return self._RF_structure.getMaxAllowableBeamTime(self.get_structure_power(), self.average_current_train)
 
     def get_gradient_max(self) -> float:
         "Calculates the max gradient (and thus voltage) before exceeding breakdown limts, given the currently selected pulse length and beam current"
-        return self._RF_structure.getMaxAllowablePower_beamTimeFixed(self.beam_current, self.get_beam_pulse_length())
+        return self._RF_structure.getMaxAllowablePower_beamTimeFixed(self.average_current_train, self.train_duration)
 
     def set_gradient_max(self) -> float:
         "Sets the gradient to the maximally achievable given the currently selected pulse length and beam current"
@@ -262,10 +327,10 @@ class RFAccelerator_TW(abel.RFAccelerator):
 
     def plot_gradient_profile(self) -> float:
         z = self._RF_structure.getZ_all()
-        if self.beam_current == None:
+        if self.average_current_train == None:
             Ez = self._RF_structure.getEz_unloaded_all(self.get_structure_power())
         else:
-            Ez = self._RF_structure.getEz_loaded_all(self.get_structure_power(), self.beam_current)
+            Ez = self._RF_structure.getEz_loaded_all(self.get_structure_power(), self.average_current_train)
 
         plt.subplots()
         plt.plot(z*1e3,Ez/1e6)
@@ -277,8 +342,8 @@ class RFAccelerator_TW(abel.RFAccelerator):
     def plot_power_profile(self) -> float:
         t = np.linspace(0,self.get_pulse_length_total(), 100)
         P = self._RF_structure.getP_t(t, self.get_structure_power(),\
-                                         self.get_beam_pulse_length(),\
-                                         self.beam_current )
+                                         self.train_duration,\
+                                         self.average_current_train )
 
         plt.subplots()
         plt.plot(t*1e9,P/1e6)
@@ -292,7 +357,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
         tit = self.make_structure_title()
         tit += "\n"
         tit += f"V={self.voltage_structure/1e6:.1f} [MV]"
-        tit += f", I={self.beam_current:.1f} [A]"
+        tit += f", I={self.average_current_train:.1f} [A]"
         tit += f", <G>={self.gradient_structure/1e6:.1f} [MV/m]"
         return tit
 
