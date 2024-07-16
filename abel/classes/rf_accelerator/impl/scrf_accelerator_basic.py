@@ -5,6 +5,7 @@ import numpy as np
 
 class SCRFAcceleratorBasic(RFAccelerator):
 
+    #NOTE: DIFFERENT ORDER OF OF PARAMETERS!
     def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=31.5e6, rep_rate_trains=None, bunch_separation=None, num_bunches_in_train=None, fill_factor=0.711, rf_frequency=1.3e9, structure_length=1.038, peak_power_klystron=9.822e6, operating_temperature=2):
         
         self.peak_power_klystron = peak_power_klystron
@@ -13,22 +14,37 @@ class SCRFAcceleratorBasic(RFAccelerator):
         self.bunch_charge = None
         
         # run base class constructor
-        super().__init__(length=length, nom_energy_gain=nom_energy_gain, structure_length=structure_length, fill_factor=fill_factor, nom_accel_gradient=nom_accel_gradient, rf_frequency=rf_frequency, rep_rate_trains=rep_rate_trains, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation)
+        num_structures = None
+        if (length != None and structure_length != None and fill_factor != None):
+            num_structures = int(np.ceil(length/structure_length)/fill_factor)
+        #super().__init__(length=length, nom_energy_gain=nom_energy_gain, structure_length=structure_length, fill_factor=fill_factor, nom_accel_gradient=nom_accel_gradient, rf_frequency=rf_frequency, rep_rate_trains=rep_rate_trains, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation)
+        super().__init__(length=length, structure_length=structure_length, num_structures=num_structures, nom_energy_gain=nom_energy_gain)
+        self.rf_frequency=rf_frequency
+        self.rep_rate_trains = rep_rate_trains #To Trackable
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-
-        # set the bunch charge (for power calculations)
-        self.bunch_charge = beam.charge()
+        b = super().track(beam, savedepth, runnable, verbose)
 
         # calculate the number of klystrons required
         self.energy_usage()
-        
-        return super().track(beam, savedepth, runnable, verbose)
 
+        return b
+
+
+    def optimize_linac_geometry_and_gradient(self,fill_factor=1.0):
+        """
+        Find the right structure voltage based on the physics, then set the number of structures
+        and the overall linac length so that the total energy gain is respected.
+
+        See RFAccelerator_TW for example
+
+        Returns (Vmax, Vstruct, Ntotal_int)
+        """
+        raise NotImplementedError()
 
     def get_cost_structures(self):
         "Cost of the RF structures [ILC units]"
-        return self.get_length() * CostModeled.cost_per_length_rf_structure_superconducting
+        return self.length * CostModeled.cost_per_length_rf_structure_superconducting
         
     
     # implement required abstract methods
@@ -53,7 +69,7 @@ class SCRFAcceleratorBasic(RFAccelerator):
         static_heat_load_per_structure = 1.32/9 # [W/structure]
         dynamic_heat_load_per_structure = 9.79/9 # [W/structure] TODO: normalize by the current
         heat_load_per_structure = static_heat_load_per_structure + dynamic_heat_load_per_structure
-        heat_load_total = heat_load_per_structure*self.get_num_structures()
+        heat_load_total = heat_load_per_structure*self.num_structures
         
         # calculate cooling efficiency (Carnot engine efficiency)
         room_temperature = 309 # [K]
@@ -79,7 +95,7 @@ class SCRFAcceleratorBasic(RFAccelerator):
         filling_time = 925e-6 # [s]
         
         # beam loading efficiency
-        train_duration = self.get_train_duration()
+        train_duration = self.train_duration
         peak_power_duration = filling_time + train_duration
         efficiency_beamloading = train_duration/peak_power_duration
 
@@ -104,7 +120,7 @@ class SCRFAcceleratorBasic(RFAccelerator):
         filling_time = 925e-6 # [s]
         
         # beam loading efficiency
-        train_duration = self.get_train_duration()
+        train_duration = self.train_duration
         peak_power_duration = filling_time + train_duration
         efficiency_beamloading = train_duration/peak_power_duration
 
@@ -119,7 +135,7 @@ class SCRFAcceleratorBasic(RFAccelerator):
         static_heat_load_per_structure = 1.32/9 # [W/structure]
         dynamic_heat_load_per_structure = 9.79/9 # [W/structure] TODO: normalize by the current
         heat_load_per_structure = static_heat_load_per_structure + dynamic_heat_load_per_structure
-        heat_load_total = heat_load_per_structure*self.get_num_structures()
+        heat_load_total = heat_load_per_structure*self.num_structures
         
         # calculate cooling efficiency (Carnot engine efficiency)
         room_temperature = 309 # [K]

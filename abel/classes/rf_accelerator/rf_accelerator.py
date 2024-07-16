@@ -71,12 +71,26 @@ class RFAccelerator(Trackable, CostModeled):
         self.num_structures_per_klystron = 1.0
         self.efficiency_wallplug_to_rf   = 0.55
 
+        #Initialize the average_current_train and train_duration to None,
+        # and get it from Beam once in track().
+        # Can also be manually specified.
+        # For consistency, it follows how Beam does it even if average current + pulse length
+        # is more fundamental for CLICopti modelling.
+        self.bunch_charge           = None # [C]
+        self.bunch_separation       = None # [s]
+        self.num_bunches_in_train   = None # [-] #This resets what was done in Trackable
+
+        #Set this to true to always optimize the gradient, number of structures, and overall length on track()
+        self.autoOptimize = False
+        self.autoOptimize_targetFillFactor = 0.71
+
         self.name = 'RF accelerator'
 
     def __str__(self):
         "Print info"
         s = f"{self.name}: Length={self.length:.1f}[m], L_struct={self.structure_length*1e3:.0f}[mm], N={self.num_structures}, fill={self.fill_factor*100:.3f}[%], " + \
-            f"Egain={self.nom_energy_gain/1e9:.3f} [GV], gradient_structure={self.gradient_structure/1e6:.1f}[MV/m], rf_frequency={self.rf_frequency/1e9}[GHz]"
+            f"Egain={self.nom_energy_gain/1e9:.3f} [GV], gradient_structure={self.gradient_structure/1e6:.1f}[MV/m], rf_frequency={self.rf_frequency/1e9}[GHz], " + \
+            f"bunch_charge={self._bunch_charge}[C], bunch_separation={self._bunch_separation}[s], num_bunches_in_train={self._num_bunches_in_train}"
         return s
 
     #-----------------------------------------#
@@ -137,6 +151,114 @@ class RFAccelerator(Trackable, CostModeled):
     def gradient_structure(self,gradient_structure : float):
         self.voltage_structure = gradient_structure*self.structure_length
 
+
+    #---------------------------------------#
+    # Properties related to train structure #
+    #=======================================#
+
+    ## Manage caching of average_current_train [A], train_duration [s], num_bunches_in_train [int], and bunch_charge [C]
+    # Stored like this confusing mess since average_current_train an train_duration are the most important parameters
+
+    #TODO: Integrate with or move to `trackable`
+
+    def _ensureFloat(self,r, ensurePos=False) -> float:
+        "Little helper function, allowing None or float, autoconverting int to float. If ensurePos is True, then only allow r>0.0."
+        if r == None:
+            return r
+        if type(r) == int or type(r) == np.float64:
+            #quietly convert to float
+            r = float(r)
+        if type(r) != float:
+            raise TypeError(f"must be float, int, or None. Got: {type(r)}, {r}")
+        if ensurePos and r < 0.0:
+            raise ValueError("must be >= 0.0")
+        return r
+
+    @property
+    def bunch_charge(self) -> float:
+        """The total charge of one bunch [C]"""
+        if self._bunch_charge == None:
+            raise RFAcceleratorInitializationException("bunch_charge not yet initialized")
+        return self._bunch_charge
+    @bunch_charge.setter
+    def bunch_charge(self, bunch_charge : float):
+        self._bunch_charge = self._ensureFloat(bunch_charge)
+
+    @property
+    def bunch_separation(self) -> float:
+        "The time [s] between each bunch"
+        if self._bunch_separation == None:
+            raise RFAcceleratorInitializationException("bunch_separation not yet initialized")
+        return self._bunch_separation
+    @bunch_separation.setter
+    def bunch_separation(self, bunch_separation : float):
+        self._bunch_separation = self._ensureFloat(bunch_separation,True)
+    
+    @property
+    def num_bunches_in_train(self) -> int:
+        """
+        The number of bunches in the train.
+        When 1, train_duration is 0.0 and average_current_train is None / undefined.
+        """
+        if self._num_bunches_in_train == None:
+            raise RFAcceleratorInitializationException("num_bunches_in_train not yet initialized")
+        return self._num_bunches_in_train
+    @num_bunches_in_train.setter
+    def num_bunches_in_train(self, num_bunches_in_train : int):
+        if num_bunches_in_train == None:
+            self._num_bunches_in_train = None
+            return
+        if type(num_bunches_in_train) != int:
+            raise TypeError("num_bunches_in_train must be int or None")
+        if num_bunches_in_train <= 0:
+            raise ValueError("num_bunches_in_train must be > 0")
+        self._num_bunches_in_train = num_bunches_in_train
+
+    @property
+    def bunch_frequency(self) -> float:
+        if self.num_bunches_in_train == 1:
+            raise ValueError("Bunch frequency undefined when num_bunches_in_train == 1")
+            return None
+        return 1.0/self.bunch_separation
+    @bunch_frequency.setter
+    def bunch_frequency(self, bunch_frequency):
+        raise NotImplementedError("Cannot directly set bunch_frequency")
+    
+    @property
+    def train_duration(self) -> float:
+        """
+        The train duration [s] = beam pulse length [s] = length of RF pulse flat top length [s] for the RF structures.
+        0.0 for single-bunch trains.
+        Normally populated from Beam in track() but can be set directly for calculator use.
+        """
+        if self.num_bunches_in_train == 1:
+            return 0.0 
+        return self.bunch_separation*(self.num_bunches_in_train-1)
+    @train_duration.setter
+    def train_duration(self, train_duration : float):
+        raise NotImplementedError("Cannot directly set train_duration")
+    
+    @property
+    def average_current_train(self) -> float:
+        """
+        The beam current of the linac [A].
+        """
+        return self.bunch_charge*self.bunch_frequency
+    @average_current_train.setter
+    def average_current_train(self, average_current_train : float) -> None:
+        raise NotImplementedError("Cannot directly set average_current_train")
+
+    @property
+    def beam_charge(self) -> float:
+        """
+        The total charge of the beam [C]
+        """
+        if self._bunch_charge != None and self._num_bunches_in_train != None:
+            return self._bunch_charge*self._num_bunches_in_train
+        raise RFAcceleratorInitializationException("Beam charge not initialized")
+    @beam_charge.setter
+    def beam_charge(self,beam_charge : float):
+        raise NotImplementedError("Cannot set beam_charge directly")
 
     #--------------------------------#
     # Properties related to geometry #
@@ -228,6 +350,18 @@ class RFAccelerator(Trackable, CostModeled):
     def rf_frequency(self,rf_frequency : float):
         self._rf_frequency = rf_frequency
 
+    @abstractmethod
+    def optimize_linac_geometry_and_gradient(self,fill_factor=1.0):
+        """
+        Find the right structure voltage based on the physics, then set the number of structures
+        and the overall linac length so that the total energy gain is respected.
+
+        See RFAccelerator_TW for example
+
+        Returns (Vmax, Vstruct, Ntotal_int)
+        """
+        pass
+
     #-------------------------------------------#
     # Implement abstract methods from Trackable #
     #===========================================#
@@ -241,6 +375,16 @@ class RFAccelerator(Trackable, CostModeled):
                 harmdiff = 1.0-harmdiff
             if harmdiff > 0.01:
                 raise ValueError(f"Harmonic mismatch too large: rf_frequency={self.rf_frequency/1e9:.2f}[GHz], bunch_frequency={beam.bunch_frequency()/1e9:.2f}[GHz], harm={harm:.3f}")
+
+        #Store data used power-flow/power use/etc modelling
+        self.bunch_charge           = beam.abs_charge()         # [C]
+        self.bunch_separation       = beam.bunch_separation     # [s]
+        self.num_bunches_in_train   = beam.num_bunches_in_train # [-]
+
+        if self.autoOptimize:
+            #Given the target energy gain, current, and pulse length,
+            # set the max gradient and the minimum linac length
+            self.optimize_linac_geometry_and_gradient(self.autoOptimize_targetFillFactor)
 
         beam.set_Es(beam.Es() + self.nom_energy_gain)
         return super().track(beam, savedepth, runnable, verbose)
