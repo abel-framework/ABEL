@@ -76,6 +76,9 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
             RFAccelerator_TW_DB2.database,
             num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency/1e9)
 
+        #DB v2 constructed ignoring P/C limit
+        structure.uselimit_PC = False
+
         if not constructorCalling:
             self._initialize_RF_structure(structure)
 
