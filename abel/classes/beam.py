@@ -232,7 +232,7 @@ class Beam():
     ## BEAM STATISTICS
 
     def total_particles(self):
-        return np.nansum(self.weightings())
+        return int(np.nansum(self.weightings()))
     
     def charge(self):
         return np.nansum(self.qs())
@@ -454,6 +454,7 @@ class Beam():
 
     
     # ==================================================
+    # TODO: Currently does not reproduce the correct peak density unless the bin numbers are adjusted manually.
     def charge_density_3D(self, zbins=None, xbins=None, ybins=None):
         """
         Calculates the 3D charge density.

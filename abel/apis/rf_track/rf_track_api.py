@@ -74,8 +74,8 @@ def rft_beam2abel_beam(beam_rft):
 
 
 # ==================================================
-def get_rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=4, sort_zs=False):
-    
+def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1):
+
     if num_z_cells is None:
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
 
@@ -84,6 +84,15 @@ def get_rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, n
     
     # Set the solver resolution and calculate fields
     sc_fields_obj = SpaceCharge_Field(beam_rft, num_x_cells, num_y_cells, num_z_cells, num_t_bins)  # num_x_cells, num_y_cells, num_z_cells, number of velocity slices
+
+    return sc_fields_obj
+
+    
+# ==================================================
+def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1, sort_zs=False):
+    
+    # Set the solver resolution and calculate fields
+    sc_fields_obj = calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells, num_t_bins)
 
     # Extract beam coordinates
     #phase_space_rft = beam_rft.get_phase_space('%X %Y %Z', 'good')

@@ -40,7 +40,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=True):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None):
         """
         Parameters
         ----------
@@ -81,6 +81,8 @@ class StagePrtclTransWakeInstability(Stage):
 
         enable_radiation_reaction: bool
             Flag for enabling radiation reactions.
+
+        ...
         """
         
         super().__init__(length, nom_energy_gain, plasma_density)
@@ -105,6 +107,11 @@ class StagePrtclTransWakeInstability(Stage):
         self.enable_tr_instability = enable_tr_instability 
         self.enable_radiation_reaction = enable_radiation_reaction
         self.enable_ion_motion = enable_ion_motion
+        self.ion_charge_num = ion_charge_num
+
+        if ion_mass is None:
+            ion_mass = 4.002602 * SI.physical_constants['atomic mass constant'][0]  # [kg], He mass.
+        self.ion_mass = ion_mass
         
         self.interstages_enabled = False
         self.show_prog_bar = True
@@ -152,6 +159,8 @@ class StagePrtclTransWakeInstability(Stage):
         stage_length = self.length
         gamma0 = beam0.gamma()
         time_step_mod = self.time_step_mod
+
+        particle_mass = beam0.particle_mass
 
         # ==========  ==========
         if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0:
@@ -301,7 +310,7 @@ class StagePrtclTransWakeInstability(Stage):
         
 
         # ========== Instability tracking ==========
-        beam_filtered = self.bubble_filter(copy.deepcopy(beam0))
+        beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
         inputs = [beam_filtered, plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
@@ -333,17 +342,19 @@ class StagePrtclTransWakeInstability(Stage):
             beam = Beam()
             
             # Set the phase space of the ABEL beam
-            beam.set_phase_space(Q=np.sum(weights_sorted)*-e,
+            beam.set_phase_space(Q=np.sum(weights_sorted)*beam0.charge_sign()*e,
                                  xs=xs_sorted,
                                  ys=ys_sorted,
                                  zs=zs_sorted, 
-                                 pxs=pxs_sorted,
+                                 pxs=pxs_sorted,  # Always use single particle momenta?
                                  pys=pys_sorted,
-                                 pzs=pzs_sorted)
+                                 pzs=pzs_sorted,
+                                 weightings=weights_sorted,
+                                 particle_mass=particle_mass)
             
         else:
             
-            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, enable_tr_instability=self.enable_tr_instability, enable_radiation_reaction=self.enable_radiation_reaction, enable_ion_motion=self.enable_ion_motion, show_prog_bar=self.show_prog_bar)
+            beam = transverse_wake_instability_particles(beam_filtered, plasma_density=plasma_density, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, stage_length=stage_length, time_step_mod=time_step_mod, enable_tr_instability=self.enable_tr_instability, enable_radiation_reaction=self.enable_radiation_reaction, enable_ion_motion=self.enable_ion_motion, ion_charge_num=self.ion_charge_num, ion_mass=self.ion_mass, show_prog_bar=self.show_prog_bar)
             
         
         #print('After instability tracking')
@@ -476,7 +487,7 @@ class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
     # Filter out particles that collide into bubble
-    def bubble_filter(self, beam):
+    def bubble_filter(self, beam, sort_zs=True):
         xs = beam.xs()
         ys = beam.ys()
         zs = beam.zs()
@@ -485,15 +496,25 @@ class StagePrtclTransWakeInstability(Stage):
         pzs = beam.pzs()
         weights = beam.weightings()
     
-        # Sort the arrays based on zs
-        indices = np.argsort(zs)
-        zs_sorted = zs[indices]
-        xs_sorted = xs[indices]
-        ys_sorted = ys[indices]
-        pxs_sorted = pxs[indices]
-        pys_sorted = pys[indices]
-        pzs_sorted = pzs[indices]
-        weights_sorted = weights[indices]
+        # Check if the arrays are sorted based on zs
+        if sort_zs:
+            # Sort the arrays based on zs.
+            indices = np.argsort(zs)
+            zs_sorted = zs[indices]
+            xs_sorted = xs[indices]
+            ys_sorted = ys[indices]
+            pxs_sorted = pxs[indices]
+            pys_sorted = pys[indices]
+            pzs_sorted = pzs[indices]
+            weights_sorted = weights[indices]
+        else:
+            zs_sorted = zs
+            xs_sorted = xs
+            ys_sorted = ys
+            pxs_sorted = pxs
+            pys_sorted = pys
+            pzs_sorted = pzs
+            weights_sorted = weights
 
         # Calculate rb based on interpolation of rb vs z
         rb_fit_obj = self.rb_fit_obj
@@ -513,13 +534,15 @@ class StagePrtclTransWakeInstability(Stage):
         beam_out = Beam()
         
         # Set the phase space of the ABEL beam
-        beam_out.set_phase_space(Q=np.sum(weights_sorted)*-e,
-                             xs=xs_sorted,
-                             ys=ys_sorted,
-                             zs=zs_sorted, 
-                             pxs=pxs_sorted,  # Always use single particle momenta?
-                             pys=pys_sorted,
-                             pzs=pzs_sorted)
+        beam_out.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
+                                 xs=xs_sorted,
+                                 ys=ys_sorted,
+                                 zs=zs_sorted, 
+                                 pxs=pxs_sorted,  # Always use single particle momenta?
+                                 pys=pys_sorted,
+                                 pzs=pzs_sorted,
+                                 weightings=weights_sorted,
+                                 particle_mass=beam.particle_mass)
         return beam_out
 
     
