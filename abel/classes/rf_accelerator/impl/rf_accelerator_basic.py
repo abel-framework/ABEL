@@ -61,7 +61,7 @@ class RFAcceleratorBasic(RFAccelerator):
         filling_time = 2 * structure_energy_per_length * self.structure_length / peak_power_structure
         
         # beam loading efficiency
-        train_duration = self.get_train_duration()
+        train_duration = self.train_duration
         peak_power_duration = filling_time + train_duration
         
         # adjust the number of klystrons per structure
@@ -95,7 +95,7 @@ class RFAcceleratorBasic(RFAccelerator):
         filling_time = 2 * structure_energy_per_length * self.structure_length / peak_power_structure
         
         # beam loading efficiency
-        train_duration = self.get_train_duration()
+        train_duration = self.train_duration
         peak_power_duration = filling_time + train_duration
         efficiency_beamloading = train_duration/peak_power_duration
         

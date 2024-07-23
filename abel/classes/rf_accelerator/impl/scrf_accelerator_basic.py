@@ -56,7 +56,7 @@ class SCRFAcceleratorBasic(RFAccelerator):
         filling_time = 925e-6 # [s]
         
         # beam loading efficiency
-        train_duration = self.get_train_duration()
+        train_duration = self.train_duration
         peak_power_duration = filling_time + train_duration
         efficiency_beamloading = train_duration/peak_power_duration
         
