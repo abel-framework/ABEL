@@ -77,8 +77,6 @@ class RFAccelerator(Trackable, CostModeled):
         # For consistency, it follows how Beam does it even if average current + pulse length
         # is more fundamental for CLICopti modelling.
         self.bunch_charge           = None # [C]
-        self.bunch_separation       = None # [s]
-        self.num_bunches_in_train   = None # [-] #This resets what was done in Trackable
 
         #Set this to true to always optimize the gradient, number of structures, and overall length on track()
         self.autoOptimize = False
@@ -156,24 +154,6 @@ class RFAccelerator(Trackable, CostModeled):
     # Properties related to train structure #
     #=======================================#
 
-    ## Manage caching of average_current_train [A], train_duration [s], num_bunches_in_train [int], and bunch_charge [C]
-    # Stored like this confusing mess since average_current_train an train_duration are the most important parameters
-
-    #TODO: Integrate with or move to `trackable`
-
-    def _ensureFloat(self,r, ensurePos=False) -> float:
-        "Little helper function, allowing None or float, autoconverting int to float. If ensurePos is True, then only allow r>0.0."
-        if r == None:
-            return r
-        if type(r) == int or type(r) == np.float64:
-            #quietly convert to float
-            r = float(r)
-        if type(r) != float:
-            raise TypeError(f"must be float, int, or None. Got: {type(r)}, {r}")
-        if ensurePos and r < 0.0:
-            raise ValueError("must be >= 0.0")
-        return r
-
     @property
     def bunch_charge(self) -> float:
         """The total charge of one bunch [C]"""
@@ -184,60 +164,6 @@ class RFAccelerator(Trackable, CostModeled):
     def bunch_charge(self, bunch_charge : float):
         self._bunch_charge = self._ensureFloat(bunch_charge)
 
-    @property
-    def bunch_separation(self) -> float:
-        "The time [s] between each bunch"
-        if self._bunch_separation == None:
-            raise RFAcceleratorInitializationException("bunch_separation not yet initialized")
-        return self._bunch_separation
-    @bunch_separation.setter
-    def bunch_separation(self, bunch_separation : float):
-        self._bunch_separation = self._ensureFloat(bunch_separation,True)
-    
-    @property
-    def num_bunches_in_train(self) -> int:
-        """
-        The number of bunches in the train.
-        When 1, train_duration is 0.0 and average_current_train is None / undefined.
-        """
-        if self._num_bunches_in_train == None:
-            raise RFAcceleratorInitializationException("num_bunches_in_train not yet initialized")
-        return self._num_bunches_in_train
-    @num_bunches_in_train.setter
-    def num_bunches_in_train(self, num_bunches_in_train : int):
-        if num_bunches_in_train == None:
-            self._num_bunches_in_train = None
-            return
-        if type(num_bunches_in_train) != int:
-            raise TypeError("num_bunches_in_train must be int or None")
-        if num_bunches_in_train <= 0:
-            raise ValueError("num_bunches_in_train must be > 0")
-        self._num_bunches_in_train = num_bunches_in_train
-
-    @property
-    def bunch_frequency(self) -> float:
-        if self.num_bunches_in_train == 1:
-            raise ValueError("Bunch frequency undefined when num_bunches_in_train == 1")
-            return None
-        return 1.0/self.bunch_separation
-    @bunch_frequency.setter
-    def bunch_frequency(self, bunch_frequency):
-        raise NotImplementedError("Cannot directly set bunch_frequency")
-    
-    @property
-    def train_duration(self) -> float:
-        """
-        The train duration [s] = beam pulse length [s] = length of RF pulse flat top length [s] for the RF structures.
-        0.0 for single-bunch trains.
-        Normally populated from Beam in track() but can be set directly for calculator use.
-        """
-        if self.num_bunches_in_train == 1:
-            return 0.0 
-        return self.bunch_separation*(self.num_bunches_in_train-1)
-    @train_duration.setter
-    def train_duration(self, train_duration : float):
-        raise NotImplementedError("Cannot directly set train_duration")
-    
     @property
     def average_current_train(self) -> float:
         """
