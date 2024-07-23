@@ -10,7 +10,7 @@ from .CONFIG import CONFIG
 # import all other classes
 from .classes.beam import Beam
 from .classes.event import Event
-from .classes.trackable import Trackable
+from .classes.trackable import Trackable, TrackableInitializationException
 from .classes.runnable import Runnable
 
 from .classes.ip.ip import InteractionPoint

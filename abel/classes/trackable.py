@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import warnings
 import numpy as np
 
 class Trackable(ABC):
@@ -105,6 +106,9 @@ class Trackable(ABC):
         raise NotImplementedError("Cannot directly set train_duration")
     def get_train_duration(self):
         "Get the duration of the bunch train [s] - alias for self.train_duration"
+        if self._num_bunches_in_train is None:
+            warnings.warn("Bunch separation is unset, trackable.train_duration is undefined", DeprecationWarning)
+            return None
         return self.train_duration
         #if self.bunch_separation is not None:
         #    return self.bunch_separation * (self.num_bunches_in_train-1)
@@ -133,6 +137,9 @@ class Trackable(ABC):
         raise NotImplementedError("Cannot directly set rep_rate_average")
     def get_rep_rate_average(self):
         "Get the average repetition rate of bunches [Hz] - alias for self.rep_rate_average"
+        if self._rep_rate_trains is None:
+            warnings.warn("Rep_rate_trains is unset, trackable.rep_rate_average is undefined", DeprecationWarning)
+            return None
         return self.rep_rate_average
         #if self.rep_rate_trains is not None:
         #    return self.num_bunches_in_train * self.rep_rate_trains
