@@ -919,7 +919,7 @@ class Beam():
             
         
             # add metadata
-            series.author = "ABEL (the Advanced Beams and Extreme Linacs code)"
+            series.author = "ABEL (the Adaptable Beginning-to-End Linac simulation framework)"
             series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
 
         # make step (only one)
