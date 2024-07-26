@@ -18,11 +18,11 @@ from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 
 
 
-# Contains calculation configurations for calculating the ion wakefield perturbation. Can be called when setting up a StagePrtclTransWakeInstability.
 class IonMotionConfig():
+# Contains calculation configurations for calculating the ion wakefield perturbation. Can be called when setting up a StagePrtclTransWakeInstability.
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, drive_beam_len_scale=1.0, uniform_z_grid=True, update_factor=1.0):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0):
         """
         Parameters
         ----------
@@ -50,9 +50,6 @@ class IonMotionConfig():
         
         uniform_z_grid: bool
             Determines whether the grid along z is uniform (True) or finely resolved along the drive beam and main beam regions, while the region between the beams are coarsely resolved (False).
-
-        drive_beam_len_scale: float (<=1.0, >=0.0)
-            Determines where along the drive beam to start the integration of the wakefield perturbation.
 
         xs_probe: [m] 1D float array
             x-coordinates used to probe beam electric fields calculated by RF-Track.
@@ -87,7 +84,6 @@ class IonMotionConfig():
 
         self.update_factor = update_factor
         self.uniform_z_grid = uniform_z_grid
-        self.drive_beam_len_scale = drive_beam_len_scale
         
         # Set the coordinates used to probe beam electric fields from RF-Track
         self.set_probing_coordinates(drive_beam, main_beam)
@@ -98,10 +94,11 @@ class IonMotionConfig():
     
     # ==================================================
     def set_probing_coordinates(self, drive_beam, main_beam):
-
-        drive_beam_len_scale = self.drive_beam_len_scale
         
-        # Coordinates for probing the fields from RF-Track get_field()
+        if drive_beam.zs().min() < main_beam.zs().max():
+            raise ValueError('Beams have to propagate towards increasing z with drive beam placed in front of main beam.')
+        
+        # Transverse coordinates for probing the fields from RF-Track get_field()
         #xy_min = np.min( [main_beam.xs().min(), main_beam.ys().min()] )
         #xy_max = np.max( [main_beam.xs().max(), main_beam.ys().max()] )
         #self.xs_probe = np.linspace( xy_min, xy_max, self.num_xy_cells_probe)  # [m]
@@ -110,30 +107,22 @@ class IonMotionConfig():
         padded_min = lambda arr_min: arr_min*(1.0-np.sign(arr_min)*0.1)
         padded_max = lambda arr_max: arr_max*(1.0+np.sign(arr_max)*0.1)
         
-        self.xs_probe = np.linspace( padded_min(main_beam.xs().min()), padded_max(main_beam.xs().max()), self.num_xy_cells_probe)  # [m]
-        self.ys_probe = np.linspace( padded_min(main_beam.ys().min()), padded_max(main_beam.ys().max()), self.num_xy_cells_probe)  # [m]
-
-        zs_drive_beam = drive_beam.zs()
-
-        # Find the drive beam head z-coordinate to be used for wakefield perturbation calculations
-        _, z_eff_driver_head = find_closest_value_in_arr( zs_drive_beam, zs_drive_beam.min() + drive_beam_len_scale*(zs_drive_beam.max()-zs_drive_beam.min()) )
-        
-        z_max = z_eff_driver_head
-        z_min = main_beam.zs().min()
+        self.xs_probe = np.linspace( padded_min(main_beam.xs().min()), padded_max(main_beam.xs().max()), self.num_xy_cells_probe)  # [m], padded xs
+        self.ys_probe = np.linspace( padded_min(main_beam.ys().min()), padded_max(main_beam.ys().max()), self.num_xy_cells_probe)  # [m], padded ys
 
         # Set the z-coordinates used to probe beam electric fields from RF-Track
         if self.uniform_z_grid:
-            self.zs_probe = np.linspace(z_max, z_min, self.num_z_cells)  # [m], beam head facing start of array.
+            self.zs_probe = np.linspace( padded_max(drive_beam.zs().max()), padded_min(main_beam.zs().min()), self.num_z_cells )  # [m], beam head facing start of array.
 
             # Set the size of grid cells along z
             self.grid_size_z = (self.zs_probe.max() - self.zs_probe.min()) / (self.num_z_cells-1)  # [m]
         
         else:
-            zs_probe_driver = np.linspace(z_max, drive_beam.zs().min(), round(np.sqrt(len(drive_beam))/2))
-            zs_probe_main = np.linspace(main_beam.zs().max(), main_beam.zs().min(), round(np.sqrt(len(main_beam))/2))
-            zs_probe_middle = np.linspace(padded_min(drive_beam.zs().min()), padded_max(main_beam.zs().max()), 10)
-            self.zs_probe = np.concatenate((zs_probe_driver, zs_probe_middle, zs_probe_main)) # z_max > drive_beam.zs().min() > main_beam.zs().max()
-
+            zs_probe_driver = np.linspace( padded_max(drive_beam.zs().max()), drive_beam.zs().min(), round(np.sqrt(len(drive_beam))/2) )
+            zs_probe_middle = np.linspace( padded_min(drive_beam.zs().min()), padded_max(main_beam.zs().max()), 10 )
+            zs_probe_main = np.linspace( main_beam.zs().max(), padded_min(main_beam.zs().min()), round(np.sqrt(len(main_beam))/2) )
+            self.zs_probe = np.concatenate( (zs_probe_driver, zs_probe_middle, zs_probe_main) ) # z_max > drive_beam.zs().min() > main_beam.zs().max()
+            
             # Set the size of grid cells along z
             self.grid_size_z = np.abs( np.insert(np.diff(self.zs_probe), 0, 0.0) )
 
@@ -235,9 +224,8 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
         zs_probe = ion_motion_config.zs_probe
         head_idx, _ = find_closest_value_in_arr( zs_probe, beam.zs().max() )
         tail_idx, _ = find_closest_value_in_arr( zs_probe, beam.zs().min() )
-        tail_idx = tail_idx + 1
-        wakefield_perturbations = wakefield_perturbations[:, :, head_idx:tail_idx]
-        zs_probe = zs_probe[head_idx:tail_idx]
+        wakefield_perturbations = wakefield_perturbations[:, :, head_idx-1:tail_idx+1]
+        zs_probe = zs_probe[head_idx-1:tail_idx+1]
     else:
         zs_probe = ion_motion_config.zs_probe
     
