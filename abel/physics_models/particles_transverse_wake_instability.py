@@ -58,7 +58,7 @@ from abel.apis.rf_track.rf_track_api import rft_beam_fields
 
 
 
-# ==================================================
+###################################################
 # Simplified loop integration option
 def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
     
@@ -81,7 +81,7 @@ def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble
 
 
 
-# ==================================================
+###################################################
 # Single pass integration option (Stupakov's wake function)
 def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
     
@@ -109,7 +109,7 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 
 
-# ==================================================
+###################################################
 # Single pass integration of (Stupakov's wake function)
 def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, tr_direction='x', enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, sort_zs=False):
     
@@ -189,7 +189,7 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
     return tr_momenta
 
 
-# ==================================================
+###################################################
 #def doffset_dt(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta, Ez, pzs_sorted):
 #    tr_force = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
 #    for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macroparticles
@@ -211,7 +211,7 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
 #    return tr_momenta/pzs_sorted*c
 #
 #
-# ==================================================
+###################################################
 #def RK4(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta, Ez, pzs_sorted):
 #    #ys_sorted = ys_sorted + pys_sorted/pzs_sorted*1/2*c*time_step
 #    #
@@ -234,7 +234,7 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
 
 
 
-# ==================================================
+###################################################
 def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, show_prog_bar=True):
     
     xs = beam.xs()
@@ -424,7 +424,7 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
 
 
 
-# ==================================================
+###################################################
 def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius):
     zs_sorted = zs_sorted[bool_indices]
     xs_sorted = xs_sorted[bool_indices]
