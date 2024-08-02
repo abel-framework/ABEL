@@ -42,15 +42,47 @@ import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
 
 from tqdm import tqdm
-import time
+#import time
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
 
-from abel.classes.beam import *
+from abel.classes.beam import *  # TODO: no need to import everything.
 #from abel.utilities.relativity import energy2gamma
 from abel.utilities.relativity import momentum2gamma, velocity2gamma
 from abel.utilities.plasma_physics import k_p
-from abel.apis.rf_track.rf_track_api import rft_beam_fields
+#from abel.apis.rf_track.rf_track_api import rft_beam_fields
+from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
+
+
+
+class PrtclTransWakeConfig():
+# Stores configuration for the transverse wake instability calculations.
+
+    # =============================================
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0):
+        
+        self.plasma_density = plasma_density  # [m^-3]
+        self.stage_length = stage_length
+        self.time_step_mod = time_step_mod
+        self.enable_tr_instability = enable_tr_instability
+        self.enable_radiation_reaction = enable_radiation_reaction
+        self.enable_ion_motion = enable_ion_motion
+        self.show_prog_bar = show_prog_bar
+
+        if enable_ion_motion:
+            self.ion_motion_config = IonMotionConfig(
+                drive_beam=drive_beam, 
+                main_beam=main_beam, 
+                plasma_ion_density=plasma_density, 
+                ion_charge_num=ion_charge_num, 
+                ion_mass=ion_mass, 
+                num_z_cells=num_z_cells, 
+                num_xy_cells_rft=num_xy_cells_rft, 
+                num_xy_cells_probe=num_xy_cells_probe, 
+                uniform_z_grid=uniform_z_grid, 
+                update_factor=update_factor
+            )
+        
 
 
 #def wakefunc_Stupakov(xi_lead, xi_ref, a):
@@ -111,7 +143,11 @@ def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_so
 
 ###################################################
 # Single pass integration of (Stupakov's wake function)
-def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, tr_direction='x', enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, sort_zs=False):
+def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, tr_direction, trans_wake_config):
+
+    enable_tr_instability = trans_wake_config.enable_tr_instability
+    enable_radiation_reaction = trans_wake_config.enable_radiation_reaction
+    enable_ion_motion = trans_wake_config.enable_ion_motion
     
     a = bubble_radius + 0.75*skin_depth
     zzs = np.diff(zs_sorted)  # [m] z distance between neighbouring particles. zs_sorted[i+1]-zs_sorted[i]. zs_sorted increases towards larger indicies. I.e. coincide with beam head at the end of the array.
@@ -145,28 +181,26 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
 
     # ============= Calculate the effects of ion motion =============
     if enable_ion_motion:
-        num_z_cells_rft = round(np.sqrt(len(offsets))/2)
-        rft_z_grid_size = (beam.zs().max()-beam.zs().min())/num_z_cells_rft
-        
-        E_fields_beam, _, _, _, _ = rft_beam_fields(beam, num_x_cells=60, num_y_cells=60, num_z_cells=num_z_cells_rft, num_t_bins=4, sort_zs=sort_zs)  # beam needs to be sorted according to z. E_fields_beam is then alseo sorted according to z.
-        
-        if tr_direction == 'x':
-            E_fields_comp = E_fields_beam[:,0]
-        elif tr_direction == 'y':
-            E_fields_comp = E_fields_beam[:,1]
 
-        #print(len(beam), len(offsets), len(E_fields_comp))
-
-        if ion_mass is None:
-            ion_mass = 39.95*SI.physical_constants['atomic mass constant'][0]  # [kg], Ar mass.
-
-        dionfields_dz = np.cumsum(E_fields_comp[::-1])
-        dionfields_dz = np.flip(dionfields_dz)
-        ion_wakefields = ion_charge_num * m_e/ion_mass/skin_depth**2 * np.cumsum( (zzs * dionfields_dz[:-1])[::-1] )*rft_z_grid_size
-        ion_wakefields = np.flip(ion_wakefields)
-        ion_wakefields = np.insert(arr=ion_wakefields, obj=-1, values=0.0)
+        ion_motion_config = trans_wake_config.ion_motion_config
+        drive_beam = ion_motion_config.drive_beam
         
-        background_fields = plasma_density*e/(2*eps0)*offsets + ion_wakefields
+        # Set the coordinates used to probe beam electric fields from RF-Track
+        ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam)
+
+        ## Update the RF-Track SpaceCharge_Field object
+        #ion_motion_config.set_sc_fields_obj(drive_beam, main_beam=beam)
+        #sc_fields_obj = ion_motion_config.sc_fields_obj
+        sc_fields_obj = ion_motion_config.assemble_sc_fields_obj(main_beam=beam, drive_beam=drive_beam)
+        
+        # Calculate the ion wakefield perturbation. Component given by tr_direction.
+        W_perts = ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction=tr_direction)  # [V/m], 3D array
+
+        # Interpolate the ion wakefield perturbation to macroparticle positions
+        intpl_W_perts = intplt_ion_wakefield_perturbation(beam, W_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+
+        # Calculate the perturbed ion wakefield at macroparticle positions
+        background_fields = plasma_density*e/(2*eps0)*offsets - intpl_W_perts  # [V/m], 1D array
         
     else:
         background_fields = plasma_density*e/(2*eps0)*offsets
@@ -235,7 +269,25 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
 
 
 ###################################################
-def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_fit_obj, stage_length, time_step_mod=0.05, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, show_prog_bar=True):
+def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wake_config):
+
+    plasma_density = trans_wake_config.plasma_density
+    stage_length = trans_wake_config.stage_length
+    time_step_mod = trans_wake_config.time_step_mod
+    #enable_tr_instability = trans_wake_config.enable_tr_instability  ## Can remove?
+    enable_radiation_reaction = trans_wake_config.enable_radiation_reaction
+    #enable_ion_motion = trans_wake_config.enable_ion_motion
+    show_prog_bar = trans_wake_config.show_prog_bar
+
+    #if trans_wake_config.enable_ion_motion:
+    #    #ion_motion_config = trans_wake_config.ion_motion_config
+    #    
+    #    # Delete the ion_motion_config attribute so that trans_wake_config can be pickled in Parallel()
+    #    #del trans_wake_config.ion_motion_config
+    #    drive_beam = trans_wake_config.ion_motion_config.drive_beam
+    #    del trans_wake_config.ion_motion_config.drive_beam
+    #else:
+    #    ion_motion_config = None
     
     xs = beam.xs()
     ys = beam.ys()
@@ -346,8 +398,6 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
                                       pzs=pzs_sorted,
                                       weightings=weights_sorted,
                                       particle_mass=particle_mass)
-
-        #calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, enable_tr_instability=enable_tr_instability, enable_radiation_reaction=enable_radiation_reaction, enable_ion_motion=enable_ion_motion, ion_charge_num=ion_charge_num, ion_mass=ion_mass)
         
         # Parallel tracking
         results = Parallel(n_jobs=2)([
@@ -356,10 +406,11 @@ def transverse_wake_instability_particles(beam, plasma_density, Ez_fit_obj, rb_f
             #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
             #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
             
-            delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', enable_tr_instability=enable_tr_instability, enable_radiation_reaction=enable_radiation_reaction, enable_ion_motion=enable_ion_motion, ion_charge_num=ion_charge_num, ion_mass=ion_mass),
+            delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config),
             
-            delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', enable_tr_instability=enable_tr_instability, enable_radiation_reaction=enable_radiation_reaction, enable_ion_motion=enable_ion_motion, ion_charge_num=ion_charge_num, ion_mass=ion_mass, sort_zs=False)
+            delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
         ])
+        
         # Update momenta
         pxs_sorted = results[0]
         pys_sorted = results[1]
@@ -438,3 +489,4 @@ def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorte
     bubble_radius = bubble_radius[bool_indices]
 
     return zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius
+

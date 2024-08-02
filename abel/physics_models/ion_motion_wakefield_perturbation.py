@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as SI
 from scipy.interpolate import RegularGridInterpolator
+#import copy
 
 #from abel.classes.beam import Beam
 from abel.utilities.plasma_physics import k_p
@@ -19,10 +20,10 @@ from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 
 
 class IonMotionConfig():
-# Contains calculation configurations for calculating the ion wakefield perturbation. Can be called when setting up a StagePrtclTransWakeInstability.
+# Contains calculation configuration for calculating the ion wakefield perturbation.
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, do_beam_fields_calc=False):
         """
         Parameters
         ----------
@@ -62,11 +63,9 @@ class IonMotionConfig():
 
         grid_size_z: [m] float or 1D float array
             The size of grid cells along z. If uniform_z_grid is False, this becomes a 1D float array containing the distance between elements in zs_probe.
-
-        sc_fields_obj: RF-Track SpaceCharge_Field object.
-            Contains the beam electric and magnetic fields calculated by RF-Track.
         """
-    
+
+        self.drive_beam = drive_beam
         self.plasma_ion_density = plasma_ion_density  # [m^-3]
         self.ion_charge_num = ion_charge_num
         
@@ -84,12 +83,14 @@ class IonMotionConfig():
 
         self.update_factor = update_factor
         self.uniform_z_grid = uniform_z_grid
+
+        self.xs_probe = None
+        self.ys_probe = None
+        self.zs_probe = None
+        self.grid_size_z = None
         
         # Set the coordinates used to probe beam electric fields from RF-Track
         self.set_probing_coordinates(drive_beam, main_beam)
-
-        # Set the RF-Track SpaceCharge_Field object
-        self.set_sc_fields_obj(drive_beam, main_beam)
 
     
     # ==================================================
@@ -128,11 +129,13 @@ class IonMotionConfig():
 
     
     # ==================================================
-    def set_sc_fields_obj(self, drive_beam, main_beam):
+    def assemble_sc_fields_obj(self, main_beam, drive_beam=None):
+        if drive_beam is None:
+            drive_beam = self.drive_beam
         ion_motion_beam = drive_beam + main_beam
         ion_motion_beam.particle_mass = main_beam.particle_mass
         
-        self.sc_fields_obj = calc_sc_fields_obj(ion_motion_beam, self.num_xy_cells_rft, self.num_xy_cells_rft, self.num_z_cells, num_t_bins=1)
+        return calc_sc_fields_obj(ion_motion_beam, self.num_xy_cells_rft, self.num_xy_cells_rft, self.num_z_cells, num_t_bins=1)
 
 
 
@@ -222,10 +225,17 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
 
     if intplt_beam_region_only:  # Perform the interpolation only in the beam's region
         zs_probe = ion_motion_config.zs_probe
-        head_idx, _ = find_closest_value_in_arr( zs_probe, beam.zs().max() )
-        tail_idx, _ = find_closest_value_in_arr( zs_probe, beam.zs().min() )
-        wakefield_perturbations = wakefield_perturbations[:, :, head_idx-1:tail_idx+1]
-        zs_probe = zs_probe[head_idx-1:tail_idx+1]
+        head_idx, _ = find_closest_value_in_arr( zs_probe, beam.zs().max()+ion_motion_config.grid_size_z )
+        tail_idx, zs_probe_val = find_closest_value_in_arr( zs_probe, beam.zs().min()-ion_motion_config.grid_size_z )
+        
+        wakefield_perturbations = wakefield_perturbations[:, :, head_idx:tail_idx+1]
+        zs_probe = zs_probe[head_idx:tail_idx+1]
+    
+        if beam.zs().min() < zs_probe.min() or beam.zs().max() > zs_probe.max():
+            print('Probe z min max:', zs_probe.min()*1e6, zs_probe.max()*1e6)
+            print('beam z min max:', beam.zs().min()*1e6, beam.zs().max()*1e6)
+            print(ion_motion_config.zs_probe*1e6)
+            raise ValueError('z is out of bounds.')
     else:
         zs_probe = ion_motion_config.zs_probe
     
@@ -236,6 +246,7 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
     xs_intplt = beam.xs()  # [m]
     ys_intplt = beam.ys()  # [m]
     zs_intplt = beam.zs()  # [m]
+    
     
     # Combine the coordinates into an array of points
     points = np.vstack((xs_intplt, ys_intplt, zs_intplt)).T
