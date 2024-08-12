@@ -23,7 +23,7 @@ class IonMotionConfig():
 # Contains calculation configuration for calculating the ion wakefield perturbation.
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, do_beam_fields_calc=False):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, update_ion_wakefield=False):
         """
         Parameters
         ----------
@@ -45,12 +45,15 @@ class IonMotionConfig():
             
         num_xy_cells_probe: float
             Number of grid cells along x and y used to probe beam electric fields calculated by RF-Track.
-
-        update_factor: float
-            Update ion wakefield perturbation when beam sizes have changed by this factor.
         
         uniform_z_grid: bool
             Determines whether the grid along z is uniform (True) or finely resolved along the drive beam and main beam regions, while the region between the beams are coarsely resolved (False).
+
+        update_factor: float
+            Update ion wakefield perturbation when beam sizes have changed by this factor.
+
+        update_ion_wakefield: bool
+            ...
 
         xs_probe: [m] 1D float array
             x-coordinates used to probe beam electric fields calculated by RF-Track.
@@ -82,12 +85,15 @@ class IonMotionConfig():
         self.num_xy_cells_probe = num_xy_cells_probe
 
         self.update_factor = update_factor
+        self.update_ion_wakefield = update_ion_wakefield
         self.uniform_z_grid = uniform_z_grid
 
         self.xs_probe = None
         self.ys_probe = None
         self.zs_probe = None
         self.grid_size_z = None
+        self.Wx_perts = None
+        self.Wy_perts = None
         
         # Set the coordinates used to probe beam electric fields from RF-Track
         self.set_probing_coordinates(drive_beam, main_beam)
@@ -182,7 +188,7 @@ def ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction):
         Contains the ion wakefield perturbation where the first, second and third dimensions correspond to positions along x, y and z. 
     """
 
-    # Set parameters
+    # Get parameters
     skin_depth = 1/k_p(ion_motion_config.plasma_ion_density)  # [m]
     ion_mass = ion_motion_config.ion_mass  # [kg]
     ion_charge_num = ion_motion_config.ion_charge_num
@@ -210,8 +216,8 @@ def ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction):
     # Reshape the field component into a 3D array       
     E_fields_comp_3d = E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
     
-    # Integration along z using by splitting up to convolution integral
-    integral = np.cumsum( zs_probe * E_fields_comp_3d * grid_size_z , axis=2)- zs_probe * np.cumsum(E_fields_comp_3d * grid_size_z , axis=2)
+    # Integration along z using by splitting up the convolution integral
+    integral = np.cumsum( zs_probe * E_fields_comp_3d * grid_size_z, axis=2) - zs_probe * np.cumsum(E_fields_comp_3d * grid_size_z, axis=2)
     
     wakefield_perturbations = ion_charge_num * SI.m_e/ion_mass/skin_depth**2 * integral
     
@@ -247,12 +253,11 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
     ys_intplt = beam.ys()  # [m]
     zs_intplt = beam.zs()  # [m]
     
-    
     # Combine the coordinates into an array of points
     points = np.vstack((xs_intplt, ys_intplt, zs_intplt)).T
     
     # Interpolate the field values at the given coordinates
     interpolated_wakefield_perturbations = interpolator(points)  # 1D array
 
-    return interpolated_wakefield_perturbations
+    return interpolated_wakefield_perturbations, interpolator
 
