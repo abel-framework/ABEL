@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import ticker as mticker
+import inspect
 
 class Linac(Beamline):
     
@@ -186,7 +187,7 @@ class Linac(Beamline):
     ## PLOT EVOLUTION
     
     # apply function to all beam files
-    def evolution_fcn(self, fcns, shot=None):
+    def evolution_fcn(self, fcns, clean=False, shot=None):
         
         # declare data structure
         num_outputs = self.num_outputs()
@@ -208,7 +209,13 @@ class Linac(Beamline):
             for shot in range(self.num_shots):
                 beam = self.get_beam(index=index, shot=shot)
                 for k in range(len(fcns)):
-                    vals[shot,k] = fcns[k](beam)
+                    fcn = fcns[k]
+                    input_list = inspect.signature(fcn).parameters
+                    
+                    if 'clean' in input_list:  # Check if the input list contains clean.
+                        vals[shot,k] = fcn(beam, clean=clean)
+                    else:
+                        vals[shot,k] = fcn(beam)
             
             # calculate mean and standard dev
             for k in range(len(fcns)):
@@ -254,7 +261,7 @@ class Linac(Beamline):
         return waterfalls, trackable_numbers, bins
              
         
-    def plot_evolution(self, use_stage_nums=False, shot=None, save_fig=False):
+    def plot_evolution(self, use_stage_nums=False, shot=None, save_fig=False, clean=False):
         
         if self.trackables is None:
             self.assemble_trackables()

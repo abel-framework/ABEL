@@ -113,6 +113,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.enable_ion_motion = enable_ion_motion
         self.ion_charge_num = ion_charge_num
         self.ion_mass = ion_mass
+        
         self.num_z_cells = num_z_cells
         self.num_xy_cells_rft = num_xy_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
@@ -327,6 +328,9 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ========== Instability tracking ==========
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
+
+        if self.num_z_cells is None:
+            self.num_z_cells = round(np.sqrt( len(shifted_drive_beam)+len(beam_filtered) )/2)
         
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
@@ -1497,14 +1501,16 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
             
         print(f"Ramp beta magnification:\t\t\t\t {self.ramp_beta_mag :.3f}")
-        print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
-
         if self.main_source is None:
             main_symmetrise = 'Not registered.'
         else:
             main_symmetrise = str(self.main_source.symmetrize)
         print(f"Symmetrised main beam:\t\t\t\t\t {str(self.main_source.symmetrize) :s}")
         print(f"Symmetrised drive beam:\t\t\t\t\t {str(self.driver_source.symmetrize) :s}\n")
+        
+        print(f"Transverse wake instability enabled:\t\t\t {str(self.enable_tr_instability) :s}")
+        print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
+        print(f"Ion motion enabled:\t\t\t\t\t {str(self.enable_ion_motion) :s}\n")
         
         print(f"Stage length [m]:\t\t\t\t\t {self.length :.3f}")
         print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}")
@@ -1557,7 +1563,7 @@ class StagePrtclTransWakeInstability(Stage):
         
     
     # ==================================================
-    def print_current_summary(self, drive_beam, initial_main_beam, beam_out):
+    def print_current_summary(self, drive_beam, initial_main_beam, beam_out, clean=False):
 
         with open(self.diag_path + 'output.txt', 'w') as f:
             print('============================================================================', file=f)
@@ -1572,9 +1578,6 @@ class StagePrtclTransWakeInstability(Stage):
             else:
                 interstage_dipole_field = self.interstage_dipole_field
                 print(f"Interstage dipole field:\t\t\t {interstage_dipole_field :.3f}", file=f)
-                
-            print(f"Ramp beta magnification:\t\t\t {self.ramp_beta_mag :.3f}", file=f)
-            print(f"Radiation reaction enabled:\t\t\t {str(self.enable_radiation_reaction) :s}", file=f)
             
             if self.main_source is None:
                 main_symmetrise = 'Not registered.'
@@ -1591,6 +1594,18 @@ class StagePrtclTransWakeInstability(Stage):
                 print(f"Symmetrised drive beam:\t\t\t\t 6D symmetrised\n", file=f)
             else:
                 print(f"Symmetrised drive beam:\t\t\t\t Not symmetrised.\n", file=f)
+
+            print(f"Ramp beta magnification:\t\t\t {self.ramp_beta_mag :.3f}", file=f)
+            print(f"Radiation reaction enabled:\t\t\t {str(self.enable_radiation_reaction) :s}", file=f)
+            print(f"Transverse wake instability enabled:\t\t {str(self.enable_tr_instability) :s}", file=f)
+            print(f"Radiation reaction enabled:\t\t\t {str(self.enable_radiation_reaction) :s}", file=f)
+            print(f"Ion motion enabled:\t\t\t\t {str(self.enable_ion_motion) :s}", file=f)
+            print(f"\tIon charge number:\t\t\t {self.ion_charge_num :.3f}", file=f)
+            print(f"\tIon mass [u]:\t\t\t\t {self.ion_mass/SI.physical_constants['atomic mass constant'][0] :.3f}", file=f)
+            print(f"\tnum_z_cells:\t\t\t\t {self.num_z_cells :d}", file=f)
+            print(f"\tnum_xy_cells_rft:\t\t\t {self.num_xy_cells_rft :d}", file=f)
+            print(f"\tnum_xy_cells_probe:\t\t\t {self.num_xy_cells_probe :d}", file=f)
+            print(f"\tupdate_factor:\t\t\t\t {self.update_factor :.3f}\n", file=f)
             
             print(f"Stage length [m]:\t\t\t\t {self.length :.3f}", file=f)
             print(f"Propagation length [m]:\t\t\t\t {beam_out.location :.3f}", file=f)
@@ -1598,6 +1613,7 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Plasma density [m^-3]:\t\t\t\t {self.plasma_density :.3e}", file=f)
             print(f"Drive beam x jitter (std) [um]:\t\t\t {self.driver_source.jitter.x*1e6 :.3f}", file=f)
             print(f"Drive beam y jitter (std) [um]:\t\t\t {self.driver_source.jitter.y*1e6 :.3f}", file=f)
+            print(f"Clean measured beam parameters:\t\t\t {str(clean) :s}", file=f)
             print('----------------------------------------------------------------------------\n', file=f)
             
             print('-------------------------------------------------------------------------------------', file=f)
@@ -1617,44 +1633,44 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Weighted main beam gradient [GV/m]:\t\t\t  \t\t {weighted_mean(self.Ez_fit_obj(zs_sorted), weights_sorted, clean=False)/1e9 :.7f}", file=f)
             #_, z_centre = find_closest_value_in_arr(arr=beam_out.zs(), val=beam_out.z_offset())  # Centre z of beam.
             #print(f"Beam centre gradient [GV/m]:\t\t\t\t  \t\t {self.Ez_fit_obj(z_centre)/1e9 :.3f}", file=f)
-            print(f"Current mean gamma:\t\t\t\t \t \t\t {beam_out.gamma() :.3f}", file=f)
-            print(f"Initial mean energy [GeV]:\t\t\t {drive_beam.energy()/1e9 :.3f} \t\t {initial_main_beam.energy()/1e9 :.3f}", file=f)
-            print(f"Current mean energy [GeV]:\t\t\t \t \t\t {beam_out.energy()/1e9 :.3f}", file=f)
-            print(f"Initial rms energy spread [%]:\t\t\t {drive_beam.rel_energy_spread()*1e2 :.3f} \t\t\t {initial_main_beam.rel_energy_spread()*1e2 :.3f}", file=f)
-            print(f"Current rms energy spread [%]:\t\t\t  \t\t\t {beam_out.rel_energy_spread()*1e2 :.3f}", file=f)
+            print(f"Current mean gamma:\t\t\t\t \t \t\t {beam_out.gamma(clean=clean) :.3f}", file=f)
+            print(f"Initial mean energy [GeV]:\t\t\t {drive_beam.energy(clean=clean)/1e9 :.3f} \t\t {initial_main_beam.energy(clean=clean)/1e9 :.3f}", file=f)
+            print(f"Current mean energy [GeV]:\t\t\t \t \t\t {beam_out.energy(clean=clean)/1e9 :.3f}", file=f)
+            print(f"Initial rms energy spread [%]:\t\t\t {drive_beam.rel_energy_spread(clean=clean)*1e2 :.3f} \t\t\t {initial_main_beam.rel_energy_spread(clean=clean)*1e2 :.3f}", file=f)
+            print(f"Current rms energy spread [%]:\t\t\t  \t\t\t {beam_out.rel_energy_spread(clean=clean)*1e2 :.3f}", file=f)
     
-            print(f"Initial beam x offset [um]:\t\t\t {drive_beam.x_offset()*1e6 :.3f} \t\t {initial_main_beam.x_offset()*1e6 :.3f}", file=f)
-            print(f"Current beam x offset [um]:\t\t\t  \t\t\t {beam_out.x_offset()*1e6 :.3f}", file=f)
-            print(f"Initial beam y offset [um]:\t\t\t {drive_beam.y_offset()*1e6 :.3f} \t\t\t {initial_main_beam.y_offset()*1e6 :.3f}", file=f)
-            print(f"Current beam y offset [um]:\t\t\t  \t\t\t {beam_out.y_offset()*1e6 :.3f}", file=f)
-            print(f"Initial beam z offset [um]:\t\t\t {drive_beam.z_offset()*1e6 :.3f} \t\t {initial_main_beam.z_offset()*1e6 :.3f}", file=f)
-            print(f"Current beam z offset [um]:\t\t\t  \t\t\t {beam_out.z_offset()*1e6 :.3f}\n", file=f)
+            print(f"Initial beam x offset [um]:\t\t\t {drive_beam.x_offset(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.x_offset(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current beam x offset [um]:\t\t\t  \t\t\t {beam_out.x_offset(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial beam y offset [um]:\t\t\t {drive_beam.y_offset(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.y_offset(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current beam y offset [um]:\t\t\t  \t\t\t {beam_out.y_offset(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial beam z offset [um]:\t\t\t {drive_beam.z_offset(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.z_offset(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current beam z offset [um]:\t\t\t  \t\t\t {beam_out.z_offset(clean=clean)*1e6 :.3f}\n", file=f)
 
-            print(f"Initial beam x angular offset [urad]:\t\t {drive_beam.x_angle()*1e6 :.3f} \t\t\t {initial_main_beam.x_angle()*1e6 :.3f}", file=f)
-            print(f"Current beam x angular offset [urad]:\t\t  \t\t\t {beam_out.x_angle()*1e6 :.3f}", file=f)
-            print(f"Initial beam y angular offset [urad]:\t\t {drive_beam.y_angle()*1e6 :.3f} \t\t {initial_main_beam.y_angle()*1e6 :.3f}", file=f)
-            print(f"Current beam y angular offset [urad]:\t\t  \t\t\t {beam_out.y_angle()*1e6 :.3f}\n", file=f)
+            print(f"Initial beam x angular offset [urad]:\t\t {drive_beam.x_angle(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.x_angle(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current beam x angular offset [urad]:\t\t  \t\t\t {beam_out.x_angle(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial beam y angular offset [urad]:\t\t {drive_beam.y_angle(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.y_angle(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current beam y angular offset [urad]:\t\t  \t\t\t {beam_out.y_angle(clean=clean)*1e6 :.3f}\n", file=f)
     
-            print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x()*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x()*1e6 :.3f}", file=f)
-            print(f"Current normalised x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x()*1e6 :.3f}", file=f)
-            print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y()*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y()*1e6 :.3f}", file=f)
-            print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y()*1e6 :.3f}\n", file=f)
+            print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current normalised x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y(clean=clean)*1e6 :.3f}\n", file=f)
             
             print(f"Initial angular momentum [mm mrad]:\t\t {drive_beam.angular_momentum()*1e6 :.3f} \t\t\t {initial_main_beam.angular_momentum()*1e6 :.3f}", file=f)
             print(f"Current angular momentum [mm mrad]:\t\t  \t\t\t {beam_out.angular_momentum()*1e6 :.3f}\n", file=f)
             
-            print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(initial_main_beam.energy())*1e3 :.3f}", file=f)
-            print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x()*1e3 :.3f} \t\t\t {initial_main_beam.beta_x()*1e3 :.3f}", file=f)
-            print(f"Current x beta function [mm]:\t\t\t \t \t\t {beam_out.beta_x()*1e3 :.3f}", file=f)
-            print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y()*1e3 :.3f} \t\t\t {initial_main_beam.beta_y()*1e3 :.3f}", file=f)
-            print(f"Current y beta function [mm]:\t\t\t \t \t\t {beam_out.beta_y()*1e3 :.3f}\n", file=f)
+            print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(initial_main_beam.energy(clean=clean))*1e3 :.3f}", file=f)
+            print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x(clean=clean)*1e3 :.3f} \t\t\t {initial_main_beam.beta_x(clean=clean)*1e3 :.3f}", file=f)
+            print(f"Current x beta function [mm]:\t\t\t \t \t\t {beam_out.beta_x(clean=clean)*1e3 :.3f}", file=f)
+            print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y(clean=clean)*1e3 :.3f} \t\t\t {initial_main_beam.beta_y(clean=clean)*1e3 :.3f}", file=f)
+            print(f"Current y beta function [mm]:\t\t\t \t \t\t {beam_out.beta_y(clean=clean)*1e3 :.3f}\n", file=f)
     
-            print(f"Initial x beam size [um]:\t\t\t {drive_beam.beam_size_x()*1e6 :.3f} \t\t\t {initial_main_beam.beam_size_x()*1e6 :.3f}", file=f)
-            print(f"Current x beam size [um]:\t\t\t  \t\t\t {beam_out.beam_size_x()*1e6 :.3f}", file=f)
-            print(f"Initial y beam size [um]:\t\t\t {drive_beam.beam_size_y()*1e6 :.3f} \t\t\t {initial_main_beam.beam_size_y()*1e6 :.3f}", file=f)
-            print(f"Current y beam size [um]:\t\t\t  \t\t\t {beam_out.beam_size_y()*1e6 :.3f}", file=f)
-            print(f"Initial rms beam length [um]:\t\t\t {drive_beam.bunch_length()*1e6 :.3f} \t\t {initial_main_beam.bunch_length()*1e6 :.3f}", file=f)
-            print(f"Current rms beam length [um]:\t\t\t \t \t\t {beam_out.bunch_length()*1e6 :.3f}", file=f)
+            print(f"Initial x beam size [um]:\t\t\t {drive_beam.beam_size_x(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.beam_size_x(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current x beam size [um]:\t\t\t  \t\t\t {beam_out.beam_size_x(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial y beam size [um]:\t\t\t {drive_beam.beam_size_y(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.beam_size_y(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current y beam size [um]:\t\t\t  \t\t\t {beam_out.beam_size_y(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial rms beam length [um]:\t\t\t {drive_beam.bunch_length(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.bunch_length(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Current rms beam length [um]:\t\t\t \t \t\t {beam_out.bunch_length(clean=clean)*1e6 :.3f}", file=f)
             print(f"Initial peak current [kA]:\t\t\t {drive_beam.peak_current()/1e3 :.3f} \t\t {initial_main_beam.peak_current()/1e3 :.3f}", file=f)
             print(f"Current peak current [kA]:\t\t\t  \t\t\t {beam_out.peak_current()/1e3 :.3f}", file=f)
             print(f"Bubble radius at beam head [um]:\t\t \t\t\t {self.rb_fit_obj(np.max(beam_out.zs()))*1e6 :.3f}", file=f)

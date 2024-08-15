@@ -111,8 +111,10 @@ class IonMotionConfig():
         #self.xs_probe = np.linspace( xy_min, xy_max, self.num_xy_cells_probe)  # [m]
         #self.ys_probe = self.xs_probe  # [m]
 
-        padded_min = lambda arr_min: arr_min*(1.0-np.sign(arr_min)*0.1)
-        padded_max = lambda arr_max: arr_max*(1.0+np.sign(arr_max)*0.1)
+        #padding = 0.1
+        padding = 0.0  # TODO: Padding seems no longer necessary. Remove.
+        padded_min = lambda arr_min: arr_min*(1.0-np.sign(arr_min)*padding)
+        padded_max = lambda arr_max: arr_max*(1.0+np.sign(arr_max)*padding)
         
         self.xs_probe = np.linspace( padded_min(main_beam.xs().min()), padded_max(main_beam.xs().max()), self.num_xy_cells_probe)  # [m], padded xs
         self.ys_probe = np.linspace( padded_min(main_beam.ys().min()), padded_max(main_beam.ys().max()), self.num_xy_cells_probe)  # [m], padded ys
@@ -218,6 +220,131 @@ def ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction):
     
     # Integration along z using by splitting up the convolution integral
     integral = np.cumsum( zs_probe * E_fields_comp_3d * grid_size_z, axis=2) - zs_probe * np.cumsum(E_fields_comp_3d * grid_size_z, axis=2)
+    
+    wakefield_perturbations = ion_charge_num * SI.m_e/ion_mass/skin_depth**2 * integral
+    
+    return wakefield_perturbations
+
+
+
+###################################################
+from joblib import Parallel, delayed
+import os
+#import multiprocessing
+import time
+
+# Function to perform cumulative sum on a slice of the beam field (3D array)
+def compute_cumsum_slice(E_slice, zs_probe, grid_size_z):
+    #print(f"Processing slice i = {i} on core/process ID = {process_id}", flush=True)
+    #process_id = multiprocessing.current_process().pid
+
+    #start_time = time.time()
+    #print(f"Processing chunk on process ID = {process_id} at time {start_time:.2f}", flush=True)
+    
+    
+    # Integration along z using by splitting up the convolution integral
+    integral = (np.cumsum(zs_probe * E_slice * grid_size_z, axis=2) 
+            - zs_probe * np.cumsum(E_slice * grid_size_z, axis=2))
+
+    #end_time = time.time()
+    #print(f"Finished chunk on process ID = {process_id} at time {end_time:.2f}, duration = {end_time - start_time:.3e} seconds", flush=True)
+    
+    return integral
+
+
+
+###################################################
+def ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_direction):
+    """
+    Calculates the ion wakefield perturbation to the otherwise linear background focusing kp*E0*r/2 by integrating the beam electric fields along z.
+
+    Parameters
+    ----------
+    ion_motion_config: IonMotionConfig object
+        Contains the configurations for calculating the ion wakefield perturbation.
+    
+    sc_fields_obj: RF-Track SpaceCharge_Field object.
+        Contains the beam electric and magnetic fields calculated by RF-Track.
+
+    tr_direction: string
+        Specifies the transverse direction ('x' or 'y') of the wakefield.
+        
+    Returns
+    ----------
+    wakefield_perturbations: [V/m] 3D float array
+        Contains the ion wakefield perturbation where the first, second and third dimensions correspond to positions along x, y and z. 
+    """
+    
+    # Get parameters
+    skin_depth = 1/k_p(ion_motion_config.plasma_ion_density)  # [m]
+    ion_mass = ion_motion_config.ion_mass  # [kg]
+    ion_charge_num = ion_motion_config.ion_charge_num
+    xs_probe = ion_motion_config.xs_probe  # [m]
+    ys_probe = ion_motion_config.ys_probe  # [m]
+    zs_probe = ion_motion_config.zs_probe  # [m]
+    grid_size_z = ion_motion_config.grid_size_z  # [m], the grid size along z
+    
+    # Set up a 3D mesh grid
+    X, Y, Z = np.meshgrid(xs_probe, ys_probe, zs_probe, indexing='ij')
+    xs_grid_flat = X.flatten()*1e3  # [mm]
+    ys_grid_flat = Y.flatten()*1e3  # [mm]
+    zs_grid_flat = Z.flatten()*1e3  # [mm]
+
+    # Determine the total number of available cores
+    total_cores = os.cpu_count()
+    
+    # Use 80% of available cores
+    n_jobs = max(1, int(total_cores * 0.8))
+
+    #start_time = time.time()
+
+    # Split probe grid coordinates into n_jobs segments
+    xs_grid_flat_segments = np.array_split(xs_grid_flat, n_jobs)
+    ys_grid_flat_segments = np.array_split(ys_grid_flat, n_jobs)
+    zs_grid_flat_segments = np.array_split(zs_grid_flat, n_jobs)
+
+    # Probe beam E-field in parallel
+    def process_chunk(xs_chunk, ys_chunk, zs_chunk):
+        zeros_chunk = np.zeros_like(xs_chunk)
+        E_fields, _ = sc_fields_obj.get_field(xs_chunk, ys_chunk, zs_chunk, zeros_chunk)
+        return E_fields
+
+    results = Parallel(n_jobs=n_jobs, backend='threading')(
+        delayed(process_chunk)(xs_grid_flat_segments[i], ys_grid_flat_segments[i], zs_grid_flat_segments[i])
+        for i in range(n_jobs)
+    )
+    
+    E_fields_beam = np.concatenate(results, axis=0)
+
+    #end_time = time.time()
+    #print('Probe time taken:', end_time - start_time, 'seconds')
+
+    if tr_direction == 'x':
+        E_fields_comp = E_fields_beam[:,0]
+    elif tr_direction == 'y':
+        E_fields_comp = E_fields_beam[:,1]
+    else:
+        raise ValueError('ion_wakefield_perturbation(): Choose a valid tr_direction (''x'' or ''y'').')
+
+    #start_time = time.time()
+    
+    # Reshape the field component into a 3D array       
+    E_fields_comp_3d = E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+
+    # Split E_fields_comp_3d into n_jobs segments along axis 0
+    E_fields_segments = np.array_split(E_fields_comp_3d, n_jobs, axis=0)
+    
+    # Process each E_fields_segment in parallel
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(compute_cumsum_slice)(E_fields_segment, zs_probe, grid_size_z)
+        for E_fields_segment in E_fields_segments
+    )
+
+    # Stack the results back into a 3D array
+    integral = np.concatenate(results, axis=0)
+
+    #end_time = time.time()
+    #print('Integration time taken:', end_time - start_time, 'seconds')
     
     wakefield_perturbations = ion_charge_num * SI.m_e/ion_mass/skin_depth**2 * integral
     
