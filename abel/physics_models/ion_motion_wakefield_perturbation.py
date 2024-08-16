@@ -8,6 +8,7 @@ Ben Chen, 12 June 2024, University of Oslo
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
 import scipy.constants as SI
 from scipy.interpolate import RegularGridInterpolator
 #import copy
@@ -388,3 +389,46 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
 
     return interpolated_wakefield_perturbations, interpolator
 
+
+    
+###################################################
+def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_perts, n_th_particle=1):
+
+    # Define the color map and boundaries
+    colors = ['yellow', 'orange', 'red', 'black']
+    bounds = [0, 0.2, 0.4, 0.8, 1]
+    cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
+
+    zs = beam.zs()
+    zs = zs[::n_th_particle]
+    xs = beam.xs()
+    xs = xs[::n_th_particle]
+    ys = beam.ys()
+    ys = ys[::n_th_particle]
+    intpl_Wx_perts = intpl_Wx_perts[::n_th_particle]
+    intpl_Wy_perts = intpl_Wy_perts[::n_th_particle]
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(6*2, 5))
+    
+    plt.tight_layout(pad=6.0)  # Sets padding between the figure edge and the edges of subplots, as a fraction of the font size.
+    fig.subplots_adjust(top=0.87)
+
+    #sort_x_indices = np.argsort(xs)
+    p = axes[0].scatter(xs*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*xs/1e9 - intpl_Wx_perts/1e9, c=zs*1e6, cmap=cmap)
+    axes[0].plot(xs*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*xs/1e9)
+    axes[0].set_xlabel('x [µm]')
+    axes[0].set_ylabel('$\mathcal{W}_x$ [GV/m]')
+    axes[0].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+    
+    #sort_y_indices = np.argsort(ys)
+    axes[1].scatter(ys*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*ys/1e9 - intpl_Wy_perts/1e9, c=zs*1e6, cmap=cmap)
+    axes[1].plot(ys*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*ys/1e9)
+    axes[1].set_xlabel('y [µm]')
+    axes[1].set_ylabel('$\mathcal{W}_y$ [GV/m]')
+    axes[1].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+
+    # Set label and other properties for the colorbar
+    cbar_ax = fig.add_axes([0.15, 0.96, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
+    fig.colorbar(p, cax=cbar_ax, orientation='horizontal', label=r'$z$ [µm]')
+
+    
