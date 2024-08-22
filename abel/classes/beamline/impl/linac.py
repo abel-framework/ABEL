@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import ticker as mticker
+import inspect
 
 class Linac(Beamline):
     
@@ -186,7 +187,7 @@ class Linac(Beamline):
     ## PLOT EVOLUTION
     
     # apply function to all beam files
-    def evolution_fcn(self, fcns, shot=None):
+    def evolution_fcn(self, fcns, shot=None, clean=False):
         
         # declare data structure
         num_outputs = self.num_outputs()
@@ -208,7 +209,13 @@ class Linac(Beamline):
             for shot in range(self.num_shots):
                 beam = self.get_beam(index=index, shot=shot)
                 for k in range(len(fcns)):
-                    vals[shot,k] = fcns[k](beam)
+                    fcn = fcns[k]
+                    input_list = inspect.signature(fcn).parameters
+                    
+                    if 'clean' in input_list:  # Check if the input list contains clean.
+                        vals[shot,k] = fcn(beam, clean=clean)
+                    else:
+                        vals[shot,k] = fcn(beam)
             
             # calculate mean and standard dev
             for k in range(len(fcns)):
@@ -254,7 +261,7 @@ class Linac(Beamline):
         return waterfalls, trackable_numbers, bins
              
         
-    def plot_evolution(self, use_stage_nums=False, shot=None, save_fig=False):
+    def plot_evolution(self, use_stage_nums=False, shot=None, save_fig=False, clean=False):
         
         if self.trackables is None:
             self.assemble_trackables()
@@ -267,7 +274,7 @@ class Linac(Beamline):
                                              Beam.bunch_length, Beam.z_offset, \
                                              Beam.norm_emittance_x, Beam.norm_emittance_y, \
                                              Beam.beam_size_x, Beam.beam_size_y, \
-                                             Beam.x_offset, Beam.y_offset, Beam.angular_momentum], shot)
+                                             Beam.x_offset, Beam.y_offset, Beam.angular_momentum], shot, clean=clean)
         
         if use_stage_nums:
             long_axis = stage_nums
@@ -365,9 +372,9 @@ class Linac(Beamline):
         axs[0,2].plot(long_axis, emnys*1e6, color=col2, label=r'$\varepsilon_{\mathrm{n}y}$')
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnxs+emnxs_error, np.flip(emnxs-emnxs_error))) * 1e6, color=col1, alpha=af)
         axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((emnys+emnys_error, np.flip(emnys-emnys_error))) * 1e6, color=col2, alpha=af)
-        #if Lzs.max() > (min(emnxs.min(), emnys.min()))*1e-2:
-        #    axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
-        #    axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
+        if Lzs.max() > (min(emnxs.min(), emnys.min()))*1e-2:
+            axs[0,2].plot(long_axis, Lzs*1e6, color=col0)
+            axs[0,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Lzs+Lzs_error, np.flip(Lzs-Lzs_error))) * 1e6, color=col0, alpha=af)
         axs[0,2].set_xlabel(long_label)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_yscale('log')

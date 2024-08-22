@@ -46,7 +46,7 @@ class Beam():
         del self[np.isnan(self).any(axis=1)]
         
     # set phase space
-    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None):
+    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None, particle_mass=SI.m_e):
         
         # make empty phase space
         num_particles = len(xs)
@@ -87,6 +87,9 @@ class Beam():
         
         # ids
         self.__phasespace[7,:] = np.arange(num_particles)
+
+        # single particle mass [kg]
+        self.particle_mass = particle_mass
        
     
     # addition operator (add two beams using the + operator)
@@ -229,7 +232,7 @@ class Beam():
     ## BEAM STATISTICS
 
     def total_particles(self):
-        return np.nansum(self.weightings())
+        return int(np.nansum(self.weightings()))
     
     def charge(self):
         return np.nansum(self.qs())
@@ -365,7 +368,7 @@ class Beam():
             alpha_y = -covy[1,0]/emgy
         return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
         
-    def peak_density(self):
+    def peak_density(self):  # TODO: this is only valid for Gaussian beams.
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
     def peak_current(self):
@@ -451,6 +454,7 @@ class Beam():
 
     
     # ==================================================
+    # TODO: Currently does not reproduce the correct peak density for Gaussian beams unless the bin numbers are adjusted manually.
     def charge_density_3D(self, zbins=None, xbins=None, ybins=None):
         """
         Calculates the 3D charge density.
@@ -657,7 +661,7 @@ class Beam():
 
 
     # ==================================================
-    def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0):
+    def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0, tolerance=5.0):
         """
         Calculate slice Ex and Ey for the entire beam by solving the Poisson equations for Ex and Ey slice by slice.
 
@@ -694,7 +698,6 @@ class Beam():
         # Check if the selected simulation boundaries are significantly larger than the beam extent
         xs = self.xs()
         ys = self.ys()
-        tolerance = 5.0
         
         if np.abs(x_box_min/xs.min()) < tolerance or np.abs(y_box_min/ys.min()) < tolerance or np.abs(x_box_max/xs.max()) < tolerance or np.abs(y_box_max/ys.max()) < tolerance:
             raise ValueError('Simulation box size is too small compared to beam size.')
@@ -1120,8 +1123,7 @@ class Beam():
         
         binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
         beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
-        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, 
-                  xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
+        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
 
     
     # ==================================================
