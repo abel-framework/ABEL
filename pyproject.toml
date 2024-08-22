@@ -22,7 +22,8 @@ dependencies = [
    "pyqtgraph",
    "Wake-T",
    "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
-   "ax-platform"
+   "ax-platform",
+   "CLICopti@git+https://gitlab.cern.ch/clic-software/clicopti.git"
 ]
 requires-python = ">= 3"
 

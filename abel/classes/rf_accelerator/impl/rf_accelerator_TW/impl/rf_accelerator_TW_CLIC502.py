@@ -4,23 +4,31 @@ import CLICopti
 import abel
 
 class RFAccelerator_TW_CLIC502(abel.RFAccelerator_TW):
-    "Class implementing a CLIC_502 type RF structure"
+    """
+    Class implementing a CLIC_502 type RF structure
 
-    def __init__(self, num_rf_cells=24, R05=True, f0_scaleto=11.9942, length=None, num_structures=None, gradient=None, voltage_total=None, beam_pulse_length=None,beam_current=0.0):
+    Parameters:
+    ===========
+
+    num_rf_cells : int
+        The number of accelerating cells in the modelled RF structure
+
+    rf_frequency : float
+        The frequency the structure is operating at [Hz]
+    """
+
+    def __init__(self, num_rf_cells=24, rf_frequency=11.9942, \
+                 length=None, num_structures=None, nom_energy_gain=None):
         if type(num_rf_cells) != int:
             raise TypeError("num_rf_cells must be an int")
-        self.num_rf_cells = num_rf_cells
 
-        self.f0 = f0_scaleto
-
-        structure = CLICopti.RFStructure.AccelStructure_CLIC502(num_rf_cells, f0_scaleto=f0_scaleto)
+        structure = CLICopti.RFStructure.AccelStructure_CLIC502(num_rf_cells, f0_scaleto=rf_frequency/1e9)
 
         super().__init__(RF_structure=structure, \
-                         length=length, num_structures=num_structures, gradient=gradient, voltage_total=voltage_total,
-                         beam_pulse_length=beam_pulse_length,beam_current=beam_current)
+                         length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain )
 
     def make_structure_title(self):
         tit = "CLIC502"
-        tit += f",N={self.num_rf_cells}"
-        tit += f",f0={self.f0 :.1f} [GHz]"
+        tit += f", N={self.num_rf_cells}"
+        tit += f", f0={self.rf_frequency/1e9:.1f} [GHz]"
         return tit

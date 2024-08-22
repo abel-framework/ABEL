@@ -10,7 +10,7 @@ from .CONFIG import CONFIG
 # import all other classes
 from .classes.beam import Beam
 from .classes.event import Event
-from .classes.trackable import Trackable
+from .classes.trackable import Trackable, TrackableInitializationException
 from .classes.runnable import Runnable
 
 from .classes.ip.ip import InteractionPoint
@@ -20,7 +20,7 @@ from .classes.source.source import Source
 from .classes.stage.stage import Stage
 from .classes.plasma_lens.plasma_lens import PlasmaLens
 from .classes.interstage.interstage import Interstage
-from .classes.rf_accelerator.rf_accelerator import RFAccelerator
+from .classes.rf_accelerator.rf_accelerator import RFAccelerator, RFAcceleratorInitializationException
 from .classes.bds.bds import BeamDeliverySystem
 from .classes.spectrometer.spectrometer import Spectrometer
 from .classes.damping_ring.damping_ring import DampingRing
@@ -58,6 +58,7 @@ from .classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorB
 from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW import RFAccelerator_TW
 from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLICG import RFAccelerator_TW_CLICG
 from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLIC502 import RFAccelerator_TW_CLIC502
+from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_DB2 import RFAccelerator_TW_DB2
 from .classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
 from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.bds.impl.bds_basic import *

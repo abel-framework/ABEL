@@ -5,31 +5,42 @@ import numpy as np
 
 class RFAcceleratorBasic(RFAccelerator):
 
-    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=20e6, rep_rate_trains=None, bunch_separation=None, num_bunches_in_train=None, fill_factor=0.71, rf_frequency=2e9, structure_length=0.5, peak_power_klystron=50e6, operating_temperature=300):
+    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=20e6, fill_factor=0.71, rf_frequency=2e9, structure_length=0.5, peak_power_klystron=50e6, operating_temperature=300):
         
         self.peak_power_klystron = peak_power_klystron
         self.operating_temperature = operating_temperature
-
-        self.bunch_charge = None
         
         # run base class constructor
-        super().__init__(length=length, nom_energy_gain=nom_energy_gain, structure_length=structure_length, fill_factor=fill_factor, nom_accel_gradient=nom_accel_gradient, rf_frequency=rf_frequency, rep_rate_trains=rep_rate_trains, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation)
+        super().__init__(length=length, nom_energy_gain=nom_energy_gain, structure_length=structure_length)
+        
+        self.rf_frequency = rf_frequency
+        #IDK what to do whith these.
+        #self.nom_accel_gradient=nom_accel_gradient
+        #self.fill_factor = fill_factor
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-
-        # set the bunch charge (for power calculations)
-        self.bunch_charge = beam.charge()
+        b = super().track(beam, savedepth, runnable, verbose)
 
         # calculate the number of klystrons required
         self.energy_usage()
-        
-        return super().track(beam, savedepth, runnable, verbose)
 
-    
+        return b
+
+
     def get_cost_structures(self):
         "Cost of the RF structures [ILC units]"
-        return self.get_length() * CostModeled.cost_per_length_rf_structure_normalconducting
+        return self.length * CostModeled.cost_per_length_rf_structure_normalconducting
 
+    def optimize_linac_geometry_and_gradient(self,fill_factor=1.0):
+        """
+        Find the right structure voltage based on the physics, then set the number of structures
+        and the overall linac length so that the total energy gain is respected.
+
+        See RFAccelerator_TW for example
+
+        Returns (Vmax, Vstruct, Ntotal_int)
+        """
+        raise NotImplementedError()
     
     # implement required abstract methods
     
@@ -37,20 +48,20 @@ class RFAcceleratorBasic(RFAccelerator):
         "Energy usage per shot for cooling [J]"
         
         # cavity R/Q per length (shape dependent only)
-        norm_R_upon_Q = 1/(SI.c*SI.epsilon_0)*(self.get_rf_frequency()/SI.c)
+        norm_R_upon_Q = 1/(SI.c*SI.epsilon_0)*(self.rf_frequency/SI.c)
         
         # energy per length in structures
-        structure_energy_per_length = self.get_gradient_structure()**2/(2*np.pi*self.get_rf_frequency()*norm_R_upon_Q)
+        structure_energy_per_length = self.gradient_structure**2/(2*np.pi*self.rf_frequency*norm_R_upon_Q)
 
         # peak power required in the structure # [W]
         peak_power_structure_min = 10e6
-        peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.get_voltage_structure() / self.bunch_separation)
+        peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.voltage_structure / self.bunch_separation)
         
         # cavity filling time (approx.)
-        filling_time = 2 * structure_energy_per_length * self.get_structure_length() / peak_power_structure
+        filling_time = 2 * structure_energy_per_length * self.structure_length / peak_power_structure
         
         # beam loading efficiency
-        train_duration = self.get_train_duration()
+        train_duration = self.train_duration
         peak_power_duration = filling_time + train_duration
         
         # adjust the number of klystrons per structure
@@ -71,20 +82,20 @@ class RFAcceleratorBasic(RFAccelerator):
         "Energy usage per shot [J]"
         
         # cavity R/Q per length (shape dependent only)
-        norm_R_upon_Q = 1/(SI.c*SI.epsilon_0)*(self.get_rf_frequency()/SI.c)
+        norm_R_upon_Q = 1/(SI.c*SI.epsilon_0)*(self.rf_frequency/SI.c)
         
         # energy per length in structures
-        structure_energy_per_length = self.get_gradient_structure()**2/(2*np.pi*self.get_rf_frequency()*norm_R_upon_Q)
+        structure_energy_per_length = self.gradient_structure**2/(2*np.pi*self.rf_frequency*norm_R_upon_Q)
 
         # peak power required in the structure # [W]
         peak_power_structure_min = 10e6
-        peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.get_voltage_structure() / self.bunch_separation)
+        peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.voltage_structure / self.bunch_separation)
         
         # cavity filling time (approx.)
-        filling_time = 2 * structure_energy_per_length * self.get_structure_length() / peak_power_structure
+        filling_time = 2 * structure_energy_per_length * self.structure_length / peak_power_structure
         
         # beam loading efficiency
-        train_duration = self.get_train_duration()
+        train_duration = self.train_duration
         peak_power_duration = filling_time + train_duration
         efficiency_beamloading = train_duration/peak_power_duration
         
