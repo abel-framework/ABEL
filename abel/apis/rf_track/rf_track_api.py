@@ -22,6 +22,11 @@ def abel_beam2rft_beam(beam):
     qs_abel = beam.qs()
     weightings_abel = beam.weightings()
 
+    # Hack for setting the weight for macroparticles with 0 charge
+    zero_mask = qs_abel == 0
+    if sum(zero_mask) != 0:
+        weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
+
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
     ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
 

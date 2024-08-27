@@ -241,7 +241,10 @@ class Beam():
         return abs(self.charge())
     
     def charge_sign(self):
-        return self.charge()/abs(self.charge())
+        if self.charge() == 0:
+            return 1.0
+        else:
+            return self.charge()/abs(self.charge())
     
     def energy(self, clean=False):
         return weighted_mean(self.Es(), self.weightings(), clean)

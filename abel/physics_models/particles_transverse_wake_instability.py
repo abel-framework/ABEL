@@ -42,9 +42,10 @@ import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
 
 from tqdm import tqdm
-#import time
+import time
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
+import csv, os
 
 from abel.classes.beam import *  # TODO: no need to import everything.
 #from abel.utilities.relativity import energy2gamma
@@ -52,8 +53,9 @@ from abel.utilities.relativity import momentum2gamma, velocity2gamma
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_std
 #from abel.apis.rf_track.rf_track_api import rft_beam_fields
-from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, intplt_ion_wakefield_perturbation
-from abel.physics_models.ion_motion_wakefield_perturbation import ion_wakefield_perturbation_parallel
+from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, intplt_ion_wakefield_perturbation, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field
+from abel.physics_models.ion_motion_wakefield_perturbation import ion_wakefield_perturbation
+#from abel.physics_models.ion_motion_wakefield_perturbation import ion_wakefield_perturbation_parallel
 
 
 
@@ -61,7 +63,7 @@ class PrtclTransWakeConfig():
 # Stores configuration for the transverse wake instability calculations.
 
     # =============================================
-    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, shot_path=None, stage_num=None, save_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, update_ion_wakefield=False):
         
         self.plasma_density = plasma_density  # [m^-3]
         self.stage_length = stage_length
@@ -70,6 +72,9 @@ class PrtclTransWakeConfig():
         self.enable_radiation_reaction = enable_radiation_reaction
         self.enable_ion_motion = enable_ion_motion
         self.show_prog_bar = show_prog_bar
+        self.shot_path = shot_path
+        self.stage_num = stage_num
+        self.save_data_frac = save_data_frac
 
         if enable_ion_motion:
             self.ion_motion_config = IonMotionConfig(
@@ -79,7 +84,8 @@ class PrtclTransWakeConfig():
                 ion_charge_num=ion_charge_num, 
                 ion_mass=ion_mass, 
                 num_z_cells=num_z_cells, 
-                num_xy_cells_rft=num_xy_cells_rft, 
+                num_x_cells_rft=num_x_cells_rft, 
+                num_y_cells_rft=num_y_cells_rft, 
                 num_xy_cells_probe=num_xy_cells_probe, 
                 uniform_z_grid=uniform_z_grid, 
                 update_factor=update_factor, 
@@ -154,7 +160,10 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
     
     a = bubble_radius + 0.75*skin_depth
     zzs = np.diff(zs_sorted)  # [m] z distance between neighbouring particles. zs_sorted[i+1]-zs_sorted[i]. zs_sorted increases towards larger indicies. I.e. coincide with beam head at the end of the array.
-    
+
+
+    ## Start time
+    #tr_start_time = time.time()
 
     # ============= Calculate the transverse intra-beam wakefield =============
     if enable_tr_instability:  # TODO: Calculate the transverse wakefield using the split integral method instead.
@@ -181,9 +190,16 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
     else:
         wakefields = np.zeros(len(offsets))
 
-    
+    ## End time
+    #tr_end_time = time.time()
+    #
+    ## Time usage
+    #print('Tr instability time taken:', tr_end_time - tr_start_time, 'seconds')
+#
+    ## Start time
+    #ion_start_time = time.time()
+        
     # ============= Calculate the effects of ion motion =============
-    W_perts = None
     if enable_ion_motion:
 
         ion_motion_config = trans_wake_config.ion_motion_config
@@ -192,15 +208,29 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
         # Set the coordinates used to probe beam electric fields from RF-Track
         ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam)
 
-        #ion_motion_config.update_ion_wakefield = True ####### Override
+        #ion_motion_config.update_ion_wakefield = True #######<- Override
 
         if ion_motion_config.update_ion_wakefield:
-            # Update the RF-Track SpaceCharge_Field object
-            sc_fields_obj = ion_motion_config.assemble_sc_fields_obj(main_beam=beam, drive_beam=drive_beam)
+
+            # Drive beam RF-Track SpaceCharge_Field object
+            driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
+
+            # 3D drive beam field component
+            driver_E_comp_3d = probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj, field_comp=tr_direction)
+            
+            ## Update the RF-Track SpaceCharge_Field object
+            #sc_fields_obj = ion_motion_config.assemble_sc_fields_obj(main_beam=beam, drive_beam=drive_beam)
+
+            # Update the RF-Track SpaceCharge_Field object for the main beam
+            sc_fields_obj = assemble_main_sc_fields_obj(ion_motion_config, main_beam=beam)
+
+            # 3D main beam field component
+            main_E_comp_3d = probe_main_beam_field(ion_motion_config, sc_fields_obj, field_comp=tr_direction)
             
             # Calculate the ion wakefield perturbation. Component given by tr_direction.
-            #W_perts = ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction=tr_direction)  # [V/m], 3D array
-            W_perts = ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_direction=tr_direction)  # [V/m], 3D array, parallel calculation.
+            #W_perts = ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, field_comp=tr_direction)  # [V/m], 3D array
+            #W_perts = ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_direction=tr_direction)  # [V/m], 3D array, parallel calculation.
+            W_perts = ion_wakefield_perturbation(ion_motion_config, main_E_comp_3d, driver_E_comp_3d, field_comp=tr_direction)  # [V/m], 3D array
     
             # Interpolate the ion wakefield perturbation to macroparticle positions
             intpl_W_perts, _ = intplt_ion_wakefield_perturbation(beam, W_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
@@ -218,13 +248,11 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
         else:
             if tr_direction == 'x':
                 W_perts = ion_motion_config.Wx_perts
-                #if W_perts is None:
-                #    raise ValueError('Wx_perts is None when retrieved.')
                 intpl_W_perts, _ = intplt_ion_wakefield_perturbation(beam, W_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+            
+            # ion_wakefield_perturbation() / ion_wakefield_perturbation_parallel() ensures that tr_direction is either 'x' or 'y'.
             else:
                 W_perts = ion_motion_config.Wy_perts
-                #if W_perts is None:
-                #    raise ValueError('Wy_perts is None when retrieved.')
                 intpl_W_perts, _ = intplt_ion_wakefield_perturbation(beam, W_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
 
         # Calculate the perturbed ion wakefield at macroparticle positions
@@ -232,7 +260,15 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
         
     else:
         background_fields = plasma_density*e/(2*eps0)*offsets
-        
+        W_perts = None
+        intpl_W_perts = None
+
+    ## End time
+    #ion_end_time = time.time()
+    #
+    ## Time usage
+    #print('Ion motion time taken:', ion_end_time - ion_start_time, 'seconds')
+
     
     # ============= Calculate the total transverse force on macroparticles =============
     tr_force = -e*(wakefields + background_fields)
@@ -249,7 +285,7 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
     else:
         tr_momenta = tr_momenta + tr_force*time_step
         
-    return tr_momenta, W_perts
+    return tr_momenta, W_perts, intpl_W_perts
 
 
 ###################################################
@@ -299,24 +335,23 @@ def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubb
 
 ###################################################
 def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wake_config):
-
+    
     plasma_density = trans_wake_config.plasma_density
     stage_length = trans_wake_config.stage_length
     time_step_mod = trans_wake_config.time_step_mod
-    #enable_tr_instability = trans_wake_config.enable_tr_instability  ## Can remove?
     enable_radiation_reaction = trans_wake_config.enable_radiation_reaction
     enable_ion_motion = trans_wake_config.enable_ion_motion
     show_prog_bar = trans_wake_config.show_prog_bar
 
-    #if trans_wake_config.enable_ion_motion:
-    #    #ion_motion_config = trans_wake_config.ion_motion_config
-    #    
-    #    # Delete the ion_motion_config attribute so that trans_wake_config can be pickled in Parallel()
-    #    #del trans_wake_config.ion_motion_config
-    #    drive_beam = trans_wake_config.ion_motion_config.drive_beam
-    #    del trans_wake_config.ion_motion_config.drive_beam
-    #else:
-    #    ion_motion_config = None
+    skin_depth = 1/k_p(plasma_density)  # [m] 1/kp, plasma skin depth.
+    beta_func = c/e*np.sqrt(2* beam.gamma() * eps0*m_e/plasma_density)  # [m] matched beta function.
+    beta_wave_length = 2*np.pi*beta_func  # [m] betatron wavelength.
+    time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
+    num_time_steps = np.ceil(stage_length/(c*time_step))
+    time_step = stage_length/(c*num_time_steps)
+
+    if trans_wake_config.save_data_frac != None:
+        save_data_freq = int(trans_wake_config.save_data_frac * num_time_steps)
     
     xs = beam.xs()
     ys = beam.ys()
@@ -363,34 +398,22 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
     # Calculate Ez and rb based on interpolations of Ez and rb vs z
     Ez = Ez_fit_obj(zs_sorted)
     bubble_radius = rb_fit_obj(zs_sorted)
-    
-    skin_depth = 1/k_p(plasma_density)  # [m] 1/kp, plasma skin depth.
-    beta_func = c/e*np.sqrt(2* beam.gamma() * eps0*m_e/plasma_density)  # [m] matched beta function.
-    beta_wave_length = 2*np.pi*beta_func  # [m] betatron wavelength.
-    time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
-    num_time_steps = np.ceil(stage_length/(c*time_step))
-    time_step = stage_length/(c*num_time_steps)
-
-    
 
     if enable_ion_motion:
-    #    prev_beam_size_x = weighted_std(xs_sorted, weights_sorted, clean=False)
-    #    prev_beam_size_y = weighted_std(ys_sorted, weights_sorted, clean=False)
-        update_factor = np.max([time_step_mod, trans_wake_config.ion_motion_config.update_factor])
-        beta_wlen_multiple = update_factor*beta_wave_length  # Ion wakefield perturbation only calculated when the propagation distance is a multiple of beta_wlen_multiple.
-        closest_mult_tol = 0.1  # Check if prop_length is within tolerance of the closest multiple of beta_wlen_multiple.
-        last_triggered_multiple = None  # To keep track of the last multiple that triggered ion wakefield perturbation calculation.
-        trans_wake_config.ion_motion_config.update_ion_wakefield = True  # Need to be initially true for the first ion wakefield calculation.
-    
-    #print(time_step)
-    #print(num_time_steps*c*time_step)
-    #print(c*time_step)
-    #print(stage_length-c*time_step)
-    #print(stage_length)
+        ion_motion_config = trans_wake_config.ion_motion_config
+        update_factor = np.max([time_step_mod, ion_motion_config.update_factor])
+        #beta_wlen_multiple = update_factor*beta_wave_length  # Ion wakefield perturbation only calculated when the propagation distance is a multiple of beta_wlen_multiple.
+        #closest_mult_tol = 0.1  # Check if prop_length is within tolerance of the closest multiple of beta_wlen_multiple.
+        #last_triggered_multiple = None  # To keep track of the last multiple that triggered ion wakefield perturbation calculation.
+        ion_motion_config.update_ion_wakefield = True  # Need to be initially true for the first ion wakefield calculation.
+        
+        update_freq = int(update_factor/time_step_mod)
+        driver_sc_fields_obj = ion_motion_config.assemble_driver_sc_fields_obj()
+        ion_motion_config.driver_sc_fields_obj = driver_sc_fields_obj
     
     
     ############# Beam propagation through the plasma cell #############
-    #time_step_count = 0.0
+    time_step_count = 0
     prop_length = 0.0
 
     # Progress bar
@@ -398,6 +421,10 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         pbar = tqdm(total=100)
         pbar.set_description('0%')
 
+    
+    #tot_start_time = time.time()
+
+    
     while prop_length < stage_length-0.5*c*time_step:
 
         # ============= Apply filters =============
@@ -416,7 +443,6 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         tot_offsets_sqr = xs_sorted**2 + ys_sorted**2
         bool_indices = (np.sqrt(tot_offsets_sqr) - bubble_radius <= 0)
         zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
-        
         
         # ============= Drift of beam =============
         # Leapfrog
@@ -442,18 +468,10 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         gammas = momentum2gamma(pzs_sorted)  # Lorentz factor for each particle.
         tot_offsets_sqr = xs_sorted**2 + ys_sorted**2
 
+        #momenta_start_time = time.time()
         
-
-        #pxs_sorted = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config)
-        #
-        #pys_sorted = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
-#
-        #if trans_wake_config.ion_motion_config.Wy_perts is None:
-        #    raise ValueError('Still None after calc_tr_momenta.')
-
-    
         # Parallel calculation
-        results = Parallel(n_jobs=2)([
+        results = Parallel(n_jobs=2, backend='threading')([
             #delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
             #delayed(integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=pys_sorted)
             #delayed(single_pass_integrate_wake_func)(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tr_momenta=pxs_sorted),
@@ -465,52 +483,17 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         ])
 
         # Extract the tr_momenta and W_perts arrays separately
-        (pxs_sorted, Wx_perts), (pys_sorted, Wy_perts) = results
-        
-        
-        
-        #print(np.std(pxs_sorted), np.std(pys_sorted))
-        #print(np.mean(pxs_sorted/pzs_sorted), np.mean(pys_sorted/pzs_sorted))
-#
-        #Wx_perts_slice = Wx_perts[:, :, 65]
-        #Wy_perts_slice = Wy_perts[:, :, 65]
-#
-        #fig, axes = plt.subplots(nrows=2, ncols=2, layout="constrained", figsize=(5*2, 4*2))
-#
-        #im = axes[0,0].scatter(xs_sorted*1e6, ys_sorted*1e6, c=pxs_sorted, cmap='seismic', marker='o')
-        #plt.colorbar(im, ax=axes[0,0], cax=None, label='$p_x$')
-        #axes[0,0].set_xlabel('$x$ [µm]')
-        #axes[0,0].set_ylabel('$y$ [µm]')
-        #
-        #im = axes[0,1].scatter(xs_sorted*1e6, ys_sorted*1e6, c=pys_sorted, cmap='seismic', marker='o')
-        #plt.colorbar(im, ax=axes[0,1], cax=None, label='$p_y$')
-        #axes[0,1].set_xlabel('$x$ [µm]')
-        #axes[0,1].set_ylabel('$y$ [µm]')
-    #
-        #im = axes[1,0].imshow(Wx_perts_slice.T/1e9, cmap='seismic', origin='lower', aspect='auto')
-        #plt.colorbar(im, ax=axes[1,0], cax=None, label='$\mathcal{W}_x$ [GV/m]')
-        #axes[1,0].set_xlabel('$x$ [µm]')
-        #axes[1,0].set_ylabel('$y$ [µm]')
-        #axes[1,0].set_title('Interpolated $x$-component')
-    #
-        #im = axes[1,1].imshow(Wy_perts_slice.T/1e9, cmap='seismic', origin='lower', aspect='auto')
-        #plt.colorbar(im, ax=axes[1,1], cax=None, label='$\mathcal{W}_y$ [GV/m]')
-        #axes[1,1].set_xlabel('$x$ [µm]')
-        #axes[1,1].set_ylabel('$y$ [µm]')
-        #axes[1,1].set_title('Interpolated $y$-component')
-#
-        #raise ValueError('stop')
+        (pxs_sorted, Wx_perts, intpl_Wx_perts), (pys_sorted, Wy_perts, intpl_Wy_perts) = results
 
-        if enable_ion_motion and trans_wake_config.ion_motion_config.update_ion_wakefield:
+        if enable_ion_motion and ion_motion_config.update_ion_wakefield:
             trans_wake_config.ion_motion_config.Wx_perts = Wx_perts
             trans_wake_config.ion_motion_config.Wy_perts = Wy_perts
-    
-            #if trans_wake_config.ion_motion_config.Wx_perts is None:
-            #    raise ValueError('Still None after Parallel')
-        
-        # Update momenta
-        #pxs_sorted = results_x[0]
-        #pys_sorted = results_y[0]
+
+        ## End time
+        #momenta_end_time = time.time()
+        #
+        ## Time usage
+        #print('Momenta calc time taken:', momenta_end_time - momenta_start_time, 'seconds')
 
         #Ez = -3.35e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
         #Ez = -3.20e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
@@ -521,7 +504,12 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
             pzs_sorted = pzs_sorted - (e*Ez + m_e*c**2 * 1.87863e-15 * (1/skin_depth)**4/4 * gammas**2 * tot_offsets_sqr)*time_step
         else:
             pzs_sorted = pzs_sorted - e*Ez*time_step
-        
+            
+        # Save data
+        if time_step_count == 0 and trans_wake_config.save_data_frac != None:
+            file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
+            save_time_step(file_path, [xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts])
+
         
         # ============= Drift of beam =============
         # Leapfrog
@@ -530,28 +518,38 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         #time_step_count = time_step_count + 1/2
         prop_length = prop_length + 1/2*c*time_step
 
-        if enable_ion_motion:
+        
+        # Save data
+        if trans_wake_config.save_data_frac != None:
+            if time_step_count % save_data_freq == 0:
+                file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
+                save_time_step(file_path, [xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts])
 
-            # Calculate the closest multiple of beta_wlen_multiple
-            closest_multiple = round(prop_length / beta_wlen_multiple)
-            
-            # Check if prop_length is within tolerance of the closest multiple of beta_wlen_multiple
-            if abs(prop_length - closest_multiple * beta_wlen_multiple) < closest_mult_tol:
-                # Ensure the trigger is not set consecutively for the same multiple
-                if last_triggered_multiple != closest_multiple:
-                    trans_wake_config.ion_motion_config.update_ion_wakefield = True
-                    last_triggered_multiple = closest_multiple
-                else:
-                    trans_wake_config.ion_motion_config.update_ion_wakefield = False
+        time_step_count = time_step_count + 1
+        
+        if enable_ion_motion:
+            if time_step_count % update_freq == 0:
+                trans_wake_config.ion_motion_config.update_ion_wakefield = True
             else:
                 trans_wake_config.ion_motion_config.update_ion_wakefield = False
-
             
-            #if trans_wake_config.ion_motion_config.update_ion_wakefield:
-            #    print(np.max(Wx_perts), np.max(Wy_perts))
-            #    print(f"Trigger set at prop_length: {prop_length}, closest multiple: {closest_multiple * beta_wlen_multiple}")
+
+        #if enable_ion_motion:
+#
+        #    # Calculate the closest multiple of beta_wlen_multiple
+        #    closest_multiple = round(prop_length / beta_wlen_multiple)
+        #    
+        #    # Check if prop_length is within tolerance of the closest multiple of beta_wlen_multiple
+        #    if abs(prop_length - closest_multiple * beta_wlen_multiple) < closest_mult_tol:
+        #        # Ensure the trigger is not set consecutively for the same multiple
+        #        if last_triggered_multiple != closest_multiple:
+        #            trans_wake_config.ion_motion_config.update_ion_wakefield = True
+        #            last_triggered_multiple = closest_multiple
+        #        else:
+        #            trans_wake_config.ion_motion_config.update_ion_wakefield = False
+        #    else:
+        #        trans_wake_config.ion_motion_config.update_ion_wakefield = False
                     
-        
 
         # RK4
         #xs_sorted = RK4(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, xs_sorted, pxs_sorted, Ez, pzs_sorted)
@@ -564,7 +562,9 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         if show_prog_bar is True:
             pbar.update(prop_length/stage_length*100 - pbar.n)        
             pbar.set_description(f"Instability tracking {round(prop_length/stage_length*100,2)}%")
-        
+
+        #print(time_step_count)
+        #break #####################< override
         
     ############# End of loop #############
     
@@ -590,6 +590,11 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
                              pzs=pzs_sorted,
                              weightings=weights_sorted,
                              particle_mass=particle_mass)
+    ## End time
+    #tot_end_time = time.time()
+    #
+    ## Time usage
+    #print('Tot time taken:', tot_end_time - tot_start_time, 'seconds')
     
     return beam_out
 
@@ -609,4 +614,29 @@ def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorte
     bubble_radius = bubble_radius[bool_indices]
 
     return zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius
+
+
+
+###################################################
+def save_time_step(file_path, arrays):
+    """""
+    arrays: List of arrays in the order
+        xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts
+    """""
+    
+    # Headers for the columns
+    headers = ['x [m]', 'y [m]', 'z [m]', 'px [kg m/s]', 'py [kg m/s]', 'pz [kg m/s]', 'Weights', 'Ez [V/m]', 'Bubble radius [m]', 'Wx perturbation [V/m]', 'Wy perturbation [V/m]']
+
+    # Stack them into columns for CSV output
+    data = np.column_stack(arrays)
+
+    # Create parent directories if they do not exist
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+    # Open the file for writing (creates the file if it does not exist)
+    with open(file_path, mode='w', newline='') as file:
+        np.savetxt(file, data, delimiter=",", header=",".join(headers))
+
+    # File is automatically closed when exiting the 'with' block
+
 

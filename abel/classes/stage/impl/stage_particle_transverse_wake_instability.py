@@ -41,7 +41,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, save_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0):
         """
         Parameters
         ----------
@@ -115,13 +115,11 @@ class StagePrtclTransWakeInstability(Stage):
         self.ion_mass = ion_mass
         
         self.num_z_cells = num_z_cells
-        self.num_xy_cells_rft = num_xy_cells_rft
+        self.num_x_cells_rft = num_x_cells_rft
+        self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
         self.uniform_z_grid = uniform_z_grid
-        self.update_factor = update_factor
-        
-        self.interstages_enabled = False
-        self.show_prog_bar = show_prog_bar
+        self.update_factor = np.max([time_step_mod, update_factor])
         
         self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
         self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
@@ -135,8 +133,11 @@ class StagePrtclTransWakeInstability(Stage):
         self.main_num_profile = None
         self.z_slices = None
         self.main_slices_edges = None
-        
+
+        self.save_data_frac = save_data_frac
         self.diag_path = None
+        self.interstages_enabled = False
+        self.show_prog_bar = show_prog_bar
         self.parallel_track_2D = False
         
         self.driver_to_wake_efficiency = None
@@ -252,13 +253,11 @@ class StagePrtclTransWakeInstability(Stage):
         #print('Driver x/y offsets:', drive_beam.x_offset() , drive_beam.y_offset() )                               ########################################## to be del
         #print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - driver_x_offset, beam0.x_offset())   ########################################## to be del
         #print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - driver_y_offset, beam0.y_offset())   ########################################## to be del
-        #print(abs((x_offset - driver_x_offset) / beam0.x_offset()))
-        #print(abs((y_offset - driver_y_offset) / beam0.y_offset()))
         
-        if self.driver_source.jitter.x != 0 and abs((x_offset - driver_x_offset) / beam0.x_offset() - 1) > 1e-6:
+        if abs((x_offset - driver_x_offset) / beam0.x_offset() - 1) > 1e-6:
             raise ValueError('Main beam not shifted accurately.')
 
-        if self.driver_source.jitter.y != 0 and abs((y_offset - driver_y_offset) / beam0.y_offset() - 1) > 1e-6:
+        if abs((y_offset - driver_y_offset) / beam0.y_offset() - 1) > 1e-6:
             raise ValueError('Main beam not shifted accurately.')
 
         # Also shift a copy of the drive beam if ion motion is enabled
@@ -331,7 +330,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         if self.num_z_cells is None:
             self.num_z_cells = round(np.sqrt( len(shifted_drive_beam)+len(beam_filtered) )/2)
-        
+            
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
             stage_length=self.length, 
@@ -339,13 +338,17 @@ class StagePrtclTransWakeInstability(Stage):
             main_beam=beam_filtered, 
             time_step_mod=self.time_step_mod, 
             show_prog_bar=self.show_prog_bar, 
+            shot_path=runnable.shot_path(), 
+            stage_num=beam0.stage_number, 
+            save_data_frac=self.save_data_frac, 
             enable_tr_instability=self.enable_tr_instability, 
             enable_radiation_reaction=self.enable_radiation_reaction, 
             enable_ion_motion=self.enable_ion_motion, 
             ion_charge_num=self.ion_charge_num, 
             ion_mass=self.ion_mass, 
             num_z_cells=self.num_z_cells, 
-            num_xy_cells_rft=self.num_xy_cells_rft, 
+            num_x_cells_rft=self.num_x_cells_rft, 
+            num_y_cells_rft=self.num_y_cells_rft, 
             num_xy_cells_probe=self.num_xy_cells_probe, 
             uniform_z_grid=self.uniform_z_grid, 
             update_factor=self.update_factor
@@ -364,6 +367,8 @@ class StagePrtclTransWakeInstability(Stage):
         #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                            ########################### to be del
         #print('Effective x-offset, beam_filtered.x_offset:', beam_filtered.x_offset() - drive_beam.x_offset(), beam_filtered.x_offset()) ################# to be del
         #print('Effective y-offset, beam_filtered.y_offset:', beam_filtered.y_offset() - drive_beam.y_offset(), beam_filtered.y_offset()) ################# to be del
+        #print(abs((x_offset - driver_x_offset) / beam_filtered.x_offset()))
+        #print(abs((y_offset - driver_y_offset) / beam_filtered.y_offset()))
         
         
         if self.parallel_track_2D is True:
@@ -1603,7 +1608,8 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"\tIon charge number:\t\t\t {self.ion_charge_num :.3f}", file=f)
             print(f"\tIon mass [u]:\t\t\t\t {self.ion_mass/SI.physical_constants['atomic mass constant'][0] :.3f}", file=f)
             print(f"\tnum_z_cells:\t\t\t\t {self.num_z_cells :d}", file=f)
-            print(f"\tnum_xy_cells_rft:\t\t\t {self.num_xy_cells_rft :d}", file=f)
+            print(f"\tnum_x_cells_rft:\t\t\t {self.num_x_cells_rft :d}", file=f)
+            print(f"\tnum_y_cells_rft:\t\t\t {self.num_y_cells_rft :d}", file=f)
             print(f"\tnum_xy_cells_probe:\t\t\t {self.num_xy_cells_probe :d}", file=f)
             print(f"\tupdate_factor:\t\t\t\t {self.update_factor :.3f}\n", file=f)
             

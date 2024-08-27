@@ -12,8 +12,12 @@ from matplotlib.colors import LinearSegmentedColormap  # For customising colour 
 import scipy.constants as SI
 from scipy.interpolate import RegularGridInterpolator
 #import copy
+from joblib import Parallel, delayed
+import os
+#import multiprocessing
+import time, warnings
 
-#from abel.classes.beam import Beam
+from abel.classes.beam import Beam
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.other import find_closest_value_in_arr
 from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
@@ -24,7 +28,7 @@ class IonMotionConfig():
 # Contains calculation configuration for calculating the ion wakefield perturbation.
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, update_ion_wakefield=False):
         """
         Parameters
         ----------
@@ -41,7 +45,7 @@ class IonMotionConfig():
         num_z_cells: float
             Number of grid cells along z.
 
-        num_xy_cells_rft: float
+        num_x(y)_cells_rft: float
             Number of grid cells along x and y used in RF-Track for calculating beam electric fields.
             
         num_xy_cells_probe: float
@@ -82,7 +86,8 @@ class IonMotionConfig():
         if num_z_cells is None:
             num_z_cells = round(np.sqrt( len(drive_beam)+len(main_beam) )/2)
         self.num_z_cells = num_z_cells
-        self.num_xy_cells_rft = num_xy_cells_rft
+        self.num_x_cells_rft = num_x_cells_rft
+        self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
 
         self.update_factor = update_factor
@@ -92,59 +97,118 @@ class IonMotionConfig():
         self.xs_probe = None
         self.ys_probe = None
         self.zs_probe = None
+        self.zs_probe_main = None
+        self.zs_probe_driver = None
+        self.xlims_driver_sc = None
+        self.ylims_driver_sc = None
         self.grid_size_z = None
-        self.Wx_perts = None
-        self.Wy_perts = None
+
+        self.driver_sc_fields_obj = None
+        #self.driver_E_fields_x_3d = None
+        #self.driver_E_fields_y_3d = None
+        #self.Wx_perts = None
+        #self.Wy_perts = None
         
         # Set the coordinates used to probe beam electric fields from RF-Track
-        self.set_probing_coordinates(drive_beam, main_beam)
+        self.set_probing_coordinates(drive_beam, main_beam, set_driver_sc_coords=True)
 
     
     # ==================================================
-    def set_probing_coordinates(self, drive_beam, main_beam):
+    def set_probing_coordinates(self, drive_beam, main_beam, set_driver_sc_coords=False):
+        """
+        Sets the coordinates used to probe the beam fields of the drive beam and main beam. Has to be called at every ion wakefield calculation step.
+        """
         
         if drive_beam.zs().min() < main_beam.zs().max():
             raise ValueError('Beams have to propagate towards increasing z with drive beam placed in front of main beam.')
+
+        if set_driver_sc_coords:
+            x_max = np.max([drive_beam.xs().max(), main_beam.xs().max()])
+            x_min = np.min([drive_beam.xs().min(), main_beam.xs().min()])
+            y_max = np.max([drive_beam.ys().max(), main_beam.ys().max()])
+            y_min = np.min([drive_beam.ys().min(), main_beam.ys().min()])
+            x_max = self.upper_padding(x_max, padding=1.0)
+            x_min = self.lower_padding(x_min, padding=1.0)
+            y_max = self.upper_padding(y_max, padding=1.0)
+            y_min = self.lower_padding(y_min, padding=1.0)
+            self.xlims_driver_sc = np.array([x_min, x_max])  # [m]
+            self.ylims_driver_sc = np.array([y_min, y_max])  # [m]
         
         # Transverse coordinates for probing the fields from RF-Track get_field()
-        #xy_min = np.min( [main_beam.xs().min(), main_beam.ys().min()] )
-        #xy_max = np.max( [main_beam.xs().max(), main_beam.ys().max()] )
-        #self.xs_probe = np.linspace( xy_min, xy_max, self.num_xy_cells_probe)  # [m]
-        #self.ys_probe = self.xs_probe  # [m]
+        self.xs_probe = np.linspace( main_beam.xs().min(), main_beam.xs().max(), self.num_xy_cells_probe)  # [m]
+        self.ys_probe = np.linspace( main_beam.ys().min(), main_beam.ys().max(), self.num_xy_cells_probe)  # [m]
 
-        #padding = 0.1
-        padding = 0.0  # TODO: Padding seems no longer necessary. Remove.
-        padded_min = lambda arr_min: arr_min*(1.0-np.sign(arr_min)*padding)
-        padded_max = lambda arr_max: arr_max*(1.0+np.sign(arr_max)*padding)
-        
-        self.xs_probe = np.linspace( padded_min(main_beam.xs().min()), padded_max(main_beam.xs().max()), self.num_xy_cells_probe)  # [m], padded xs
-        self.ys_probe = np.linspace( padded_min(main_beam.ys().min()), padded_max(main_beam.ys().max()), self.num_xy_cells_probe)  # [m], padded ys
+        if self.xs_probe.min() < self.xlims_driver_sc.min() or self.xs_probe.max() > self.xlims_driver_sc.max() or self.ys_probe.min() < self.ylims_driver_sc.min() or self.ys_probe.max() > self.ylims_driver_sc.max():
+            warnings.warn("The range of the probing coordinates is larger than the driver probing coordinates. This may lead to a slower performance due to extrapolations when extracting the driver beam fields.", UserWarning)
 
         # Set the z-coordinates used to probe beam electric fields from RF-Track
-        if self.uniform_z_grid:
-            self.zs_probe = np.linspace( padded_max(drive_beam.zs().max()), padded_min(main_beam.zs().min()), self.num_z_cells )  # [m], beam head facing start of array.
-
-            # Set the size of grid cells along z
-            self.grid_size_z = (self.zs_probe.max() - self.zs_probe.min()) / (self.num_z_cells-1)  # [m]
+        self.zs_probe_main = np.linspace( main_beam.zs().max(), main_beam.zs().min(), self.num_z_cells )  # [m], beam head facing start of array.
         
+        if self.uniform_z_grid:
+            self.grid_size_z = np.abs(np.diff(self.zs_probe_main)[0])  # [m], the size of grid cells along z
+            driver_num_z = int( (drive_beam.zs().max() - self.upper_padding(main_beam.zs().max()))/self.grid_size_z )
+            self.zs_probe_driver = np.linspace( drive_beam.zs().max(), self.upper_padding(main_beam.zs().max()), driver_num_z )  # [m], beam head facing start of array. Also includes empty space between driver and main beam.
+            self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_main] )  # [m], beam head facing start of array.
         else:
-            zs_probe_driver = np.linspace( padded_max(drive_beam.zs().max()), drive_beam.zs().min(), round(np.sqrt(len(drive_beam))/2) )
-            zs_probe_middle = np.linspace( padded_min(drive_beam.zs().min()), padded_max(main_beam.zs().max()), 10 )
-            zs_probe_main = np.linspace( main_beam.zs().max(), padded_min(main_beam.zs().min()), round(np.sqrt(len(main_beam))/2) )
-            self.zs_probe = np.concatenate( (zs_probe_driver, zs_probe_middle, zs_probe_main) ) # z_max > drive_beam.zs().min() > main_beam.zs().max()
-            
-            # Set the size of grid cells along z
+            #driver_num_z = round(np.sqrt(len(drive_beam))/2)  # [m], the sizes of grid cells along z
+            dz = drive_beam.bunch_length()/10
+            driver_num_z = int( (drive_beam.zs().max() - main_beam.zs().max())/dz )
+            self.zs_probe_driver = np.linspace( drive_beam.zs().max(), self.upper_padding(main_beam.zs().max()), driver_num_z )  # [m], beam head facing start of array. Also includes empty space between driver and main beam.
+
+            #self.zs_probe_driver = np.linspace( drive_beam.zs().max(), drive_beam.zs().min(), driver_num_z )  # [m], beam head facing start of array. 
+            self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_main] )  # [m], beam head facing start of array.
             self.grid_size_z = np.abs( np.insert(np.diff(self.zs_probe), 0, 0.0) )
 
     
     # ==================================================
-    def assemble_sc_fields_obj(self, main_beam, drive_beam=None):
-        if drive_beam is None:
-            drive_beam = self.drive_beam
-        ion_motion_beam = drive_beam + main_beam
-        ion_motion_beam.particle_mass = main_beam.particle_mass
+    def assemble_driver_sc_fields_obj(self):
+        "Creates a SpaceCharge_Field object for the drive beam. Only needs to be called at the start of a stage for non-evolving drive beam."
         
-        return calc_sc_fields_obj(ion_motion_beam, self.num_xy_cells_rft, self.num_xy_cells_rft, self.num_z_cells, num_t_bins=1)
+        drive_beam = self.drive_beam
+        x_min, x_max = self.xlims_driver_sc
+        y_min, y_max = self.ylims_driver_sc
+        
+        z_end = self.zs_probe_driver.min()
+        z_start = self.upper_padding(self.zs_probe_driver.max())
+        
+        X, Y, Z = np.meshgrid([x_min, x_max], [y_min, y_max], [z_start, z_end], indexing='ij')
+        
+        empty_beam = Beam()
+        empty_beam.set_phase_space(Q=0,
+                                   xs=X.flatten(),
+                                   ys=Y.flatten(),
+                                   zs=Z.flatten(), 
+                                   uxs=np.ones_like(X.flatten())*drive_beam.uxs()[0],
+                                   uys=np.ones_like(X.flatten())*drive_beam.uys()[0],
+                                   uzs=np.ones_like(X.flatten())*drive_beam.uzs()[0],
+                                   weightings=np.ones_like(X.flatten())*drive_beam.weightings()[0],
+                                   particle_mass=drive_beam.particle_mass)
+        
+        combined_beam = drive_beam + empty_beam
+        combined_beam.particle_mass = drive_beam.particle_mass
+
+        dx = drive_beam.beam_size_x()/6
+        num_x = int( (combined_beam.xs().max() - combined_beam.xs().min())/dx )
+        dy = drive_beam.beam_size_y()/6
+        num_y = int( (combined_beam.ys().max() - combined_beam.ys().min())/dy )
+        dz = drive_beam.bunch_length()/20
+        num_z = int( (combined_beam.zs().max() - combined_beam.zs().min())/dz )
+        
+        return calc_sc_fields_obj(combined_beam, num_x, num_y, num_z, num_t_bins=1)
+
+    
+    # ==================================================
+    def lower_padding(self, arr_min, padding=0.05):
+        if padding < 0.0:
+            padding = np.abs(padding)
+        return arr_min*(1.0 - np.sign(arr_min)*padding)
+
+
+    # ==================================================
+    def upper_padding(self, arr_max, padding=0.05):
+        if padding < 0.0:
+            padding = np.abs(padding)
+        return arr_max*(1.0 + np.sign(arr_max)*padding)
 
 
 
@@ -170,7 +234,116 @@ def ion_motion_quantifier2(beam_size_x, beam_size_y, bunch_length, beam_peak_cur
 
 
 ###################################################
-def ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction):
+def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj, field_comp):
+    "Probes the drive beam SpaceCharge_Field object and returns the drive beam E-field component stored in a 3D numpy array. Needs to be called at every ion wakefield calculation step."
+    
+    # Set up a 3D mesh grid
+    xs_probe = ion_motion_config.xs_probe  # [m]
+    ys_probe = ion_motion_config.ys_probe  # [m]
+    zs_probe = ion_motion_config.zs_probe_driver  # [m]
+    X, Y, Z = np.meshgrid(xs_probe, ys_probe, zs_probe, indexing='ij')
+    xs_grid_flat = X.flatten()*1e3  # [mm]
+    ys_grid_flat = Y.flatten()*1e3  # [mm]
+    zs_grid_flat = Z.flatten()*1e3  # [mm]
+        
+    # Probe beam E-field
+    E_fields_beam, _ = driver_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
+    if field_comp == 'x':
+        E_fields_comp = E_fields_beam[:,0]
+    elif field_comp == 'y':
+        E_fields_comp = E_fields_beam[:,1]
+    else:
+        raise ValueError('ion_wakefield_perturbation_parallel(): Choose a valid field_comp (''x'' or ''y'').')
+    
+    # Reshape the field component into a 3D array       
+    E_fields_comp_3d = E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    
+    return E_fields_comp_3d
+
+
+    
+###################################################
+def assemble_main_sc_fields_obj(ion_motion_config, main_beam):
+    "Creates a SpaceCharge_Field object for the main beam. Needs to be called at every ion wakefield calculation step."
+    
+    # Slightly enlarge the transverse region by constructing empty_beam to avoid extrapolation when evaluating the beam fields.
+    x_min = ion_motion_config.lower_padding(ion_motion_config.xs_probe.min(), padding=0.05)
+    x_max = ion_motion_config.upper_padding(ion_motion_config.xs_probe.max(), padding=0.05)
+    y_min = ion_motion_config.lower_padding(ion_motion_config.ys_probe.min(), padding=0.05)
+    y_max = ion_motion_config.upper_padding(ion_motion_config.ys_probe.max(), padding=0.05)
+    z_end = main_beam.zs().min()
+    z_start = main_beam.zs().max()
+    
+    X, Y, Z = np.meshgrid([x_min, x_max], [y_min, y_max], [z_start, z_end], indexing='ij')
+    
+    empty_beam = Beam()
+    empty_beam.set_phase_space(Q=0,
+                               xs=X.flatten(),
+                               ys=Y.flatten(),
+                               zs=Z.flatten(), 
+                               uxs=np.ones_like(X.flatten())*main_beam.uxs()[0],
+                               uys=np.ones_like(X.flatten())*main_beam.uys()[0],
+                               uzs=np.ones_like(X.flatten())*main_beam.uzs()[0],
+                               weightings=np.ones_like(X.flatten())*main_beam.weightings()[0],
+                               particle_mass=main_beam.particle_mass)
+    
+    combined_beam = main_beam + empty_beam
+    combined_beam.particle_mass = main_beam.particle_mass
+    
+    return calc_sc_fields_obj(combined_beam, ion_motion_config.num_x_cells_rft, ion_motion_config.num_y_cells_rft, ion_motion_config.num_z_cells, num_t_bins=1)
+
+
+
+###################################################
+def probe_main_beam_field(ion_motion_config, main_sc_fields_obj, field_comp):
+    """
+    Probes the main beam SpaceCharge_Field object and returns the main beam E-field component stored in a 3D numpy array. Needs to be called at every ion wakefield calculation step.
+
+    Parameters
+    ----------
+    ion_motion_config: IonMotionConfig object
+        Contains the configurations for calculating the ion wakefield perturbation.
+    
+    main_sc_fields_obj: RF-Track SpaceCharge_Field object.
+        Contains the beam electric and magnetic fields for the main beam calculated by RF-Track.
+
+    field_comp: string
+        Specifies the transverse component ('x' or 'y') of the wakefield.
+        
+    Returns
+    ----------
+    E_fields_comp_3d: [V/m] 3D float array
+        Contains the beam field component where the first, second and third dimensions correspond to positions along x, y and z.
+    """
+    
+    # Set up a 3D mesh grid
+    xs_probe = ion_motion_config.xs_probe  # [m]
+    ys_probe = ion_motion_config.ys_probe  # [m]
+    zs_probe = ion_motion_config.zs_probe_main  # [m]
+    X, Y, Z = np.meshgrid(xs_probe, ys_probe, zs_probe, indexing='ij')
+    xs_grid_flat = X.flatten()*1e3  # [mm]
+    ys_grid_flat = Y.flatten()*1e3  # [mm]
+    zs_grid_flat = Z.flatten()*1e3  # [mm]
+        
+    # Probe beam E-field
+    E_fields_beam, _ = main_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
+    if field_comp == 'x':
+        E_fields_comp = E_fields_beam[:,0]
+    elif field_comp == 'y':
+        E_fields_comp = E_fields_beam[:,1]
+    else:
+        raise ValueError('ion_wakefield_perturbation_parallel(): Choose a valid field_comp (''x'' or ''y'').')
+    
+    # Reshape the field component into a 3D array       
+    E_fields_comp_3d = E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    
+    return E_fields_comp_3d
+
+
+
+
+###################################################
+def ion_wakefield_perturbation(ion_motion_config, main_E_fields_comp_3d, driver_E_fields_comp_3d, field_comp):
     """
     Calculates the ion wakefield perturbation to the otherwise linear background focusing kp*E0*r/2 by integrating the beam electric fields along z.
 
@@ -178,12 +351,13 @@ def ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction):
     ----------
     ion_motion_config: IonMotionConfig object
         Contains the configurations for calculating the ion wakefield perturbation.
-    
-    sc_fields_obj: RF-Track SpaceCharge_Field object.
-        Contains the beam electric and magnetic fields calculated by RF-Track.
 
-    tr_direction: string
-        Specifies the transverse direction ('x' or 'y') of the wakefield.
+    main_E_fields_comp_3d: ...
+    
+    driver_E_fields_comp_3d: ...
+
+    field_comp: string
+        Specifies the transverse component ('x' or 'y') of the wakefield.
         
     Returns
     ----------
@@ -192,55 +366,34 @@ def ion_wakefield_perturbation(ion_motion_config, sc_fields_obj, tr_direction):
     """
 
     # Get parameters
-    skin_depth = 1/k_p(ion_motion_config.plasma_ion_density)  # [m]
+    kp = k_p(ion_motion_config.plasma_ion_density)  # [m]
     ion_mass = ion_motion_config.ion_mass  # [kg]
     ion_charge_num = ion_motion_config.ion_charge_num
     xs_probe = ion_motion_config.xs_probe  # [m]
     ys_probe = ion_motion_config.ys_probe  # [m]
     zs_probe = ion_motion_config.zs_probe  # [m]
     grid_size_z = ion_motion_config.grid_size_z  # [m], the grid size along z
-    
-    # Set up a 3D mesh grid
-    X, Y, Z = np.meshgrid(xs_probe, ys_probe, zs_probe, indexing='ij')
-    xs_grid_flat = X.flatten()*1e3  # [mm]
-    ys_grid_flat = Y.flatten()*1e3  # [mm]
-    zs_grid_flat = Z.flatten()*1e3  # [mm]
 
-    # Probe beam E-field
-    E_fields_beam, _ = sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
-
-    if tr_direction == 'x':
-        E_fields_comp = E_fields_beam[:,0]
-    elif tr_direction == 'y':
-        E_fields_comp = E_fields_beam[:,1]
-    else:
-        raise ValueError('ion_wakefield_perturbation(): Choose a valid tr_direction (''x'' or ''y'').')
-    
-    # Reshape the field component into a 3D array       
-    E_fields_comp_3d = E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    # Concatenate the 3D beam field of the drive beam and main beam
+    E_fields_comp_3d = np.concatenate([driver_E_fields_comp_3d, main_E_fields_comp_3d], axis=2)
     
     # Integration along z using by splitting up the convolution integral
     integral = np.cumsum( zs_probe * E_fields_comp_3d * grid_size_z, axis=2) - zs_probe * np.cumsum(E_fields_comp_3d * grid_size_z, axis=2)
     
-    wakefield_perturbations = ion_charge_num * SI.m_e/ion_mass/skin_depth**2 * integral
+    wakefield_perturbations = ion_charge_num * SI.m_e/ion_mass * kp**2 * integral
     
     return wakefield_perturbations
 
 
 
 ###################################################
-from joblib import Parallel, delayed
-import os
-#import multiprocessing
-import time
-
-# Function to perform cumulative sum on a slice of the beam field (3D array)
-def compute_cumsum_slice(E_slice, zs_probe, grid_size_z):
+# Function to perform cumulative sum on a segment of the beam field (3D array)
+def compute_cumsum_segment(E_slice, zs_probe, grid_size_z):
     #print(f"Processing slice i = {i} on core/process ID = {process_id}", flush=True)
     #process_id = multiprocessing.current_process().pid
 
     #start_time = time.time()
-    #print(f"Processing chunk on process ID = {process_id} at time {start_time:.2f}", flush=True)
+    #print(f"Processing segment on process ID = {process_id} at time {start_time:.2f}", flush=True)
     
     
     # Integration along z using by splitting up the convolution integral
@@ -248,10 +401,15 @@ def compute_cumsum_slice(E_slice, zs_probe, grid_size_z):
             - zs_probe * np.cumsum(E_slice * grid_size_z, axis=2))
 
     #end_time = time.time()
-    #print(f"Finished chunk on process ID = {process_id} at time {end_time:.2f}, duration = {end_time - start_time:.3e} seconds", flush=True)
+    #print(f"Finished segment on process ID = {process_id} at time {end_time:.2f}, duration = {end_time - start_time:.3e} seconds", flush=True)
     
     return integral
 
+# Function for extracting a segment of the beam field
+def process_segment(sc_fields_obj, xs_segment, ys_segment, zs_segment):
+    zeros_segment = np.zeros_like(xs_segment)
+    E_fields, _ = sc_fields_obj.get_field(xs_segment, ys_segment, zs_segment, zeros_segment)
+    return E_fields
 
 
 ###################################################
@@ -277,7 +435,7 @@ def ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_dir
     """
     
     # Get parameters
-    skin_depth = 1/k_p(ion_motion_config.plasma_ion_density)  # [m]
+    kp = k_p(ion_motion_config.plasma_ion_density)  # [m]
     ion_mass = ion_motion_config.ion_mass  # [kg]
     ion_charge_num = ion_motion_config.ion_charge_num
     xs_probe = ion_motion_config.xs_probe  # [m]
@@ -305,13 +463,8 @@ def ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_dir
     zs_grid_flat_segments = np.array_split(zs_grid_flat, n_jobs)
 
     # Probe beam E-field in parallel
-    def process_chunk(xs_chunk, ys_chunk, zs_chunk):
-        zeros_chunk = np.zeros_like(xs_chunk)
-        E_fields, _ = sc_fields_obj.get_field(xs_chunk, ys_chunk, zs_chunk, zeros_chunk)
-        return E_fields
-
     results = Parallel(n_jobs=n_jobs, backend='threading')(
-        delayed(process_chunk)(xs_grid_flat_segments[i], ys_grid_flat_segments[i], zs_grid_flat_segments[i])
+        delayed(process_segment)(sc_fields_obj, xs_grid_flat_segments[i], ys_grid_flat_segments[i], zs_grid_flat_segments[i])
         for i in range(n_jobs)
     )
     
@@ -325,7 +478,7 @@ def ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_dir
     elif tr_direction == 'y':
         E_fields_comp = E_fields_beam[:,1]
     else:
-        raise ValueError('ion_wakefield_perturbation(): Choose a valid tr_direction (''x'' or ''y'').')
+        raise ValueError('ion_wakefield_perturbation_parallel(): Choose a valid tr_direction (''x'' or ''y'').')
 
     #start_time = time.time()
     
@@ -337,7 +490,7 @@ def ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_dir
     
     # Process each E_fields_segment in parallel
     results = Parallel(n_jobs=n_jobs)(
-        delayed(compute_cumsum_slice)(E_fields_segment, zs_probe, grid_size_z)
+        delayed(compute_cumsum_segment)(E_fields_segment, zs_probe, grid_size_z)
         for E_fields_segment in E_fields_segments
     )
 
@@ -347,7 +500,7 @@ def ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_dir
     #end_time = time.time()
     #print('Integration time taken:', end_time - start_time, 'seconds')
     
-    wakefield_perturbations = ion_charge_num * SI.m_e/ion_mass/skin_depth**2 * integral
+    wakefield_perturbations = ion_charge_num * SI.m_e/ion_mass * kp**2 * integral
     
     return wakefield_perturbations
 
@@ -390,6 +543,22 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
     return interpolated_wakefield_perturbations, interpolator
 
 
+
+###################################################
+def ion_wakefield_scatter(arr1, arr2, intpl_W_perts, label1=None, label2=None, clabel=None, n_th_particle=1):
+    
+    arr1 = arr1[::n_th_particle]
+    arr2 = arr2[::n_th_particle]
+    intpl_W_perts = intpl_W_perts[::n_th_particle]
+    
+    plt.figure()
+    plt.scatter(arr1*1e6, arr2*1e6, c=intpl_W_perts/1e9, cmap='seismic', s=5.0)
+    plt.xlabel(label1)
+    plt.ylabel(label2)
+    cbar = plt.colorbar()
+    cbar.set_label(clabel)
+    plt.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+
     
 ###################################################
 def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_perts, n_th_particle=1):
@@ -414,18 +583,24 @@ def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_pert
     fig.subplots_adjust(top=0.87)
 
     #sort_x_indices = np.argsort(xs)
-    p = axes[0].scatter(xs*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*xs/1e9 - intpl_Wx_perts/1e9, c=zs*1e6, cmap=cmap)
+    p = axes[0].scatter(xs*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*xs/1e9 - intpl_Wx_perts/1e9, c=zs*1e6, cmap=cmap, s=5.0)
     axes[0].plot(xs*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*xs/1e9)
     axes[0].set_xlabel('x [µm]')
     axes[0].set_ylabel('$\mathcal{W}_x$ [GV/m]')
     axes[0].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+    twinax = axes[0].twinx()
+    twinax.fill_between(x=beam.transverse_profile_x()[1]*1e6, y1=beam.charge_sign()*beam.transverse_profile_x()[0], y2=0, color='g', alpha=0.3)
+    twinax.set_yticks([])
     
     #sort_y_indices = np.argsort(ys)
-    axes[1].scatter(ys*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*ys/1e9 - intpl_Wy_perts/1e9, c=zs*1e6, cmap=cmap)
+    axes[1].scatter(ys*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*ys/1e9 - intpl_Wy_perts/1e9, c=zs*1e6, cmap=cmap, s=3.0)
     axes[1].plot(ys*1e6, plasma_density*SI.e/(2*SI.epsilon_0)*ys/1e9)
     axes[1].set_xlabel('y [µm]')
     axes[1].set_ylabel('$\mathcal{W}_y$ [GV/m]')
     axes[1].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+    twinax = axes[1].twinx()
+    twinax.fill_between(x=beam.transverse_profile_y()[1]*1e6, y1=beam.charge_sign()*beam.transverse_profile_y()[0], y2=0, color='g', alpha=0.3)
+    twinax.set_yticks([])
 
     # Set label and other properties for the colorbar
     cbar_ax = fig.add_axes([0.15, 0.96, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
