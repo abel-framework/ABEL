@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
 import scipy.constants as SI
 from scipy.interpolate import RegularGridInterpolator
-#import copy
+import copy
 from joblib import Parallel, delayed
 import os
 #import multiprocessing
@@ -19,6 +19,7 @@ import time, warnings
 
 from abel.classes.beam import Beam
 from abel.utilities.plasma_physics import k_p
+from abel.utilities.statistics import weighted_std
 from abel.utilities.other import find_closest_value_in_arr
 from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 
@@ -28,7 +29,7 @@ class IonMotionConfig():
 # Contains calculation configuration for calculating the ion wakefield perturbation.
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0, update_ion_wakefield=False):
         """
         Parameters
         ----------
@@ -42,7 +43,7 @@ class IonMotionConfig():
         ion_charge_num: [e] float
             Plasma io charge in units of the elementary charge.
         
-        num_z_cells: float
+        num_z_cells_main: float
             Number of grid cells along z.
 
         num_x(y)_cells_rft: float
@@ -83,9 +84,9 @@ class IonMotionConfig():
         self.ion_mass = ion_mass
 
         # Set the number of cells
-        if num_z_cells is None:
-            num_z_cells = round(np.sqrt( len(drive_beam)+len(main_beam) )/2)
-        self.num_z_cells = num_z_cells
+        if num_z_cells_main is None:
+            num_z_cells_main = round(np.sqrt( len(drive_beam)+len(main_beam) )/2)
+        self.num_z_cells_main = num_z_cells_main
         self.num_x_cells_rft = num_x_cells_rft
         self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
@@ -98,6 +99,7 @@ class IonMotionConfig():
         self.ys_probe = None
         self.zs_probe = None
         self.zs_probe_main = None
+        self.zs_probe_separation = None
         self.zs_probe_driver = None
         self.xlims_driver_sc = None
         self.ylims_driver_sc = None
@@ -106,8 +108,8 @@ class IonMotionConfig():
         self.driver_sc_fields_obj = None
         #self.driver_E_fields_x_3d = None
         #self.driver_E_fields_y_3d = None
-        #self.Wx_perts = None
-        #self.Wy_perts = None
+        self.Wx_perts = None
+        self.Wy_perts = None
         
         # Set the coordinates used to probe beam electric fields from RF-Track
         self.set_probing_coordinates(drive_beam, main_beam, set_driver_sc_coords=True)
@@ -127,10 +129,10 @@ class IonMotionConfig():
             x_min = np.min([drive_beam.xs().min(), main_beam.xs().min()])
             y_max = np.max([drive_beam.ys().max(), main_beam.ys().max()])
             y_min = np.min([drive_beam.ys().min(), main_beam.ys().min()])
-            x_max = self.upper_padding(x_max, padding=1.0)
-            x_min = self.lower_padding(x_min, padding=1.0)
-            y_max = self.upper_padding(y_max, padding=1.0)
-            y_min = self.lower_padding(y_min, padding=1.0)
+            x_max = self.pad_upwards(x_max, padding=1.0)
+            x_min = self.pad_downwards(x_min, padding=1.0)
+            y_max = self.pad_upwards(y_max, padding=1.0)
+            y_min = self.pad_downwards(y_min, padding=1.0)
             self.xlims_driver_sc = np.array([x_min, x_max])  # [m]
             self.ylims_driver_sc = np.array([y_min, y_max])  # [m]
         
@@ -142,21 +144,26 @@ class IonMotionConfig():
             warnings.warn("The range of the probing coordinates is larger than the driver probing coordinates. This may lead to a slower performance due to extrapolations when extracting the driver beam fields.", UserWarning)
 
         # Set the z-coordinates used to probe beam electric fields from RF-Track
-        self.zs_probe_main = np.linspace( main_beam.zs().max(), main_beam.zs().min(), self.num_z_cells )  # [m], beam head facing start of array.
+        self.zs_probe_main = np.linspace( main_beam.zs().max(), main_beam.zs().min(), self.num_z_cells_main )  # [m], beam head facing start of array.
         
         if self.uniform_z_grid:
             self.grid_size_z = np.abs(np.diff(self.zs_probe_main)[0])  # [m], the size of grid cells along z
-            driver_num_z = int( (drive_beam.zs().max() - self.upper_padding(main_beam.zs().max()))/self.grid_size_z )
-            self.zs_probe_driver = np.linspace( drive_beam.zs().max(), self.upper_padding(main_beam.zs().max()), driver_num_z )  # [m], beam head facing start of array. Also includes empty space between driver and main beam.
-            self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_main] )  # [m], beam head facing start of array.
-        else:
-            #driver_num_z = round(np.sqrt(len(drive_beam))/2)  # [m], the sizes of grid cells along z
-            dz = drive_beam.bunch_length()/10
-            driver_num_z = int( (drive_beam.zs().max() - main_beam.zs().max())/dz )
-            self.zs_probe_driver = np.linspace( drive_beam.zs().max(), self.upper_padding(main_beam.zs().max()), driver_num_z )  # [m], beam head facing start of array. Also includes empty space between driver and main beam.
+            driver_num_z = int( (drive_beam.zs().max() - self.pad_upwards(main_beam.zs().max()))/self.grid_size_z )
+            self.zs_probe_driver = np.linspace( drive_beam.zs().max(), drive_beam.zs().min(), driver_num_z )  # [m], beam head facing start of array.
 
-            #self.zs_probe_driver = np.linspace( drive_beam.zs().max(), drive_beam.zs().min(), driver_num_z )  # [m], beam head facing start of array. 
-            self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_main] )  # [m], beam head facing start of array.
+            sep_num_z = int( (self.pad_downwards(self.zs_probe_driver.min()) - self.pad_upwards(self.zs_probe_main.max()) )/self.grid_size_z )
+            self.zs_probe_separation = np.linspace( self.pad_downwards(self.zs_probe_driver.min()), self.pad_upwards(self.zs_probe_main.max()), sep_num_z )  # [m], beam head facing start of array. Space between driver and main beam.
+            
+            self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_separation, self.zs_probe_main] )  # [m], beam head facing start of array.
+            
+        else:
+            dz = weighted_std(drive_beam.zs(), drive_beam.weightings())/5
+            driver_num_z = int( (drive_beam.zs().max() - drive_beam.zs().min())/dz )
+            self.zs_probe_driver = np.linspace( drive_beam.zs().max(), drive_beam.zs().min(), driver_num_z )  # [m], beam head facing start of array.
+
+            sep_num_z = int( (self.pad_downwards(self.zs_probe_driver.min()) - self.pad_upwards(self.zs_probe_main.max()) )/dz )
+            self.zs_probe_separation = np.linspace( self.pad_downwards(self.zs_probe_driver.min()), self.pad_upwards(self.zs_probe_main.max()), sep_num_z )  # [m], beam head facing start of array. Space between driver and main beam.
+            self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_separation, self.zs_probe_main] )  # [m], beam head facing start of array.
             self.grid_size_z = np.abs( np.insert(np.diff(self.zs_probe), 0, 0.0) )
 
     
@@ -168,8 +175,8 @@ class IonMotionConfig():
         x_min, x_max = self.xlims_driver_sc
         y_min, y_max = self.ylims_driver_sc
         
-        z_end = self.zs_probe_driver.min()
-        z_start = self.upper_padding(self.zs_probe_driver.max())
+        z_end = self.pad_downwards(self.zs_probe_driver.min())
+        z_start = self.pad_upwards(self.zs_probe_driver.max())
         
         X, Y, Z = np.meshgrid([x_min, x_max], [y_min, y_max], [z_start, z_end], indexing='ij')
         
@@ -191,21 +198,21 @@ class IonMotionConfig():
         num_x = int( (combined_beam.xs().max() - combined_beam.xs().min())/dx )
         dy = drive_beam.beam_size_y()/6
         num_y = int( (combined_beam.ys().max() - combined_beam.ys().min())/dy )
-        dz = drive_beam.bunch_length()/20
+        dz = drive_beam.bunch_length()/10
         num_z = int( (combined_beam.zs().max() - combined_beam.zs().min())/dz )
         
         return calc_sc_fields_obj(combined_beam, num_x, num_y, num_z, num_t_bins=1)
 
     
     # ==================================================
-    def lower_padding(self, arr_min, padding=0.05):
+    def pad_downwards(self, arr_min, padding=0.05):
         if padding < 0.0:
             padding = np.abs(padding)
         return arr_min*(1.0 - np.sign(arr_min)*padding)
 
 
     # ==================================================
-    def upper_padding(self, arr_max, padding=0.05):
+    def pad_upwards(self, arr_max, padding=0.05):
         if padding < 0.0:
             padding = np.abs(padding)
         return arr_max*(1.0 + np.sign(arr_max)*padding)
@@ -235,7 +242,7 @@ def ion_motion_quantifier2(beam_size_x, beam_size_y, bunch_length, beam_peak_cur
 
 ###################################################
 def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj, field_comp):
-    "Probes the drive beam SpaceCharge_Field object and returns the drive beam E-field component stored in a 3D numpy array. Needs to be called at every ion wakefield calculation step."
+    "Probes the drive beam SpaceCharge_Field object and returns the drive beam E-field component stored in a 3D numpy array where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step."
     
     # Set up a 3D mesh grid
     xs_probe = ion_motion_config.xs_probe  # [m]
@@ -248,6 +255,7 @@ def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj, field_comp)
         
     # Probe beam E-field
     E_fields_beam, _ = driver_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
+    #E_fields_beam, _ = get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
     if field_comp == 'x':
         E_fields_comp = E_fields_beam[:,0]
     elif field_comp == 'y':
@@ -261,16 +269,32 @@ def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj, field_comp)
     return E_fields_comp_3d
 
 
-    
+
+###################################################
+def construct_empty_field(ion_motion_config):
+    "Returns a zero 3D numpy where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step."
+
+    # Get the dimensions
+    xs_probe = ion_motion_config.xs_probe  # [m]
+    ys_probe = ion_motion_config.ys_probe  # [m]
+    zs_probe = ion_motion_config.zs_probe_separation  # [m]
+    num_x = len(xs_probe)
+    num_y = len(ys_probe)
+    num_z = len(zs_probe)
+
+    return np.zeros((num_x, num_y, num_z))
+
+
+
 ###################################################
 def assemble_main_sc_fields_obj(ion_motion_config, main_beam):
     "Creates a SpaceCharge_Field object for the main beam. Needs to be called at every ion wakefield calculation step."
     
     # Slightly enlarge the transverse region by constructing empty_beam to avoid extrapolation when evaluating the beam fields.
-    x_min = ion_motion_config.lower_padding(ion_motion_config.xs_probe.min(), padding=0.05)
-    x_max = ion_motion_config.upper_padding(ion_motion_config.xs_probe.max(), padding=0.05)
-    y_min = ion_motion_config.lower_padding(ion_motion_config.ys_probe.min(), padding=0.05)
-    y_max = ion_motion_config.upper_padding(ion_motion_config.ys_probe.max(), padding=0.05)
+    x_min = ion_motion_config.pad_downwards(ion_motion_config.xs_probe.min(), padding=0.05)
+    x_max = ion_motion_config.pad_upwards(ion_motion_config.xs_probe.max(), padding=0.05)
+    y_min = ion_motion_config.pad_downwards(ion_motion_config.ys_probe.min(), padding=0.05)
+    y_max = ion_motion_config.pad_upwards(ion_motion_config.ys_probe.max(), padding=0.05)
     z_end = main_beam.zs().min()
     z_start = main_beam.zs().max()
     
@@ -290,7 +314,7 @@ def assemble_main_sc_fields_obj(ion_motion_config, main_beam):
     combined_beam = main_beam + empty_beam
     combined_beam.particle_mass = main_beam.particle_mass
     
-    return calc_sc_fields_obj(combined_beam, ion_motion_config.num_x_cells_rft, ion_motion_config.num_y_cells_rft, ion_motion_config.num_z_cells, num_t_bins=1)
+    return calc_sc_fields_obj(combined_beam, ion_motion_config.num_x_cells_rft, ion_motion_config.num_y_cells_rft, ion_motion_config.num_z_cells_main, num_t_bins=1)
 
 
 
@@ -369,13 +393,14 @@ def ion_wakefield_perturbation(ion_motion_config, main_E_fields_comp_3d, driver_
     kp = k_p(ion_motion_config.plasma_ion_density)  # [m]
     ion_mass = ion_motion_config.ion_mass  # [kg]
     ion_charge_num = ion_motion_config.ion_charge_num
-    xs_probe = ion_motion_config.xs_probe  # [m]
-    ys_probe = ion_motion_config.ys_probe  # [m]
     zs_probe = ion_motion_config.zs_probe  # [m]
     grid_size_z = ion_motion_config.grid_size_z  # [m], the grid size along z
 
+    # Get the empty region between the drive beam and main beam
+    sep_E_fields_3d = construct_empty_field(ion_motion_config)
+
     # Concatenate the 3D beam field of the drive beam and main beam
-    E_fields_comp_3d = np.concatenate([driver_E_fields_comp_3d, main_E_fields_comp_3d], axis=2)
+    E_fields_comp_3d = np.concatenate([driver_E_fields_comp_3d, sep_E_fields_3d, main_E_fields_comp_3d], axis=2)
     
     # Integration along z using by splitting up the convolution integral
     integral = np.cumsum( zs_probe * E_fields_comp_3d * grid_size_z, axis=2) - zs_probe * np.cumsum(E_fields_comp_3d * grid_size_z, axis=2)
@@ -406,7 +431,7 @@ def compute_cumsum_segment(E_slice, zs_probe, grid_size_z):
     return integral
 
 # Function for extracting a segment of the beam field
-def process_segment(sc_fields_obj, xs_segment, ys_segment, zs_segment):
+def probe_beam_field_segment(sc_fields_obj, xs_segment, ys_segment, zs_segment):
     zeros_segment = np.zeros_like(xs_segment)
     E_fields, _ = sc_fields_obj.get_field(xs_segment, ys_segment, zs_segment, zeros_segment)
     return E_fields
@@ -464,7 +489,7 @@ def ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_dir
 
     # Probe beam E-field in parallel
     results = Parallel(n_jobs=n_jobs, backend='threading')(
-        delayed(process_segment)(sc_fields_obj, xs_grid_flat_segments[i], ys_grid_flat_segments[i], zs_grid_flat_segments[i])
+        delayed(probe_beam_field_segment)(sc_fields_obj, xs_grid_flat_segments[i], ys_grid_flat_segments[i], zs_grid_flat_segments[i])
         for i in range(n_jobs)
     )
     
@@ -512,8 +537,13 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
 
     if intplt_beam_region_only:  # Perform the interpolation only in the beam's region
         zs_probe = ion_motion_config.zs_probe
-        head_idx, _ = find_closest_value_in_arr( zs_probe, beam.zs().max()+ion_motion_config.grid_size_z )
-        tail_idx, zs_probe_val = find_closest_value_in_arr( zs_probe, beam.zs().min()-ion_motion_config.grid_size_z )
+        dz = ion_motion_config.grid_size_z
+        
+        if isinstance(dz, np.ndarray):
+            dz = np.min(dz)
+            
+        head_idx, _ = find_closest_value_in_arr( zs_probe, beam.zs().max()+dz )
+        tail_idx, zs_probe_val = find_closest_value_in_arr( zs_probe, beam.zs().min()-dz )
         
         wakefield_perturbations = wakefield_perturbations[:, :, head_idx:tail_idx+1]
         zs_probe = zs_probe[head_idx:tail_idx+1]
@@ -521,7 +551,6 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
         if beam.zs().min() < zs_probe.min() or beam.zs().max() > zs_probe.max():
             print('Probe z min max:', zs_probe.min()*1e6, zs_probe.max()*1e6)
             print('beam z min max:', beam.zs().min()*1e6, beam.zs().max()*1e6)
-            print(ion_motion_config.zs_probe*1e6)
             raise ValueError('z is out of bounds.')
     else:
         zs_probe = ion_motion_config.zs_probe

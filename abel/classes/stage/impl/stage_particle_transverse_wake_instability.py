@@ -41,7 +41,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, save_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, save_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
         """
         Parameters
         ----------
@@ -114,7 +114,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.ion_charge_num = ion_charge_num
         self.ion_mass = ion_mass
         
-        self.num_z_cells = num_z_cells
+        self.num_z_cells_main = num_z_cells_main
         self.num_x_cells_rft = num_x_cells_rft
         self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
@@ -254,10 +254,10 @@ class StagePrtclTransWakeInstability(Stage):
         #print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - driver_x_offset, beam0.x_offset())   ########################################## to be del
         #print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - driver_y_offset, beam0.y_offset())   ########################################## to be del
         
-        if abs((x_offset - driver_x_offset) / beam0.x_offset() - 1) > 1e-6:
+        if self.driver_source.jitter.x != 0 and abs((x_offset - driver_x_offset) / beam0.x_offset() - 1) > 1e-6:
             raise ValueError('Main beam not shifted accurately.')
 
-        if abs((y_offset - driver_y_offset) / beam0.y_offset() - 1) > 1e-6:
+        if self.driver_source.jitter.y != 0 and abs((y_offset - driver_y_offset) / beam0.y_offset() - 1) > 1e-6:
             raise ValueError('Main beam not shifted accurately.')
 
         # Also shift a copy of the drive beam if ion motion is enabled
@@ -328,8 +328,8 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Instability tracking ==========
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
 
-        if self.num_z_cells is None:
-            self.num_z_cells = round(np.sqrt( len(shifted_drive_beam)+len(beam_filtered) )/2)
+        if self.num_z_cells_main is None:
+            self.num_z_cells_main = round(np.sqrt( len(shifted_drive_beam)+len(beam_filtered) )/2)
             
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
@@ -346,7 +346,7 @@ class StagePrtclTransWakeInstability(Stage):
             enable_ion_motion=self.enable_ion_motion, 
             ion_charge_num=self.ion_charge_num, 
             ion_mass=self.ion_mass, 
-            num_z_cells=self.num_z_cells, 
+            num_z_cells_main=self.num_z_cells_main, 
             num_x_cells_rft=self.num_x_cells_rft, 
             num_y_cells_rft=self.num_y_cells_rft, 
             num_xy_cells_probe=self.num_xy_cells_probe, 
@@ -411,10 +411,10 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Shift the main beam back to the original coordinate system ==========
         x_offset = beam.x_offset()
         y_offset = beam.y_offset()
-        xs = beam.xs()                                          ######################################## 
-        beam.set_xs(xs + driver_x_offset)                       ######################################## 
-        ys = beam.ys()                                          ######################################## 
-        beam.set_ys(ys + driver_y_offset)                       ########################################
+        xs = beam.xs()                                          
+        beam.set_xs(xs + driver_x_offset)                       
+        ys = beam.ys()                                          
+        beam.set_ys(ys + driver_y_offset)                       
 
         eff_x_offset_sig_before_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
         eff_y_offset_sig_before_downramp = (beam.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
@@ -433,9 +433,9 @@ class StagePrtclTransWakeInstability(Stage):
             raise ValueError('Main beam not shifted accurately.')
         
         # ==========  Apply plasma density down ramp (magnify beta function) after shifting the coordinates back to original reference ========== 
-        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                                   ######################################
+        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                #########################
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)
-        #drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                                   #########################################
+        #drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)               #########################
 
         
         eff_x_offset_sig_after_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
@@ -1607,7 +1607,7 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Ion motion enabled:\t\t\t\t {str(self.enable_ion_motion) :s}", file=f)
             print(f"\tIon charge number:\t\t\t {self.ion_charge_num :.3f}", file=f)
             print(f"\tIon mass [u]:\t\t\t\t {self.ion_mass/SI.physical_constants['atomic mass constant'][0] :.3f}", file=f)
-            print(f"\tnum_z_cells:\t\t\t\t {self.num_z_cells :d}", file=f)
+            print(f"\tnum_z_cells:\t\t\t\t {self.num_z_cells_main :d}", file=f)
             print(f"\tnum_x_cells_rft:\t\t\t {self.num_x_cells_rft :d}", file=f)
             print(f"\tnum_y_cells_rft:\t\t\t {self.num_y_cells_rft :d}", file=f)
             print(f"\tnum_xy_cells_probe:\t\t\t {self.num_xy_cells_probe :d}", file=f)
