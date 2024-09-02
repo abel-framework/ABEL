@@ -53,9 +53,9 @@ from abel.utilities.relativity import momentum2gamma, velocity2gamma
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_std
 #from abel.apis.rf_track.rf_track_api import rft_beam_fields
-#from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field_comp, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
+from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
 #from abel.physics_models.ion_motion_wakefield_perturbation import ion_wakefield_perturbation_parallel
-from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, grid_intpl_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
+#from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, grid_intpl_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
 
 
 
@@ -143,12 +143,12 @@ def calc_ion_wakefield_perturbation(beam, trans_wake_config):
     
         if ion_motion_config.update_ion_wakefield:
 
-            ## Extract drive beam RF-Track SpaceCharge_Field object
-            #driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
+            # Extract drive beam RF-Track SpaceCharge_Field object
+            driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
     
             # Probe drive beam E-field component in 3D
-            driver_Exs_3d, driver_Eys_3d = grid_intpl_driver_beam_field(ion_motion_config)
-            #driver_E_comp_3d = probe_driver_beam_field_comp(ion_motion_config, driver_sc_fields_obj, field_comp=tr_direction)
+            #driver_Exs_3d, driver_Eys_3d = grid_intpl_driver_beam_field(ion_motion_config)
+            driver_Exs_3d, driver_Eys_3d = probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj)
             
             # Update the RF-Track SpaceCharge_Field object for the main beam
             sc_fields_obj = assemble_main_sc_fields_obj(ion_motion_config, main_beam=beam)

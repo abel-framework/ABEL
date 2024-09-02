@@ -112,11 +112,12 @@ class IonMotionConfig():
         # Set the coordinates used to probe beam electric fields from RF-Track
         self.set_probing_coordinates(drive_beam, main_beam, set_driver_sc_coords=True)
         driver_sc_fields_obj = self.assemble_driver_sc_fields_obj()
-        wide_driver_Ex_3d, wide_driver_Ey_3d, xs_grid, ys_grid, zs_grid = self.wide_probe_driver_field(driver_sc_fields_obj)
-        driver_Ex_interpolator, driver_Ey_interpolator = self.beam_field_interpolators(xs_grid, ys_grid, zs_grid, wide_driver_Ex_3d, wide_driver_Ey_3d)
+        self.driver_sc_fields_obj = driver_sc_fields_obj
+        #wide_driver_Ex_3d, wide_driver_Ey_3d, xs_grid, ys_grid, zs_grid = self.wide_probe_driver_field(driver_sc_fields_obj)
+        #driver_Ex_interpolator, driver_Ey_interpolator = self.beam_field_interpolators(xs_grid, ys_grid, zs_grid, wide_driver_Ex_3d, wide_driver_Ey_3d)
         
-        self.driver_Ex_interpolator = driver_Ex_interpolator
-        self.driver_Ey_interpolator = driver_Ey_interpolator
+        #self.driver_Ex_interpolator = driver_Ex_interpolator
+        #self.driver_Ey_interpolator = driver_Ey_interpolator
 
     
     # ==================================================
@@ -212,61 +213,6 @@ class IonMotionConfig():
         
         return calc_sc_fields_obj(combined_beam, num_x, num_y, num_z, num_t_bins=1)
 
-
-    # ==================================================
-    def wide_probe_driver_field(self, sc_fields_obj):
-        """
-        Probes the beam SpaceCharge_Field object over a wider region around the beam and returns the drive beam E-field components stored in a 3D numpy array where the first, second and third dimensions correspond to positions along x, y and z.
-        """
-
-        x_min, x_max = self.xlims_driver_sc
-        y_min, y_max = self.ylims_driver_sc
-        z_end = self.pad_downwards(self.zs_probe_driver.min())
-        z_start = self.pad_upwards(self.zs_probe_driver.max())
-        drive_beam = self.drive_beam
-    
-        # Set the resolution for the interpolator
-        dx = drive_beam.beam_size_x()/6
-        num_x = int( (x_max - x_min)/dx )
-        dy = drive_beam.beam_size_y()/6
-        num_y = int( (y_max - y_min)/dy )
-        dz = drive_beam.bunch_length()/10
-        num_z = int( (z_start - z_end)/dz )
-    
-        xs_grid = np.linspace(x_min, x_max, num_x)  # [m]
-        ys_grid = np.linspace(y_min, y_max, num_y)  # [m]
-        zs_grid = np.linspace(z_start, z_end, num_z)  # [m]
-        
-        # Set up a 3D mesh grid
-        X, Y, Z = np.meshgrid(xs_grid, ys_grid, zs_grid, indexing='ij')
-        xs_grid_flat = X.flatten()*1e3  # [mm]
-        ys_grid_flat = Y.flatten()*1e3  # [mm]
-        zs_grid_flat = Z.flatten()*1e3  # [mm]
-            
-        # Probe beam E-field
-        E_fields_beam, _ = sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
-        Ex = E_fields_beam[:,0]
-        Ey = E_fields_beam[:,1]
-        
-        # Reshape the field component into a 3D array       
-        Ex_3d = Ex.reshape(len(xs_grid), len(ys_grid), len(zs_grid))
-        Ey_3d = Ey.reshape(len(xs_grid), len(ys_grid), len(zs_grid))
-        
-        return Ex_3d, Ey_3d, xs_grid, ys_grid, zs_grid
-
-
-    # ==================================================
-    def beam_field_interpolators(self, xs_grid, ys_grid, zs_grid, Ex_3d, Ey_3d):
-        """
-        Creates an interpolator for the input E-fields stored as 3D numpy arrays where the first, second and third dimensions correspond to positions along x, y and z.
-        """
-        
-        # Create the interpolators
-        Ex_interpolator = RegularGridInterpolator((xs_grid, ys_grid, zs_grid), Ex_3d, method='linear', bounds_error=True, fill_value=np.nan)
-        Ey_interpolator = RegularGridInterpolator((xs_grid, ys_grid, zs_grid), Ey_3d, method='linear', bounds_error=True, fill_value=np.nan)
-
-        return Ex_interpolator, Ey_interpolator
-
     
     # ==================================================
     def pad_downwards(self, arr_min, padding=0.05):
@@ -305,71 +251,22 @@ def ion_motion_quantifier2(beam_size_x, beam_size_y, bunch_length, beam_peak_cur
 
 
 ###################################################
-def grid_intpl_driver_beam_field(ion_motion_config):
-
-    # Set up a 3D mesh grid
-    xs_probe = ion_motion_config.xs_probe  # [m]
-    ys_probe = ion_motion_config.ys_probe  # [m]
-    zs_probe = ion_motion_config.zs_probe_driver  # [m]
-    X, Y, Z = np.meshgrid(xs_probe, ys_probe, zs_probe, indexing='ij')
-    xs_grid_flat = X.flatten()  # [m]
-    ys_grid_flat = Y.flatten()  # [m]
-    zs_grid_flat = Z.flatten()  # [m]
-    points = np.vstack((xs_grid_flat, ys_grid_flat, zs_grid_flat)).T
-        
-    ## Interpolate beam E-field
-    ##if field_comp == 'x':
-    ##    driver_E_fields_comp = ion_motion_config.driver_Ex_interpolator(points)
-    ##elif field_comp == 'y':
-    ##    driver_E_fields_comp = ion_motion_config.driver_Ey_interpolator(points)
-    ##else:
-    ##    raise ValueError('ion_wakefield_perturbation_parallel(): Choose a valid field_comp (''x'' or ''y'').')
-    ##
-    ## Reshape the field component into a 3D array       
-    ##driver_E_fields_3d = driver_E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
-    ##
-    ##return driver_E_fields_3d
-
-    # Determine the total number of available cores
-    #total_cores = os.cpu_count()
-    #
-    # Use 80% of available cores
-    #n_jobs = max(1, int(total_cores * 0.8))
-#
-    # Split probe grid coordinates into n_jobs segments
-    #xs_grid_flat_segments = np.array_split(xs_grid_flat, n_jobs)
-    #ys_grid_flat_segments = np.array_split(ys_grid_flat, n_jobs)
-    #zs_grid_flat_segments = np.array_split(zs_grid_flat, n_jobs)
-    #
-    # Interpolate beam E-field in parallel
-    #results = Parallel(n_jobs=n_jobs, backend='threading')(
-    #    delayed(intpl_beam_field)(ion_motion_config.driver_Ex_interpolator, ion_motion_config.driver_Ey_interpolator, xs_grid_flat_segments[i], ys_grid_flat_segments[i], zs_grid_flat_segments[i])
-    #    for i in range(n_jobs)
-    #)
-#
-    # Extract Ex_3d and Ey_3d from the results
-    #driver_Ex_list = [res[0] for res in results]  # Extract all Ex_3d arrays
-    #driver_Ey_list = [res[1] for res in results]  # Extract all Ey_3d arrays
-    #
-    # Concatenate the extracted arrays along axis 0
-    #driver_Exs = np.concatenate(driver_Ex_list, axis=0)
-    #driver_Eys = np.concatenate(driver_Ey_list, axis=0)
-
-    driver_Exs = ion_motion_config.driver_Ex_interpolator(points)
-    driver_Eys = ion_motion_config.driver_Ey_interpolator(points)
-
-    # Reshape the field component into a 3D array       
-    driver_Ex_3d = driver_Exs.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
-    driver_Ey_3d = driver_Eys.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
-    
-    return driver_Ex_3d, driver_Ey_3d
-
-
-
-###################################################
-def probe_driver_beam_field_comp(ion_motion_config, driver_sc_fields_obj, field_comp):
+def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj):
     """
-    Probes the drive beam SpaceCharge_Field object and returns the drive beam E-field component stored in a 3D numpy array where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step.
+    Probes the drive beam SpaceCharge_Field object and returns the drive beam E-fields stored in 3D numpy arrays where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step.
+
+    Parameters
+    ----------
+    ion_motion_config: IonMotionConfig object
+        Contains the configurations for calculating the ion wakefield perturbation.
+    
+    driver_sc_fields_obj: RF-Track SpaceCharge_Field object.
+        Contains the beam electric and magnetic fields for the drive beam calculated by RF-Track.
+        
+    Returns
+    ----------
+    driver_Exs_3d, driver_Eys_3d: [V/m] 3D float array
+        Contain the beam E-field components where the first, second and third dimensions correspond to positions along x, y and z.
     """
     
     # Set up a 3D mesh grid
@@ -383,18 +280,15 @@ def probe_driver_beam_field_comp(ion_motion_config, driver_sc_fields_obj, field_
         
     # Probe beam E-field
     E_fields_beam, _ = driver_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
+
+    driver_Exs = E_fields_beam[:,0]
+    driver_Eys = E_fields_beam[:,1]
     
-    if field_comp == 'x':
-        E_fields_comp = E_fields_beam[:,0]
-    elif field_comp == 'y':
-        E_fields_comp = E_fields_beam[:,1]
-    else:
-        raise ValueError('ion_wakefield_perturbation_parallel(): Choose a valid field_comp (''x'' or ''y'').')
+    # Reshape the field component into a 3D array
+    driver_Exs_3d = driver_Exs.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    driver_Eys_3d = driver_Eys.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
     
-    # Reshape the field component into a 3D array       
-    E_fields_comp_3d = E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
-    
-    return E_fields_comp_3d
+    return driver_Exs_3d, driver_Eys_3d
 
 
 
@@ -465,8 +359,8 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
         
     Returns
     ----------
-    E_fields_comp_3d: [V/m] 3D float array
-        Contains the beam E-field component where the first, second and third dimensions correspond to positions along x, y and z.
+    Exs_3d, Eys_3d: [V/m] 3D float array
+        Contain the beam E-field components where the first, second and third dimensions correspond to positions along x, y and z.
     """
     
     # Set up a 3D mesh grid
@@ -650,6 +544,61 @@ def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_pert
 
 #vvvvvvvvvvvvvvvvvvvvvv Not currently in use vvvvvvvvvvvvvvvvvvvvvv
 '''
+    # ==================================================
+    def wide_probe_driver_field(self, sc_fields_obj):
+        """
+        Probes the beam SpaceCharge_Field object over a wider region around the beam and returns the drive beam E-field components stored in a 3D numpy array where the first, second and third dimensions correspond to positions along x, y and z.
+        """
+
+        x_min, x_max = self.xlims_driver_sc
+        y_min, y_max = self.ylims_driver_sc
+        z_end = self.pad_downwards(self.zs_probe_driver.min())
+        z_start = self.pad_upwards(self.zs_probe_driver.max())
+        drive_beam = self.drive_beam
+    
+        # Set the resolution for the interpolator
+        dx = drive_beam.beam_size_x()/6
+        num_x = int( (x_max - x_min)/dx )
+        dy = drive_beam.beam_size_y()/6
+        num_y = int( (y_max - y_min)/dy )
+        dz = drive_beam.bunch_length()/10
+        num_z = int( (z_start - z_end)/dz )
+    
+        xs_grid = np.linspace(x_min, x_max, num_x)  # [m]
+        ys_grid = np.linspace(y_min, y_max, num_y)  # [m]
+        zs_grid = np.linspace(z_start, z_end, num_z)  # [m]
+        
+        # Set up a 3D mesh grid
+        X, Y, Z = np.meshgrid(xs_grid, ys_grid, zs_grid, indexing='ij')
+        xs_grid_flat = X.flatten()*1e3  # [mm]
+        ys_grid_flat = Y.flatten()*1e3  # [mm]
+        zs_grid_flat = Z.flatten()*1e3  # [mm]
+            
+        # Probe beam E-field
+        E_fields_beam, _ = sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
+        Ex = E_fields_beam[:,0]
+        Ey = E_fields_beam[:,1]
+        
+        # Reshape the field component into a 3D array       
+        Ex_3d = Ex.reshape(len(xs_grid), len(ys_grid), len(zs_grid))
+        Ey_3d = Ey.reshape(len(xs_grid), len(ys_grid), len(zs_grid))
+        
+        return Ex_3d, Ey_3d, xs_grid, ys_grid, zs_grid
+
+
+    # ==================================================
+    def beam_field_interpolators(self, xs_grid, ys_grid, zs_grid, Ex_3d, Ey_3d):
+        """
+        Creates an interpolator for the input E-fields stored as 3D numpy arrays where the first, second and third dimensions correspond to positions along x, y and z.
+        """
+        
+        # Create the interpolators
+        Ex_interpolator = RegularGridInterpolator((xs_grid, ys_grid, zs_grid), Ex_3d, method='linear', bounds_error=True, fill_value=np.nan)
+        Ey_interpolator = RegularGridInterpolator((xs_grid, ys_grid, zs_grid), Ey_3d, method='linear', bounds_error=True, fill_value=np.nan)
+
+        return Ex_interpolator, Ey_interpolator
+
+
 
 ###################################################
 #def intpl_beam_field(Ex_interpolator, Ey_interpolator, xs, ys, zs):
@@ -660,6 +609,100 @@ def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_pert
 #    Eys = Ey_interpolator(points)
 #    
 #    return Exs, Eys
+
+
+
+###################################################
+def grid_intpl_driver_beam_field(ion_motion_config):
+
+    # Set up a 3D mesh grid
+    xs_probe = ion_motion_config.xs_probe  # [m]
+    ys_probe = ion_motion_config.ys_probe  # [m]
+    zs_probe = ion_motion_config.zs_probe_driver  # [m]
+    X, Y, Z = np.meshgrid(xs_probe, ys_probe, zs_probe, indexing='ij')
+    xs_grid_flat = X.flatten()  # [m]
+    ys_grid_flat = Y.flatten()  # [m]
+    zs_grid_flat = Z.flatten()  # [m]
+    points = np.vstack((xs_grid_flat, ys_grid_flat, zs_grid_flat)).T
+        
+    ## Interpolate beam E-field
+    ##if field_comp == 'x':
+    ##    driver_E_fields_comp = ion_motion_config.driver_Ex_interpolator(points)
+    ##elif field_comp == 'y':
+    ##    driver_E_fields_comp = ion_motion_config.driver_Ey_interpolator(points)
+    ##else:
+    ##    raise ValueError('ion_wakefield_perturbation_parallel(): Choose a valid field_comp (''x'' or ''y'').')
+    ##
+    ## Reshape the field component into a 3D array       
+    ##driver_E_fields_3d = driver_E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    ##
+    ##return driver_E_fields_3d
+
+    # Determine the total number of available cores
+    #total_cores = os.cpu_count()
+    #
+    # Use 80% of available cores
+    #n_jobs = max(1, int(total_cores * 0.8))
+#
+    # Split probe grid coordinates into n_jobs segments
+    #xs_grid_flat_segments = np.array_split(xs_grid_flat, n_jobs)
+    #ys_grid_flat_segments = np.array_split(ys_grid_flat, n_jobs)
+    #zs_grid_flat_segments = np.array_split(zs_grid_flat, n_jobs)
+    #
+    # Interpolate beam E-field in parallel
+    #results = Parallel(n_jobs=n_jobs, backend='threading')(
+    #    delayed(intpl_beam_field)(ion_motion_config.driver_Ex_interpolator, ion_motion_config.driver_Ey_interpolator, xs_grid_flat_segments[i], ys_grid_flat_segments[i], zs_grid_flat_segments[i])
+    #    for i in range(n_jobs)
+    #)
+#
+    # Extract Ex_3d and Ey_3d from the results
+    #driver_Ex_list = [res[0] for res in results]  # Extract all Ex_3d arrays
+    #driver_Ey_list = [res[1] for res in results]  # Extract all Ey_3d arrays
+    #
+    # Concatenate the extracted arrays along axis 0
+    #driver_Exs = np.concatenate(driver_Ex_list, axis=0)
+    #driver_Eys = np.concatenate(driver_Ey_list, axis=0)
+
+    driver_Exs = ion_motion_config.driver_Ex_interpolator(points)
+    driver_Eys = ion_motion_config.driver_Ey_interpolator(points)
+
+    # Reshape the field component into a 3D array       
+    driver_Exs_3d = driver_Exs.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    driver_Eys_3d = driver_Eys.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    
+    return driver_Exs_3d, driver_Eys_3d
+
+
+
+###################################################
+def probe_driver_beam_field_comp(ion_motion_config, driver_sc_fields_obj, field_comp):
+    """
+    Probes the drive beam SpaceCharge_Field object and returns the drive beam E-field component stored in a 3D numpy array where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step.
+    """
+    
+    # Set up a 3D mesh grid
+    xs_probe = ion_motion_config.xs_probe  # [m]
+    ys_probe = ion_motion_config.ys_probe  # [m]
+    zs_probe = ion_motion_config.zs_probe_driver  # [m]
+    X, Y, Z = np.meshgrid(xs_probe, ys_probe, zs_probe, indexing='ij')
+    xs_grid_flat = X.flatten()*1e3  # [mm]
+    ys_grid_flat = Y.flatten()*1e3  # [mm]
+    zs_grid_flat = Z.flatten()*1e3  # [mm]
+        
+    # Probe beam E-field
+    E_fields_beam, _ = driver_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
+    
+    if field_comp == 'x':
+        E_fields_comp = E_fields_beam[:,0]
+    elif field_comp == 'y':
+        E_fields_comp = E_fields_beam[:,1]
+    else:
+        raise ValueError('ion_wakefield_perturbation_parallel(): Choose a valid field_comp (''x'' or ''y'').')
+    
+    # Reshape the field component into a 3D array       
+    E_fields_comp_3d = E_fields_comp.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
+    
+    return E_fields_comp_3d
 
 
 
