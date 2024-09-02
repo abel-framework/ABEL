@@ -41,7 +41,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, save_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=200, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, save_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
         """
         Parameters
         ----------
@@ -218,7 +218,7 @@ class StagePrtclTransWakeInstability(Stage):
         #drive_beam0.set_ys(drive_beam0_ys - driver_y_offset)     ##############################
     
         # ========== Apply plasma density up ramp (demagnify beta function) before shifting the coordinates ========== 
-        drive_beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)           #####################################
+        drive_beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)           #####################################<-
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
 
         eff_x_offset_sig_after_upramp = (beam0.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
@@ -261,14 +261,15 @@ class StagePrtclTransWakeInstability(Stage):
             raise ValueError('Main beam not shifted accurately.')
 
         # Also shift a copy of the drive beam if ion motion is enabled
-        if self.enable_ion_motion:
-            shifted_drive_beam = copy.deepcopy(drive_beam)
-            xs_drive_beam = drive_beam.xs()
-            shifted_drive_beam.set_xs(xs_drive_beam - driver_x_offset)
-            ys_drive_beam = drive_beam.ys()
-            shifted_drive_beam.set_ys(ys_drive_beam - driver_y_offset)
-        else:
-            shifted_drive_beam = copy.deepcopy(drive_beam)
+        #if self.enable_ion_motion:
+        #    shifted_drive_beam = copy.deepcopy(drive_beam)
+        #    xs_drive_beam = drive_beam.xs()
+        #    shifted_drive_beam.set_xs(xs_drive_beam - driver_x_offset)
+        #    ys_drive_beam = drive_beam.ys()
+        #    shifted_drive_beam.set_ys(ys_drive_beam - driver_y_offset)
+        #else:
+        #    shifted_drive_beam = copy.deepcopy(drive_beam)
+        shifted_drive_beam = copy.deepcopy(drive_beam)
         
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
         main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
@@ -433,7 +434,7 @@ class StagePrtclTransWakeInstability(Stage):
             raise ValueError('Main beam not shifted accurately.')
         
         # ==========  Apply plasma density down ramp (magnify beta function) after shifting the coordinates back to original reference ========== 
-        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                #########################
+        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                #########################<-
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)
         #drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)               #########################
 
