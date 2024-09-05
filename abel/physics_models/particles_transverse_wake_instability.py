@@ -130,11 +130,10 @@ def calc_tr_instability_wakefield(skin_depth, bubble_radius, zs_sorted, weights_
 
 
 ###################################################
-def calc_ion_wakefield_perturbation(beam, trans_wake_config):
+def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
     
     if trans_wake_config.enable_ion_motion:
         ion_motion_config = trans_wake_config.ion_motion_config
-        drive_beam = ion_motion_config.drive_beam
         
         # Set the coordinates used to probe beam electric fields from RF-Track
         ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam)
@@ -188,7 +187,6 @@ def calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_ste
     
     enable_tr_instability = trans_wake_config.enable_tr_instability
     enable_radiation_reaction = trans_wake_config.enable_radiation_reaction
-
     
     # ============= Calculate the transverse intra-beam wakefield =============
     if enable_tr_instability:
@@ -222,7 +220,7 @@ def calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_ste
 
 
 ###################################################
-def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wake_config):
+def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_obj, trans_wake_config):
     
     plasma_density = trans_wake_config.plasma_density
     stage_length = trans_wake_config.stage_length
@@ -279,6 +277,10 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
     pys_sorted = pys_sorted[bool_indices]
     pzs_sorted = pzs_sorted[bool_indices]
     weights_sorted = weights_sorted[bool_indices]
+
+    # Determine the propagation axis
+    x_axis = drive_beam.x_offset()
+    y_axis = drive_beam.y_offset()
 
     # Calculate Ez and rb based on interpolations of Ez and rb vs z
     Ez = Ez_fit_obj(zs_sorted)
@@ -348,12 +350,12 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         
         #gammas = momentum2gamma(pzs_sorted)  # Lorentz factor for each particle.
         gammas = momentum2gamma( np.sqrt(pxs_sorted**2 + pys_sorted**2 + pzs_sorted**2) )  # Lorentz factor for each particle.
-        tot_offsets_sqr = xs_sorted**2 + ys_sorted**2
+        tot_axis_offsets_sqr = (xs_sorted - x_axis)**2 + (ys_sorted - y_axis)**2
 
         #ion_start_time = time.time()
 
         # Calculate the ion wakefield perturbations
-        intpl_Wx_perts, intpl_Wy_perts = calc_ion_wakefield_perturbation(filtered_beam, trans_wake_config)
+        intpl_Wx_perts, intpl_Wy_perts = calc_ion_wakefield_perturbation(filtered_beam, drive_beam, trans_wake_config)
         
         #ion_end_time = time.time()
         #print('Ion wake calc time taken:', ion_end_time - ion_start_time, 'seconds')
@@ -364,13 +366,13 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         # Parallel calculation
         #results = Parallel(n_jobs=2, backend='threading')([
             
-            #delayed(calc_tr_momenta_comp)(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_offsets_sqr, offsets=xs_sorted, tr_momenta_comp=pxs_sorted, ion_wakefield_perts=intpl_Wx_perts),
+            #delayed(calc_tr_momenta_comp)(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=xs_sorted, tr_momenta_comp=pxs_sorted, ion_wakefield_perts=intpl_Wx_perts),
             
-            #delayed(calc_tr_momenta_comp)(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_offsets_sqr, offsets=ys_sorted, tr_momenta_comp=pys_sorted, ion_wakefield_perts=intpl_Wy_perts)
+            #delayed(calc_tr_momenta_comp)(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=ys_sorted, tr_momenta_comp=pys_sorted, ion_wakefield_perts=intpl_Wy_perts)
 
-            #delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config),
+            #delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config),
             
-            #delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
+            #delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
             
         #])
 
@@ -380,9 +382,9 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         # Update the transverse momenta components
         #pxs_sorted = results[0]
         #pys_sorted = results[1]
-        pxs_sorted = calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_offsets_sqr, offsets=xs_sorted, tr_momenta_comp=pxs_sorted, ion_wakefield_perts=intpl_Wx_perts)
+        pxs_sorted = calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=xs_sorted-x_axis, tr_momenta_comp=pxs_sorted, ion_wakefield_perts=intpl_Wx_perts)
             
-        pys_sorted = calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_offsets_sqr, offsets=ys_sorted, tr_momenta_comp=pys_sorted, ion_wakefield_perts=intpl_Wy_perts)
+        pys_sorted = calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=ys_sorted-y_axis, tr_momenta_comp=pys_sorted, ion_wakefield_perts=intpl_Wy_perts)
 
 
 
@@ -394,9 +396,9 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         
         ## Extract the tr_momenta and W_perts arrays separately
         #(pxs_sorted, Wx_perts, intpl_Wx_perts), (pys_sorted, Wy_perts, intpl_Wy_perts) = results
-        #pxs_sorted, Wx_perts, intpl_Wx_perts = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config)
+        #pxs_sorted, Wx_perts, intpl_Wx_perts = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config)
         
-        #pys_sorted, Wy_perts, intpl_Wy_perts = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
+        #pys_sorted, Wy_perts, intpl_Wy_perts = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
 
         
 
@@ -417,7 +419,7 @@ def transverse_wake_instability_particles(beam, Ez_fit_obj, rb_fit_obj, trans_wa
         
         # Update longitudinal momenta.
         if enable_radiation_reaction:
-            pzs_sorted = pzs_sorted - (e*Ez + m_e*c**2 * 1.87863e-15 * (1/skin_depth)**4/4 * gammas**2 * tot_offsets_sqr)*time_step
+            pzs_sorted = pzs_sorted - (e*Ez + m_e*c**2 * 1.87863e-15 * (1/skin_depth)**4/4 * gammas**2 * tot_axis_offsets_sqr)*time_step
         else:
             pzs_sorted = pzs_sorted - e*Ez*time_step
             

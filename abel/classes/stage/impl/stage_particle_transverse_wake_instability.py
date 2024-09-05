@@ -171,11 +171,11 @@ class StagePrtclTransWakeInstability(Stage):
         particle_mass = beam0.particle_mass
 
         # ==========  ==========
-        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0:
+        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0:                   #############################
             drive_beam0 = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
             drive_beam0 = self.driver_source.track()
-            self.drive_beam = drive_beam0  # Generate a drive beam with jitter.
+            self.drive_beam = drive_beam0  # Generate a drive beam with jitter.                   ############################# 
 
         #x_offset = beam0.x_offset()                   ############################# to be del
         #xs = beam0.xs()                               ############################# to be del
@@ -189,8 +189,8 @@ class StagePrtclTransWakeInstability(Stage):
         beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately.
         drive_beam = copy.deepcopy(drive_beam0)
 
-        eff_x_offset_sig_before_upramp = (beam0.x_offset() - drive_beam0.x_offset())/drive_beam0.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_before_upramp = (beam0.y_offset() - drive_beam0.y_offset())/drive_beam0.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
+        #eff_x_offset_sig_before_upramp = (beam0.x_offset() - drive_beam0.x_offset())/drive_beam0.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
+        #eff_y_offset_sig_before_upramp = (beam0.y_offset() - drive_beam0.y_offset())/drive_beam0.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
 
         
         #print('\nBefore ramp demagnification')
@@ -219,56 +219,56 @@ class StagePrtclTransWakeInstability(Stage):
     
         # ========== Apply plasma density up ramp (demagnify beta function) before shifting the coordinates ========== 
         drive_beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)           #####################################<-
-        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
+        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)             
 
-        eff_x_offset_sig_after_upramp = (beam0.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_after_upramp = (beam0.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
-        
-        #print('\nAfter ramp demagnification')
-        #print('Driver x/y offsets:', drive_beam.x_offset() , drive_beam.y_offset() )                                 ############################### to be del
-        #print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - drive_beam.x_offset(), beam0.x_offset())     ############################### to be del
-        #print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - drive_beam.y_offset(), beam0.y_offset())     ############################### to be del
-        #print('Effective x-offset/drive beam size x:', eff_x_offset_sig_after_upramp)                                ############################# to be del
-        #print('Effective y-offset/drive beam size y:', eff_y_offset_sig_after_upramp)                                ############################# to be del
+        #eff_x_offset_sig_after_upramp = (beam0.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
+        #eff_y_offset_sig_after_upramp = (beam0.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
+        #
+        ##print('\nAfter ramp demagnification')
+        ##print('Driver x/y offsets:', drive_beam.x_offset() , drive_beam.y_offset() )                                 ############################### to be del
+        ##print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - drive_beam.x_offset(), beam0.x_offset())     ############################### to be del
+        ##print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - drive_beam.y_offset(), beam0.y_offset())     ############################### to be del
+        ##print('Effective x-offset/drive beam size x:', eff_x_offset_sig_after_upramp)                                ############################# to be del
+        ##print('Effective y-offset/drive beam size y:', eff_y_offset_sig_after_upramp)                                ############################# to be del
+#
+        #
+        #if self.driver_source.jitter.x != 0 and abs(eff_x_offset_sig_before_upramp / eff_x_offset_sig_after_upramp - 1) > 1e-6:
+        #    raise ValueError('Error in up ramp demagnification.')
+#
+        #if self.driver_source.jitter.y != 0 and abs(eff_y_offset_sig_before_upramp / eff_y_offset_sig_after_upramp - 1) > 1e-6:
+        #    raise ValueError('Error in up ramp demagnification.')
 
-        
-        if self.driver_source.jitter.x != 0 and abs(eff_x_offset_sig_before_upramp / eff_x_offset_sig_after_upramp - 1) > 1e-6:
-            raise ValueError('Error in up ramp demagnification.')
-
-        if self.driver_source.jitter.y != 0 and abs(eff_y_offset_sig_before_upramp / eff_y_offset_sig_after_upramp - 1) > 1e-6:
-            raise ValueError('Error in up ramp demagnification.')
-
-        # ========== Shift the main beam to coordinate system with axis defined by drive beam ==========
-        driver_x_offset = drive_beam.x_offset()   ###################################
-        driver_y_offset = drive_beam.y_offset()   ###################################
-        x_offset = beam0.x_offset()               ###################################
-        y_offset = beam0.y_offset()               ###################################
-
-        xs = beam0.xs()                          ####################################
-        beam0.set_xs(xs - driver_x_offset)       ####################################
-        ys = beam0.ys()                          ####################################
-        beam0.set_ys(ys - driver_y_offset)       ####################################
-        
-        #print('\nAfter shifting main beam using driver offset')
-        #print('Driver x/y offsets:', drive_beam.x_offset() , drive_beam.y_offset() )                               ########################################## to be del
-        #print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - driver_x_offset, beam0.x_offset())   ########################################## to be del
-        #print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - driver_y_offset, beam0.y_offset())   ########################################## to be del
-        
-        if self.driver_source.jitter.x != 0 and abs((x_offset - driver_x_offset) / beam0.x_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
-
-        if self.driver_source.jitter.y != 0 and abs((y_offset - driver_y_offset) / beam0.y_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
-
-        # Also shift a copy of the drive beam if ion motion is enabled
-        #if self.enable_ion_motion:
-        #    shifted_drive_beam = copy.deepcopy(drive_beam)
-        #    xs_drive_beam = drive_beam.xs()
-        #    shifted_drive_beam.set_xs(xs_drive_beam - driver_x_offset)
-        #    ys_drive_beam = drive_beam.ys()
-        #    shifted_drive_beam.set_ys(ys_drive_beam - driver_y_offset)
-        #else:
-        #    shifted_drive_beam = copy.deepcopy(drive_beam)
+        ## ========== Shift the main beam to coordinate system with axis defined by drive beam ==========
+        #driver_x_offset = drive_beam.x_offset()   ###################################
+        #driver_y_offset = drive_beam.y_offset()   ###################################
+        #x_offset = beam0.x_offset()               ###################################
+        #y_offset = beam0.y_offset()               ###################################
+#
+        #xs = beam0.xs()                          ####################################
+        #beam0.set_xs(xs - driver_x_offset)       ####################################
+        #ys = beam0.ys()                          ####################################
+        #beam0.set_ys(ys - driver_y_offset)       ####################################
+        #
+        ##print('\nAfter shifting main beam using driver offset')
+        ##print('Driver x/y offsets:', drive_beam.x_offset() , drive_beam.y_offset() )                               ########################################## to be del
+        ##print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - driver_x_offset, beam0.x_offset())   ########################################## to be del
+        ##print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - driver_y_offset, beam0.y_offset())   ########################################## to be del
+        #
+        #if self.driver_source.jitter.x != 0 and abs((x_offset - driver_x_offset) / beam0.x_offset() - 1) > 1e-6:
+        #    raise ValueError('Main beam not shifted accurately.')
+#
+        #if self.driver_source.jitter.y != 0 and abs((y_offset - driver_y_offset) / beam0.y_offset() - 1) > 1e-6:
+        #    raise ValueError('Main beam not shifted accurately.')
+#
+        ## Also shift a copy of the drive beam if ion motion is enabled
+        ##if self.enable_ion_motion:
+        ##    shifted_drive_beam = copy.deepcopy(drive_beam)
+        ##    xs_drive_beam = drive_beam.xs()
+        ##    shifted_drive_beam.set_xs(xs_drive_beam - driver_x_offset)
+        ##    ys_drive_beam = drive_beam.ys()
+        ##    shifted_drive_beam.set_ys(ys_drive_beam - driver_y_offset)
+        ##else:
+        ##    shifted_drive_beam = copy.deepcopy(drive_beam)
         shifted_drive_beam = copy.deepcopy(drive_beam)
         
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
@@ -290,7 +290,6 @@ class StagePrtclTransWakeInstability(Stage):
         
         # Run the Wake-T stage
         beam_wakeT = stage_wakeT.track(beam0_copy)
-        #beam_wakeT = stage_wakeT.track(beam0)
         
         # Read the Wake-T simulation data
         Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
@@ -305,7 +304,11 @@ class StagePrtclTransWakeInstability(Stage):
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
-        bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, x_offset, threshold=0.8)
+        driver_x_offset = drive_beam.x_offset()
+        #driver_y_offset = drive_beam.y_offset()
+        x_offset = beam0.x_offset()             # Important to NOT use beam0_copy.
+        #y_offset = beam0.y_offset()
+        bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, x_offset, threshold=0.8)  # TODO: also needs to consider driver_y_offset
 
         # Cut out bubble radius over the ROI
         bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead... 
@@ -355,7 +358,7 @@ class StagePrtclTransWakeInstability(Stage):
             update_factor=self.update_factor
         )
         
-        inputs = [beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
+        inputs = [shifted_drive_beam, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
@@ -366,8 +369,8 @@ class StagePrtclTransWakeInstability(Stage):
         
         #print('\nJust before instability tracking')
         #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                            ########################### to be del
-        #print('Effective x-offset, beam_filtered.x_offset:', beam_filtered.x_offset() - drive_beam.x_offset(), beam_filtered.x_offset()) ################# to be del
-        #print('Effective y-offset, beam_filtered.y_offset:', beam_filtered.y_offset() - drive_beam.y_offset(), beam_filtered.y_offset()) ################# to be del
+        #print('Effective x-offset, beam_filtered.x_offset:', beam_filtered.x_offset() - drive_beam.x_offset(), beam_filtered.x_offset()) ################ to be del
+        #print('Effective y-offset, beam_filtered.y_offset:', beam_filtered.y_offset() - drive_beam.y_offset(), beam_filtered.y_offset()) ################ to be del
         #print(abs((x_offset - driver_x_offset) / beam_filtered.x_offset()))
         #print(abs((y_offset - driver_y_offset) / beam_filtered.y_offset()))
         
@@ -400,7 +403,7 @@ class StagePrtclTransWakeInstability(Stage):
             
         else:
             
-            beam = transverse_wake_instability_particles(beam_filtered, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
+            beam = transverse_wake_instability_particles(beam_filtered, shifted_drive_beam, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
             
         
         #print('After instability tracking')
@@ -410,51 +413,51 @@ class StagePrtclTransWakeInstability(Stage):
 
 
         # ========== Shift the main beam back to the original coordinate system ==========
-        x_offset = beam.x_offset()
-        y_offset = beam.y_offset()
-        xs = beam.xs()                                          
-        beam.set_xs(xs + driver_x_offset)                       
-        ys = beam.ys()                                          
-        beam.set_ys(ys + driver_y_offset)                       
-
-        eff_x_offset_sig_before_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_before_downramp = (beam.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
-
-        #print('After shifting back to original coordinate system, before ramp magnification')
-        #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                          ############################# to be del
-        #print('Effective x-offset, beam.x_offset:', beam.x_offset() - drive_beam.x_offset(), beam.x_offset())               ############################# to be del
-        #print('Effective y-offset, beam.y_offset:', beam.y_offset() - drive_beam.y_offset(), beam.y_offset())               ############################# to be del
-        #print('Effective x-offset/drive beam size x:', eff_x_offset_sig_before_downramp)                                    ############################# to be del
-        #print('Effective y-offset/drive beam size y:', eff_y_offset_sig_before_downramp)                                    ############################# to be del
-        
-        if self.driver_source.jitter.x != 0 and abs((x_offset + driver_x_offset) / beam.x_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
-
-        if self.driver_source.jitter.y != 0 and abs((y_offset + driver_y_offset) / beam.y_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
+        #x_offset = beam.x_offset()
+        #y_offset = beam.y_offset()
+        #xs = beam.xs()                                          
+        #beam.set_xs(xs + driver_x_offset)                       
+        #ys = beam.ys()                                          
+        #beam.set_ys(ys + driver_y_offset)                       
+#
+        #eff_x_offset_sig_before_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
+        #eff_y_offset_sig_before_downramp = (beam.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
+#
+        ##print('After shifting back to original coordinate system, before ramp magnification')
+        ##print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                          ############################# to be del
+        ##print('Effective x-offset, beam.x_offset:', beam.x_offset() - drive_beam.x_offset(), beam.x_offset())               ############################# to be del
+        ##print('Effective y-offset, beam.y_offset:', beam.y_offset() - drive_beam.y_offset(), beam.y_offset())               ############################# to be del
+        ##print('Effective x-offset/drive beam size x:', eff_x_offset_sig_before_downramp)                                    ############################# to be del
+        ##print('Effective y-offset/drive beam size y:', eff_y_offset_sig_before_downramp)                                    ############################# to be del
+        #
+        #if self.driver_source.jitter.x != 0 and abs((x_offset + driver_x_offset) / beam.x_offset() - 1) > 1e-6:
+        #    raise ValueError('Main beam not shifted accurately.')
+#
+        #if self.driver_source.jitter.y != 0 and abs((y_offset + driver_y_offset) / beam.y_offset() - 1) > 1e-6:
+        #    raise ValueError('Main beam not shifted accurately.')
         
         # ==========  Apply plasma density down ramp (magnify beta function) after shifting the coordinates back to original reference ========== 
-        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                #########################<-
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)
+        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)                #########################<-
+        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
         #drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)               #########################
 
         
-        eff_x_offset_sig_after_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_after_downramp = (beam.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
-
-        
-        #print('\nAfter ramp magnification')
-        #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                          ############################# to be del
-        #print('Effective x-offset, beam.x_offset:', beam.x_offset() - drive_beam.x_offset(), beam.x_offset())               ############################# to be del
-        #print('Effective y-offset, beam.y_offset:', beam.y_offset() - drive_beam.y_offset(), beam.y_offset())               ############################# to be del
-        #print('Effective x-offset/drive beam size x:', eff_x_offset_sig_after_downramp)                                     ############################# to be del
-        #print('Effective y-offset/drive beam size y:', eff_y_offset_sig_after_downramp)                                     ############################# to be del
-
-        if self.driver_source.jitter.x != 0 and abs(eff_x_offset_sig_before_downramp / eff_x_offset_sig_after_downramp - 1) > 1e-6:
-            raise ValueError('Error in down ramp demagnification.')
-
-        if self.driver_source.jitter.y != 0 and abs(eff_y_offset_sig_before_downramp / eff_y_offset_sig_after_downramp - 1) > 1e-6:
-            raise ValueError('Error in down ramp demagnification.')
+        #eff_x_offset_sig_after_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
+        #eff_y_offset_sig_after_downramp = (beam.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
+#
+        #
+        ##print('\nAfter ramp magnification')
+        ##print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                          ############################# to be del
+        ##print('Effective x-offset, beam.x_offset:', beam.x_offset() - drive_beam.x_offset(), beam.x_offset())               ############################# to be del
+        ##print('Effective y-offset, beam.y_offset:', beam.y_offset() - drive_beam.y_offset(), beam.y_offset())               ############################# to be del
+        ##print('Effective x-offset/drive beam size x:', eff_x_offset_sig_after_downramp)                                     ############################# to be del
+        ##print('Effective y-offset/drive beam size y:', eff_y_offset_sig_after_downramp)                                     ############################# to be del
+#
+        #if self.driver_source.jitter.x != 0 and abs(eff_x_offset_sig_before_downramp / eff_x_offset_sig_after_downramp - 1) > 1e-6:
+        #    raise ValueError('Error in down ramp demagnification.')
+#
+        #if self.driver_source.jitter.y != 0 and abs(eff_y_offset_sig_before_downramp / eff_y_offset_sig_after_downramp - 1) > 1e-6:
+        #    raise ValueError('Error in down ramp demagnification.')
 
         #xs = beam.xs()                                 ######################################## 
         #beam.set_xs(xs + driver_x_offset)              ######################################## 

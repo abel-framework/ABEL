@@ -75,7 +75,7 @@ class IonMotionConfig():
             The size of grid cells along z. If uniform_z_grid is False, this becomes a 1D float array containing the distance between elements in zs_probe.
         """
 
-        self.drive_beam = drive_beam
+        #self.drive_beam = drive_beam
         self.plasma_ion_density = plasma_ion_density  # [m^-3]
         self.ion_charge_num = ion_charge_num
         
@@ -111,7 +111,7 @@ class IonMotionConfig():
         
         # Set the coordinates used to probe beam electric fields from RF-Track
         self.set_probing_coordinates(drive_beam, main_beam, set_driver_sc_coords=True)
-        driver_sc_fields_obj = self.assemble_driver_sc_fields_obj()
+        driver_sc_fields_obj = self.assemble_driver_sc_fields_obj(drive_beam)
         self.driver_sc_fields_obj = driver_sc_fields_obj
         #wide_driver_Ex_3d, wide_driver_Ey_3d, xs_grid, ys_grid, zs_grid = self.wide_probe_driver_field(driver_sc_fields_obj)
         #driver_Ex_interpolator, driver_Ey_interpolator = self.beam_field_interpolators(xs_grid, ys_grid, zs_grid, wide_driver_Ex_3d, wide_driver_Ey_3d)
@@ -174,12 +174,11 @@ class IonMotionConfig():
 
     
     # ==================================================
-    def assemble_driver_sc_fields_obj(self):
+    def assemble_driver_sc_fields_obj(self, drive_beam):
         """
         Creates a RF-Track SpaceCharge_Field object for the drive beam. Only needs to be called at the start of a stage for non-evolving drive beam.
         """
         
-        drive_beam = self.drive_beam
         x_min, x_max = self.xlims_driver_sc
         y_min, y_max = self.ylims_driver_sc
         
