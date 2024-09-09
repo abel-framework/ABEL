@@ -23,7 +23,7 @@ from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress  # TODO: remove
 from types import SimpleNamespace
 #from openpmd_viewer import OpenPMDTimeSeries
-import os, copy
+import os, copy, warnings
 
 from abel.physics_models.particles_transverse_wake_instability import *
 from abel.physics_models.twoD_particles_transverse_wake_instability import *  # TODO: remove
@@ -312,6 +312,10 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Cut out bubble radius over the ROI
         bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead... 
+        rb_roi = rb_fit(self.z_slices)
+
+        if bubble_radius.max() < 0.8 * blowout_radius(self.plasma_density, drive_beam.peak_current()) or rb_roi.any()==0:
+            warnings.warn("The bubbel radius may not have been correctly extracted.", UserWarning)
 
         # Save quantities to the stage
         self.Ez_fit_obj = Ez_fit
@@ -730,13 +734,13 @@ class StagePrtclTransWakeInstability(Stage):
         sse_Ez = np.sum((Ez_cut - Ez_fit(zs_cut))**2)
         
         if sse_Ez/np.mean(Ez_cut) > 0.05:
-            print('Warning: the longitudinal E-field may not have been accurately fitted.\n')
+            warnings.warn('The longitudinal E-field may not have been accurately fitted.\n', UserWarning)
         
         return Ez_fit(z_slices), Ez_fit
 
-    
+
     # ==================================================
-    def get_bubble_radius(self, plasma_num_density, plasma_tr_coord, driver_offset=None, main_offset=None, threshold=0.8):
+    def get_bubble_radius(self, plasma_num_density, plasma_tr_coord, driver_offset, threshold=0.8):
         """
         - For extracting the plasma ion bubble radius by finding the coordinates in which the plasma number density goes from zero to a threshold value.
         - The symmetry axis is determined using the transverse offset of the drive beam.
@@ -748,12 +752,12 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma number density in units of initial number density n0. Need to be oriented with propagation direction pointing to the right and positive offset pointing upwards.
             
         plasma_tr_coord: [m] 1D float array 
-            Transverse coordinate of plasma_num_density.
+            Transverse coordinate of plasma_num_density. Needs to be strictly growing from start to end.
 
         driver_offset: [m] float
             Mean transverse offset of the drive beam.
 
-        main_offset: [m] float
+        #main_offset: [m] float
             Mean transverse offset of the main beam.
             
         threshold: float
@@ -766,46 +770,115 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma bubble radius over the simulation box.
         """
 
-        # Find the offsets of the beams
-        if driver_offset is None:
-            drive_beam = self.drive_beam
-            driver_offset = drive_beam.x_offset()
-        if main_offset is None:
-            main_beam = self.main_beam
-            main_offset = main_beam.x_offset()
+        # Check if plasma_tr_coord is strictly growing from start to end
+        if not np.all(np.diff(plasma_tr_coord) > 0):
+            raise ValueError('plasma_tr_coord needs to be strictly increasing from start to end.')
         
         # Find the value in plasma_tr_coord closest to driver_offset and corresponding index
         idx_middle, _ = find_closest_value_in_arr(plasma_tr_coord, driver_offset)
         
-        # Find the value in plasma_tr_coord closest to main_offset and corresponding index
-        idx_offset, _ = find_closest_value_in_arr(plasma_tr_coord, main_offset)
+        ## Find the value in plasma_tr_coord closest to main_offset and corresponding index
+        ##idx_offset, _ = find_closest_value_in_arr(plasma_tr_coord, main_offset)
 
         rows, cols = np.shape(plasma_num_density)
         bubble_radius = np.zeros(cols)
+        slopes = np.diff(plasma_num_density)
 
         for i in range(0,cols):  # Loop through all transverse slices.
+            #i=114 #########
             
             # Extract a transverse slice
             slice = plasma_num_density[:,i]
+            
+            idxs_peaks, _ = signal.find_peaks(slice, height=1.2, width=2, prominence=None)  # Find all relevant peaks in the slice.
+            
+            if idxs_peaks.size == 0:
+                idxs_peaks, _ = signal.find_peaks(slice, height=1.0, width=1, prominence=None)  # Find all relevant peaks in the slice.
 
-            peaks, _ = signal.find_peaks(slice)  # Find all peaks in the slice.
-            idxs_peaks_above = peaks[peaks > idx_middle]  # Get the slice peaks above middle.
-            idxs_peaks_below = peaks[peaks < idx_middle]  # Get the slice peaks below middle.
+            
+            idxs_peaks_above = idxs_peaks[idxs_peaks > idx_middle]  # Get the slice peak indices located above middle.
+            idxs_peaks_below = idxs_peaks[idxs_peaks < idx_middle]  # Get the slice peak indices located below middle.
 
             # Check if there are peaks on both sides
-            if len(idxs_peaks_above) > 0 and len(idxs_peaks_below) > 0:
-                idx_above = idxs_peaks_above[-1]  # Get the slice peak above closest to middle.
-                idx_below = idxs_peaks_below[0]  # Get the slice peak below closest to middle.
-                valley = slice[idx_below+1:idx_above]  # Get the elements between the peaks.
+            if idxs_peaks_above.size > 0 and idxs_peaks_below.size > 0:
+                #idx_above = idxs_peaks_above[-1]  # Get the slice peak above closest to middle.
+                #idx_below = idxs_peaks_below[0]  # Get the slice peak below closest to middle.
 
+                
+                # Get the indices for the maximum negative and positive slopes of plasma_num_density
+                slopes = np.diff(slice)
+                slopes = np.insert(arr=slopes, obj=0, values=0.0)
+                idx_max_pos_slope = np.argmax(slopes)
+                idx_max_neg_slope = np.argmin(slopes)
+
+                _, idx_above = find_closest_value_in_arr(idxs_peaks_above, idx_max_pos_slope)  # Get the slice peak above middle closest to max_pos_slope.
+                _, idx_below = find_closest_value_in_arr(idxs_peaks_below, idx_max_neg_slope)  # Get the slice peak below middle closest to max_neg_slope.
+
+                
+                
+                # Get the plasma_num_density slice elements between the peaks.
+                #valley = slice[idx_below+1:idx_above]
+                valley = copy.deepcopy(slice)
+                valley[:idx_below] = np.nan
+                valley[idx_above+1:] = np.nan
+                
                 # Check that the "valley" of the slice is not too shallow. If so, bubble radius should be > 0.
-                if len(valley) and valley.min() < threshold:
-                    idxs_slice_above_thres = np.where(slice > threshold)[0]  # Find the indices of all the elements in the slice > threshold.
+                if len(valley) > 0 and np.nanmin(valley) < threshold and np.nanmax(valley) >= threshold:
+                    ##idxs_slice_above_thres = np.where(slice >= threshold)[0]  # Find the indices of all the elements in the slice > threshold.
+                    # Find the indices of all the elements in the slice >= threshold.
+                    idxs_slice_above_thres = np.where(valley >= threshold)[0]  
+                    
+                    #
+                    #if len(idxs_slice_above_thres) == 0:
+                    #    continue
+                    #    #idxs_slice_above_thres = np.argmax(valley)  #######
+#
+                    #print(idxs_slice_above_thres)
+                    
+                    # Get the valley indices above threshold located above middle
+                    idxs_valley_above_middle = idxs_slice_above_thres[idxs_slice_above_thres > idx_middle]  
    
                     # Find the value in idxs_slice_above_thres closest to idx_offset (equivalent to the value in plasma_num_density above threshold that is closest to the main beam offset axis, i.e. the innermost plasma electron layer).
-                    _, idx = find_closest_value_in_arr(idxs_slice_above_thres, idx_offset)
+                    ##_, idx = find_closest_value_in_arr(idxs_slice_above_thres, idx_offset)
+                    #_, idx = find_closest_value_in_arr(idxs_valley_above_middle, idx_offset)
+
+
+
+
+                    
+                    ## Find the sequence in idxs_valley_above_middle that only grows until the end of the array, which corresponds to the upper electron layer, assuming plasma_tr_coord grows from start to end.
+                    #if len(idxs_valley_above_middle) > 0:
+                    #    strictly_growing_seq_vals, strictly_growing_seq_indices = growing_end_seq(slice[idxs_valley_above_middle], idxs_valley_above_middle)
+                    #    idx_strictly_growing_seq_closest2thres, _ = find_closest_value_in_arr(strictly_growing_seq_vals, threshold)  # Index of the tricktly growing part of valley closest to threshold.
+                    #    idx = strictly_growing_seq_indices[idx_strictly_growing_seq_closest2thres]  # Index for the inner most electron layer.
+                    #else:
+                    #    print(i)
+                    #    print(idxs_valley_above_middle)
+                    #    idx = idxs_valley_above_middle
+                        
+                    #strictly_growing_indices = idxs_valley_above_middle[strictly_growing_seq_indices]
+                    #idx = strictly_growing_indices[0]  # Index for the inner most electron layer.
+
+                    # Find element in valley closest to threshold
+                    idx_valley_above_middle_closest2thres, _ = find_closest_value_in_arr(valley[idxs_valley_above_middle], threshold)
+                    idx = idxs_valley_above_middle[idx_valley_above_middle_closest2thres]
+                    
                     bubble_radius[i] = np.abs(plasma_tr_coord[idx] - driver_offset)
+                    #print(idx_middle)
+                    #print(idxs_valley_above_middle)
+                    #print(strictly_growing_seq_indices)
+                    #break
         
+        return bubble_radius
+
+
+    # ==================================================
+    def get_bubble_radius_WakeT(self, plasma_num_density, plasma_tr_coord, threshold=0.8):
+        """
+        The plasma wake calculated by Wake-T is always centered around r = 0.0, so that driver_offset=0.0, main_offset=0.0 are used as inputs in get_bubble_radius().
+        """
+        bubble_radius = self.get_bubble_radius(plasma_num_density=plasma_num_density, plasma_tr_coord=plasma_tr_coord, driver_offset=0.0, threshold=0.8)
+
         return bubble_radius
 
     
@@ -844,6 +917,7 @@ class StagePrtclTransWakeInstability(Stage):
         
         # Start index (head of the beam) of extraction interval.
         head_idx, _ = find_closest_value_in_arr(arr=zs_rb, val=zs.max())
+        
         # End index (tail of the beam) of extraction interval.
         tail_idx, _ = find_closest_value_in_arr(arr=zs_rb, val=zs.min())
         
@@ -857,7 +931,7 @@ class StagePrtclTransWakeInstability(Stage):
         sse_rb = np.sum((rb_cut - rb_fit(zs_cut))**2)
         
         if sse_rb/np.mean(rb_cut) > 0.05:
-            print('Warning: the plasma bubble radius may not have been accurately fitted.\n')
+            warnings.warn('The plasma bubble radius may not have been accurately fitted.\n', UserWarning)
         
         return rb_fit(z_slices), rb_fit    
         
@@ -1691,3 +1765,29 @@ class StagePrtclTransWakeInstability(Stage):
         with open(self.diag_path + 'output.txt', 'r') as f:
             print(f.read())
         f.close()
+
+
+###################################################
+def growing_end_seq(arr, idxs):
+    
+    # Find the strictly growing sequence and their continuous indices
+    growing_sequence = np.array([])
+    growing_indices = np.array([], dtype=int)
+    sequence_head_idx = 1
+    for i in range(len(arr)-1, 1, -1):
+        if arr[i-1] < arr[i] and idxs[i]==idxs[i-1]+1:
+            growing_sequence = np.append(growing_sequence, arr[i-1])
+            growing_indices = np.append(growing_indices, int(idxs[i-1]))
+            sequence_head_idx = i
+        else:
+            break
+
+    growing_sequence = np.append(growing_sequence, arr[sequence_head_idx-2])
+    growing_indices = np.append(growing_indices, int(idxs[sequence_head_idx-2]))
+    
+    growing_sequence = np.flip(growing_sequence)
+    growing_indices = np.flip(growing_indices)
+    growing_sequence = np.append(growing_sequence, arr[-1])
+    growing_indices = np.append(growing_indices, int(idxs[-1]))
+    return growing_sequence, growing_indices
+    
