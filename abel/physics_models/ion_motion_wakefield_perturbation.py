@@ -14,7 +14,6 @@ from scipy.interpolate import RegularGridInterpolator
 import copy
 from joblib import Parallel, delayed
 import os
-#import multiprocessing
 import time, warnings
 
 from abel.classes.beam import Beam
@@ -113,11 +112,6 @@ class IonMotionConfig():
         self.set_probing_coordinates(drive_beam, main_beam, set_driver_sc_coords=True)
         driver_sc_fields_obj = self.assemble_driver_sc_fields_obj(drive_beam)
         self.driver_sc_fields_obj = driver_sc_fields_obj
-        #wide_driver_Ex_3d, wide_driver_Ey_3d, xs_grid, ys_grid, zs_grid = self.wide_probe_driver_field(driver_sc_fields_obj)
-        #driver_Ex_interpolator, driver_Ey_interpolator = self.beam_field_interpolators(xs_grid, ys_grid, zs_grid, wide_driver_Ex_3d, wide_driver_Ey_3d)
-        
-        #self.driver_Ex_interpolator = driver_Ex_interpolator
-        #self.driver_Ey_interpolator = driver_Ey_interpolator
 
     
     # ==================================================

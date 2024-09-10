@@ -48,22 +48,17 @@ from joblib_progress import joblib_progress
 import csv, os
 
 from abel.classes.beam import *  # TODO: no need to import everything.
-#from abel.utilities.relativity import energy2gamma
 from abel.utilities.relativity import momentum2gamma, velocity2gamma
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_std
-#from abel.apis.rf_track.rf_track_api import rft_beam_fields
 from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
-#from abel.physics_models.ion_motion_wakefield_perturbation import ion_wakefield_perturbation_parallel
-#from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, grid_intpl_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
-
 
 
 class PrtclTransWakeConfig():
 # Stores configuration for the transverse wake instability calculations.
 
     # =============================================
-    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, shot_path=None, stage_num=None, save_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, shot_path=None, stage_num=None, probe_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0, update_ion_wakefield=False):
         
         self.plasma_density = plasma_density  # [m^-3]
         self.stage_length = stage_length
@@ -74,7 +69,7 @@ class PrtclTransWakeConfig():
         self.show_prog_bar = show_prog_bar
         self.shot_path = shot_path
         self.stage_num = stage_num
-        self.save_data_frac = save_data_frac
+        self.probe_data_frac = probe_data_frac
 
         if enable_ion_motion:
             self.ion_motion_config = IonMotionConfig(
@@ -236,8 +231,8 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     num_time_steps = np.ceil(stage_length/(c*time_step))
     time_step = stage_length/(c*num_time_steps)
 
-    if trans_wake_config.save_data_frac != None:
-        save_data_freq = int(trans_wake_config.save_data_frac * num_time_steps)
+    if trans_wake_config.probe_data_frac != None:
+        probe_data_freq = int(trans_wake_config.probe_data_frac * num_time_steps)
     
     xs = beam.xs()
     ys = beam.ys()
@@ -305,9 +300,6 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         pbar.set_description('0%')
 
     
-    #tot_start_time = time.time()
-
-    
     while prop_length < stage_length-0.5*c*time_step:
 
         # ============= Apply filters =============
@@ -359,63 +351,18 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
         #ion_end_time = time.time()
         #print('Ion wake calc time taken:', ion_end_time - ion_start_time, 'seconds')
-
-        
-        #momenta_start_time = time.time()
-        
-        # Parallel calculation
-        #results = Parallel(n_jobs=2, backend='threading')([
-            
-            #delayed(calc_tr_momenta_comp)(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=xs_sorted, tr_momenta_comp=pxs_sorted, ion_wakefield_perts=intpl_Wx_perts),
-            
-            #delayed(calc_tr_momenta_comp)(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=ys_sorted, tr_momenta_comp=pys_sorted, ion_wakefield_perts=intpl_Wy_perts)
-
-            #delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config),
-            
-            #delayed(calc_tr_momenta)(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
-            
-        #])
-
-        
         
 
         # Update the transverse momenta components
-        #pxs_sorted = results[0]
-        #pys_sorted = results[1]
         pxs_sorted = calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=xs_sorted-x_axis, tr_momenta_comp=pxs_sorted, ion_wakefield_perts=intpl_Wx_perts)
             
         pys_sorted = calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=ys_sorted-y_axis, tr_momenta_comp=pys_sorted, ion_wakefield_perts=intpl_Wy_perts)
-
-
-
-
-
-        #momenta_end_time = time.time()
-        #print('Momenta calc time taken:', momenta_end_time - momenta_start_time, 'seconds')
-
         
-        ## Extract the tr_momenta and W_perts arrays separately
-        #(pxs_sorted, Wx_perts, intpl_Wx_perts), (pys_sorted, Wy_perts, intpl_Wy_perts) = results
-        #pxs_sorted, Wx_perts, intpl_Wx_perts = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=xs_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pxs_sorted, gammas=gammas, tr_direction='x', trans_wake_config=trans_wake_config)
         
-        #pys_sorted, Wy_perts, intpl_Wy_perts = calc_tr_momenta(filtered_beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tot_offsets_sqr=tot_axis_offsets_sqr, tr_momenta=pys_sorted, gammas=gammas, tr_direction='y', trans_wake_config=trans_wake_config)
-
-        
-
-        ## End time
-        #momenta_end_time = time.time()
-        #
-        ## Time usage
-        #print('Momenta calc time taken:', momenta_end_time - momenta_start_time, 'seconds')
-
-
-
-
-        
-
         #Ez = -3.35e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
         #Ez = -3.20e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
         #Ez = -2.0e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ######################
+
         
         # Update longitudinal momenta.
         if enable_radiation_reaction:
@@ -424,7 +371,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
             pzs_sorted = pzs_sorted - e*Ez*time_step
             
         # Save data
-        if time_step_count == 0 and trans_wake_config.save_data_frac != None:
+        if time_step_count == 0 and trans_wake_config.probe_data_frac != None:
             file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
             save_time_step(file_path, [xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts])
 
@@ -438,8 +385,8 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
 
         
         # Save data
-        if trans_wake_config.save_data_frac != None:
-            if time_step_count % save_data_freq == 0:
+        if trans_wake_config.probe_data_frac != None:
+            if time_step_count % probe_data_freq == 0:
                 file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
                 save_time_step(file_path, [xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts])
 
@@ -490,13 +437,6 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                              pzs=pzs_sorted,
                              weightings=weights_sorted,
                              particle_mass=particle_mass)
-    ## End time
-    #tot_end_time = time.time()
-    #
-    ## Time usage
-    #print('Tot time taken:', tot_end_time - tot_start_time, 'seconds')
-    #print(np.abs(ion_motion_config.xs_probe).max(), np.abs(ion_motion_config.ys_probe).max(), ion_motion_config.zs_probe_main.mean(), ion_motion_config.grid_size_z.mean(), ion_motion_config.xlims_driver_sc, ion_motion_config.ylims_driver_sc)
-    #print(ion_motion_config.test_num)
     
     return beam_out
 
