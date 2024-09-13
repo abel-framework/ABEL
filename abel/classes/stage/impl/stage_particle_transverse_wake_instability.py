@@ -155,18 +155,18 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Get the drive beam ==========
-        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0:                   #############################
+        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:                   #############################
             drive_beam0 = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
             drive_beam0 = self.driver_source.track()
             self.drive_beam = drive_beam0  # Generate a drive beam with jitter.                   ############################# 
         
         beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately.
-        drive_beam = copy.deepcopy(drive_beam0)
+        drive_beam_ramped = copy.deepcopy(drive_beam0)  # Make a deep copy to not affect the original drive beam.
 
         
         # ========== Apply plasma density up ramp (demagnify beta function) ========== 
-        drive_beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
+        drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
         
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
@@ -178,8 +178,9 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Wake-T simulation and extraction ==========
         # Define a Wake-T stage
         stage_wakeT = StageWakeT()
-        stage_wakeT.driver_source = self.driver_source  # TODO: Should use the same drive beam as above instead of generating another one.
-        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam.gamma()/2))
+        #stage_wakeT.driver_source = self.driver_source
+        stage_wakeT.drive_beam = drive_beam0
+        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam0.gamma()/2))
         lambda_betatron = (2*np.pi/k_beta)
         stage_wakeT.length = lambda_betatron/10  # [m]
         stage_wakeT.plasma_density = plasma_density  # [m^-3]
@@ -202,8 +203,8 @@ class StagePrtclTransWakeInstability(Stage):
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
-        #driver_x_offset = drive_beam.x_offset()
-        #driver_y_offset = drive_beam.y_offset()
+        #driver_x_offset = drive_beam_ramped.x_offset()
+        #driver_y_offset = drive_beam_ramped.y_offset()
         #x_offset = beam0.x_offset()             # Important to NOT use beam0_copy.
         #bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, threshold=0.8)
         bubble_radius_wakeT = self.get_bubble_radius_WakeT(plasma_num_density, rs_rho, threshold=0.8)
@@ -211,7 +212,7 @@ class StagePrtclTransWakeInstability(Stage):
         # Cut out bubble radius over the ROI
         bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead...
 
-        if bubble_radius_wakeT.max() < 0.5 * blowout_radius(self.plasma_density, drive_beam.peak_current()) or bubble_radius_roi.any()==0:
+        if bubble_radius_wakeT.max() < 0.5 * blowout_radius(self.plasma_density, drive_beam_ramped.peak_current()) or bubble_radius_roi.any()==0:
             warnings.warn("The bubbel radius may not have been correctly extracted.", UserWarning)
 
         idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
@@ -221,7 +222,7 @@ class StagePrtclTransWakeInstability(Stage):
         # Save quantities to the stage
         self.Ez_fit_obj = Ez_fit
         self.rb_fit_obj = rb_fit
-        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam, beam0=beam0)
+        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam0)
         
         self.Ez_roi = Ez
         #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
@@ -238,12 +239,12 @@ class StagePrtclTransWakeInstability(Stage):
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
 
         if self.num_z_cells_main is None:
-            self.num_z_cells_main = round(np.sqrt( len(drive_beam)+len(beam_filtered) )/2)
+            self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
             
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
             stage_length=self.length, 
-            drive_beam=drive_beam, 
+            drive_beam=drive_beam_ramped, 
             main_beam=beam_filtered, 
             time_step_mod=self.time_step_mod, 
             show_prog_bar=self.show_prog_bar, 
@@ -260,10 +261,12 @@ class StagePrtclTransWakeInstability(Stage):
             num_y_cells_rft=self.num_y_cells_rft, 
             num_xy_cells_probe=self.num_xy_cells_probe, 
             uniform_z_grid=self.uniform_z_grid, 
+            driver_x_jitter=self.driver_source.jitter.x, 
+            driver_y_jitter=self.driver_source.jitter.y, 
             update_factor=self.update_factor
         )
         
-        inputs = [drive_beam, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
+        inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
@@ -300,16 +303,16 @@ class StagePrtclTransWakeInstability(Stage):
             
         else:
             
-            beam = transverse_wake_instability_particles(beam_filtered, drive_beam, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
+            beam = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
             
         
         # ==========  Apply plasma density down ramp (magnify beta function) ========== 
-        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
+        drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
         beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
         
 
         # ========== Bookkeeping ========== 
-        self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/drive_beam.energy() * beam.abs_charge()/drive_beam.abs_charge()
+        self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/drive_beam_ramped.energy() * beam.abs_charge()/drive_beam_ramped.abs_charge()
         self.main_beam = copy.deepcopy(beam)  # Need to make a deepcopy, or changes to beam may affect the Beam object saved here.
         
         # Copy meta data from input beam (will be iterated by super)

@@ -58,7 +58,7 @@ class PrtclTransWakeConfig():
 # Stores configuration for the transverse wake instability calculations.
 
     # =============================================
-    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, shot_path=None, stage_num=None, probe_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, shot_path=None, stage_num=None, probe_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, update_factor=1.0, update_ion_wakefield=False):
         
         self.plasma_density = plasma_density  # [m^-3]
         self.stage_length = stage_length
@@ -83,6 +83,8 @@ class PrtclTransWakeConfig():
                 num_y_cells_rft=num_y_cells_rft, 
                 num_xy_cells_probe=num_xy_cells_probe, 
                 uniform_z_grid=uniform_z_grid, 
+                driver_x_jitter=driver_x_jitter, 
+                driver_y_jitter=driver_y_jitter, 
                 update_factor=update_factor, 
                 update_ion_wakefield=update_ion_wakefield
             )
@@ -131,7 +133,7 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
         ion_motion_config = trans_wake_config.ion_motion_config
         
         # Set the coordinates used to probe beam electric fields from RF-Track
-        ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam)
+        ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam, set_driver_sc_coords=False)
         
         #ion_motion_config.update_ion_wakefield = True #######<- Override
     
@@ -141,7 +143,6 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
             driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
     
             # Probe drive beam E-field component in 3D
-            #driver_Exs_3d, driver_Eys_3d = grid_intpl_driver_beam_field(ion_motion_config)
             driver_Exs_3d, driver_Eys_3d = probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj)
             
             # Update the RF-Track SpaceCharge_Field object for the main beam

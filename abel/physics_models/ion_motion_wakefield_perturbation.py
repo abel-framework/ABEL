@@ -27,7 +27,7 @@ from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 class IonMotionConfig():
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, update_factor=1.0, update_ion_wakefield=False):
         """
         Contains calculation configuration for calculating the ion wakefield perturbation.
         
@@ -90,9 +90,6 @@ class IonMotionConfig():
         self.num_x_cells_rft = num_x_cells_rft
         self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
-
-        self.update_factor = update_factor
-        self.update_ion_wakefield = update_ion_wakefield
         self.uniform_z_grid = uniform_z_grid
 
         self.xs_probe = None
@@ -104,6 +101,13 @@ class IonMotionConfig():
         self.xlims_driver_sc = None
         self.ylims_driver_sc = None
         self.grid_size_z = None
+
+        # Store the std of driver jitters for transverse mesh refinement
+        self.driver_x_jitter = driver_x_jitter
+        self.driver_y_jitter = driver_y_jitter
+
+        self.update_factor = update_factor
+        self.update_ion_wakefield = update_ion_wakefield
         
         self.Wx_perts = None
         self.Wy_perts = None
@@ -124,11 +128,12 @@ class IonMotionConfig():
             raise ValueError('Beams have to propagate towards increasing z with drive beam placed in front of main beam.')
 
         if set_driver_sc_coords:
+            # Set the xy limits used by assemble_driver_sc_fields_obj()
             x_max = np.max([drive_beam.xs().max(), main_beam.xs().max()])
             x_min = np.min([drive_beam.xs().min(), main_beam.xs().min()])
             y_max = np.max([drive_beam.ys().max(), main_beam.ys().max()])
             y_min = np.min([drive_beam.ys().min(), main_beam.ys().min()])
-            xy_padding = 1.0
+            xy_padding = 2.0
             x_max = self.pad_upwards(x_max, padding=xy_padding)
             x_min = self.pad_downwards(x_min, padding=xy_padding)
             y_max = self.pad_upwards(y_max, padding=xy_padding)
@@ -137,10 +142,47 @@ class IonMotionConfig():
             self.ylims_driver_sc = np.array([y_min, y_max])  # [m]
         
         # Transverse coordinates for probing the fields from RF-Track get_field()
-        self.xs_probe = np.linspace( main_beam.xs().min(), main_beam.xs().max(), self.num_xy_cells_probe)  # [m]
-        self.ys_probe = np.linspace( main_beam.ys().min(), main_beam.ys().max(), self.num_xy_cells_probe)  # [m]
+        xs_probe = np.linspace( main_beam.xs().min(), main_beam.xs().max(), self.num_xy_cells_probe)  # [m]
+        ys_probe = np.linspace( main_beam.ys().min(), main_beam.ys().max(), self.num_xy_cells_probe)  # [m]
+
+        # Modify xs_probe and ys_probe if mesh refinement is required
+        if self.driver_x_jitter != 0.0 or self.driver_y_jitter != 0.0:
+
+            # Take care of when only one of the jitters is non-zero.
+            driver_x_jitter = self.driver_x_jitter
+            if driver_x_jitter == 0.0:
+                driver_x_jitter = 0.1e-6
+            driver_y_jitter = self.driver_y_jitter
+            if driver_y_jitter == 0.0:
+                driver_y_jitter = 0.1e-6
+                
+            dx_driver_middle = driver_x_jitter/5
+            num_x_fine_middle_mesh = 7
+            driver_x_middle_width = num_x_fine_middle_mesh * dx_driver_middle
+
+            xs_driver_middle = np.linspace(drive_beam.x_offset()-driver_x_middle_width/2, drive_beam.x_offset()+driver_x_middle_width/2, num_x_fine_middle_mesh)
+            indices = np.searchsorted(xs_probe, xs_driver_middle)
+            xs_probe = np.insert(xs_probe, indices, xs_driver_middle)
+
+            dy_driver_middle = driver_y_jitter/5
+            num_y_fine_middle_mesh = 7
+            driver_y_middle_width = num_y_fine_middle_mesh * dy_driver_middle
+            
+            ys_driver_middle = np.linspace(drive_beam.y_offset()-driver_y_middle_width/2, drive_beam.y_offset()+driver_y_middle_width/2, num_y_fine_middle_mesh)
+            indices = np.searchsorted(ys_probe, ys_driver_middle)
+            ys_probe = np.insert(ys_probe, indices, ys_driver_middle)
+
+            if np.any(np.diff(xs_probe)) < 0 or np.any(np.diff(ys_probe)) < 0:
+                raise ValueError('xs_probe and/or ys_probe are not in ascending order.')
+            #if self.num_xy_cells_probe_updated is False:
+            #    self.num_xy_cells_probe = len(xs_probe)
+            #    self.num_xy_cells_probe_updated = True
+
+        self.xs_probe = xs_probe
+        self.ys_probe = ys_probe
 
         if self.xs_probe.min() < self.xlims_driver_sc.min() or self.xs_probe.max() > self.xlims_driver_sc.max() or self.ys_probe.min() < self.ylims_driver_sc.min() or self.ys_probe.max() > self.ylims_driver_sc.max():
+            print('xs_probe.min:', self.xs_probe.min(), 'xlims_driver_sc.min:', self.xlims_driver_sc.min(), 'xs_probe.max:', self.self.xs_probe.max(), 'ys_probe.min:', self.ys_probe.min(), 'ylims_driver_sc.min:', self.self.ylims_driver_sc.min(), 'ys_probe.max:', self.ys_probe.max())
             warnings.warn("The range of the probing coordinates is larger than the driver probing coordinates. This may lead to a slower performance due to extrapolations when extracting the driver beam fields.", UserWarning)
 
         # Set the z-coordinates used to probe beam electric fields from RF-Track
@@ -165,6 +207,9 @@ class IonMotionConfig():
             self.zs_probe_separation = np.linspace( self.pad_downwards(self.zs_probe_driver.min()), self.pad_upwards(self.zs_probe_main.max()), sep_num_z )  # [m], beam head facing start of array. Space between driver and main beam.
             self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_separation, self.zs_probe_main] )  # [m], beam head facing start of array.
             self.grid_size_z = np.abs( np.insert(np.diff(self.zs_probe), 0, 0.0) )
+
+        if np.any(np.diff(self.zs_probe) > 0):
+            raise ValueError('zs_probe is not in descending order.')
 
     
     # ==================================================
@@ -412,8 +457,8 @@ def ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driv
     sep_E_fields_3d = construct_empty_field(ion_motion_config)
 
     # Concatenate the 3D beam field of the drive beam and main beam
-    Exs_3d = np.concatenate([driver_Exs_3d, sep_E_fields_3d, main_Exs_3d], axis=2)
-    Eys_3d = np.concatenate([driver_Eys_3d, sep_E_fields_3d, main_Eys_3d], axis=2)
+    Exs_3d = np.concatenate([driver_Exs_3d, sep_E_fields_3d, main_Exs_3d], axis=2)  # [V/m], beam head facing start of array.
+    Eys_3d = np.concatenate([driver_Eys_3d, sep_E_fields_3d, main_Eys_3d], axis=2)  # [V/m], beam head facing start of array.
     
     # Integration along z using by splitting up the convolution integral
     integral_x = np.cumsum( zs_probe * Exs_3d * grid_size_z, axis=2) - zs_probe * np.cumsum(Exs_3d * grid_size_z, axis=2)
