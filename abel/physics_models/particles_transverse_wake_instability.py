@@ -46,11 +46,12 @@ import time
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress
 import csv, os
+#from types import SimpleNamespace
 
 from abel.classes.beam import *  # TODO: no need to import everything.
 from abel.utilities.relativity import momentum2gamma, velocity2gamma
 from abel.utilities.plasma_physics import k_p
-from abel.utilities.statistics import weighted_std
+from abel.utilities.statistics import weighted_mean, weighted_std
 from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation
 
 
@@ -58,7 +59,7 @@ class PrtclTransWakeConfig():
 # Stores configuration for the transverse wake instability calculations.
 
     # =============================================
-    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, shot_path=None, stage_num=None, probe_data_frac=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, tmpfolder=None, shot_path=None, stage_num=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, update_factor=None, update_ion_wakefield=False):
         
         self.plasma_density = plasma_density  # [m^-3]
         self.stage_length = stage_length
@@ -67,11 +68,21 @@ class PrtclTransWakeConfig():
         self.enable_radiation_reaction = enable_radiation_reaction
         self.enable_ion_motion = enable_ion_motion
         self.show_prog_bar = show_prog_bar
-        self.shot_path = shot_path
-        self.stage_num = stage_num
-        self.probe_data_frac = probe_data_frac
+
+        self.probe_evolution = probe_evolution
+        if probe_evolution:
+            if probe_every_nth_time_step <= 0 or isinstance(probe_every_nth_time_step, int) == False:
+                raise ValueError('probe_every_nth_time_step has to be an integer larger than 0')
+            self.probe_every_nth_time_step = probe_every_nth_time_step
+            self.make_animations = make_animations
+            self.tmpfolder = tmpfolder
+            self.shot_path = shot_path
+            self.stage_num = stage_num
 
         if enable_ion_motion:
+            if update_factor is None:
+                update_factor=time_step_mod
+                
             self.ion_motion_config = IonMotionConfig(
                 drive_beam=drive_beam, 
                 main_beam=main_beam, 
@@ -88,7 +99,7 @@ class PrtclTransWakeConfig():
                 update_factor=update_factor, 
                 update_ion_wakefield=update_ion_wakefield
             )
-        
+
 
 
 ###################################################
@@ -231,9 +242,6 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
     num_time_steps = np.ceil(stage_length/(c*time_step))
     time_step = stage_length/(c*num_time_steps)
-
-    if trans_wake_config.probe_data_frac != None:
-        probe_data_freq = int(trans_wake_config.probe_data_frac * num_time_steps)
     
     xs = beam.xs()
     ys = beam.ys()
@@ -294,11 +302,35 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     ############# Beam propagation through the plasma cell #############
     time_step_count = 0
     prop_length = 0.0
+    filtered_beam = Beam()
 
     # Progress bar
     if show_prog_bar is True:
         pbar = tqdm(total=100)
         pbar.set_description('0%')
+
+    # ============= Save evolution =============
+    evolution = Evolution()
+    
+    if trans_wake_config.probe_evolution:
+        if trans_wake_config.probe_every_nth_time_step > num_time_steps:
+            probe_data_freq = num_time_steps
+        else:
+            probe_data_freq = trans_wake_config.probe_every_nth_time_step
+        current_beam = Beam()
+        current_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
+                                     xs=xs_sorted,
+                                     ys=ys_sorted,
+                                     zs=zs_sorted,
+                                     pxs=pxs_sorted,
+                                     pys=pys_sorted,
+                                     pzs=pzs_sorted,
+                                     weightings=weights_sorted,
+                                     particle_mass=particle_mass)
+        evolution.save_evolution(prop_length, current_beam, clean=True)
+        
+        if trans_wake_config.make_animations:
+            save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
 
     
     while prop_length < stage_length-0.5*c*time_step:
@@ -330,7 +362,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
         # ============= Beam kick =============
         # Set the phase space of the filtered ABEL beam
-        filtered_beam = Beam()
+        #filtered_beam = Beam()
         filtered_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
                                       xs=xs_sorted,
                                       ys=ys_sorted,
@@ -372,32 +404,50 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
             pzs_sorted = pzs_sorted - e*Ez*time_step
             
         # Save data
-        if time_step_count == 0 and trans_wake_config.probe_data_frac != None:
-            file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
-            save_time_step(file_path, [xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts])
+        #if time_step_count == 0 and trans_wake_config.probe_evolution:
+            #file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
+            #save_time_step([xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts], file_path)
 
         
         # ============= Drift of beam =============
         # Leapfrog
-        xs_sorted = xs_sorted + pxs_sorted/pzs_sorted*1/2*c*time_step
-        ys_sorted = ys_sorted + pys_sorted/pzs_sorted*1/2*c*time_step
+        x_angles = pxs_sorted/pzs_sorted
+        xs_sorted = xs_sorted + x_angles*1/2*c*time_step
+        y_angles = pys_sorted/pzs_sorted
+        ys_sorted = ys_sorted + y_angles*1/2*c*time_step
         #time_step_count = time_step_count + 1/2
         prop_length = prop_length + 1/2*c*time_step
-
         
-        # Save data
-        if trans_wake_config.probe_data_frac != None:
-            if time_step_count % probe_data_freq == 0:
-                file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
-                save_time_step(file_path, [xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts])
-
         time_step_count = time_step_count + 1
-        
+
         if enable_ion_motion:
             if time_step_count % update_freq == 0:
                 ion_motion_config.update_ion_wakefield = True
             else:
                 ion_motion_config.update_ion_wakefield = False
+
+        # ============= Save evolution =============
+        if trans_wake_config.probe_evolution and time_step_count % probe_data_freq == 0:
+            current_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
+                                         xs=xs_sorted,
+                                         ys=ys_sorted,
+                                         zs=zs_sorted,
+                                         pxs=pxs_sorted,
+                                         pys=pys_sorted,
+                                         pzs=pzs_sorted,
+                                         weightings=weights_sorted,
+                                         particle_mass=particle_mass)
+            evolution.save_evolution(prop_length, current_beam, clean=True)
+            
+            if trans_wake_config.make_animations:
+                save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
+                   
+            #file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
+            #save_time_step([xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts], file_path)
+
+        
+        
+        
                 
         # RK4
         #xs_sorted = RK4(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, xs_sorted, pxs_sorted, Ez, pzs_sorted)
@@ -439,7 +489,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                              weightings=weights_sorted,
                              particle_mass=particle_mass)
     
-    return beam_out
+    return beam_out, evolution
 
 
 
@@ -461,7 +511,61 @@ def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorte
 
 
 ###################################################
-def save_time_step(file_path, arrays):
+class Evolution:
+    # =============================================
+    def __init__(self):
+        self.prop_length = np.array([])
+        self.x_offset = np.array([])
+        self.y_offset = np.array([])
+        self.z_offset = np.array([])
+        self.energy = np.array([])
+        self.x_angle = np.array([])
+        self.y_angle = np.array([])
+        self.beam_size_x = np.array([])
+        self.beam_size_y = np.array([])
+        self.bunch_length = np.array([])
+        self.rel_energy_spread = np.array([])
+        self.divergence_x = np.array([])
+        self.divergence_y = np.array([])
+        self.beta_x = np.array([])
+        self.beta_y = np.array([])
+        self.norm_emittance_x = np.array([])
+        self.norm_emittance_y = np.array([])
+        self.num_particles = np.array([])
+        self.charge = np.array([])
+
+    # =============================================
+    def save_evolution(self, prop_length, beam, clean):
+        self.prop_length = np.append(self.prop_length, prop_length)
+        self.x_offset = np.append(self.x_offset, beam.x_offset(clean=clean))
+        self.y_offset = np.append(self.y_offset, beam.y_offset(clean=clean))
+        self.z_offset = np.append(self.z_offset, beam.z_offset(clean=clean))
+        self.energy = np.append(self.energy, beam.energy(clean=clean))
+        self.x_angle = np.append(self.x_angle, beam.x_angle(clean=clean))
+        self.y_angle = np.append(self.y_angle, beam.y_angle(clean=clean))
+        self.beam_size_x = np.append(self.beam_size_x, beam.beam_size_x(clean=clean))
+        self.beam_size_y = np.append(self.beam_size_y, beam.beam_size_y(clean=clean))
+        self.bunch_length = np.append(self.bunch_length, beam.bunch_length(clean=clean))
+        self.rel_energy_spread = np.append(self.rel_energy_spread, beam.rel_energy_spread(clean=clean))
+        self.divergence_x = np.append(self.divergence_x, beam.divergence_x(clean=clean))
+        self.divergence_y = np.append(self.divergence_y, beam.divergence_y(clean=clean))
+        self.beta_x = np.append(self.beta_x, beam.beta_x(clean=clean))
+        self.beta_y = np.append(self.beta_y, beam.beta_y(clean=clean))
+        self.norm_emittance_x = np.append(self.norm_emittance_x, beam.norm_emittance_x(clean=clean))
+        self.norm_emittance_y = np.append(self.norm_emittance_y, beam.norm_emittance_y(clean=clean))
+        self.num_particles = np.append(self.num_particles, len(beam))
+        self.charge = np.append(self.charge, beam.charge())
+
+
+
+###################################################
+def save_beam(main_beam, file_path, stage_num, time_step, num_time_steps):
+    main_beam.save(filename=file_path + 'main_beam_' + str(stage_num).zfill(3) + '_' + str(time_step).zfill(len(str(int(num_time_steps)))) + '.h5')
+
+
+
+###################################################
+def save_time_step(arrays, file_path):
     """
     arrays: List of arrays in the order
         xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts
