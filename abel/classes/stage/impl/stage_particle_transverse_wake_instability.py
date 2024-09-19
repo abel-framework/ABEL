@@ -329,7 +329,7 @@ class StagePrtclTransWakeInstability(Stage):
             
             beam, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
 
-        self.evolution = evolution
+            self.evolution = evolution
         
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
@@ -337,13 +337,14 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ==========  Make animations ==========
-        if self.make_animations:
+        if self.probe_evolution and self.make_animations:
         #if self.make_animations and self.stage_number == 9:
             self.animate_sideview_x(tmpfolder)
             self.animate_sideview_y(tmpfolder)
             self.animate_phasespace_x(tmpfolder)
             self.animate_phasespace_y(tmpfolder)
-    
+
+        if tmpfolder is not None:
             # Remove temporary files
             shutil.rmtree(tmpfolder)
         
@@ -1338,6 +1339,8 @@ class StagePrtclTransWakeInstability(Stage):
         norm_emittance_ys = evolution.norm_emittance_y
         
         long_label = '$s_\mathrm{stage}$ [m]'
+        xlim_max = prop_length.max()
+        xlim_min = prop_length.min()
 
         # line format
         col0 = "tab:gray"
@@ -1348,26 +1351,34 @@ class StagePrtclTransWakeInstability(Stage):
         fig, axs = plt.subplots(3,3)
         fig.set_figwidth(20)
         fig.set_figheight(12)
+        plt.subplots_adjust(hspace=0.05)  # Reduce the space between subplots
 
         axs[0,0].plot(prop_length, energies/1e9, color=col1)
         axs[0,0].plot(prop_length, np.ones_like(prop_length)*nom_energy/1e9, ':', color=col0)
-        axs[0,0].set_xlabel(long_label)
+        #axs[0,0].set_xlabel(long_label)
+        axs[0,0].set(xticklabels=[])
         axs[0,0].set_ylabel(r'Energy [GeV]')
+        axs[0,0].set_xlim(xlim_min, xlim_max)
 
         axs[1,0].plot(prop_length, rel_energy_spreads*100, color=col1)
-        axs[1,0].set_xlabel(long_label)
+        #axs[1,0].set_xlabel(long_label)
+        axs[1,0].set(xticklabels=[])
         axs[1,0].set_ylabel('Energy spread [%]')
         axs[1,0].set_yscale('log')
+        axs[1,0].set_xlim(xlim_min, xlim_max)
         
         axs[2,0].plot(prop_length, np.zeros_like(rel_energy_offsets), ':', color=col0)
         axs[2,0].plot(prop_length, rel_energy_offsets*100, color=col1)
         axs[2,0].set_xlabel(long_label)
         axs[2,0].set_ylabel('Energy offset [%]')
+        axs[2,0].set_xlim(xlim_min, xlim_max)
 
         axs[0,1].plot(prop_length, charges[0]*np.ones_like(charges)*1e9, ':', color=col0)
         axs[0,1].plot(prop_length, charges*1e9, color=col1)
-        axs[0,1].set_xlabel(long_label)
+        #axs[0,1].set_xlabel(long_label)
+        axs[0,1].set(xticklabels=[])
         axs[0,1].set_ylabel('Charge [nC]')
+        axs[0,1].set_xlim(xlim_min, xlim_max)
 
         #axs[1,1].plot(prop_length, bunch_lengths*1e6, color=col1)
         #axs[1,1].set_xlabel(long_label)
@@ -1375,9 +1386,11 @@ class StagePrtclTransWakeInstability(Stage):
 
         axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label='$\sigma_{x\'} $')
         axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label='$\sigma_{y\'} $')
-        axs[1,1].set_xlabel(long_label)
+        #axs[1,1].set_xlabel(long_label)
+        axs[1,1].set(xticklabels=[])
         axs[1,1].set_ylabel(r'Divergence [$\mathrm{\mu}$rad]')
         axs[1,1].legend()
+        axs[1,1].set_xlim(xlim_min, xlim_max)
         
         #axs[2,1].plot(s_centroids, np.zeros(x_angle.shape), ':', color=col0)
         #axs[2,1].plot(s_centroids, x_angle*1e6, color=col1, marker='x', label=r'$\langle x\' \rangle$')
@@ -1394,15 +1407,18 @@ class StagePrtclTransWakeInstability(Stage):
         axs[2,1].set_xlabel(long_label)
         axs[2,1].set_ylabel(r'Beta function [mm]')
         axs[2,1].legend()
+        axs[2,1].set_xlim(xlim_min, xlim_max)
 
         axs[0,2].plot(prop_length, np.ones_like(norm_emittance_xs)*norm_emittance_xs[0]*1e6, ':', color=col0, label='Nominal value')
         axs[0,2].plot(prop_length, np.ones_like(norm_emittance_ys)*norm_emittance_ys[0]*1e6, ':', color=col0)
         axs[0,2].plot(prop_length, norm_emittance_xs*1e6, color=col1, label=r'$\varepsilon_{\mathrm{n}x}$')
         axs[0,2].plot(prop_length, norm_emittance_ys*1e6, color=col2, label=r'$\varepsilon_{\mathrm{n}y}$')
-        axs[0,2].set_xlabel(long_label)
+        #axs[0,2].set_xlabel(long_label)
+        axs[0,2].set(xticklabels=[])
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_yscale('log')
         axs[0,2].legend()
+        axs[0,2].set_xlim(xlim_min, xlim_max)
 
         axs[1,2].plot(prop_length, (energies[0]/energies)**(1/4)*beam_size_xs[0]*1e6, ':', color=col0, label='Nominal value')
         axs[1,2].plot(prop_length, (energies[0]/energies)**(1/4)*beam_size_ys[0]*1e6, ':', color=col0)
@@ -1410,18 +1426,21 @@ class StagePrtclTransWakeInstability(Stage):
         #axs[1,2].plot(prop_length, np.ones(beam_size_ys.shape)*beam_size_ys[0]*1e6, ':', color=col0)
         axs[1,2].plot(prop_length, beam_size_xs*1e6, color=col1, label=r'$\sigma_x$')
         axs[1,2].plot(prop_length, beam_size_ys*1e6, color=col2, label=r'$\sigma_y$')
-        axs[1,2].set_xlabel(long_label)
+        #axs[1,2].set_xlabel(long_label)
+        axs[1,2].set(xticklabels=[])
         axs[1,2].set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
         axs[1,2].set_yscale('log')
         axs[1,2].legend()
+        axs[1,2].set_xlim(xlim_min, xlim_max)
 
         axs[2,2].plot(prop_length, np.zeros_like(x_offsets), ':', color=col0)
         axs[2,2].plot(prop_length, x_offsets*1e6, color=col1, label=r'$\langle x \rangle$')
         axs[2,2].plot(prop_length, y_offsets*1e6, color=col2, label=r'$\langle y \rangle$')
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
-        #axs[2,2].set_yscale('log')
+        axs[2,2].set_yscale('log')
         axs[2,2].legend()
+        axs[2,2].set_xlim(xlim_min, xlim_max)
 
     
     # ==================================================

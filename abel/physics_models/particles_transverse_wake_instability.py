@@ -310,8 +310,6 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         pbar.set_description('0%')
 
     # ============= Save evolution =============
-    evolution = Evolution()
-    
     if trans_wake_config.probe_evolution:
         if trans_wake_config.probe_every_nth_time_step > num_time_steps:
             probe_data_freq = num_time_steps
@@ -327,10 +325,14 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                                      pzs=pzs_sorted,
                                      weightings=weights_sorted,
                                      particle_mass=particle_mass)
+        evolution = Evolution( data_length=int(np.ceil(num_time_steps/probe_data_freq)) )
         evolution.save_evolution(prop_length, current_beam, clean=True)
         
         if trans_wake_config.make_animations:
             save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
+            
+    else:
+        evolution = Evolution( data_length=0 )
 
     
     while prop_length < stage_length-0.5*c*time_step:
@@ -512,49 +514,54 @@ def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorte
 
 ###################################################
 class Evolution:
+    
     # =============================================
-    def __init__(self):
-        self.prop_length = np.array([])
-        self.x_offset = np.array([])
-        self.y_offset = np.array([])
-        self.z_offset = np.array([])
-        self.energy = np.array([])
-        self.x_angle = np.array([])
-        self.y_angle = np.array([])
-        self.beam_size_x = np.array([])
-        self.beam_size_y = np.array([])
-        self.bunch_length = np.array([])
-        self.rel_energy_spread = np.array([])
-        self.divergence_x = np.array([])
-        self.divergence_y = np.array([])
-        self.beta_x = np.array([])
-        self.beta_y = np.array([])
-        self.norm_emittance_x = np.array([])
-        self.norm_emittance_y = np.array([])
-        self.num_particles = np.array([])
-        self.charge = np.array([])
+    def __init__(self, data_length):
+        self.index = 0  # Keeping track of the current index.
+        self.prop_length = np.empty(data_length)
+        self.x_offset = np.empty(data_length)
+        self.y_offset = np.empty(data_length)
+        self.z_offset = np.empty(data_length)
+        self.energy = np.empty(data_length)
+        self.x_angle = np.empty(data_length)
+        self.y_angle = np.empty(data_length)
+        self.beam_size_x = np.empty(data_length)
+        self.beam_size_y = np.empty(data_length)
+        self.bunch_length = np.empty(data_length)
+        self.rel_energy_spread = np.empty(data_length)
+        self.divergence_x = np.empty(data_length)
+        self.divergence_y = np.empty(data_length)
+        self.beta_x = np.empty(data_length)
+        self.beta_y = np.empty(data_length)
+        self.norm_emittance_x = np.empty(data_length)
+        self.norm_emittance_y = np.empty(data_length)
+        self.num_particles = np.empty(data_length)
+        self.charge = np.empty(data_length)
 
     # =============================================
     def save_evolution(self, prop_length, beam, clean):
-        self.prop_length = np.append(self.prop_length, prop_length)
-        self.x_offset = np.append(self.x_offset, beam.x_offset(clean=clean))
-        self.y_offset = np.append(self.y_offset, beam.y_offset(clean=clean))
-        self.z_offset = np.append(self.z_offset, beam.z_offset(clean=clean))
-        self.energy = np.append(self.energy, beam.energy(clean=clean))
-        self.x_angle = np.append(self.x_angle, beam.x_angle(clean=clean))
-        self.y_angle = np.append(self.y_angle, beam.y_angle(clean=clean))
-        self.beam_size_x = np.append(self.beam_size_x, beam.beam_size_x(clean=clean))
-        self.beam_size_y = np.append(self.beam_size_y, beam.beam_size_y(clean=clean))
-        self.bunch_length = np.append(self.bunch_length, beam.bunch_length(clean=clean))
-        self.rel_energy_spread = np.append(self.rel_energy_spread, beam.rel_energy_spread(clean=clean))
-        self.divergence_x = np.append(self.divergence_x, beam.divergence_x(clean=clean))
-        self.divergence_y = np.append(self.divergence_y, beam.divergence_y(clean=clean))
-        self.beta_x = np.append(self.beta_x, beam.beta_x(clean=clean))
-        self.beta_y = np.append(self.beta_y, beam.beta_y(clean=clean))
-        self.norm_emittance_x = np.append(self.norm_emittance_x, beam.norm_emittance_x(clean=clean))
-        self.norm_emittance_y = np.append(self.norm_emittance_y, beam.norm_emittance_y(clean=clean))
-        self.num_particles = np.append(self.num_particles, len(beam))
-        self.charge = np.append(self.charge, beam.charge())
+        if self.index == len(self.prop_length):
+            raise ValueError('Data recording already completed.')
+        self.prop_length[self.index] = prop_length
+        self.x_offset[self.index] = beam.x_offset(clean=clean)
+        self.y_offset[self.index] = beam.y_offset(clean=clean)
+        self.z_offset[self.index] = beam.z_offset(clean=clean)
+        self.energy[self.index] = beam.energy(clean=clean)
+        self.x_angle[self.index] = beam.x_angle(clean=clean)
+        self.y_angle[self.index] = beam.y_angle(clean=clean)
+        self.beam_size_x[self.index] = beam.beam_size_x(clean=clean)
+        self.beam_size_y[self.index] = beam.beam_size_y(clean=clean)
+        self.bunch_length[self.index] = beam.bunch_length(clean=clean)
+        self.rel_energy_spread[self.index] = beam.rel_energy_spread(clean=clean)
+        self.divergence_x[self.index] = beam.divergence_x(clean=clean)
+        self.divergence_y[self.index] = beam.divergence_y(clean=clean)
+        self.beta_x[self.index] = beam.beta_x(clean=clean)
+        self.beta_y[self.index] = beam.beta_y(clean=clean)
+        self.norm_emittance_x[self.index] = beam.norm_emittance_x(clean=clean)
+        self.norm_emittance_y[self.index] = beam.norm_emittance_y(clean=clean)
+        self.num_particles[self.index] = len(beam)
+        self.charge[self.index] = beam.charge()
+        self.index += 1
 
 
 
