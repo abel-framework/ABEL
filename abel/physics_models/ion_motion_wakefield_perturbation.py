@@ -19,7 +19,7 @@ import time, warnings
 from abel.classes.beam import Beam
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_std
-from abel.utilities.other import find_closest_value_in_arr
+from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
 from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 
 
@@ -134,10 +134,10 @@ class IonMotionConfig():
             y_max = np.max([drive_beam.ys().max(), main_beam.ys().max()])
             y_min = np.min([drive_beam.ys().min(), main_beam.ys().min()])
             xy_padding = 2.0
-            x_max = self.pad_upwards(x_max, padding=xy_padding)
-            x_min = self.pad_downwards(x_min, padding=xy_padding)
-            y_max = self.pad_upwards(y_max, padding=xy_padding)
-            y_min = self.pad_downwards(y_min, padding=xy_padding)
+            x_max = pad_upwards(x_max, padding=xy_padding)
+            x_min = pad_downwards(x_min, padding=xy_padding)
+            y_max = pad_upwards(y_max, padding=xy_padding)
+            y_min = pad_downwards(y_min, padding=xy_padding)
             self.xlims_driver_sc = np.array([x_min, x_max])  # [m]
             self.ylims_driver_sc = np.array([y_min, y_max])  # [m]
         
@@ -190,11 +190,11 @@ class IonMotionConfig():
         
         if self.uniform_z_grid:
             self.grid_size_z = np.abs(np.diff(self.zs_probe_main)[0])  # [m], the size of grid cells along z
-            driver_num_z = int( (drive_beam.zs().max() - self.pad_upwards(main_beam.zs().max()))/self.grid_size_z )
+            driver_num_z = int( (drive_beam.zs().max() - pad_upwards(main_beam.zs().max()))/self.grid_size_z )
             self.zs_probe_driver = np.linspace( drive_beam.zs().max(), drive_beam.zs().min(), driver_num_z )  # [m], beam head facing start of array.
 
-            sep_num_z = int( (self.pad_downwards(self.zs_probe_driver.min()) - self.pad_upwards(self.zs_probe_main.max()) )/self.grid_size_z )
-            self.zs_probe_separation = np.linspace( self.pad_downwards(self.zs_probe_driver.min()), self.pad_upwards(self.zs_probe_main.max()), sep_num_z )  # [m], beam head facing start of array. Space between driver and main beam.
+            sep_num_z = int( (pad_downwards(self.zs_probe_driver.min()) - pad_upwards(self.zs_probe_main.max()) )/self.grid_size_z )
+            self.zs_probe_separation = np.linspace( pad_downwards(self.zs_probe_driver.min()), pad_upwards(self.zs_probe_main.max()), sep_num_z )  # [m], beam head facing start of array. Space between driver and main beam.
             
             self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_separation, self.zs_probe_main] )  # [m], beam head facing start of array.
             
@@ -203,8 +203,8 @@ class IonMotionConfig():
             driver_num_z = int( (drive_beam.zs().max() - drive_beam.zs().min())/dz )
             self.zs_probe_driver = np.linspace( drive_beam.zs().max(), drive_beam.zs().min(), driver_num_z )  # [m], beam head facing start of array.
 
-            sep_num_z = int( (self.pad_downwards(self.zs_probe_driver.min()) - self.pad_upwards(self.zs_probe_main.max()) )/dz )
-            self.zs_probe_separation = np.linspace( self.pad_downwards(self.zs_probe_driver.min()), self.pad_upwards(self.zs_probe_main.max()), sep_num_z )  # [m], beam head facing start of array. Space between driver and main beam.
+            sep_num_z = int( (pad_downwards(self.zs_probe_driver.min()) - pad_upwards(self.zs_probe_main.max()) )/dz )
+            self.zs_probe_separation = np.linspace( pad_downwards(self.zs_probe_driver.min()), pad_upwards(self.zs_probe_main.max()), sep_num_z )  # [m], beam head facing start of array. Space between driver and main beam.
             self.zs_probe = np.concatenate( [self.zs_probe_driver, self.zs_probe_separation, self.zs_probe_main] )  # [m], beam head facing start of array.
             self.grid_size_z = np.abs( np.insert(np.diff(self.zs_probe), 0, 0.0) )
 
@@ -221,8 +221,8 @@ class IonMotionConfig():
         x_min, x_max = self.xlims_driver_sc
         y_min, y_max = self.ylims_driver_sc
         
-        z_end = self.pad_downwards(self.zs_probe_driver.min())
-        z_start = self.pad_upwards(self.zs_probe_driver.max())
+        z_end = pad_downwards(self.zs_probe_driver.min())
+        z_start = pad_upwards(self.zs_probe_driver.max())
         
         X, Y, Z = np.meshgrid([x_min, x_max], [y_min, y_max], [z_start, z_end], indexing='ij')
 
@@ -250,20 +250,6 @@ class IonMotionConfig():
         num_z = int( (combined_beam.zs().max() - combined_beam.zs().min())/dz )
         
         return calc_sc_fields_obj(combined_beam, num_x, num_y, num_z, num_t_bins=1)
-
-    
-    # ==================================================
-    def pad_downwards(self, arr_min, padding=0.05):
-        if padding < 0.0:
-            padding = np.abs(padding)
-        return arr_min*(1.0 - np.sign(arr_min)*padding)
-
-
-    # ==================================================
-    def pad_upwards(self, arr_max, padding=0.05):
-        if padding < 0.0:
-            padding = np.abs(padding)
-        return arr_max*(1.0 + np.sign(arr_max)*padding)
 
 
 
@@ -355,10 +341,10 @@ def assemble_main_sc_fields_obj(ion_motion_config, main_beam):
     """
     
     # Slightly enlarge the transverse region by constructing empty_beam to avoid extrapolation when evaluating the beam fields.
-    x_min = ion_motion_config.pad_downwards(ion_motion_config.xs_probe.min(), padding=0.05)
-    x_max = ion_motion_config.pad_upwards(ion_motion_config.xs_probe.max(), padding=0.05)
-    y_min = ion_motion_config.pad_downwards(ion_motion_config.ys_probe.min(), padding=0.05)
-    y_max = ion_motion_config.pad_upwards(ion_motion_config.ys_probe.max(), padding=0.05)
+    x_min = pad_downwards(ion_motion_config.xs_probe.min(), padding=0.05)
+    x_max = pad_upwards(ion_motion_config.xs_probe.max(), padding=0.05)
+    y_min = pad_downwards(ion_motion_config.ys_probe.min(), padding=0.05)
+    y_max = pad_upwards(ion_motion_config.ys_probe.max(), padding=0.05)
     z_end = main_beam.zs().min()
     z_start = main_beam.zs().max()
     
@@ -590,8 +576,8 @@ def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_pert
 
         x_min, x_max = self.xlims_driver_sc
         y_min, y_max = self.ylims_driver_sc
-        z_end = self.pad_downwards(self.zs_probe_driver.min())
-        z_start = self.pad_upwards(self.zs_probe_driver.max())
+        z_end = pad_downwards(self.zs_probe_driver.min())
+        z_start = pad_upwards(self.zs_probe_driver.max())
         drive_beam = self.drive_beam
     
         # Set the resolution for the interpolator
