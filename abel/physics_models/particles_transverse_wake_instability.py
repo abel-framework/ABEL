@@ -240,7 +240,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     beta_func = c/e*np.sqrt(2* beam.gamma() * eps0*m_e/plasma_density)  # [m] matched beta function.
     beta_wave_length = 2*np.pi*beta_func  # [m] betatron wavelength.
     time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
-    num_time_steps = np.ceil(stage_length/(c*time_step))
+    num_time_steps = int(np.ceil(stage_length/(c*time_step)))
     time_step = stage_length/(c*num_time_steps)
     
     xs = beam.xs()
@@ -315,21 +315,9 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
             probe_data_freq = num_time_steps
         else:
             probe_data_freq = trans_wake_config.probe_every_nth_time_step
-        current_beam = Beam()
-        current_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
-                                     xs=xs_sorted,
-                                     ys=ys_sorted,
-                                     zs=zs_sorted,
-                                     pxs=pxs_sorted,
-                                     pys=pys_sorted,
-                                     pzs=pzs_sorted,
-                                     weightings=weights_sorted,
-                                     particle_mass=particle_mass)
-        evolution = Evolution( data_length=int(np.ceil(num_time_steps/probe_data_freq)) )
-        evolution.save_evolution(prop_length, current_beam, clean=True)
         
-        if trans_wake_config.make_animations:
-            save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
+        current_beam = Beam()
+        evolution = Evolution( data_length=1+int(np.ceil((num_time_steps - 1)/probe_data_freq)) )
             
     else:
         evolution = Evolution( data_length=0 )
@@ -337,6 +325,25 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     
     while prop_length < stage_length-0.5*c*time_step:
 
+        
+         # ============= Save evolution =============
+        if trans_wake_config.probe_evolution and time_step_count % probe_data_freq == 0:
+            current_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
+                                         xs=xs_sorted,
+                                         ys=ys_sorted,
+                                         zs=zs_sorted,
+                                         pxs=pxs_sorted,
+                                         pys=pys_sorted,
+                                         pzs=pzs_sorted,
+                                         weightings=weights_sorted,
+                                         particle_mass=particle_mass)
+            
+            evolution.save_evolution(prop_length, current_beam, clean=False)
+            
+            if trans_wake_config.make_animations:
+                save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
+
+        
         # ============= Apply filters =============
         # Filter out particles that have too small energies
         bool_indices = (pzs_sorted > velocity2gamma(0.99*c)*m_e*c*0.99)  # Corresponds to 0.99c.
@@ -428,22 +435,8 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
             else:
                 ion_motion_config.update_ion_wakefield = False
 
-        # ============= Save evolution =============
-        if trans_wake_config.probe_evolution and time_step_count % probe_data_freq == 0:
-            current_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
-                                         xs=xs_sorted,
-                                         ys=ys_sorted,
-                                         zs=zs_sorted,
-                                         pxs=pxs_sorted,
-                                         pys=pys_sorted,
-                                         pzs=pzs_sorted,
-                                         weightings=weights_sorted,
-                                         particle_mass=particle_mass)
-            evolution.save_evolution(prop_length, current_beam, clean=True)
-            
-            if trans_wake_config.make_animations:
-                save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
-                   
+        ## ============= Save evolution =============
+        #if trans_wake_config.probe_evolution and time_step_count % probe_data_freq == 0:
             #file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
             #save_time_step([xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts], file_path)
 
@@ -480,7 +473,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     # Initialise ABEL Beam object
     beam_out = Beam()
         
-    # set the phase space of the ABEL beam
+    # Set the phase space of the ABEL beam
     beam_out.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
                              xs=xs_sorted,
                              ys=ys_sorted,
@@ -490,6 +483,15 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                              pzs=pzs_sorted,
                              weightings=weights_sorted,
                              particle_mass=particle_mass)
+
+    # ============= Save evolution =============
+    if trans_wake_config.probe_evolution and evolution.index < len(evolution.prop_length):
+        # Last step in the evolution arrays already written to if num_time_steps % probe_data_freq != 0.
+        evolution.save_evolution(prop_length, beam_out, clean=False)
+        
+        if trans_wake_config.make_animations:
+                save_beam(beam_out, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
+            
     
     return beam_out, evolution
 

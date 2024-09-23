@@ -1338,7 +1338,8 @@ class StagePrtclTransWakeInstability(Stage):
         norm_emittance_xs = evolution.norm_emittance_x
         norm_emittance_ys = evolution.norm_emittance_y
         
-        long_label = '$s_\mathrm{stage}$ [m]'
+        #long_label = '$s_\mathrm{stage}$ [m]'
+        long_label = '$\Delta s$ [m]'
         xlim_max = prop_length.max()
         xlim_min = prop_length.min()
 
@@ -1438,7 +1439,7 @@ class StagePrtclTransWakeInstability(Stage):
         axs[2,2].plot(prop_length, y_offsets*1e6, color=col2, label=r'$\langle y \rangle$')
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
-        axs[2,2].set_yscale('log')
+        #axs[2,2].set_yscale('log')
         axs[2,2].legend()
         axs[2,2].set_xlim(xlim_min, xlim_max)
 
