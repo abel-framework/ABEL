@@ -1325,10 +1325,10 @@ class StagePrtclTransWakeInstability(Stage):
         
         x_offsets = evolution.x_offset
         y_offsets = evolution.y_offset
-        z_offsets = evolution.z_offset
+        #z_offsets = evolution.z_offset
         beam_size_xs = evolution.beam_size_x
         beam_size_ys = evolution.beam_size_y
-        bunch_lengths = self.evolution.bunch_length
+        #bunch_lengths = self.evolution.bunch_length
         rel_energy_spreads = evolution.rel_energy_spread
         divergence_xs = evolution.divergence_x
         divergence_ys = evolution.divergence_y
@@ -1354,8 +1354,9 @@ class StagePrtclTransWakeInstability(Stage):
         fig.set_figheight(12)
         plt.subplots_adjust(hspace=0.05)  # Reduce the space between subplots
 
+        axs[0,0].plot(np.array([0.0, self.length]), np.array([energies[0], nom_energy])/1e9, ':', color=col0, label='Nominal value')
         axs[0,0].plot(prop_length, energies/1e9, color=col1)
-        axs[0,0].plot(prop_length, np.ones_like(prop_length)*nom_energy/1e9, ':', color=col0)
+        #axs[0,0].plot(prop_length, np.ones_like(prop_length)*nom_energy/1e9, ':', color=col0)
         #axs[0,0].set_xlabel(long_label)
         axs[0,0].set(xticklabels=[])
         axs[0,0].set_ylabel(r'Energy [GeV]')
@@ -1402,7 +1403,7 @@ class StagePrtclTransWakeInstability(Stage):
         #axs[2,1].set_ylabel(r'Angular offset [$\mathrm{\mu}$rad]')
         #axs[2,1].legend()
         
-        axs[2,1].plot(prop_length, np.sqrt(energies/energies[0])*beta_xs[0]*1e3, 'k:', label='Nominal value')
+        axs[2,1].plot(prop_length, np.sqrt(energies/energies[0])*beta_xs[0]*1e3, ':', color=col0, label='Nominal value')
         axs[2,1].plot(prop_length, beta_xs*1e3, color=col1, label=r'$\beta_x$')
         axs[2,1].plot(prop_length, beta_ys*1e3, color=col2, label=r'$\beta_y$')
         axs[2,1].set_xlabel(long_label)

@@ -182,7 +182,7 @@ class IonMotionConfig():
         self.ys_probe = ys_probe
 
         if self.xs_probe.min() < self.xlims_driver_sc.min() or self.xs_probe.max() > self.xlims_driver_sc.max() or self.ys_probe.min() < self.ylims_driver_sc.min() or self.ys_probe.max() > self.ylims_driver_sc.max():
-            print('xs_probe.min:', self.xs_probe.min(), 'xlims_driver_sc.min:', self.xlims_driver_sc.min(), 'xs_probe.max:', self.self.xs_probe.max(), 'ys_probe.min:', self.ys_probe.min(), 'ylims_driver_sc.min:', self.self.ylims_driver_sc.min(), 'ys_probe.max:', self.ys_probe.max())
+            print('xs_probe.min:', self.xs_probe.min(), 'xlims_driver_sc.min:', self.xlims_driver_sc.min(), 'xs_probe.max:', self.xs_probe.max(), 'ys_probe.min:', self.ys_probe.min(), 'ylims_driver_sc.min:', self.ylims_driver_sc.min(), 'ys_probe.max:', self.ys_probe.max())
             warnings.warn("The range of the probing coordinates is larger than the driver probing coordinates. This may lead to a slower performance due to extrapolations when extracting the driver beam fields.", UserWarning)
 
         # Set the z-coordinates used to probe beam electric fields from RF-Track
