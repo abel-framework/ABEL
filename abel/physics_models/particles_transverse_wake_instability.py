@@ -178,7 +178,8 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
             intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
             Wy_perts = ion_motion_config.Wy_perts
             intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
-    else:
+    
+    else:  # No ion motion
         intpl_Wx_perts = np.zeros_like(beam.zs())
         intpl_Wy_perts = np.zeros_like(beam.zs())
             
@@ -198,7 +199,8 @@ def calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_ste
     # ============= Calculate the transverse intra-beam wakefield =============
     if enable_tr_instability:
         intra_beam_wakefields = calc_tr_instability_wakefield(skin_depth, bubble_radius, zs_sorted, weights_sorted, offsets)
-    else:
+    
+    else:  # No intra-beam transverse wake instability
         intra_beam_wakefields = np.zeros_like(zs_sorted)
     
     
@@ -219,7 +221,8 @@ def calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_ste
         
         # Forward differentiation option (direct method)
         #tr_momenta_comp = tr_momenta_comp + tr_forces_comp*time_step - c*1.87863e-15*(1/skin_depth)**2/2*tr_momenta_comp*(1+(1/skin_depth)**2/2*gammas*tot_offsets_sqr)*time_step
-    else:
+    
+    else:  # No radiation reaction
         tr_momenta_comp = tr_momenta_comp + tr_forces_comp*time_step
     
     return tr_momenta_comp
