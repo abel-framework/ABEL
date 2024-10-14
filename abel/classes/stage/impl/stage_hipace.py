@@ -21,7 +21,7 @@ except:
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -33,6 +33,7 @@ class StageHipace(Stage):
         self.driver_only = driver_only
         self.plasma_density_from_file = plasma_density_from_file
         self.save_drivers = save_drivers
+        self.no_plasma = no_plasma
 
         # physics flags
         self.ion_motion = ion_motion
@@ -141,7 +142,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma)
         
         
         ## RUN SIMULATION
@@ -325,7 +326,7 @@ class StageHipace(Stage):
         self.initial.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
         self.initial.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
 
-        # extract final plasma density
+        # extract initial plasma density
         rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=max(ts.iterations))
         self.final.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
         self.final.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)

@@ -8,7 +8,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -16,11 +16,14 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     # locate template file
     filename_input_template = os.path.join(os.path.dirname(__file__), 'input_template')
 
-    # prepare plasma components (based on ion motion)
-    if ion_motion:
-        plasma_components = 'electrons ions'
+    if no_plasma:
+        plasma_components = 'no_plasma'
     else:
-        plasma_components = 'plasma'
+        # prepare plasma components (based on ion motion)
+        if ion_motion:
+            plasma_components = 'electrons ions'
+        else:
+            plasma_components = 'plasma'
 
     # driver-only mode
     if driver_only:
@@ -44,7 +47,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     if not num_cell_xy == new_num_cell_xy:
         print('>> HiPACE++: Changing from', num_cell_xy, 'to', new_num_cell_xy, ' (i.e., 2^n-1) for better performance.')
         num_cell_xy = new_num_cell_xy
-    
+        
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
               'num_cell_y': int(num_cell_xy), 
@@ -87,7 +90,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
         partition_name = CONFIG.partition_name_small
     else:
         partition_name = CONFIG.partition_name_standard
-
+    
     # calculate the memory
     memory_per_gpu = 60 # [GB]
         
@@ -103,8 +106,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     with open(filename_job_script_template, 'r') as fin, open(filename_job_script, 'w') as fout:
         results = Template(fin.read()).substitute(inputs)
         fout.write(results)
-        #print(results)
-
+        
     # make executable
     Path(filename_job_script).chmod(0o0777)
 
@@ -253,3 +255,4 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
         # wait for some time
         wait_time = 3 # [s]
         time.sleep(wait_time)
+
