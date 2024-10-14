@@ -1,4 +1,6 @@
-from abel import *
+from abel import Collider, SourceBasic, RFAcceleratorBasic, RFAcceleratorCLICopti, DriverComplex, StageBasic, InterstageBasic, PlasmaLinac, DampingRingBasic, BeamDeliverySystemBasic, ConventionalLinac, InteractionPointBasic, TurnaroundBasic
+import scipy.constants as SI
+import numpy as np
 
 class HALHFv2(Collider):
 
@@ -7,18 +9,22 @@ class HALHFv2(Collider):
         super().__init__()
         
         self.com_energy = 250e9
-        self.energy_asymmetry = 2.416
-        self.bunch_separation = 226e-9 # [s]
-        self.num_bunches_in_train = 104
-        self.rep_rate_trains = 130.0 # [Hz]
+        self.energy_asymmetry = 3
+        driver_separation = 3e-9
+        Nstages = 25
+        transformer_ratio = 2
+        driver_energy = (self.com_energy/2)*self.energy_asymmetry/(transformer_ratio*Nstages)
+        self.bunch_separation = Nstages*driver_separation
+        self.num_bunches_in_train = 100
+        self.rep_rate_trains = 100.0 # [Hz]
         
         # define driver
         driver_source = SourceBasic()
         driver_source.charge = -8e-9 # [C]
         driver_source.energy = 0.15e9 # [eV]
         driver_source.rel_energy_spread = 0.01
-        driver_source.bunch_length = 42e-6 # [m]
-        driver_source.z_offset = 300e-6 # [m]
+        driver_source.bunch_length = 700e-6 # [m]
+        driver_source.z_offset = 10e-6 # [m]
         driver_source.emit_nx, driver_source.emit_ny = 10e-6, 10e-6 # [m rad]
         driver_source.beta_x, driver_source.beta_y = 30e-3, 30e-3 # [m]
         driver_source.num_particles = 5000
@@ -26,15 +32,20 @@ class HALHFv2(Collider):
         driver_source.accel_gradient = 10e6 # [V/m]
         
         # define driver accelerator
-        driver_accel = RFAcceleratorBasic()
-        driver_accel.nom_energy_gain = 12e9 # [eV]
-        driver_accel.nom_accel_gradient = 23.5e6 # [V/m]
+        driver_accel = RFAcceleratorCLICopti()
+        
+        driver_accel.nom_energy_gain = driver_energy-driver_source.energy # [eV]
+        driver_accel.rf_frequency = 1e9 # [Hz]
+        driver_accel.fill_factor = 0.75 # [Hz]
+        driver_accel.nom_accel_gradient = 5e6*driver_accel.fill_factor # [V/m]
+        driver_accel.num_rf_cells = 20 # [V/m]
+        driver_accel.num_structures_per_klystron = 1
         
         # define driver complex
         driver_complex = DriverComplex()
         driver_complex.source = driver_source
         driver_complex.rf_accelerator = driver_accel
-        #driver_complex.turnaround = TurnaroundBasic()
+        driver_complex.turnaround = TurnaroundBasic()
         
         # define beam
         esource = SourceBasic()
@@ -42,8 +53,8 @@ class HALHFv2(Collider):
         esource.energy = 76e6 # [eV]
         esource.rel_energy_spread = 0.01
         esource.emit_nx, esource.emit_ny = self.energy_asymmetry**2*10e-6, self.energy_asymmetry**2*0.035e-6 # [m rad]
-        esource.num_particles = 5000
-        esource.wallplug_efficiency = 0.1
+        esource.num_particles = 15000
+        esource.wallplug_efficiency = 0.3
         esource.accel_gradient = 23.5e6 # [V/m]
         esource.is_polarized = True
         
@@ -51,9 +62,10 @@ class HALHFv2(Collider):
         stage = StageBasic()
         stage.driver_source = driver_complex
         stage.nom_accel_gradient = 1e9 # [m]
-        #stage.plasma_density = 1e21 # [m^-3]
+        stage.plasma_density = 6e20 # [m^-3]
         stage.ramp_beta_mag = 5
-        stage.optimize_plasma_density(source=esource)
+        stage.transformer_ratio = transformer_ratio
+        #stage.optimize_plasma_density(source=esource)
 
         # define rest of beam
         esource.bunch_length = 18e-6 # [m]
@@ -62,12 +74,13 @@ class HALHFv2(Collider):
         esource.beta_y = esource.beta_x
         
         # electron injector
-        einjector = RFAcceleratorBasic()
-        einjector.nom_accel_gradient = 25e6 # [V/m]
+        einjector = RFAcceleratorCLICopti()
+        einjector.fill_factor = 0.75 # [Hz]
+        einjector.nom_accel_gradient = 15e6*einjector.fill_factor # [V/m]
         einjector.nom_energy_gain = 5e9 - esource.energy # [eV]
         einjector.rf_frequency = 3e9
-        einjector.structure_length = 5
-        einjector.peak_power_klystron = 50e6
+        einjector.num_rf_cells = 70
+        einjector.num_structures_per_klystron = 1
         
         # define interstage
         interstage = InterstageBasic()
@@ -88,12 +101,12 @@ class HALHFv2(Collider):
         elinac.stage = stage
         elinac.interstage = interstage
         elinac.bds = ebds
-        elinac.num_stages = 26
+        elinac.num_stages = Nstages
 
 
         # define positron source
         psource = SourceBasic()
-        psource.charge = 2e10 * SI.e # [C]
+        psource.charge = 3e10 * SI.e # [C]
         psource.energy = 60e6 # [eV]
         psource.rel_energy_spread = 0.0015
         psource.bunch_length = 75e-6 # [m]
@@ -106,20 +119,21 @@ class HALHFv2(Collider):
         psource.is_polarized = True
         
         # define RF accelerator
-        paccel = RFAcceleratorBasic()
-        paccel.nom_accel_gradient = 32.4e6 # [V/m]
-        paccel.structure_length = 2 # [m]
+        paccel = RFAcceleratorCLICopti()
+        paccel.fill_factor = 0.75 # [Hz]
+        paccel.nom_accel_gradient = 15e6*paccel.fill_factor # [V/m]
         paccel.rf_frequency = 3e9
-        paccel.structure_length = 5
-        paccel.peak_power_klystron = 50e6
+        paccel.num_rf_cells = 70
+        paccel.num_structures_per_klystron = 1
         
         # injector
-        pinjector = RFAcceleratorBasic()
+        pinjector = RFAcceleratorCLICopti()
+        pinjector.fill_factor = paccel.fill_factor
         pinjector.nom_energy_gain = 2.80e9 # [V/m]
         pinjector.nom_accel_gradient = paccel.nom_accel_gradient
-        pinjector.rf_frequency = 3e9
-        pinjector.structure_length = 5
-        pinjector.peak_power_klystron = 50e6
+        pinjector.rf_frequency = paccel.rf_frequency
+        pinjector.num_rf_cells = paccel.num_rf_cells
+        pinjector.num_structures_per_klystron = paccel.num_structures_per_klystron
         
         # damping ring
         pdamping_ring = DampingRingBasic()

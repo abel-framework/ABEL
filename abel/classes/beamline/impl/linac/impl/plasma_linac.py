@@ -50,7 +50,7 @@ class PlasmaLinac(Linac):
         if self.driver_complex is not None:
 
             # check type
-            assert(isinstance(self.driver_complex, DriverComplex))
+            assert(isinstance(self.driver_complex, DriverComplex) or isinstance(self.driver_complex, Source))
 
             # set as stage driver
             if self.stage is not None:
@@ -194,11 +194,12 @@ class PlasmaLinac(Linac):
             self.assemble_trackables()
         Etot = self.source.energy_usage()
         if self.driver_complex is not None:
-            Etot += self.driver_complex.energy_usage()
+            Etot += self.driver_complex.energy_usage() * self.driver_complex.get_rep_rate_average() / self.get_rep_rate_average()
         else:
             for stage in self.stages:
                 Etot += stage.energy_usage()
         return Etot
+        
     
     def get_energy_efficiency(self):
         Etot_beam = self.final_beam.total_energy()
@@ -233,26 +234,35 @@ class PlasmaLinac(Linac):
         "Cost breakdown for the plasma linac [ILC units]"
         
         breakdown = []
-        
-        breakdown.append(self.source.get_cost_breakdown())
-        breakdown.append(self.rf_injector.get_cost_breakdown())
 
+        # cost of the source
+        breakdown.append(self.source.get_cost_breakdown())
+
+        # cost of the rf injector
+        if self.rf_injector is not None:
+            breakdown.append(self.rf_injector.get_cost_breakdown())
+
+        # cost of the driver complex
         if self.driver_complex is not None:
             breakdown.append(self.driver_complex.get_cost_breakdown())
-        
+
+        # cost of the stages
         stage_costs = 0
         for stage in self.stages:
             stage_costs += stage.get_cost()
         breakdown.append((f"Plasma stages ({self.num_stages}x)", stage_costs))
-        
+
+        # cost of the interstages
         interstage_costs = 0
         for interstage in self.interstages:
             interstage_costs += interstage.get_cost()
         breakdown.append(('Interstages', interstage_costs))
 
+        # cost of the BDS
         if self.bds is not None:
             breakdown.append(self.bds.get_cost_breakdown())
 
+        # cost of the civil construction
         breakdown.append(self.get_cost_breakdown_civil_construction())
 
         return (self.name, breakdown)

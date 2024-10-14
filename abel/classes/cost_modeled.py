@@ -66,16 +66,59 @@ class CostModeled(ABC):
     # cost of BDS
     cost_per_length_bds = 0.04044e6 # [ILCU/m]
 
+    # cost per length of instrumented beamline (as BDS)
+    cost_per_length_instrumented_beamline = 0.04044e6 # [ILCU/m]
+
     # cost of beam dumps (TODO: add more detail and per power costs)
     cost_per_driver_dump = 1e6 # [ILCU]
     
-    # REF: R. Pitthan SLAC-PUB-8570 (August 2000) says it scales as frequency squared, but we find that for ILC and CLIC, it scales as frequency linearly.
     @classmethod
-    def cost_per_klystron(cls, num_klystrons, rf_frequency, avarage_power_klystron):
-        "Cost per klystron, including modulator [ILC units]"
-        modulator_multiplier = 2
-        #return cls.cost_per_frequency_per_power_klystron * modulator_multiplier * avarage_power_klystron * rf_frequency**2 * num_klystrons**np.log2(1-cls.learning_curve_klystrons)
-        return cls.cost_per_frequency_per_power_klystron * modulator_multiplier * avarage_power_klystron * rf_frequency * num_klystrons**np.log2(1-cls.learning_curve_klystrons)
+    def cost_per_klystron(cls, num_klystrons, rf_frequency, avarage_power_klystron, peak_power_klystron):
+        "Cost per klystron, including modulator, LLRF and waveguides [ILC units]"
+
+        if rf_frequency == 1e9: # L-band
+            
+            # for L-band (multi-beam klystron), by Erk Jensen
+            # reference: https://indico.cern.ch/event/275412/contributions/1617607/attachments/498755/688976/LbandKlystronDevelop.pdf
+            model_now_peakpower = [1.000e6, 15.871e6, 31.594e6, 100.363e6]
+            model_now_relcost = [0.31586, 0.07945, 0.07945, 0.80379]
+            model_future_peakpower = [1.000e6, 25.146e6, 50.055e6, 100.727e6]
+            model_future_relcost = [0.31586, 0.062978, 0.062978, 0.25507]
+            rel_cost_per_peak_power = np.interp(peak_power_klystron, model_now_peakpower, model_now_relcost)
+    
+            # CLIC klystron cost in 2018 (15 MW, average over 470 with 0.92 learning curve)
+            ref_peak_power = 15e6
+            rel_cost_per_peak_power_ref = np.interp(ref_peak_power, model_now_peakpower, model_now_relcost)
+            cost_klystron = (rel_cost_per_peak_power/rel_cost_per_peak_power_ref) * (peak_power_klystron/ref_peak_power) * 380e3 * 0.91 
+    
+            # cost of modulator (assumed to scale with average power)
+            cost_modulator = avarage_power_klystron * 370e3/112.5e3 * 0.91 # CLIC modulator cost in 2018 (average over 470 with 0.92 learning curve)
+
+        elif rf_frequency == 3e9: # S-band
+            
+            # S-band C^3-like klystron
+            cost_klystron = (peak_power_klystron/50e6) * 500e3 * 0.75 # CLIC modulator cost in 2023, rough
+    
+            # cost of modulator (assumed to scale with average power)
+            cost_modulator = avarage_power_klystron * 500e3/16e3 * 0.75 # C^3 modulator cost in 2023, rough
+        
+        else:
+            
+            # S-band C^3-like klystron
+            cost_klystron = (peak_power_klystron/50e6) * 500e3 * 0.75 # CLIC modulator cost in 2023, rough
+    
+            # cost of modulator (assumed to scale with average power)
+            cost_modulator = avarage_power_klystron * 500e3/16e3 * 0.75 # C^3 modulator cost in 2023, rough
+            
+        # cost of LLRF
+        cost_llrf = 50e3 * 0.91
+
+        # cost of waveguides
+        cost_waveguides = 30e3 * 0.91
+
+        # TODO: make breakdown of klystron costs
+        
+        return cost_klystron + cost_modulator + cost_llrf + cost_waveguides
 
     
     @abstractmethod

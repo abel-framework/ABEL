@@ -1015,9 +1015,6 @@ class Beam():
         particles['charge'][io.Record_Component.SCALAR].reset_dataset(dset_q)
         particles['mass'][io.Record_Component.SCALAR].reset_dataset(dset_m)
         
-        particles['num_bunches_in_train'][io.Record_Component.SCALAR].reset_dataset(dset_n)
-        particles['bunch_separation'][io.Record_Component.SCALAR].reset_dataset(dset_f)
-        
         # store data
         particles['position']['z'].store_chunk(self.zs())
         particles['position']['x'].store_chunk(self.xs())
@@ -1032,10 +1029,7 @@ class Beam():
         particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
         particles['charge'][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
         particles['mass'][io.Record_Component.SCALAR].make_constant(SI.m_e)
-
-        particles['num_bunches_in_train'][io.Record_Component.SCALAR].make_constant(self.num_bunches_in_train)
-        particles['bunch_separation'][io.Record_Component.SCALAR].make_constant(self.bunch_separation)
-
+        
         # set SI units (scaling factor)
         particles['momentum']['z'].unit_SI = SI.m_e
         particles['momentum']['x'].unit_SI = SI.m_e
@@ -1047,8 +1041,6 @@ class Beam():
         particles['momentum'].unit_dimension = {io.Unit_Dimension.L: 1, io.Unit_Dimension.M: 1, io.Unit_Dimension.T: -1}
         particles['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
         particles['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
-
-        particles['bunch_separation'].unit_dimension = {io.Unit_Dimension.T: 1}
         
         # save data to file
         series.flush()
@@ -1073,9 +1065,6 @@ class Beam():
         charge = particles["charge"][io.Record_Component.SCALAR].get_attribute("value")
         mass = particles["mass"][io.Record_Component.SCALAR].get_attribute("value")
         
-        num_bunches_in_train = particles["num_bunches_in_train"][io.Record_Component.SCALAR].get_attribute("value")
-        bunch_separation = particles["bunch_separation"][io.Record_Component.SCALAR].get_attribute("value")
-        
         # extract phase space
         ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
         weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
@@ -1095,19 +1084,20 @@ class Beam():
         # make beam
         beam = Beam()
         beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
-
-        beam.num_bunches_in_train = num_bunches_in_train
-        beam.bunch_separation = bunch_separation
         
         # add metadata to beam
         try:
             beam.trackable_number = series.iterations[index].get_attribute("trackable_number")
             beam.stage_number = series.iterations[index].get_attribute("stage_number")
-            beam.location = series.iterations[index].get_attribute("location")  
+            beam.location = series.iterations[index].get_attribute("location")
+            beam.num_bunches_in_train = series.iterations[index].get_attribute("num_bunches_in_train")
+            beam.bunch_separation = series.iterations[index].get_attribute("bunch_separation")
         except:
             beam.trackable_number = None
             beam.stage_number = None
             beam.location = None
+            beam.num_bunches_in_train = None
+            beam.bunch_separation = None
         
         return beam
 

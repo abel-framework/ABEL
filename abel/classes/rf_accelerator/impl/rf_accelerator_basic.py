@@ -1,46 +1,49 @@
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.cost_modeled import CostModeled
 import scipy.constants as SI
+import copy
 import numpy as np
 
 class RFAcceleratorBasic(RFAccelerator):
 
-    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=20e6, fill_factor=0.71, rf_frequency=2e9, structure_length=0.5, peak_power_klystron=50e6, operating_temperature=300):
+    default_structure_length = RFAccelerator.default_structure_length
+    default_rf_frequency = RFAccelerator.default_rf_frequency
+    default_fill_factor = RFAccelerator.default_fill_factor
+    
+    def __init__(self, length=None, nom_energy_gain=None, fill_factor=default_fill_factor, rf_frequency=2e9, structure_length=0.5, peak_power_klystron=50e6):
         
         self.peak_power_klystron = peak_power_klystron
-        self.operating_temperature = operating_temperature
         
         # run base class constructor
-        super().__init__(length=length, nom_energy_gain=nom_energy_gain, structure_length=structure_length)
-        
-        self.rf_frequency = rf_frequency
-        #IDK what to do whith these.
-        #self.nom_accel_gradient=nom_accel_gradient
-        #self.fill_factor = fill_factor
+        super().__init__(length=length, nom_energy_gain=nom_energy_gain, structure_length=structure_length, fill_factor=fill_factor, rf_frequency=rf_frequency)
 
-    def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        b = super().track(beam, savedepth, runnable, verbose)
+    
+    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+        
+        # store data used power-flow/power use/etc modelling
+        self.bunch_charge = beam0.abs_charge()
+        if self.bunch_separation is None:
+            self.bunch_separation = beam0.bunch_separation
+        if self.num_bunches_in_train is None:
+            self.num_bunches_in_train = beam0.num_bunches_in_train
 
         # calculate the number of klystrons required
         self.energy_usage()
 
-        return b
+        # perform energy increase
+        beam = copy.deepcopy(beam0)
+        beam.set_Es(beam0.Es() + self.nom_energy_gain)
+        
+        return super().track(beam, savedepth, runnable, verbose)
 
+    def get_structure_power(self):
+        "Get the peak power [W] required for a single RF structure in the given configuration."
+        return self.peak_power_klystron/self.num_structures_per_klystron
 
     def get_cost_structures(self):
         "Cost of the RF structures [ILC units]"
         return self.length * CostModeled.cost_per_length_rf_structure_normalconducting
 
-    def optimize_linac_geometry_and_gradient(self,fill_factor=1.0):
-        """
-        Find the right structure voltage based on the physics, then set the number of structures
-        and the overall linac length so that the total energy gain is respected.
-
-        See RFAccelerator_TW for example
-
-        Returns (Vmax, Vstruct, Ntotal_int)
-        """
-        raise NotImplementedError()
     
     # implement required abstract methods
     
@@ -55,7 +58,10 @@ class RFAcceleratorBasic(RFAccelerator):
 
         # peak power required in the structure # [W]
         peak_power_structure_min = 10e6
-        peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.voltage_structure / self.bunch_separation)
+        if self.bunch_separation > 0:
+            peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.voltage_structure / self.bunch_separation)
+        else:
+            peak_power_structure = peak_power_structure_min
         
         # cavity filling time (approx.)
         filling_time = 2 * structure_energy_per_length * self.structure_length / peak_power_structure
@@ -78,7 +84,7 @@ class RFAcceleratorBasic(RFAccelerator):
         return wallplug_energy_per_pulse_cooling / self.num_bunches_in_train
         
         
-    def energy_usage_klystrons(self) -> float: # TODO: improve the estimate of number of klystrons required
+    def energy_usage_rf(self) -> float: # TODO: improve the estimate of number of klystrons required
         "Energy usage per shot [J]"
         
         # cavity R/Q per length (shape dependent only)
@@ -89,7 +95,10 @@ class RFAcceleratorBasic(RFAccelerator):
 
         # peak power required in the structure # [W]
         peak_power_structure_min = 10e6
-        peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.voltage_structure / self.bunch_separation)
+        if self.bunch_separation > 0:
+            peak_power_structure = max(peak_power_structure_min, abs(self.bunch_charge) * self.voltage_structure / self.bunch_separation)
+        else:
+            peak_power_structure = peak_power_structure_min
         
         # cavity filling time (approx.)
         filling_time = 2 * structure_energy_per_length * self.structure_length / peak_power_structure
@@ -113,5 +122,5 @@ class RFAcceleratorBasic(RFAccelerator):
         "Energy usage per shot [J]"
         
         # return energy usage per bunch
-        return self.energy_usage_klystrons() + self.energy_usage_cooling()
+        return self.energy_usage_rf() + self.energy_usage_cooling()
         

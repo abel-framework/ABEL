@@ -2,6 +2,7 @@ from abc import abstractmethod
 from abel.CONFIG import CONFIG
 from abel.classes.beamline.beamline import Beamline
 from abel.classes.beamline.impl.linac.linac import Linac
+from abel.classes.source.source import Source
 from abel.classes.spectrometer.spectrometer import Spectrometer
 import numpy as np
 from matplotlib import pyplot as plt
@@ -20,21 +21,30 @@ class Experiment(Beamline):
     
     # assemble the trackables
     def assemble_trackables(self):
+
+        self.trackables = []
         
-        # check element classes, then assemble
-        assert(isinstance(self.linac, Linac))
-        assert(isinstance(self.spectrometer, Spectrometer))
-        
-        # run beamline constructor
-        self.trackables = [self.linac, self.component, self.spectrometer]
+        # add the linac/source
+        assert(isinstance(self.linac, Linac) or isinstance(self.linac, Source))
+        self.trackables.append(self.linac)
+
+        # add the experimental component
+        self.trackables.append(self.component)
+
+        # add the spectrometer (if it exists
+        if self.spectrometer is not None:
+            assert(isinstance(self.spectrometer, Spectrometer))
+            self.trackables.append(self.spectrometer)
         
         # set the bunch train pattern etc.
         super().assemble_trackables()
 
-    
+
     def energy_usage(self):
         return 0
-    
+
+    def get_cost_breakdown():
+        return ('Experiment', 0)
     
     # density plots
     def plot_spectrometer_screen(self, xlims=None, ylims=None, E_calib = False, diverg = None, plot_m12 = False, savefig = None):

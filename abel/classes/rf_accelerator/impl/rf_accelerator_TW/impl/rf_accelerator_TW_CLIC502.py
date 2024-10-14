@@ -22,11 +22,14 @@ class RFAccelerator_TW_CLIC502(abel.RFAccelerator_TW):
         if type(num_rf_cells) != int:
             raise TypeError("num_rf_cells must be an int")
 
-        structure = CLICopti.RFStructure.AccelStructure_CLIC502(num_rf_cells, f0_scaleto=rf_frequency/1e9)
+        structure = self._make_structure(num_rf_cells=num_rf_cells, rf_frequency=rf_frequency)
 
         super().__init__(RF_structure=structure, \
                          length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain )
 
+    def _make_structure(self, num_rf_cells=None,rf_frequency=None):
+        return CLICopti.RFStructure.AccelStructure_CLIC502(num_rf_cells, f0_scaleto=rf_frequency/1e9)
+        
     def make_structure_title(self):
         tit = "CLIC502"
         tit += f", N={self.num_rf_cells}"

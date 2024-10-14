@@ -54,8 +54,8 @@ class Trackable(ABC):
     @property
     def bunch_separation(self) -> float:
         "The time [s] between each bunch in the train"
-        if self._bunch_separation == None:
-            raise TrackableInitializationException("bunch_separation not yet initialized")
+        #if self._bunch_separation == None:
+        #    raise TrackableInitializationException("bunch_separation not yet initialized")
         return self._bunch_separation
     @bunch_separation.setter
     def bunch_separation(self, bunch_separation : float):
@@ -77,8 +77,8 @@ class Trackable(ABC):
         The number of bunches in the train.
         When 1, train_duration is 0.0 and average_current_train is None / undefined.
         """
-        if self._num_bunches_in_train == None:
-            raise TrackableInitializationException("num_bunches_in_train is not yet initialized")
+        #if self._num_bunches_in_train == None:
+        #    raise TrackableInitializationException("num_bunches_in_train is not yet initialized")
         return self._num_bunches_in_train
     @num_bunches_in_train.setter
     def num_bunches_in_train(self, num_bunches_in_train : int):

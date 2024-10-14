@@ -43,18 +43,16 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
 
     #Database object is static
     default_frequency = 11.9942e9 #[Hz]
-    database = CLICopti.CellBase.CellBase_linearInterpolation_freqScaling(CLICopti.CellBase.celldatabase_TD_12GHz_v2,("a_n","d_n"), default_frequency/1e9)
-
+    
     def __init__(self, num_rf_cells=24,
                  rf_frequency=default_frequency,
                  a_n=0.110022947942206, a_n_delta=0.016003337882503*2,
                  d_n=0.160233420548558, d_n_delta=0.040208386429788*2,
                  length=None, num_structures=None, nom_energy_gain=None):
-
+        
         structure = self._make_structure(num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency, constructorCalling=True)
 
-        super().__init__(RF_structure=structure, \
-                         length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain)
+        super().__init__(RF_structure=structure, length=length, num_structures=num_structures, nom_energy_gain=nom_energy_gain)
 
     def _make_structure(self, num_rf_cells=None, a_n=None, a_n_delta=None, d_n=None, d_n_delta=None, rf_frequency=None, constructorCalling=False):
         """
@@ -63,18 +61,12 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
         If constructorCalling is False, then finalize the initialization in RFAccelerator_TW (use True when calling from child class constructor).
         """
 
-        num_rf_cells = self._checkType_or_getOld(num_rf_cells, "num_rf_cells", typeWanted=int, nameInCLICopti="N",                 firstCall=constructorCalling)
-        a_n          = self._checkType_or_getOld(a_n,          "a_n",                                                              firstCall=constructorCalling)
-        a_n_delta    = self._checkType_or_getOld(a_n_delta,    "a_n_delta",                                                        firstCall=constructorCalling)
-        d_n          = self._checkType_or_getOld(d_n,          "d_n",                                                              firstCall=constructorCalling)
-        d_n_delta    = self._checkType_or_getOld(d_n_delta,    "d_n_delta",                                                        firstCall=constructorCalling)
-        rf_frequency = self._checkType_or_getOld(rf_frequency, "rf_frequency", nameInCLICopti="f0_scaleto", scaleFromCLICopti=1e9, firstCall=constructorCalling)
+        # make database
+        cellbase = '/pfs/lustrep2/projappl/project_465000445/software/clicopti/cellBase/TD_12GHz_v1.dat' # TODO: fix this
+        self.database = CLICopti.CellBase.CellBase_linearInterpolation_freqScaling(cellbase, ("a_n","d_n"), rf_frequency/1e9)
 
-        #print("Making new structure, parameters:", num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency)
-
-        structure = CLICopti.RFStructure.AccelStructure_paramSet2_noPsi(
-            RFAccelerator_TW_DB2.database,
-            num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency/1e9)
+        # make structure
+        structure = CLICopti.RFStructure.AccelStructure_paramSet2_noPsi(self.database, num_rf_cells, a_n, a_n_delta, d_n, d_n_delta)
 
         #DB v2 constructed ignoring P/C limit
         structure.uselimit_PC = False

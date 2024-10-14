@@ -46,7 +46,21 @@ class Collider(Runnable, CostModeled):
         self.emissions_per_tunnel_length = 6.38 # [ton CO2e/m] from 6.38 kton/km (CLIC estimate)
         self.emissions_per_energy_usage = 20/(1e9*3600) # [ton CO2e/J] from 20 ton/GWh
         self.cost_carbon_tax_per_emissions = 800 # [ILCU per ton CO2e] 800 from European Investment Bank estimate for 2050
-            
+
+    
+    def __str__(self):
+        s = f"Collider: {self.com_energy/1e9:.0f} GeV c.o.m. ({self.com_energy/2/self.energy_asymmetry/1e9:.0f} + {self.com_energy/2*self.energy_asymmetry/1e9:.0f} GeV)"
+        try:
+            s += f", {self.wallplug_power()/1e6:.0f} MW"
+        except:
+            pass
+        try:
+            s += f", {self.get_cost()/1e9:.1f} BILCU"
+        except:
+            pass
+
+        return s
+    
      # assemble the trackables
     def assemble_trackables(self):
         
@@ -235,7 +249,7 @@ class Collider(Runnable, CostModeled):
         breakdown = []
         breakdown.append(self.get_cost_breakdown_construction())
         breakdown.append(self.get_cost_breakdown_overheads())
-        breakdown.append(('Energy', self.energy_cost()))
+        breakdown.append((f'Energy ({self.wallplug_power()/1e6:.0f} MW, {self.programme_duration(in_years=True):.1f} yrs)', self.energy_cost()))
         breakdown.append(('Maintenance', self.maintenance_cost()))
         breakdown.append(('Carbon tax', self.carbon_tax_cost()))
         return ('Collider', breakdown)
@@ -258,6 +272,8 @@ class Collider(Runnable, CostModeled):
 
     def print_power(self):
         print(f"-- POWER {'_'.ljust(38,'-')}")
+        print('>> Linac 1:                     {:.0f} MW'.format(self.linac1.wallplug_power()/1e6))
+        print('>> Linac2:                      {:.0f} MW'.format(self.linac2.wallplug_power()/1e6))
         print('>> Overhead:                    {:.0f} MW'.format(self.power_overhead()/1e6))
         print('-------------------------------------------------')
         print('>> Total power:                 {:.0f} MW'.format(self.wallplug_power()/1e6))

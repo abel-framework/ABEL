@@ -61,8 +61,14 @@ class Stage(Trackable, CostModeled):
     
     def get_length(self):
         if self.length is not None:
-            self.nom_accel_gradient = self.nom_energy_gain/self.length
-            self.length = None
+            if self.nom_energy_gain is not None:
+                self.nom_accel_gradient = self.nom_energy_gain/self.length
+                self.length = None
+            elif self.nom_accel_gradient is not None:
+                self.nom_energy_gain = self.nom_accel_gradient*self.length
+                self.length = None
+            else:
+                return self.length
         return self.nom_energy_gain/self.nom_accel_gradient
 
     def get_cost_breakdown(self):

@@ -92,20 +92,23 @@ class ConventionalLinac(Linac):
 
     
     def get_nom_energy(self):
+        return self.source.get_energy() + self.get_nom_energy_gain()
 
-        # start with source energy
-        nom_energy = self.source.get_energy()
 
+    def get_nom_energy_gain(self):
+
+        nom_energy_gain = 0
+        
         # add injector energy (if exists)
         if self.rf_injector is not None:
-            nom_energy += self.rf_injector.get_nom_energy_gain()
+            nom_energy_gain += self.rf_injector.get_nom_energy_gain()
 
         # add main RF accelerator energy
         if self.rf_accelerator.get_nom_energy_gain() is not None:
-            return nom_energy + self.rf_accelerator.get_nom_energy_gain()
-        else:
-            return None
+             nom_energy_gain += self.rf_accelerator.get_nom_energy_gain()
 
+        return nom_energy_gain
+    
 
     def get_cost_breakdown(self):
 

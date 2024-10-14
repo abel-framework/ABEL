@@ -37,8 +37,8 @@ class RFAccelerator_TW(abel.RFAccelerator):
         self._structure_length = None
 
         #Set this to true to always optimize the gradient, number of structures, and overall length on track()
-        self.autoOptimize = True
-        self.autoOptimize_targetFillFactor = 0.71
+        self.auto_optimize = True
+        self.auto_optimize_target_fill_factor = 0.71
 
         self._num_integration_points = 1000
         self._initialize_RF_structure(RF_structure)
@@ -86,12 +86,32 @@ class RFAccelerator_TW(abel.RFAccelerator):
 
     @abstractmethod
     def _make_structure(self, num_rf_cells=None, rf_frequency=None):
-        """
-        Method used by subclasses to (re)generate the _RF_structure object.
-        Several arguments are generally provided, at least num_rf_cells [int] and rf_frequency [Hz].
-        """
-        raise NotImplementedError("Must be implemented in child classes")
+        pass
 
+    # Tracking
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+    #Check that beam is bunch frequency is subharmonic of RF frequency
+        #if beam.num_bunches_in_train > 1:
+        #    harm = self.rf_frequency/beam.bunch_frequency()
+        #    harmdiff = harm % 1.0
+        #    if harmdiff > 0.5:
+        #        harmdiff = 1.0-harmdiff
+        #    if harmdiff > 0.01:
+        #        raise ValueError(f"Harmonic mismatch too large: rf_frequency={self.rf_frequency/1e9:.2f}[GHz], bunch_frequency={beam.bunch_frequency()/1e9:.2f}[GHz], harm={harm:.3f}")
+
+        #Store data used power-flow/power use/etc modelling
+        self.bunch_charge           = beam.abs_charge()         # [C]
+        self.bunch_separation       = beam.bunch_separation     # [s]
+        self.num_bunches_in_train   = beam.num_bunches_in_train # [-]
+
+        if self.auto_optimize:
+            #Given the target energy gain, current, and pulse length,
+            # set the max gradient and the minimum linac length
+            self.optimize_linac_geometry_and_gradient(self.auto_optimize_target_fill_factor)
+
+        beam.set_Es(beam.Es() + self.nom_energy_gain)
+        return super().track(beam, savedepth, runnable, verbose)
+    
     #---------------------------------------------------------------------------------#
     # Override some of the properties and methods from the parent class RFAccelerator #
     #=================================================================================#
