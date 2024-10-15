@@ -8,23 +8,28 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, filename_test_particle='empty.h5'):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, filename_test_particle='empty.h5'):
 
     if output_period is None:
         output_period = int(num_steps)
         
     # locate template file
-    filename_input_template = CONFIG.abel_path + 'abel/apis/hipace/input_template'
+    filename_input_template = os.path.join(os.path.dirname(__file__), 'input_template')
 
-    # prepare plasma components (based on ion motion)
-    if ion_motion:
-        plasma_components = 'electrons ions'
+if no_plasma:
+        plasma_components = 'no_plasma'
     else:
-        plasma_components = 'plasma'
-        
-    beam_components = 'driver'
-    if not driver_only:
-        beam_components += ' beam'
+        # prepare plasma components (based on ion motion)
+        if ion_motion:
+            plasma_components = 'electrons ions'
+        else:
+            plasma_components = 'plasma'
+
+    # driver-only mode
+    if driver_only:
+        beam_components = 'driver'
+    else:
+        beam_components = 'driver beam'
 
     if not filename_test_particle == 'empty.h5':
         beam_components += ' test_particle'
@@ -45,7 +50,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     if not num_cell_xy == new_num_cell_xy:
         print('>> HiPACE++: Changing from', num_cell_xy, 'to', new_num_cell_xy, ' (i.e., 2^n-1) for better performance.')
         num_cell_xy = new_num_cell_xy
-    
+        
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
               'num_cell_y': int(num_cell_xy), 
@@ -79,14 +84,14 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
 def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num_tasks_per_node=8):
     
     # locate template file
-    filename_job_script_template = CONFIG.abel_path + 'abel/apis/hipace/job_script_template'
+    filename_job_script_template = os.path.join(os.path.dirname(__file__), 'job_script_template')
     
     # set the partition based on the number of nodes and tasks
     if num_nodes == 1 and num_tasks_per_node < 8:
         partition_name = CONFIG.partition_name_small
     else:
         partition_name = CONFIG.partition_name_standard
-
+    
     # calculate the memory
     memory_per_gpu = 60 # [GB]
         
@@ -109,14 +114,79 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
+
+    #Extract runfolder from job script name
+    if runfolder == None:
+        runfolder = os.path.dirname(filename_job_script)
+
+    #Run HIPACE++
+    if CONFIG.cluster_name == 'LOCAL':
+        _hipace_run_local(filename_job_script, runfolder, quiet=False)
+    else:
+        _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False)
     
-    # make run folder automatically from job script folder
-    if runfolder is None:
-        runfolder = str.replace(filename_job_script, os.path.basename(filename_job_script), '')
-        filename_job_script = os.path.basename(filename_job_script)
+    # when finished, load the beam and driver
+    filename = os.path.join(runfolder, "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps)))
     
+    try:
+        beam = Beam.load(filename, beam_name='beam')
+    except:
+        beam = None
+    driver = Beam.load(filename, beam_name='driver')
+    
+    return beam, driver
+
+def _hipace_run_local(filename_job_script, runfolder, quiet=False):
+    "Helper for running HiPACE++ on the local machine. Returns when job is complete."
+
+    if not quiet:
+        print(f"Running HiPACE locally in folder '{runfolder}'...")
+
+    #Get the input filename out of the job script
+    # This could probably be solved in a better way,
+    # but that would requiring reformulating the SLURM logic a bit.
+    filename_input = None
+    with open(filename_job_script, 'r') as fin:
+        inLines = fin.readlines()
+        for line in inLines:
+            ls = line.strip()
+            if ls.startswith('#'):
+                lss = ls.split()
+                if len(lss) < 3:
+                    continue
+                if lss[1] == 'filename_input':
+                    if not ((lss[2].startswith('"') or lss[2].startswith("'")) and \
+                            (lss[2].endswith('"') or lss[2].endswith("'"))):
+                        raise ValueError('Unexpected format in job script, found line "'+line+'" but unable to parse')
+                    if filename_input != None:
+                        raise RuntimeError('Double find of input filename?')
+
+                    filename_input = lss[2][1:-1]
+    if filename_input == None:
+        raise RuntimeError('Did not find the input filename in the hipace job file')
+
+    import time
+    start_time = time.time()
+    #Run HIPACE
+    process = subprocess.Popen([CONFIG.hipace_binary,filename_input], cwd=runfolder,\
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, \
+                               close_fds=True, bufsize=1, universal_newlines=True )
+    for line in iter(process.stdout.readline, ''):
+        #TODO: respect 'quiet' flag
+        print(line.rstrip())
+    process.stdout.close()
+    returncode = process.wait()
+
+    print(f'HiPace complete, returncode = {returncode}, execution time={time.time()-start_time : .1f} [s]')
+    if returncode != 0:
+        raise RuntimeError('Errors during HiPace simulation')
+
+
+def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
+    "Helper for running HiPACE++ on a batch system using SLURM. Returns when job is complete."
+
     # run system command
-    cmd = 'cd ' + runfolder + ' && sbatch ' + filename_job_script
+    cmd = 'cd ' + runfolder + ' && sbatch ' + os.path.basename(filename_job_script)
     if quiet:
         subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
     else:
@@ -200,4 +270,5 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
         test_particle = None
     
     return beam, driver, test_particle
+
 

@@ -1,0 +1,41 @@
+[build-system]
+# See https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abel"
+version = "1.0"
+
+dependencies = [
+   "numpy",
+   "scipy",
+   "numba",
+   "tqdm",
+   "openpmd-api",
+   "openpmd-viewer",
+   "joblib",
+   "joblib-progress",
+   "matplotlib",
+   "pyqtgraph",
+   "Wake-T",
+   "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
+   "RF-Track"
+]
+requires-python = ">= 3"
+
+authors = [
+  {name = "Carl Andreas Lindstrøm", email = "c.a.lindstrom@fys.uio.no"},
+  {name = "Ben Chen"},
+  {name = "Ole Gunnar Finnerud"},
+  {name = "Kyrre Sjobak"},
+  {name = "Daniel Kalvik"}
+]
+readme = "README.md"
+#license = {text="LGPL3+"}
+
+#[tool.setuptools]
+#package-dir = {"" = "Python"}
+
+#[tool.setuptools.packages.find]
+#where = ["Python"]

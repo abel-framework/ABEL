@@ -4,6 +4,7 @@ import copy
 from matplotlib import pyplot as plt
 from datetime import datetime
 import numpy as np
+import os
 
 class Beamline(Trackable, Runnable):
     
@@ -54,7 +55,7 @@ class Beamline(Trackable, Runnable):
         return objs
     
     # plot survey    
-    def plot_survey(self):
+    def plot_survey(self, save_fig=False):
          
         # setup figure
         fig, ax = plt.subplots()
@@ -79,5 +80,11 @@ class Beamline(Trackable, Runnable):
             s += obj.get_width()
         
         plt.show()
-        
+
+        if save_fig:
+            plot_path = self.run_path() + 'plots/'
+            if not os.path.exists(plot_path):
+                os.makedirs(plot_path)
+            filename = plot_path + 'survey' + '.png'
+            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
         

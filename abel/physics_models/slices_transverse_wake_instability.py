@@ -164,7 +164,7 @@ def transverse_wake_instability_slices(plasma_density, E_z, bubble_radius, num_p
             plt.plot(s_slices, bubble_radius*1e6, 'b', label='Bubble radius')
             plt.plot(s_slices, -bubble_radius*1e6, 'b')
             plt.xlabel(r'$s$ [$\mathrm{m}$]')
-            plt.ylabel('Transverse axis $\mathrm{\mu}$m]')
+            plt.ylabel(r'Transverse axis $\mathrm{\mu}$m]')
             plt.legend()
             plt.title('Diagnostic plot for the moment beam coming into contact with bubble boundary')
             raise Exception('Beam came into contact with bubble boundary!')

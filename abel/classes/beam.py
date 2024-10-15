@@ -11,6 +11,9 @@ from abel.physics_models.hills_equation import evolve_hills_equation_analytic
 from abel.physics_models.betatron_motion import evolve_betatron_motion
 #from abel.physics_models.beta_multistep import evolve_betatron_motion
 
+import scipy.sparse as sp
+import copy
+
 from matplotlib import pyplot as plt
 
 class Beam():
@@ -44,7 +47,7 @@ class Beam():
         del self[np.isnan(self).any(axis=1)]
         
     # set phase space
-    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None):
+    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None, particle_mass=SI.m_e):
         
         # make empty phase space
         num_particles = len(xs)
@@ -85,6 +88,9 @@ class Beam():
         
         # ids
         self.__phasespace[7,:] = np.arange(num_particles)
+
+        # single particle mass [kg]
+        self.particle_mass = particle_mass
        
     
     # addition operator (add two beams using the + operator)
@@ -225,6 +231,9 @@ class Beam():
     
     
     ## BEAM STATISTICS
+
+    def total_particles(self):
+        return int(np.nansum(self.weightings()))
     
     def charge(self):
         return np.nansum(self.qs())
@@ -360,7 +369,7 @@ class Beam():
             alpha_y = -covy[1,0]/emgy
         return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
         
-    def peak_density(self):
+    def peak_density(self):  # TODO: this is only valid for Gaussian beams.
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
     def peak_current(self):
@@ -373,7 +382,7 @@ class Beam():
         xfilter = np.abs(self.xs()-self.x_offset(clean=True)) > nsigma*self.beam_size_x(clean=True)
         xpfilter = np.abs(self.xps()-self.x_angle(clean=True)) > nsigma*self.divergence_x(clean=True)
         yfilter = np.abs(self.ys()-self.y_offset(clean=True)) > nsigma*self.beam_size_y(clean=True)
-        ypfilter = np.abs(self.ys()-self.y_angle(clean=True)) > nsigma*self.divergence_y(clean=True)
+        ypfilter = np.abs(self.yps()-self.y_angle(clean=True)) > nsigma*self.divergence_y(clean=True)
         filter = np.logical_or(np.logical_or(xfilter, xpfilter), np.logical_or(yfilter, ypfilter))
         del self[filter]
 
@@ -394,7 +403,8 @@ class Beam():
     
     def longitudinal_num_density(self, bins=None):
         dQdz, zs = self.projected_density(self.zs, bins=bins)
-        dNdz = dQdz / SI.e
+        #dNdz = dQdz / SI.e
+        dNdz = dQdz / SI.e / self.charge_sign()
         return dNdz, zs
     
     def energy_spectrum(self, bins=None):
@@ -429,13 +439,300 @@ class Beam():
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
         density = (counts/np.diff(vedges)).T/np.diff(hedges)
+
+        #dx = np.diff(hedges)
+        #dy = np.diff(vedges)
+        #bin_areas = dx[:, None] * dy[None, :]
+        #density = counts/bin_areas
+        #print(np.sum(density*np.diff(vedges)*np.diff(hedges))/self.charge())
         return density, hctrs, vctrs
     
     def density_lps(self, hbins=None, vbins=None):
         return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
     
     def density_transverse(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)    
+        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)
+
+    
+    # ==================================================
+    # TODO: Currently does not reproduce the correct peak density for Gaussian beams unless the bin numbers are adjusted manually.
+    def charge_density_3D(self, zbins=None, xbins=None, ybins=None):
+        """
+        Calculates the 3D charge density.
+        
+        Parameters
+        ----------
+        zbins, xbins, ybins: [m] float or 1D float ndarray
+            The bins along z(x,y).
+            
+        Returns
+        ----------
+        dQ_dxdydz: [C/m^3] 3D float ndarray 
+            Charge density of the beam.
+        
+        zctrs, xctrs, yctrs: [m] 1D float ndarray 
+            The centre positions of the bins of dQ_dxdydz.
+        """
+        
+        zs = self.zs()
+        xs = self.xs()
+        ys = self.ys()
+        
+        if zbins is None:
+            zbins = round(np.sqrt(len(self))/2)
+        if xbins is None:
+            xbins = round(np.sqrt(len(self))/2)
+        if ybins is None:
+            ybins = round(np.sqrt(len(self))/2)
+            
+        # Create a 3D histogram
+        counts, edges = np.histogramdd((zs, xs, ys), bins=(zbins, xbins, ybins), weights=self.qs())
+        edges_z = edges[0]
+        edges_x = edges[1]
+        edges_y = edges[2]
+        
+        # Calculate volume of each bin
+        dz = np.diff(edges_z)
+        dx = np.diff(edges_x)
+        dy = np.diff(edges_y)
+        bin_volumes = dz[:, None, None] * dx[None, :, None] * dy[None, None, :]  # The None indexing is used to add new axes to the differences arrays, allowing them to be broadcasted properly for division with counts. This ensures that each element of counts is divided by the corresponding bin volume (element-wise division).
+        
+        # Calculate charge density per unit volume
+        with np.errstate(divide='ignore', invalid='ignore'):  # Handle division by zero
+            dQ_dzdxdy = np.divide(counts, bin_volumes, out=np.zeros_like(counts), where=bin_volumes != 0)
+
+        #dQ_dzdxdy, edges = np.histogramdd((zs, xs, ys), bins=(zbins, xbins, ybins), weights=self.qs(), density=True)       #######
+        #dQ_dzdxdy = -dQ_dzdxdy
+
+        zctrs = (edges_z[0:-1] + edges_z[1:])/2
+        xctrs = (edges_x[0:-1] + edges_x[1:])/2
+        yctrs = (edges_y[0:-1] + edges_y[1:])/2
+
+        #print(np.sum(dQ_dzdxdy*bin_volumes)/self.charge())        
+        
+        return dQ_dzdxdy, zctrs, xctrs, yctrs, edges_z, edges_x, edges_y
+
+    
+    # ==================================================
+    def Dirichlet_BC_system_matrix(self, main_diag, upper_inner_off_diag, lower_inner_off_diag, upper_outer_off_diag, lower_outer_off_diag, num_x_cells, num_unknowns, rhs, boundary_val):
+        """
+        Applies Dirichlet boundary conditions and assemble the system matrix and the right hand side (source term) of the Poisson equation.
+        
+        Parameters
+        ----------
+        main_diag: [m^-2] 1D float ndarray
+            The main diagonal of the system matrix to be modified according to the boundary conditions.
+
+        upper_inner_off_diag: [m^-2] 1D float ndarray
+            The upper inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+
+        lower_inner_off_diag: [m^-2] 1D float ndarray
+            The lower inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+
+        outer_inner_off_diag: [m^-2] 1D float ndarray
+            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+
+        outer_inner_off_diag: [m^-2] 1D float ndarray
+            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+            
+        num_x_cells: float
+            The number of cells in the x-direction. Determines the number of columns of the system matrix A.
+
+        num_x_cells: float
+            The number of unknowns in the system, which is determined by The number of cells in the x and y-direction.
+
+        rhs: [V/m^3] 1D float ndarray
+            The right hand side of the Poisson equation to be modified according to the boundary conditions.
+
+        boundary_val: [V/m] float
+            The value of the electric fields Ex and Ey at the simulation box boundary.
+
+            
+        Returns
+        ----------
+        A: [m^-2] 2D float sparse matrix
+            System matrix.
+
+        rhs: [V/m^3] 1D float ndarray
+            The modified right hand side of the Poisson equation.
+        """
+        
+        # Set the right side boundary conditions
+        rhs[num_x_cells-1::num_x_cells] = boundary_val  # Set BC. Set every num_x_cells-th element starting from the num_x_cells-1 index to 1
+        main_diag[num_x_cells-1::num_x_cells] = 1  # Set BC        
+        upper_inner_off_diag[num_x_cells-1::num_x_cells] = 0  # Remove off-diagonal elements at boundaries
+        lower_inner_off_diag[num_x_cells-2::num_x_cells] = 0  # Remove off-diagonal elements at boundaries
+        upper_outer_off_diag[num_x_cells-1::num_x_cells] = 0  # Remove off-diagonal elements at boundaries
+        lower_outer_off_diag[-1::-num_x_cells] = 0  # Remove off-diagonal elements at boundaries
+        
+        # Set the left side boundary conditions
+        rhs[0::num_x_cells] = boundary_val
+        main_diag[0::num_x_cells] = 1
+        upper_inner_off_diag[0::num_x_cells] = 0
+        lower_inner_off_diag[-num_x_cells::-num_x_cells] = 0
+        upper_outer_off_diag[0::num_x_cells] = 0
+        lower_outer_off_diag[-num_x_cells::-num_x_cells] = 0
+        
+        # Set the top boundary conditions
+        rhs[1:num_x_cells-1] = boundary_val
+        main_diag[1:num_x_cells-1] = 1
+        upper_inner_off_diag[1:num_x_cells-1] = 0
+        lower_inner_off_diag[0:num_x_cells-2] = 0
+        upper_outer_off_diag[1:num_x_cells-1] = 0
+        
+        # Set the bottom boundary conditions
+        rhs[-num_x_cells+1:-1] = boundary_val
+        main_diag[-num_x_cells+1:-1] = 1
+        upper_inner_off_diag[-num_x_cells+2:] = 0
+        lower_inner_off_diag[-num_x_cells+1:-1] = 0
+        lower_outer_off_diag[-num_x_cells+1:-1] = 0
+
+        # Assemble the system matrix as a sparse diagonal dominant matrix
+        diagonals = [main_diag, lower_inner_off_diag, upper_inner_off_diag, lower_outer_off_diag, upper_outer_off_diag]  # list
+        offsets = [0, -1, 1, -num_x_cells, num_x_cells]  # Offsets of the diagonals. The outer diagonals outer_off_diag containing 1/dy^2 are num_x_cells away from the main diagonal.
+        A = sp.diags(diagonals, offsets, shape=(num_unknowns, num_unknowns), format="csr")
+
+        return A, rhs
+        
+
+    # ==================================================
+    def Ex_Ey_2D(self, num_x_cells, num_y_cells, charge_density_xy_slice, dx, dy, boundary_val=0.0):
+        """
+        2D Poisson solver for the transverse electric fields Ex and Ey of a beam slice in the xy-plane. The equations solved are a combination of Gauss' law and Faraday's law assuming no time-varying z-component of magnetic field Bz. I.e.
+
+        dEx/dx + dEy/dy = 1/epsilon_0 * dQ/dzdxdy
+        dEy/dx - dEx/dy = 0.
+        
+        
+        Parameters
+        ----------
+        num_x_cells, num_y_cells: float
+            The number of cells in the x and y-direction.
+
+        charge_density_xy_slice: [C/m^3] 2D ndarray
+            A xy-slice of the beam charge density.
+
+        dx, dy: [m] float
+            Bin widths in x and y of the bins of dQ_dzdxdy.
+
+        boundary_val: [V/m] 
+
+            
+        Returns
+        ----------
+        Ex: [V/m] 2D float array 
+            x-conponent of electric field generated by the chosen beam slice.
+
+        Ey: [V/m] 2D float array 
+            y-conponent of electric field generated by the chosen beam slice.
+        """
+        
+        num_rows, num_cols = charge_density_xy_slice.shape
+
+        # Set up the system matrix
+        num_unknowns = int(num_x_cells * num_y_cells)
+        main_diag = np.ones(num_unknowns)* (-2/dx**2 - 2/dy**2)
+        upper_inner_off_diag = np.ones(num_unknowns - 1)/dx**2
+        lower_inner_off_diag = copy.deepcopy(upper_inner_off_diag)
+        upper_outer_off_diag = np.ones(num_unknowns - num_x_cells)/dy**2
+        lower_outer_off_diag = copy.deepcopy(upper_outer_off_diag)
+
+        # Construct the right hand side of the Poisson equation for Ex
+        rhs_2d = 1/SI.epsilon_0*np.gradient(charge_density_xy_slice, dx, axis=1)
+        rhs = rhs_2d.flatten()
+
+        # Apply Dirichlet boundary conditions
+        A, rhs_BC = self.Dirichlet_BC_system_matrix(main_diag, upper_inner_off_diag, lower_inner_off_diag, upper_outer_off_diag, lower_outer_off_diag, num_x_cells, num_unknowns, rhs, boundary_val=boundary_val)
+
+        # Solve the matrix equation for Ex
+        #Ex = sp.linalg.spsolve(A, rhs_BC)
+        Ex, has_converged_x = sp.linalg.cg(A, rhs_BC, x0=np.zeros(len(rhs_BC)), tol=1e-2)  # Works for positive definite A.
+
+        # Construct the right hand side of the Poisson equation for Ey
+        rhs_2d = 1/SI.epsilon_0*np.gradient(charge_density_xy_slice, dy, axis=0)
+        rhs = rhs_2d.flatten()
+
+        # Apply Dirichlet boundary conditions
+        A, rhs_BC = self.Dirichlet_BC_system_matrix(main_diag, upper_inner_off_diag, lower_inner_off_diag, upper_outer_off_diag, lower_outer_off_diag, num_x_cells, num_unknowns, rhs, boundary_val=boundary_val)
+
+        # Solve the matrix equation for Ey
+        Ey, has_converged_y = sp.linalg.cg(A, rhs_BC, x0=np.zeros(len(rhs_BC)), tol=1e-2)  # Works for positive definite A.
+
+        return Ex.reshape((num_rows, num_cols)), Ey.reshape((num_rows, num_cols))
+
+
+    # ==================================================
+    def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0, tolerance=5.0):
+        """
+        Calculate slice Ex and Ey for the entire beam by solving the Poisson equations for Ex and Ey slice by slice.
+
+        Parameters
+        ----------
+        x_box_min, y_box_min: [m] float
+            The lower x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+
+        x_box_max, y_box_max: [m] float
+            The upper x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+        
+        dx, dy: [m] float
+            Bin widths in x and y of the bins of dQ_dzdxdy.
+
+        num_z_cells: float
+            The number of cells in the z-direction.
+
+        boundary_val: [V/m]
+            The values of the electric fields Ex and Ey at the simulation domain boundary.
+
+            
+        Returns
+        ----------
+        Ex: [V/m] 2D float array 
+            x-conponent of electric field generated by the chosen beam slice.
+
+        Ey: [V/m] 2D float array 
+            y-conponent of electric field generated by the chosen beam slice.
+
+        zctrs, xctrs, yctrs: [m] 1D float ndarray
+            Coordinates in z, x and y for the centres of the bins of Ex and Ey.
+        """
+
+        # Check if the selected simulation boundaries are significantly larger than the beam extent
+        xs = self.xs()
+        ys = self.ys()
+        
+        if np.abs(x_box_min/xs.min()) < tolerance or np.abs(y_box_min/ys.min()) < tolerance or np.abs(x_box_max/xs.max()) < tolerance or np.abs(y_box_max/ys.max()) < tolerance:
+            raise ValueError('Simulation box size is too small compared to beam size.')
+        
+        if num_z_cells is None:
+            num_z_cells = round(np.sqrt(len(self))/2)
+
+        z_box_max = np.max(self.zs())
+        z_box_min = np.min(self.zs())
+        zbins = np.linspace(z_box_min, z_box_max, num_z_cells+1)
+        
+        num_x_cells = int((x_box_max-x_box_min)/dx)
+        num_y_cells = int((y_box_max-y_box_min)/dy)
+        
+        xbins = np.linspace(x_box_min, x_box_max, num_x_cells+1)
+        ybins = np.linspace(y_box_min, y_box_max, num_y_cells+1)
+
+        dQ_dzdxdy, zctrs, xctrs, yctrs, edges_z, edges_x, edges_y = self.charge_density_3D(zbins=zbins, xbins=xbins, ybins=ybins)
+        
+        Ex = np.zeros((num_z_cells, num_y_cells, num_x_cells))
+        Ey = np.zeros((num_z_cells, num_y_cells, num_x_cells))
+
+        for slice_idx in range(0, num_z_cells):
+            # Extract a xy-slice from the charge density
+            charge_density_xy_slice = dQ_dzdxdy[slice_idx, :, :].T
+
+            # Calculate the fields for the charge density slice
+            Ex_2d, Ey_2d = self.Ex_Ey_2D(num_x_cells, num_y_cells, charge_density_xy_slice, dx, dy, boundary_val=boundary_val)
+            
+            Ex[slice_idx,:,:] = Ex_2d
+            Ey[slice_idx,:,:] = Ey_2d
+            
+        return Ex, Ey, zctrs, xctrs, yctrs
+          
         
     
     ## PLOTTING
@@ -494,8 +791,10 @@ class Beam():
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
-        fig.set_figheight(5)  
+        fig.set_figheight(5)
         p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
+        #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
+        #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
         ax.set_xlabel('x (um)')
         ax.set_ylabel('y (um)')
         ax.set_title('Transverse profile')
@@ -632,7 +931,7 @@ class Beam():
             
         
             # add metadata
-            series.author = "ABEL (the Advanced Beams and Extreme Linacs code)"
+            series.author = "ABEL (the Adaptable Beginning-to-End Linac simulation framework)"
             series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
 
         # make step (only one)
@@ -836,8 +1135,7 @@ class Beam():
         
         binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
         beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
-        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, 
-                  xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
+        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
 
     
     # ==================================================
@@ -860,17 +1158,17 @@ class Beam():
         weights = self.weightings()
 
         # Labels for plots
-        zlab = '$z$ [$\mathrm{\mu}$m]'
+        zlab = r'$z$ [$\mathrm{\mu}$m]'
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
-        xlab = '$x$ [$\mathrm{\mu}$m]'
-        ylab = '$y$ [$\mathrm{\mu}$m]'
+        xlab = r'$x$ [$\mathrm{\mu}$m]'
+        ylab = r'$y$ [$\mathrm{\mu}$m]'
         xps_lab = '$x\'$ [mrad]'
         yps_lab = '$y\'$ [mrad]'
-        energ_lab = '$\mathcal{E}$ [GeV]'
+        energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
         fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
-        fig.suptitle('$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
+        fig.suptitle(r'$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
 
         nbins = int(np.sqrt(len(weights)/2))
         hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms

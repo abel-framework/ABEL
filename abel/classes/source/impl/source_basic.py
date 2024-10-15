@@ -7,7 +7,7 @@ from abel.utilities.relativity import energy2gamma
 
 class SourceBasic(Source):
     
-    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, symmetrize_6d=False):
+    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, symmetrize_6d=False, z_cutoff=None):
         
         self.rel_energy_spread = rel_energy_spread # [eV]
         self.energy_spread = energy_spread
@@ -25,6 +25,7 @@ class SourceBasic(Source):
         self.angular_momentum = angular_momentum
         self.symmetrize = symmetrize
         self.symmetrize_6d = symmetrize_6d
+        self.z_cutoff = z_cutoff
 
         super().__init__(length, charge, energy, accel_gradient, wallplug_efficiency, x_offset, y_offset, x_angle, y_angle)
         
@@ -71,7 +72,46 @@ class SourceBasic(Source):
         # create phase space
         beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=self.charge)
 
+        # Apply filter(s) if desired
+        if self.z_cutoff is not None:
+            beam = self.z_filter(beam)
+
         # add jitters and offsets in super function
         return super().track(beam, savedepth, runnable, verbose)
-    
+
+
+    # ==================================================
+    # Filter out particles whose z < z_cutoff for testing instability etc.
+    def z_filter(self, beam):
+        xs = beam.xs()
+        ys = beam.ys()
+        zs = beam.zs()
+        pxs = beam.pxs()
+        pys = beam.pys()
+        pzs = beam.pzs()
+        weights = beam.weightings()
+
+        # Apply the filter
+        bool_indices = (zs > self.z_cutoff)
+        zs_filtered = zs[bool_indices]
+        xs_filtered = xs[bool_indices]
+        ys_filtered = ys[bool_indices]
+        pxs_filtered = pxs[bool_indices]
+        pys_filtered = pys[bool_indices]
+        pzs_filtered = pzs[bool_indices]
+        weights_filtered = weights[bool_indices]
+
+        # Initialise ABEL Beam object
+        beam_out = Beam()
+        
+        # Set the phase space of the ABEL beam
+        beam_out.set_phase_space(Q=np.sum(weights_filtered)*-SI.e,
+                             xs=xs_filtered,
+                             ys=ys_filtered,
+                             zs=zs_filtered, 
+                             pxs=pxs_filtered,  # Always use single particle momenta?
+                             pys=pys_filtered,
+                             pzs=pzs_filtered)
+
+        return beam_out
     

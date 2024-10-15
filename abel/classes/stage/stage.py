@@ -136,27 +136,26 @@ class Stage(Trackable):
         axs[1].legend()
         
         # plot energy spread
-        #axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)
-        #axs[1,0].set_ylabel('Energy spread, rms [%]')
-        #axs[1,0].set_xlabel(long_label)
-        #axs[1,0].set_xlim(long_limits)
-        #
-        ## plot beam size
-        #axs[1,1].plot(self.evolution.location, self.evolution.beam_size_x*1e6, color=col1, label='$\sigma_x$')
-        #axs[1,1].plot(self.evolution.location, self.evolution.beam_size_y*1e6, color=col2, label='$\sigma_y$')
-        #axs[1,1].set_ylabel('Beam size, rms [$\mathrm{\mu}$m]')
-        #axs[1,1].set_xlabel(long_label)
-        #axs[1,1].set_xlim(long_limits)
-        #axs[1,1].set_yscale('log')
-        #axs[1,1].legend()
+
+        axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)
+        axs[1,0].set_ylabel('Energy spread, rms [%]')
+        axs[1,0].set_xlabel(long_label)
+        axs[1,0].set_xlim(long_limits)
+        
+        # plot beam size
+        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_y*1e6, color=col2)
+        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_x*1e6, color=col1)
+        axs[1,2].set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
+        axs[1,2].set_xlabel(long_label)
+        axs[1,2].set_xlim(long_limits)
 
         # plot transverse offset
-        #axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)
-        #axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)  
-        #axs[1,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
-        #axs[1,1].set_ylabel('Transverse offset [$\mathrm{\mu}$m]')
-        #axs[1,1].set_xlabel(long_label)
-        #axs[1,1].set_xlim(long_limits)
+        axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)
+        axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)  
+        axs[1,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
+        axs[1,1].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
+        axs[1,1].set_xlabel(long_label)
+        axs[1,1].set_xlim(long_limits)
         
         plt.show()
         return fig
@@ -209,7 +208,7 @@ class Stage(Trackable):
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
         axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
-        axs[0].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+        axs[0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
         axs[0].set_ylabel('Longitudinal electric field [GV/m]')
         zlims = [min(zs0)*1e6, max(zs0)*1e6]
         axs[0].set_xlim(zlims)
@@ -218,7 +217,7 @@ class Stage(Trackable):
         # plot beam current
         axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
         axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
-        axs[1].set_xlabel('$z$ [$\mathrm{\mu}$m]')
+        axs[1].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
         axs[1].set_ylabel('Beam current [kA]')
         axs[1].set_xlim(zlims)
         axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
@@ -312,8 +311,8 @@ class Stage(Trackable):
             
             # set labels
             if i==(num_plots-1):
-                ax1.set_xlabel('$z$ [$\mathrm{\mu}$m]')
-            ax1.set_ylabel('$x$ [$\mathrm{\mu}$m]')
+                ax1.set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
+            ax1.set_ylabel(r'$x$ [$\mathrm{\mu}$m]')
             ax1.set_title(title)
             ax1.grid(False)
             ax2.grid(False)
