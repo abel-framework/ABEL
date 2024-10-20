@@ -114,6 +114,8 @@ class PlasmaLinac(Linac):
                     stage_instance = self.stage
                 else:
                     stage_instance = copy.deepcopy(self.stage)
+                if stage_instance.nom_energy is None:
+                    stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
                     
                 # reassign the same driver complex
                 if self.driver_complex is not None:

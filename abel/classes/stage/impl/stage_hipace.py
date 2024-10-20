@@ -21,7 +21,7 @@ except:
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -79,10 +79,10 @@ class StageHipace(Stage):
             # apply plasma-density up ramp (demagnify beta function)
             driver0 = copy.deepcopy(driver_incoming)
             beam0 = copy.deepcopy(beam_incoming)
-            driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-            beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-            
-
+            if self.ramp_beta_mag is not None:
+                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        
         beam0.location = 0.0
         driver0.location = 0.0
         
@@ -183,8 +183,9 @@ class StageHipace(Stage):
         else:
             beam_outgoing = copy.deepcopy(beam)
             driver_outgoing = copy.deepcopy(driver)
-            beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-            driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+            if self.ramp_beta_mag is not None:
+                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
         
         ## SAVE DRIVERS TO FILE
         if self.save_drivers:

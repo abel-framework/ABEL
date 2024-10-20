@@ -13,7 +13,7 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, enable_transverse_instability=False, enable_radiation_reaction=False, calculate_evolution=True):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_transverse_instability=False, enable_radiation_reaction=False, calculate_evolution=True):
         
         super().__init__(nom_accel_gradient, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -37,8 +37,9 @@ class StageQuasistatic2d(Stage):
         if self.upramp is not None:
             beam0, driver0 = self.track_upramp(beam0, driver0)
         else:
-            driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
-            beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+            if self.ramp_beta_mag is not None:
+                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
 
         # make copy of the beam to update later
         beam = copy.deepcopy(beam0)
@@ -162,8 +163,9 @@ class StageQuasistatic2d(Stage):
         if self.downramp is not None:
             beam, driver = self.track_downramp(beam, driver)
         else:
-            beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-            driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+            if self.ramp_beta_mag is not None:
+                beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+                driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number

@@ -10,12 +10,12 @@ import scipy.constants as SI
 from matplotlib import pyplot as plt
 from types import SimpleNamespace
 from matplotlib.colors import LogNorm
-from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius
+from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
 
 class Stage(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=1, length=None):
+    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None, length=None):
 
         # common variables
         self.nom_accel_gradient = nom_accel_gradient
@@ -26,6 +26,9 @@ class Stage(Trackable, CostModeled):
         self.length = length
 
         self.stage_number = None
+        
+        # nominal initial energy
+        self.nom_energy = None 
 
         self.upramp = None
         self.downramp = None
@@ -62,23 +65,57 @@ class Stage(Trackable, CostModeled):
     # upramp to be tracked before the main tracking
     def track_upramp(self, beam0, driver0=None):
         if self.upramp is not None and isinstance(self.upramp, Stage):
+
+            # set driver
             self.upramp.driver_source = SourceCapsule(beam=driver0)
+
+            # determine length and density if not already set
+            if self.upramp.length is None and self.upramp.plasma_density is None:
+                
+                # set ramp density
+                self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
+
+                # set ramp length
+                if self.nom_energy is None:
+                    self.nom_energy = beam0.energy()
+                self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+
+            # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
+            
         else:
             beam = beam0
             driver = driver0
+            
         return beam, driver
 
     # downramp to be tracked after the main tracking
     def track_downramp(self, beam0, driver0):
         if self.downramp is not None and isinstance(self.downramp, Stage):
+
+            # set driver
             self.downramp.driver_source = SourceCapsule(beam=driver0)
+            
+            # determine length and density if not already set
+            if self.downramp.length is None and self.downramp.plasma_density is None:
+                
+                # set ramp density
+                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
+
+                # set ramp length
+                if self.nom_energy is None:
+                    self.nom_energy = beam0.energy()
+                self.downramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+
+            # perform tracking
             self.downramp._return_tracked_driver = True
             beam, driver = self.downramp.track(beam0)
+            
         else:
             beam = beam0
             driver = driver0
+            
         return beam, driver
     
     @abstractmethod   
@@ -114,8 +151,16 @@ class Stage(Trackable, CostModeled):
     def get_nom_accel_gradient(self):
         return self.nom_accel_gradient
 
+    def matched_beta_function_incoming(self, energy_incoming):
+        if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
+            return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
+        elif self.ramp_beta_mag is not None:
+            return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
+        else:
+            return beta_matched(self.plasma_density, energy_incoming)
+            
     def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy)*self.ramp_beta_mag
+        return beta_matched(self.plasma_density, energy)
     
     def energy_usage(self):
         return self.driver_source.energy_usage()
