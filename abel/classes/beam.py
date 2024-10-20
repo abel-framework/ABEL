@@ -3,6 +3,7 @@ import openpmd_api as io
 from datetime import datetime
 from pytz import timezone
 from abel.CONFIG import CONFIG
+from types import SimpleNamespace
 import scipy.constants as SI
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
@@ -917,7 +918,7 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
         
         # remove particles with subzero energy
         del self[self.Es() < 0]
@@ -929,6 +930,49 @@ class Beam():
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
+        if calc_evolution:
+                
+            # calculate evolution
+            num_evol_steps = max(10, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
+            evol = SimpleNamespace()
+            evol.location = np.linspace(0, L, num_evol_steps)
+            evol.x, evol.ux, evol.ux, evol.y, evol.uy, evol.energy, evol.energy_spread, evol.rel_energy_spread, evol.beam_size_x, evol.beam_size_y, evol.emit_nx, evol.emit_ny, evol.beta_x, evol.beta_y = (np.empty(evol.location.shape) for _ in range(14))
+
+            # select a given subset of the particles (for faster calculation)
+            sample_fraction = round(np.sqrt(len(self)))
+            inds_sample = np.arange(0, len(self), sample_fraction, dtype=int) # not random, to be consistent across ramps and stages
+            xs_sample, uxs_sample = self.xs()[inds_sample], self.uxs()[inds_sample]
+            ys_sample, uys_sample = self.ys()[inds_sample], self.uys()[inds_sample]
+            gamma0s_sample, dgamma_ds_sample = gamma0s[inds_sample], dgamma_ds[inds_sample]
+            Es_sample, deltaEs_sample = self.Es()[inds_sample], deltaEs[inds_sample]
+
+            # go through steps
+            for i in range(num_evol_steps):
+                
+                # evolve the beam (no radiation reaction)
+                xs_i, uxs_i = evolve_hills_equation_analytic(xs_sample-x0_driver, uxs_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
+                ys_i, uys_i = evolve_hills_equation_analytic(ys_sample-y0_driver, uys_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
+                Es_i = Es_sample+deltaEs_sample*i/(num_evol_steps-1)
+                uzs_i = energy2proper_velocity(Es_i)
+                
+                # save the parameters
+                evol.x[i], evol.ux[i] = np.mean(xs_i), np.mean(uxs_i)
+                evol.y[i], evol.uy[i] = np.mean(ys_i), np.mean(uys_i)
+                evol.energy[i], evol.energy_spread[i] = np.mean(Es_i), np.std(Es_i)
+                evol.beam_size_x[i], evol.beam_size_y[i] = np.std(xs_i), np.std(ys_i)
+                evol.emit_nx[i] = np.sqrt(np.linalg.det(np.cov(xs_i, uxs_i/SI.c))) # only works for equal weight particles
+                evol.emit_ny[i] = np.sqrt(np.linalg.det(np.cov(ys_i, uys_i/SI.c))) # only works for equal weight particles
+                covx, covy = np.cov(xs_i, uxs_i/uzs_i), np.cov(ys_i, uys_i/uzs_i)
+                evol.beta_x[i] = covx[0,0]/np.sqrt(np.linalg.det(covx))
+                evol.beta_y[i] = covy[0,0]/np.sqrt(np.linalg.det(covy))
+
+            evol.rel_energy_spread = evol.energy_spread/evol.energy
+            evol.charge = self.charge()*np.ones(evol.location.shape)
+            evol.z = self.z_offset()*np.ones(evol.location.shape)
+            evol.bunch_length = self.bunch_length()*np.ones(evol.location.shape)
+            evol.plasma_density = n0*np.ones(evol.location.shape)
+            
+            
         # calculate final positions and angles after betatron motion
         if radiation_reaction:
             xs, uxs, ys, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.uxs(), self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
@@ -942,7 +986,10 @@ class Beam():
         self.set_ys(ys+y0_driver)
         self.set_uys(uys)
 
-        return Es_final
+        if calc_evolution:
+            return Es_final, evol
+        else:
+            return Es_final
         
   
     ## SAVE AND LOAD BEAM

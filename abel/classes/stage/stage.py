@@ -2,8 +2,10 @@ from abc import abstractmethod
 from matplotlib import patches
 from abel import Trackable, CONFIG
 from abel.classes.cost_modeled import CostModeled
+from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.utilities.plasma_physics import beta_matched
 import numpy as np
+import copy
 import scipy.constants as SI
 from matplotlib import pyplot as plt
 from types import SimpleNamespace
@@ -24,6 +26,10 @@ class Stage(Trackable, CostModeled):
         self.length = length
 
         self.stage_number = None
+
+        self.upramp = None
+        self.downramp = None
+        self._return_tracked_driver = False
         
         self.evolution = SimpleNamespace()
         self.evolution.beam = SimpleNamespace()
@@ -53,11 +59,33 @@ class Stage(Trackable, CostModeled):
 
         self.name = 'Plasma stage'
 
+    # upramp to be tracked before the main tracking
+    def track_upramp(self, beam0, driver0=None):
+        if self.upramp is not None and isinstance(self.upramp, Stage):
+            self.upramp.driver_source = SourceCapsule(beam=driver0)
+            self.upramp._return_tracked_driver = True
+            beam, driver = self.upramp.track(beam0)
+        else:
+            beam = beam0
+            driver = driver0
+        return beam, driver
+
+    # downramp to be tracked after the main tracking
+    def track_downramp(self, beam0, driver0):
+        if self.downramp is not None and isinstance(self.downramp, Stage):
+            self.downramp.driver_source = SourceCapsule(beam=driver0)
+            self.downramp._return_tracked_driver = True
+            beam, driver = self.downramp.track(beam0)
+        else:
+            beam = beam0
+            driver = driver0
+        return beam, driver
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         beam.stage_number += 1
         return super().track(beam, savedepth, runnable, verbose)
+
     
     def get_length(self):
         if self.length is not None:
@@ -164,22 +192,60 @@ class Stage(Trackable, CostModeled):
         self.plot_evolution(bunch='driver')
     
     def plot_evolution(self, bunch='beam'):
-
+        
         # select bunch
         if bunch == 'beam':
-            evol = self.evolution.beam
+            evol = copy.deepcopy(self.evolution.beam)
         elif bunch == 'driver':
-            evol = self.evolution.driver
+            evol = copy.deepcopy(self.evolution.driver)
             
         # extract wakefield if not already existing
         if not hasattr(evol, 'location'):
             print('No evolution calculated')
             return
 
+        # add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            upramp_evol = self.upramp.evolution.beam
+            evol.location = np.append(upramp_evol.location, evol.location-np.min(evol.location)+np.max(upramp_evol.location))
+            evol.energy = np.append(upramp_evol.energy, evol.energy)
+            evol.charge = np.append(upramp_evol.charge, evol.charge)
+            evol.emit_nx = np.append(upramp_evol.emit_nx, evol.emit_nx)
+            evol.emit_ny = np.append(upramp_evol.emit_ny, evol.emit_ny)
+            evol.rel_energy_spread = np.append(upramp_evol.rel_energy_spread, evol.rel_energy_spread)
+            evol.beam_size_x = np.append(upramp_evol.beam_size_x, evol.beam_size_x)
+            evol.beam_size_y = np.append(upramp_evol.beam_size_y, evol.beam_size_y)
+            evol.bunch_length = np.append(upramp_evol.bunch_length, evol.bunch_length)
+            evol.x = np.append(upramp_evol.x, evol.x)
+            evol.y = np.append(upramp_evol.y, evol.y)
+            evol.z = np.append(upramp_evol.z, evol.z)
+            evol.beta_x = np.append(upramp_evol.beta_x, evol.beta_x)
+            evol.beta_y = np.append(upramp_evol.beta_y, evol.beta_y)
+            evol.plasma_density = np.append(upramp_evol.plasma_density, evol.plasma_density)
+
+        # add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+            downramp_evol = self.downramp.evolution.beam
+            evol.location = np.append(evol.location, downramp_evol.location-np.min(downramp_evol.location)+np.max(evol.location))
+            evol.energy = np.append(evol.energy, downramp_evol.energy)
+            evol.charge = np.append(evol.charge, downramp_evol.charge)
+            evol.emit_ny = np.append(evol.emit_ny, downramp_evol.emit_ny)
+            evol.emit_nx = np.append(evol.emit_nx, downramp_evol.emit_nx)
+            evol.rel_energy_spread = np.append(evol.rel_energy_spread, downramp_evol.rel_energy_spread)
+            evol.beam_size_x = np.append(evol.beam_size_x, downramp_evol.beam_size_x)
+            evol.beam_size_y = np.append(evol.beam_size_y, downramp_evol.beam_size_y)
+            evol.bunch_length = np.append(evol.bunch_length, downramp_evol.bunch_length)
+            evol.x = np.append(evol.x, downramp_evol.x)
+            evol.y = np.append(evol.y, downramp_evol.y)
+            evol.z = np.append(evol.z, downramp_evol.z)
+            evol.beta_x = np.append(evol.beta_x, downramp_evol.beta_x)
+            evol.beta_y = np.append(evol.beta_y, downramp_evol.beta_y)
+            evol.plasma_density = np.append(evol.plasma_density, downramp_evol.plasma_density)
+        
         # preprate plot
         fig, axs = plt.subplots(3,3)
-        fig.set_figwidth(CONFIG.plot_fullwidth_default)
-        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        fig.set_figwidth(20)
+        fig.set_figheight(12)
         col0 = "tab:gray"
         col1 = "tab:blue"
         col2 = "tab:orange"
@@ -189,59 +255,62 @@ class Stage(Trackable, CostModeled):
         # plot energy
         axs[0,0].plot(evol.location, evol.energy / 1e9, color=col1)
         axs[0,0].set_ylabel('Energy [GeV]')
+        axs[0,0].set_xlabel(long_label)
         axs[0,0].set_xlim(long_limits)
-
+        
         # plot charge
-        axs[0,1].plot(evol.location, -evol.charge[0] * np.ones(evol.location.shape) * 1e9, ':', color=col0)
-        axs[0,1].plot(evol.location, -evol.charge * 1e9, color=col1)
+        axs[0,1].plot(evol.location, abs(evol.charge[0]) * np.ones(evol.location.shape) * 1e9, ':', color=col0)
+        axs[0,1].plot(evol.location, abs(evol.charge) * 1e9, color=col1)
         axs[0,1].set_ylabel('Charge [nC]')
         axs[0,1].set_xlim(long_limits)
-        axs[0,1].set_ylim(0, -evol.charge[0] * 1.3 * 1e9)
+        axs[0,1].set_ylim(0, abs(evol.charge[0]) * 1.3 * 1e9)
         
         # plot normalized emittance
         axs[0,2].plot(evol.location, evol.emit_ny*1e6, color=col2)
         axs[0,2].plot(evol.location, evol.emit_nx*1e6, color=col1)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_xlim(long_limits)
+        axs[0,2].set_yscale('log')
         
         # plot energy spread
         axs[1,0].plot(evol.location, evol.rel_energy_spread*1e2, color=col1)
         axs[1,0].set_ylabel('Energy spread, rms [%]')
         axs[1,0].set_xlabel(long_label)
         axs[1,0].set_xlim(long_limits)
-        
-        # plot beam size
-        axs[1,2].plot(evol.location, evol.beam_size_y*1e6, color=col2)
-        axs[1,2].plot(evol.location, evol.beam_size_x*1e6, color=col1)
-        axs[1,2].set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
-        axs[1,2].set_xlabel(long_label)
-        axs[1,2].set_xlim(long_limits)
-        
-        # plot transverse offset
-        axs[1,1].plot(evol.location, np.zeros(evol.location.shape), ':', color=col0)
-        axs[1,1].plot(evol.location, evol.y*1e6, color=col2)  
-        axs[1,1].plot(evol.location, evol.x*1e6, color=col1)
-        axs[1,1].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
+        axs[1,0].set_yscale('log')
+
+        # plot bunch length
+        axs[1,1].plot(evol.location, evol.bunch_length*1e6, color=col1)
+        axs[1,1].set_ylabel(r'Bunch length, rms [$\mathrm{\mu}$m]')
         axs[1,1].set_xlabel(long_label)
         axs[1,1].set_xlim(long_limits)
-        
+
         # plot beta function
-        axs[2,0].plot(evol.location, evol.beta_y*1e3, color=col2)  
-        axs[2,0].plot(evol.location, evol.beta_x*1e3, color=col1)
-        axs[2,0].set_ylabel('Beta function [mm]')
+        axs[1,2].plot(evol.location, evol.beta_y*1e3, color=col2)  
+        axs[1,2].plot(evol.location, evol.beta_x*1e3, color=col1)
+        axs[1,2].set_ylabel('Beta function [mm]')
+        axs[1,2].set_xlabel(long_label)
+        axs[1,2].set_xlim(long_limits)
+        axs[1,2].set_yscale('log')
+        
+        # plot longitudinal offset
+        axs[2,0].plot(evol.location, evol.plasma_density / 1e6, color=col1)
+        axs[2,0].set_ylabel('Plasma density [$\mathrm{cm}^{-3}$]')
         axs[2,0].set_xlabel(long_label)
         axs[2,0].set_xlim(long_limits)
         axs[2,0].set_yscale('log')
         
-        # plot fwhm energy spread
-        axs[2,1].plot(evol.location, evol.rel_energy_spread_fwhm*1e2, color=col1)
-        axs[2,1].set_ylabel('Energy spread, fwhm [%]')
+        # plot longitudinal offset
+        axs[2,1].plot(evol.location, evol.z * 1e6, color=col1)
+        axs[2,1].set_ylabel('Longitudinal offset [$\mathrm{\mu}$m]')
         axs[2,1].set_xlabel(long_label)
         axs[2,1].set_xlim(long_limits)
-
-        # plot peak spectral density
-        axs[2,2].plot(evol.location, evol.peak_spectral_density*1e18, color=col1)
-        axs[2,2].set_ylabel('Peak spectral density [pC/MeV]')
+        
+        # plot transverse offset
+        axs[2,2].plot(evol.location, np.zeros(evol.location.shape), ':', color=col0)
+        axs[2,2].plot(evol.location, evol.y*1e6, color=col2)  
+        axs[2,2].plot(evol.location, evol.x*1e6, color=col1)
+        axs[2,2].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_xlim(long_limits)
         
@@ -412,8 +481,6 @@ class Stage(Trackable, CostModeled):
 
     
     def survey_object(self):
-        #return patches.Rectangle((0, -1), self.get_length(), 2)
-        
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
         y_points = np.linspace(0, 0, npoints)

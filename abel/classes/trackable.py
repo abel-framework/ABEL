@@ -118,8 +118,8 @@ class Trackable(ABC):
     @property
     def rep_rate_trains(self):
         "The average repetition rate of trains [Hz]"
-        if self._rep_rate_trains == None:
-            raise TrackableInitializationException("rep_rate_trains is not yet initialized")
+        #if self._rep_rate_trains == None:
+        #    raise TrackableInitializationException("rep_rate_trains is not yet initialized")
         return self._rep_rate_trains
     @rep_rate_trains.setter
     def rep_rate_trains(self,rep_rate_trains : float):

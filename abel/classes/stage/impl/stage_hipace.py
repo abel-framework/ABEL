@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 try:
     import sys
-    sys.path.append(CONFIG.hipace_path + '/tools')
+    sys.path.append(os.path.join(CONFIG.hipace_path, 'tools'))
     import read_insitu_diagnostics
 except:
     print('Could not import HiPACE++ tools')
@@ -54,7 +54,7 @@ class StageHipace(Stage):
         self.__phase_advances = None
         
 
-    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
         
         ## PREPARE TEMPORARY FOLDER
         
@@ -68,14 +68,25 @@ class StageHipace(Stage):
             os.mkdir(tmpfolder)
         
         # generate driver
-        driver0 = self.driver_source.track()
+        driver_incoming = self.driver_source.track()
+
+        # plasma-density ramps (de-magnify beta function)
+        location_flattop_start = 0
+        if self.upramp is not None:
+            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
+            location_flattop_start = beam0.location
+        else:
+            # apply plasma-density up ramp (demagnify beta function)
+            driver0 = copy.deepcopy(driver_incoming)
+            beam0 = copy.deepcopy(beam_incoming)
+            driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+            beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+            
+
+        beam0.location = 0.0
+        driver0.location = 0.0
         
-        # !! QUICK FIX: TODO to make this a real ramp
-        # apply plasma-density up ramp (demagnify beta function)
-        driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
-        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
-        
-        # SAVE BEAMS
+        # SAVE BEAMS TO BE USED IN HiPACE++ SIMULATION
         
         # saving beam to temporary folder
         filename_beam = 'beam.h5'
@@ -122,7 +133,7 @@ class StageHipace(Stage):
         dz = beta_matched/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)
-        self.num_steps = np.ceil(self.length/dz)
+        self.num_steps = np.ceil(self.get_length()/dz)
         
         if self.output is not None:
             remainder = self.num_steps % self.output
@@ -131,7 +142,7 @@ class StageHipace(Stage):
             else:  # If remainder is less than 10, round down
                 self.num_steps = self.num_steps - remainder
         
-        time_step = self.length/(self.num_steps*SI.c)
+        time_step = self.get_length()/(self.num_steps*SI.c)
 
         # overwrite output period
         if self.output is not None:
@@ -156,33 +167,39 @@ class StageHipace(Stage):
         if self.driver_only:
             beam = beam0
         
-        # !! QUICK FIX: TODO to make this a real ramp
-        # apply plasma-density down ramp (magnify beta function)
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-        driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-
-
-        ## SAVE DRIVERS TO FILE
-        if self.save_drivers:
-            driver0.stage_number = beam0.stage_number
-            driver0.location = 0.0
-            driver0.trackable_number = 0
-            self.save_driver_to_file(driver0, runnable)
-            driver.stage_number = beam0.stage_number
-            driver.location = self.get_length()
-            driver.trackable_number = 1
-            self.save_driver_to_file(driver, runnable)
-        
         ## ADD METADATA
         
         # copy meta data from input beam (will be iterated by super)
-        beam.trackable_number = beam0.trackable_number
-        beam.stage_number = beam0.stage_number
-        beam.location = beam0.location
+        beam.trackable_number = beam_incoming.trackable_number
+        beam.stage_number = beam_incoming.stage_number
+        beam.location = location_flattop_start + beam0.location
+        driver.trackable_number = beam_incoming.trackable_number
+        driver.stage_number = beam_incoming.stage_number
+        driver.location = beam.location
+        
+        # apply plasma-density down ramp (magnify beta function)
+        if self.downramp is not None:
+            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
+        else:
+            beam_outgoing = copy.deepcopy(beam)
+            driver_outgoing = copy.deepcopy(driver)
+            beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+            driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        
+        ## SAVE DRIVERS TO FILE
+        if self.save_drivers:
+            driver_incoming.stage_number = beam_incoming.stage_number
+            driver_incoming.location = beam_incoming.location
+            driver_incoming.trackable_number = 0
+            self.save_driver_to_file(driver_incoming, runnable)
+            driver_outgoing.stage_number = beam_outgoing.stage_number
+            driver_outgoing.location = beam_outgoing.location
+            driver_outgoing.trackable_number = 1
+            self.save_driver_to_file(driver_outgoing, runnable)
         
         # clean nan particles and extreme outliers
-        beam.remove_nans()
-        beam.remove_halo_particles()
+        beam_outgoing.remove_nans()
+        beam_outgoing.remove_halo_particles()
 
         # extract insitu diagnostics and wakefield data
         self.__extract_evolution(tmpfolder, beam0, runnable)
@@ -192,12 +209,16 @@ class StageHipace(Stage):
         shutil.rmtree(tmpfolder)
         
         # calculate efficiency
-        self.calculate_efficiency(beam0, driver0, beam, driver)
+        self.calculate_efficiency(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
         
         # save current profile
-        self.calculate_beam_current(beam0, driver0, beam, driver)
+        self.calculate_beam_current(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
 
-        return super().track(beam, savedepth, runnable, verbose)
+        # return the beam (and optionally the driver)
+        if self._return_tracked_driver:
+            return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing
+        else:
+            return super().track(beam_outgoing, savedepth, runnable, verbose)
     
     
     def __extract_evolution(self, tmpfolder, beam0, runnable):
@@ -236,6 +257,7 @@ class StageHipace(Stage):
             evol.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
             evol.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
             evol.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
+            evol.plasma_density = self.get_plasma_density(evol.location)
             
             # beta functions (temporary fix)
             evol.beta_x = evol.beam_size_x**2*(evol.energy/0.5109989461e6)/evol.emit_nx # TODO: improve with x-x' correlations instead of x-px
@@ -442,19 +464,28 @@ class StageHipace(Stage):
         self.__amplitude_evol = phase_advances, amplitudes
 
     
-    def get_plasma_density(self):
+    def get_plasma_density(self, locations=None):
         if self.plasma_density_from_file is not None:
             density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
             ns = density_table[:,1]
             self.plasma_density = ns.max()
-        return self.plasma_density
+            if locations is not None:
+                ss = density_table[:,0]
+                return np.interp(locations, ss, ns)
+            else:
+                return self.plasma_density
+        else:
+            if locations is not None:
+                return self.plasma_density*np.ones(locations.shape)
+            else:
+                return self.plasma_density
 
     def get_length(self):
         if self.plasma_density_from_file is not None:
             density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
             ss = density_table[:,0]
             self.length = ss.max()-ss.min()
-        return self.length
+        return super().get_length()
     
     def get_amplitudes(self):
         if self.__amplitude_evol is None:

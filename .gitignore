@@ -134,7 +134,7 @@ dmypy.json
 # Jupyter files
 *.jupyter/
 
-# OPAL specific
+# ABEL specific
 *rundata/
 *run_data/
 abel/examples/*
@@ -151,5 +151,5 @@ examples/Untitled.ipynb
 examples/RF-Track_test.ipynb
 examples/rf_track_vs_hipace.ipynb
 abel/CONFIG.py
-/examples/
+#/examples/
 

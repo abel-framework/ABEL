@@ -100,6 +100,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
               'memory': str(int(memory_per_gpu*num_tasks_per_node))+'g',
               'num_nodes': num_nodes,
               'num_tasks_per_node': num_tasks_per_node,
+              'hipace_binary_path': CONFIG.hipace_binary,
               'filename_input': filename_input}
     
     # fill in template file
@@ -225,7 +226,7 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
                     pbar.set_description('>>> Running HiPACE++ (job ' + str(jobid) + ')')
                     
                 # read progress from output file
-                outputfile = runfolder + 'hipace-' + str(jobid) + '.out'
+                outputfile = os.path.join(runfolder,'hipace-' + str(jobid) + '.out')
                 if os.path.exists(outputfile) and not quiet:
                     with open(outputfile, 'rb') as f:
                         try:  # catch OSError in case of a one line file 
