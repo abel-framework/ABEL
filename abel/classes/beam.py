@@ -933,13 +933,13 @@ class Beam():
         if calc_evolution:
                 
             # calculate evolution
-            num_evol_steps = max(10, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
+            num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
             evol = SimpleNamespace()
             evol.location = np.linspace(0, L, num_evol_steps)
             evol.x, evol.ux, evol.ux, evol.y, evol.uy, evol.energy, evol.energy_spread, evol.rel_energy_spread, evol.beam_size_x, evol.beam_size_y, evol.emit_nx, evol.emit_ny, evol.beta_x, evol.beta_y = (np.empty(evol.location.shape) for _ in range(14))
 
             # select a given subset of the particles (for faster calculation)
-            sample_fraction = round(np.sqrt(len(self)))
+            sample_fraction = round(2*np.sqrt(len(self))) #
             inds_sample = np.arange(0, len(self), sample_fraction, dtype=int) # not random, to be consistent across ramps and stages
             xs_sample, uxs_sample = self.xs()[inds_sample], self.uxs()[inds_sample]
             ys_sample, uys_sample = self.ys()[inds_sample], self.uys()[inds_sample]

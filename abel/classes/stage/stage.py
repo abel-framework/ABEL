@@ -83,6 +83,8 @@ class Stage(Trackable, CostModeled):
             # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
+            beam.stage_number -= 1
+            driver.stage_number -= 1
             
         else:
             beam = beam0
@@ -106,11 +108,13 @@ class Stage(Trackable, CostModeled):
                 # set ramp length
                 if self.nom_energy is None:
                     self.nom_energy = beam0.energy()
-                self.downramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+                self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
 
             # perform tracking
             self.downramp._return_tracked_driver = True
             beam, driver = self.downramp.track(beam0)
+            beam.stage_number -= 1
+            driver.stage_number -= 1
             
         else:
             beam = beam0
@@ -151,7 +155,7 @@ class Stage(Trackable, CostModeled):
     def get_nom_accel_gradient(self):
         return self.nom_accel_gradient
 
-    def matched_beta_function_incoming(self, energy_incoming):
+    def matched_beta_function(self, energy_incoming):
         if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
             return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
         elif self.ramp_beta_mag is not None:
@@ -159,7 +163,7 @@ class Stage(Trackable, CostModeled):
         else:
             return beta_matched(self.plasma_density, energy_incoming)
             
-    def matched_beta_function(self, energy):
+    def matched_beta_function_flattop(self, energy):
         return beta_matched(self.plasma_density, energy)
     
     def energy_usage(self):
