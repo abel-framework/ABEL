@@ -11,6 +11,7 @@ from abel.physics_models.hills_equation import evolve_hills_equation_analytic
 from abel.physics_models.betatron_motion import evolve_betatron_motion
 
 import scipy.sparse as sp
+from scipy.spatial.transform import Rotation as Rot
 import copy
 
 from matplotlib import pyplot as plt
@@ -200,6 +201,7 @@ class Beam():
         if pz0 is None:
             pz0 = np.mean(self.pzs())
         return self.pzs()/pz0 -1
+        
     
     def ts(self):
         return self.zs()/SI.c
@@ -227,7 +229,218 @@ class Beam():
         vector[2,:] = self.ys()
         vector[3,:] = self.uys()/SI.c
         return vector
+
+
+    ## Rotate the coordinate system of the beam
+    # ==================================================
+    def rotate_coord_sys_3D(self, axis1, angle1, axis2=np.array([0, 1, 0]), angle2=0.0, axis3=np.array([1, 0, 0]), angle3=0.0, invert=False):
+        """
+        Rotates the coordinate system (passive transformation) of the beam first with angle1 around axis1, then with angle2 around axis2 and lastly with angle3 around axis3.
+        
+        Parameters
+        ----------
+        axis1, axis2, axis3: 1x3 float nd arrays
+            Unit vectors specifying the rotation axes.
+        
+        angle1, angle2, angle3: [rad] float
+            Angles used for rotation of the beam's coordinate system around the respective axes.
+
+        invert: bool
+            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+            
+        Returns
+        ----------
+        Modified beam.xs(), beam.ys(), beam.zs(), beam.uxs(), beam.uys() and beam.uzs().
+        """
+
+        zs = self.zs()
+        xs = self.xs()
+        ys = self.ys()
+        uzs = self.uzs()
+        uxs = self.uxs()
+        uys = self.uys()
+        
+        # Combine into (N, 3) arrays
+        coords = np.column_stack((zs, xs, ys))
+        u_vecs = np.column_stack((uzs, uxs, uys))
+
+        # Create rotation objects
+        rotation1 = Rot.from_rotvec(angle1 * axis1)
+        rotation2 = Rot.from_rotvec(angle2 * axis2)
+        rotation3 = Rot.from_rotvec(angle3 * axis3)
+
+        # Combine the rotations by applying them in sequence
+        combined_rotation = rotation1 * rotation2 * rotation3  # Rotation order is right-to-left, but effectively opposite when inverse=True in combined_rotation.apply().
+
+        # Apply rotation to the arrays
+        if invert is False:
+            inverse = True  # Since combined_rotation.apply() performs active transformations by default, inverse must be set to True for passive transformation.
+        else:
+            inverse = False
+        rotated_coords = combined_rotation.apply(coords, inverse=inverse)
+        rotated_u_vecs = combined_rotation.apply(u_vecs, inverse=inverse)
+
+        # Extract the rotated arrays
+        rotated_zs, rotated_xs, rotated_ys = rotated_coords[:, 0], rotated_coords[:, 1], rotated_coords[:, 2]
+        rotated_uzs, rotated_uxs, rotated_uys = rotated_u_vecs[:, 0], rotated_u_vecs[:, 1], rotated_u_vecs[:, 2]
+
+        self.set_zs(rotated_zs)
+        self.set_xs(rotated_xs)
+        self.set_ys(rotated_ys)
+        self.set_uzs(rotated_uzs)
+        self.set_uxs(rotated_uxs)
+        self.set_uys(rotated_uys)
+
     
+    # ==================================================
+    def xy_rotate_coord_sys(self, x_angle, y_angle, invert=False):
+        """
+        Rotates the coordinate system of the beam first with x_angle around the y-axis then with y_angle around the x-axis.
+        
+        Parameters
+        ----------
+        x_angle: [rad] float
+            Angle to rotate the coordinate system with in the zx-plane.
+        
+        y_angle: [rad] float
+            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+
+        invert: bool
+            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+        
+            
+        Returns
+        ----------
+        Modified beam.xs(), beam.ys(), beam.zs(), beam.uxs(), beam.uys() and beam.uzs().
+        """
+
+        y_axis = np.array([0, 0, 1])
+        x_axis = np.array([0, 1, 0])
+        
+        self.rotate_coord_sys_3D(y_axis, x_angle, x_axis, y_angle, invert=invert)
+        
+
+    # ==================================================
+    def beam_alignment_angles(self):
+        """
+        Calculates the angles for rotation around the y- and x-axis to align the z-axis to the beam proper velocity.
+        
+        Parameters
+        ----------
+        ...
+        
+            
+        Returns
+        ----------
+        x_angle: [rad] float
+            Used for rotating the beam's frame around the y-axis.
+        
+        y_angle: [rad] float
+            Used for rotating the beam's frame around the x-axis. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        """
+
+        # Get the mean proper velocity component offsets
+        uz_offset = energy2proper_velocity(self.energy())
+        ux_offset = self.ux_offset()
+        uy_offset = self.uy_offset()
+
+        point_vec = np.array([uz_offset, ux_offset, uy_offset])
+        point_vec = point_vec/np.linalg.norm(point_vec)
+
+        # Calculate the angles to be used for beam rotation
+        z_axis = np.array([1, 0, 0])  # Axis as an unit vector
+        x_axis = np.array([0, 1, 0])
+        y_axis = np.array([0, 0, 1])
+        
+        zx_projection = point_vec * np.array([1, 1, 0])  # The projection of the pointing vector onto the zx-plane.
+        
+        x_angle = np.sign(point_vec[1]) * np.arccos( np.dot(zx_projection, z_axis) / np.linalg.norm(zx_projection) / np.linalg.norm(z_axis) )  # The angle between zx_projection and z_axis.
+
+        y_rotated_point_vec = np.array([ np.linalg.norm(zx_projection), 0, point_vec[2] ])  # The pointing vector after its zx-projection is aligned to the rotated z-axis.
+
+        y_angle = np.sign(point_vec[2]) * np.arccos( np.dot(y_rotated_point_vec, z_axis) / np.linalg.norm(y_rotated_point_vec) / np.linalg.norm(z_axis) )  # Note that due to the right hand rule, a positive y_angle corresponds to rotation from z-axis towards negative y. I.e. opposite sign convention of yps.
+
+        return x_angle, y_angle
+        
+
+    # ==================================================
+    def z_align_beam_u(self, invert=False):
+        """
+        Rotates the coordinate system of the beam so that the rotated z-axis is aligned with the beam proper velocity.
+        
+        Parameters
+        ----------
+        invert: bool
+            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+        
+            
+        Returns
+        ----------
+        Modified beam.xs(), beam.ys(), beam.zs(), beam.uxs(), beam.uys() and beam.uzs().
+        """
+        
+        # Calculate the angles to be used for beam rotation
+        x_axis = np.array([0, 1, 0])  # Axis as an unit vector
+        y_axis = np.array([0, 0, 1])
+
+        x_angle, y_angle = self.beam_alignment_angles()
+        y_angle = -y_angle
+
+        # Rotate the beam 6D phase space
+        self.rotate_coord_sys_3D(y_axis, x_angle, x_axis, y_angle, invert=invert)
+
+    
+    # ==================================================
+    def add_pointing_tilts(self, align_x_angle=None, align_y_angle=None):
+        """
+        Uses active transformation to tilt the beam in the zx- and zy-planes.
+        
+        Parameters
+        ----------
+         align_x_angle: [rad] float
+            Beam coordinates with in the zx-plane are rotated with this angle.
+        
+        align_y_angle: [rad] float
+            Beam coordinates with in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        
+            
+        Returns
+        ----------
+        Modified beam.xs(), beam.ys(), beam.zs()
+        """
+
+        if align_x_angle is None:
+            align_x_angle, _ = self.beam_alignment_angles()
+        if align_y_angle is None:
+            _, align_y_angle = self.beam_alignment_angles()
+            align_y_angle = -align_y_angle
+
+        y_axis = np.array([0, 0, 1])
+        x_axis = np.array([0, 1, 0])
+        
+        zs = self.zs()
+        xs = self.xs()
+        ys = self.ys()
+
+        # Combine into (N, 3) arrays
+        coords = np.column_stack((zs, xs, ys))
+        
+        # Create the rotation object
+        rotation_y = Rot.from_rotvec(align_x_angle * y_axis)
+        rotation_x = Rot.from_rotvec(align_y_angle * x_axis)
+        combined_rotation = rotation_y * rotation_x
+
+        # Apply rotation to the coordinates only
+        rotated_coords = combined_rotation.apply(coords, inverse=False)  # Active transformation
+
+        # Extract the rotated coordinates
+        rotated_zs, rotated_xs, rotated_ys = rotated_coords[:, 0], rotated_coords[:, 1], rotated_coords[:, 2]
+
+        self.set_zs(rotated_zs)
+        self.set_xs(rotated_xs)
+        self.set_ys(rotated_ys)
+            
+
     
     ## BEAM STATISTICS
 
