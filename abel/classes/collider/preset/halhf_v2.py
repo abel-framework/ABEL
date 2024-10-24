@@ -10,20 +10,30 @@ class HALHFv2(Collider):
 
         # OPTIMIZATION VARIABLES
         self.com_energy = 250e9 # [eV]
-        self.energy_asymmetry = 3
+        self.energy_asymmetry = 2.7
         
         self.num_bunches_in_train = 100
         self.rep_rate_trains = 100.0 # [Hz]
         
         self.driver_separation_num_buckets = 3
         self.driver_linac_rf_frequency = 1e9 # [Hz]
-        self.driver_linac_gradient = 5e6 # [V/m]
+        self.driver_linac_gradient = 4e6 # [V/m]
         self.driver_linac_structure_num_rf_cells = 20
         self.driver_linac_num_structures_per_klystron = 1.0
+
+        self.use_cool_copper_positron_linac = True
+        if self.use_cool_copper_positron_linac:
+            self.positron_linac_gradient = 30e6 # [V/m]
+            self.positron_linac_num_structures_per_klystron = 300.0
+            self.positron_linac_num_rf_cells = 1
+        else:
+            self.positron_linac_gradient = 20e6 # [V/m]
+            self.positron_linac_num_structures_per_klystron = 1.0
+            self.positron_linac_num_rf_cells = 80
         
         self.combiner_ring_compression_factor = 5
         
-        self.pwfa_num_stages = 25
+        self.pwfa_num_stages = 32
         self.pwfa_transformer_ratio = 2
         self.pwfa_gradient = 1e9
         
@@ -124,23 +134,22 @@ class HALHFv2(Collider):
         psource.is_polarized = True
         
         # define RF accelerator
-        #paccel = RFAcceleratorCLICopti()
-        paccel = RFAcceleratorBasic()
-        paccel.rf_frequency = 3e9
-        self.use_cool_copper_positron_linac = True
         if self.use_cool_copper_positron_linac:
+            paccel = RFAcceleratorBasic()
             paccel.operating_temperature = 77
             paccel.fill_factor = 0.9 # [Hz]
-            paccel.nom_accel_gradient = 40e6 * paccel.fill_factor # [V/m] # OPTIMIZATION VARIABLE
-            paccel.num_rf_cells = 1 # OPTIMIZATION VARIABLE
-            #paccel.num_structures_per_klystron = 500 # for reduced bunch train length
-            paccel.num_structures_per_klystron = 170 # OPTIMIZATION VARIABLE
+            paccel.nom_accel_gradient = self.positron_linac_gradient * paccel.fill_factor
+            paccel.num_rf_cells = self.positron_linac_num_rf_cells
+            paccel.num_structures_per_klystron = self.positron_linac_num_structures_per_klystron
         else:
+            paccel = RFAcceleratorCLICopti()
+            #paccel = RFAcceleratorBasic()
             paccel.operating_temperature = 330
             paccel.fill_factor = 0.75 # [Hz]
-            paccel.nom_accel_gradient = 20e6 * paccel.fill_factor # [V/m] # OPTIMIZATION VARIABLE
-            paccel.num_rf_cells = 80 # OPTIMIZATION VARIABLE
-            paccel.num_structures_per_klystron = 1
+            paccel.nom_accel_gradient = self.positron_linac_gradient * paccel.fill_factor # [V/m] # OPTIMIZATION VARIABLE
+            paccel.num_rf_cells = self.positron_linac_num_rf_cells # OPTIMIZATION VARIABLE
+            paccel.num_structures_per_klystron = self.positron_linac_num_structures_per_klystron
+        paccel.rf_frequency = 3e9
         
         # injector
         pinjector = paccel.__class__()

@@ -321,7 +321,7 @@ class Collider(Runnable, CostModeled):
             # simulate collisions
             if self.verbose:
                 print(">> INTERACTION POINT")
-            event = self.ip.run(self.linac1, self.linac2, self.run_name + "/ip", all_by_all=True, overwrite=False, step_filter=self.step)
+            event = self.ip.run(self.linac1, self.linac2, self.run_name + "/ip", all_by_all=True, overwrite=False, step_filter=self.step, verbose=self.verbose)
             
             # save object to file
             self.save()

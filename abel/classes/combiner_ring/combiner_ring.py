@@ -18,6 +18,8 @@ class CombinerRing(Trackable, CostModeled):
 
         self.start_with_quarter_circle = False
 
+        self.name = 'Combiner ring'
+
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -30,6 +32,9 @@ class CombinerRing(Trackable, CostModeled):
     @abstractmethod 
     def get_bend_radius(self):
         pass
+
+    def get_circumference(self):
+        return 2.0*np.pi*self.get_bend_radius()
     
     def get_nom_energy(self):
         return self.nom_energy 
@@ -41,7 +46,7 @@ class CombinerRing(Trackable, CostModeled):
         return self.bunch_separation
     
     def get_cost_breakdown(self):
-        return ('Combiner ring', self.get_length() * CostModeled.cost_per_length_turnaround)
+        return (self.name, self.get_circumference() * CostModeled.cost_per_length_turnaround)
     
     def energy_usage(self):
         return 0.0

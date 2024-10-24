@@ -304,7 +304,7 @@ class Runnable(ABC):
             self.scan(run_name=self.run_name, fcn=opt_fcn, vals=np.arange(num_steps), step_filter=self.step, num_shots_per_step=num_shots_per_step, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores, label=label)
             
             # evaluate the merit function
-            vals = np.empty(self.num_steps)
+            vals = np.empty(self.num_shots_per_step)
             for shot_in_step in range(self.num_shots_per_step):
                 vals[shot_in_step] = self.merit_fcn(self[self.step, shot_in_step])
 
@@ -313,6 +313,11 @@ class Runnable(ABC):
             
             # iterate the optimzation step
             self.step += 1
+
+            # print the merit function and parameters
+            print(f"Merit function ({label}): {val_mean:.3g}")
+            for key in params:
+                print(f">> {key}: {params[key]:.3g}")
             
             return val_mean
         
