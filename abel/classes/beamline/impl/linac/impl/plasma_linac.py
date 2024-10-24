@@ -69,9 +69,12 @@ class PlasmaLinac(Linac):
             if self.num_bunches_in_train is not None and self.rep_rate_trains is not None:
                 
                 # driver complex rep rate (one driver per stage)
-                self.driver_complex.num_bunches_in_train = self.num_bunches_in_train*self.num_stages
-                self.driver_complex.bunch_separation = self.bunch_separation/self.num_stages
-                self.driver_complex.rep_rate_trains = self.rep_rate_trains
+                if self.driver_complex.bunch_separation is None:
+                    self.driver_complex.bunch_separation = self.bunch_separation/self.num_stages
+                if self.driver_complex.num_bunches_in_train is None:
+                    self.driver_complex.num_bunches_in_train = self.num_bunches_in_train*self.num_stages
+                if self.driver_complex.rep_rate_trains is None:
+                    self.driver_complex.rep_rate_trains = self.rep_rate_trains
         
         # declare list of trackables, stages and interstages
         self.trackables = []

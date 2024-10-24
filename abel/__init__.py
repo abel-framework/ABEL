@@ -24,6 +24,7 @@ from .classes.rf_accelerator.rf_accelerator import RFAccelerator, RFAcceleratorI
 from .classes.bds.bds import BeamDeliverySystem
 from .classes.spectrometer.spectrometer import Spectrometer
 from .classes.damping_ring.damping_ring import DampingRing
+from .classes.combiner_ring.combiner_ring import CombinerRing
 from .classes.turnaround.turnaround import Turnaround
 
 from .classes.beamline.impl.driver_complex import DriverComplex
@@ -62,6 +63,7 @@ from .classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorB
 #from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_DB2 import RFAccelerator_TW_DB2
 from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
 from .classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
+from .classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
 from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.bds.impl.bds_basic import *
 from .classes.bds.impl.bds_fbt import *

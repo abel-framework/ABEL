@@ -160,6 +160,12 @@ class Trackable(ABC):
         
         # iterate trackable number
         beam.trackable_number += 1
+
+        # set the bunch pattern if not already set
+        if self.bunch_separation is None:
+            self.bunch_separation = beam.bunch_separation
+        if self.num_bunches_in_train is None:
+            self.num_bunches_in_train = beam.num_bunches_in_train
         
         # save beam to file
         if savedepth >= 0:

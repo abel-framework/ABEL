@@ -14,14 +14,14 @@ class RFAccelerator(Trackable, CostModeled):
     It's an abstract class, meant to be superseeded by a specific RFlinac implementation, relating to a structure type and how it is modelled.
     """
 
-    default_structure_length = 1 # [m]
+    default_num_rf_cells = 20 # [m]
     default_fill_factor = 0.71
     default_rf_frequency = 2e9 # [Hz]
     
-    operating_temperature = 300
+    default_operating_temperature = 300
     
     @abstractmethod
-    def __init__(self, length=None, nom_energy_gain=None, structure_length=default_structure_length, fill_factor=default_fill_factor, rf_frequency=default_rf_frequency):
+    def __init__(self, length=None, nom_energy_gain=None, num_rf_cells=default_num_rf_cells, fill_factor=default_fill_factor, rf_frequency=default_rf_frequency, operating_temperature=default_operating_temperature):
         """
         Initialize the rf_accelerator base class.
         This can interface an underlying RF structure model including power requirements, and costs.
@@ -62,16 +62,10 @@ class RFAccelerator(Trackable, CostModeled):
 
         self.length = length
         self.nom_energy_gain = nom_energy_gain
-
-        if not hasattr(self, "_structure_length"):
-            #If already handled by daughter class, don't try to set again;
-            # This is indicated by setting _structure_length to None before calling this __init__().
-            # E.g in rf_accelerator_TW, the structure_length is a computed parameter (from number of rf cells),
-            # and cannot be set directly.
-            self.structure_length   = structure_length
-
+        self.num_rf_cells = num_rf_cells
         self.fill_factor = fill_factor
         self.rf_frequency = rf_frequency
+        self.operating_temperature = operating_temperature
 
         # default settings
         self.num_structures_per_klystron = 1.0
@@ -83,10 +77,6 @@ class RFAccelerator(Trackable, CostModeled):
         # For consistency, it follows how Beam does it even if average current + pulse length
         # is more fundamental for CLICopti modelling.
         self.bunch_charge           = None # [C]
-
-        #Set this to true to always optimize the gradient, number of structures, and overall length on track()
-        self.auto_optimize = False
-        self.auto_optimize_target_fill_factor = 0.71
 
         self.name = 'RF accelerator'
 
@@ -328,11 +318,10 @@ class RFAccelerator(Trackable, CostModeled):
     #---------------------------------------------#
     # Methods for cost modelling                  #
     #=============================================#
-
-    @abstractmethod
+    
     def get_cost_structures(self):
         "Cost of the RF structures [ILC units]"
-        pass
+        return self.num_structures * self.structure_length * CostModeled.cost_per_length_rf_structure_normalconducting
 
     def get_cost_remaining_beamline(self):
         "Cost of the beamline between structures [ILC units]"

@@ -21,7 +21,7 @@ except:
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -34,6 +34,9 @@ class StageHipace(Stage):
         self.plasma_density_from_file = plasma_density_from_file
         self.save_drivers = save_drivers
         self.no_plasma = no_plasma
+
+        # external focusing (APL-like) [T/m]
+        self.external_focusing_radial = external_focusing_radial
 
         # physics flags
         self.ion_motion = ion_motion
@@ -153,7 +156,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial)
         
         
         ## RUN SIMULATION
@@ -224,6 +227,10 @@ class StageHipace(Stage):
     
     def __extract_evolution(self, tmpfolder, beam0, runnable):
 
+        # suppress divide-by-zero errors
+        np.seterr(divide='ignore', invalid='ignore')
+
+        # in-situ data path
         insitu_path = tmpfolder + 'diags/insitu/'
 
         bunches = ['beam','driver']

@@ -280,7 +280,4 @@ class RFAcceleratorCLICopti(RFAccelerator):
         # return energy usage per bunch
         return self.energy_usage_rf() + self.energy_usage_cooling()
         
-    def get_cost_structures(self):
-       return self.num_structures * self.structure_length * CostModeled.cost_per_length_rf_structure_normalconducting # TODO 
-        
 

@@ -255,7 +255,7 @@ class Collider(Runnable, CostModeled):
         return ('Collider', breakdown)
     
     # total cost of construction and running
-    def full_programme_cost(self, include_carbon_tax=False):
+    def full_programme_cost(self, include_carbon_tax=True):
         fpc = self.total_project_cost() + self.energy_cost() + self.maintenance_cost()
         if include_carbon_tax:
             fpc += self.carbon_tax_cost()
