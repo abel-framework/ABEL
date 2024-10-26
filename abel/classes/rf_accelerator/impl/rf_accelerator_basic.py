@@ -27,6 +27,7 @@ class RFAcceleratorBasic(RFAccelerator):
 
         self.wallplug_energy_per_bunch_rf = None
         self.wallplug_energy_per_bunch_cooling = None
+        self.heat_energy_per_bunch_heating = None
         
     
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
@@ -107,22 +108,26 @@ class RFAcceleratorBasic(RFAccelerator):
 
         # total energy lost into the wall
         energy_per_train_heating = dP_dz_losses * self.structure.pulse_length_total * self.structure_length * self.num_structures
-        energy_per_bunch_heating = energy_per_train_heating / self.num_bunches_in_train
-        self.wallplug_energy_per_bunch_cooling = energy_per_bunch_heating * inv_efficiency_cooling
+        self.heat_energy_per_bunch_heating = energy_per_train_heating / self.num_bunches_in_train
+        self.wallplug_energy_per_bunch_cooling = self.heat_energy_per_bunch_heating * inv_efficiency_cooling
 
     
     # implement required abstract methods
     
+    def heat_energy_at_cryo_temperature(self) -> float:
+        "Heat energy dissipated per bunch at cryo temperature [J]"
+        return self.heat_energy_per_bunch_heating
+    
     def energy_usage_rf(self) -> float:
-        "Energy usage per shot [J]"
+        "Energy usage per bunch for RF [J]"
         return self.wallplug_energy_per_bunch_rf
 
     def energy_usage_cooling(self) -> float:
-        "Energy usage per shot for cooling [J]"
+        "Energy usage per bunch for cooling [J]"
         return self.wallplug_energy_per_bunch_cooling
-    
+
     def energy_usage(self) -> float: # TODO: improve the estimate of number of klystrons required
-        "Energy usage per shot [J]"
+        "Energy usage per bunch total [J]"
         
         # return energy usage per bunch
         return self.energy_usage_rf() + self.energy_usage_cooling()

@@ -12,7 +12,9 @@ class PlasmaLinac(Linac):
     
     def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
-        self.source = source
+        super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
+        
+        #self.source = source
         self.rf_injector = rf_injector
         self.driver_complex = driver_complex
         self.stage = stage
@@ -28,7 +30,6 @@ class PlasmaLinac(Linac):
 
         self.name = 'Plasma linac'
         
-        super().__init__(nom_energy, num_bunches_in_train, bunch_separation, rep_rate_trains)
         
     
     # assemble the trackables

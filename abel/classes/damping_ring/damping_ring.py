@@ -7,16 +7,15 @@ from abel.classes.cost_modeled import CostModeled
 class DampingRing(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, nom_energy=None, emit_nx_target=None, emit_ny_target=None, bunch_separation_in_ring=None, num_bunches_in_train=None, rep_rate_trains=None, num_rings=1):
+    def __init__(self, nom_energy=None, emit_nx_target=None, emit_ny_target=None, bunch_separation_in_ring=None, num_rings=1):
 
+        super().__init__()
+        
         self.nom_energy = nom_energy
         self.emit_nx_target = emit_nx_target
         self.emit_ny_target = emit_ny_target
         
         self.bunch_separation_in_ring = bunch_separation_in_ring
-        self.num_bunches_in_train = num_bunches_in_train
-        self.rep_rate_trains = rep_rate_trains
-
         self.num_rings = num_rings
 
         self.name = 'Damping ring'

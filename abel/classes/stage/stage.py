@@ -17,6 +17,8 @@ class Stage(Trackable, CostModeled):
     @abstractmethod
     def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None, length=None):
 
+        super().__init__()
+        
         # common variables
         self.nom_accel_gradient = nom_accel_gradient
         self.nom_energy_gain = nom_energy_gain

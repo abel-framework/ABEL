@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 class InterstageBasic(Interstage):
     
     def __init__(self, nom_energy=None, length=None, dipole_length=None, dipole_field=None, beta0=None, R56=None, phase_advance=1.5*np.pi):
+        
         super().__init__()
         
         self.nom_energy = nom_energy

@@ -9,10 +9,15 @@ class Interstage(Trackable, CostModeled):
     
     @abstractmethod
     def __init__(self):
-        self.evolution = SimpleNamespace()
         
+        super().__init__()
+        
+        self.evolution = SimpleNamespace()
+
+    
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
+
     
     @abstractmethod
     def get_length(self):
@@ -22,10 +27,6 @@ class Interstage(Trackable, CostModeled):
         return ('Interstage', self.get_length() * CostModeled.cost_per_length_interstage)
     
     def survey_object(self):
-        #rect = patches.Rectangle((0, -0.05), self.get_length(), 0.1)
-        #rect.set_facecolor = 'k'
-        #return rect
-        
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
         y_points = np.linspace(0, 0, npoints)

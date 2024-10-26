@@ -22,10 +22,22 @@ class Beamline(Trackable, Runnable, CostModeled):
     def assemble_trackables(self):
         
         # set bunch pattern for all trackables
-        for trackable in self.trackables:
-            trackable.num_bunches_in_train = self.num_bunches_in_train
-            trackable.bunch_separation = self.bunch_separation
-            trackable.rep_rate_trains = self.rep_rate_trains
+        #for trackable in self.trackables:
+        #    trackable.num_bunches_in_train = self.num_bunches_in_train
+        #    trackable.bunch_separation = self.bunch_separation
+        #    trackable.rep_rate_trains = self.rep_rate_trains
+        
+        # apply the bunch pattern to all trackables
+        for i in range(len(self.trackables)):
+            if self.bunch_separation is not None:
+                assert self.trackables[i].bunch_separation is None or self.trackables[i].bunch_separation==self.bunch_separation, 'Mismatched bunch separation'
+                self.trackables[i].bunch_separation = self.bunch_separation
+            if self.num_bunches_in_train is not None:
+                assert self.trackables[i].num_bunches_in_train is None or self.trackables[i].num_bunches_in_train==self.num_bunches_in_train, 'Mismatched number of bunches in train'
+                self.trackables[i].num_bunches_in_train = self.num_bunches_in_train
+            if self.rep_rate_trains is not None:
+                assert self.trackables[i].rep_rate_trains is None or self.trackables[i].rep_rate_trains==self.rep_rate_trains, 'Mismatched train rep rate'
+                self.trackables[i].rep_rate_trains = self.rep_rate_trains
 
     
     # perform tracking

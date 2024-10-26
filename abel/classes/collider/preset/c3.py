@@ -6,16 +6,32 @@ class C3(Collider):
     def __init__(self):
 
         super().__init__()
-
-        # overall parameters
-        self.com_energy = 250e9
-        self.bunch_separation = 5.26e-9 # [s]
+        
+        # OPTIMIZATION VARIABLES
+        self.com_energy = 250e9 # [eV]
+        
         self.num_bunches_in_train = 133
-        self.rep_rate_trains = 120 # [Hz]
+        self.rep_rate_trains = 120.0 # [Hz]
+        self.bunch_separation_ns = 5.26 # [s]
+
+        self.bunch_charge = 1e10 * SI.e # [C]
+
+        self.rf_frequency = 5.712e9 # [V/m]
+        self.linac_gradient = 70e6 # [V/m]
+        self.num_structures_per_klystron = 130
+
+        # from optimization @ 250 GeV: {'bunch_separation_ns': 8.192714440875887, 'linac_gradient': 51417581.36622494, 'num_structures_per_klystron': 270}
+        # from optimization @ 550 GeV: {'bunch_separation_ns': 8.534381894337127, 'linac_gradient': 52715332.71703247, 'num_structures_per_klystron': 270}
+        
+
+    # pre-assembly of the collider subsystems
+    def assemble_trackables(self):
+        
+        self.bunch_separation = self.bunch_separation_ns*1e-9
         
         # define positron source
         esource = SourceBasic()
-        esource.charge = -1e10 * SI.e # [C]
+        esource.charge = -self.bunch_charge
         esource.energy = 76e6 # [eV]
         esource.rel_energy_spread = 0.0015
         esource.bunch_length = 100e-6 # [m]
@@ -29,7 +45,7 @@ class C3(Collider):
         einjector = RFAcceleratorBasic()
         einjector.nom_accel_gradient = 30e6 # [V/m]
         einjector.num_rf_cells = 1
-        einjector.num_structures_per_klystron = 130
+        einjector.num_structures_per_klystron = self.num_structures_per_klystron
         einjector.fill_factor = 0.9 # [V/m]
         einjector.nom_energy_gain = 3e9 - esource.energy # [eV]
         einjector.rf_frequency = 2.856e9 # [Hz]
@@ -45,15 +61,15 @@ class C3(Collider):
         eaccel = RFAcceleratorBasic()
         eaccel.nom_energy_gain = self.com_energy/2 - (einjector.nom_energy_gain + esource.energy)
         eaccel.num_rf_cells = 1
-        eaccel.num_structures_per_klystron = 130
+        eaccel.num_structures_per_klystron = self.num_structures_per_klystron
         eaccel.fill_factor = 0.9
-        eaccel.nom_accel_gradient = 70e6 * eaccel.fill_factor # [V/m]
-        eaccel.rf_frequency = 5.712e9 # [Hz]
+        eaccel.nom_accel_gradient = self.linac_gradient * eaccel.fill_factor # [V/m]
+        eaccel.rf_frequency = self.rf_frequency # [Hz]
         eaccel.operating_temperature = 77 # [K]
         
         # define positron BDS
         ebds = BeamDeliverySystemBasic()
-        ebds.length = 1200
+        ebds.length = 1200*np.sqrt(self.com_energy/250e9)
         ebds.beta_x = 12e-3 # [m]
         ebds.beta_y = 0.12e-3 # [m]
         
@@ -68,7 +84,8 @@ class C3(Collider):
         
         # define positron source
         psource = copy.deepcopy(esource)
-        psource.charge = -esource.charge
+        psource.charge = self.bunch_charge
+        psource.is_polarized = False
         
         # injector
         pinjector = copy.deepcopy(einjector)
@@ -100,9 +117,7 @@ class C3(Collider):
         self.linac1 = elinac
         self.linac2 = plinac
         self.ip = ip
-
         
         # assemble everything
-        self.assemble_trackables()
-        
-        
+        super().assemble_trackables()
+    

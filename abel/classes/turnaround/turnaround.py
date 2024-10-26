@@ -9,6 +9,8 @@ class Turnaround(Trackable, CostModeled):
     @abstractmethod
     def __init__(self, nom_energy=None, use_semi_circle=False, start_with_semi_circle=False):
 
+        super().__init__()
+        
         self.nom_energy = nom_energy
         self.use_semi_circle = use_semi_circle
         self.start_with_semi_circle = start_with_semi_circle

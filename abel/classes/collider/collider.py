@@ -4,6 +4,7 @@ from abel.classes.event import Event
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.bds.bds import BeamDeliverySystem
 from abel.classes.ip.ip import InteractionPoint
+from abel.CONFIG import CONFIG
 from matplotlib import pyplot as plt
 import numpy as np
 import os, copy
@@ -22,9 +23,7 @@ class Collider(Runnable, CostModeled):
         self.com_energy = com_energy
         self.energy_asymmetry = energy_asymmetry
         
-        self.cost_per_length = 2e5 # [LCU/m]
-        self.cost_per_energy = 0.2/(3600*1000)# ILCU/J (0.2 ILCU per kWh)
-        self.target_integrated_luminosity = 1e46 # [m^-2] or 1/ab
+        self.target_integrated_luminosity = 2e46 # [m^-2] or 1/ab # C3 assumes 2/ab @ 250 GeV and 4/ab at 550 GeV
 
         # cost overheads
         self.overheads = SimpleNamespace()
@@ -96,13 +95,16 @@ class Collider(Runnable, CostModeled):
             self.energy_asymmetry = self.get_energy_asymmetry()
 
         # assign bunch train pattern
-        self.linac1.bunch_separation = self.bunch_separation
-        self.linac1.num_bunches_in_train = self.num_bunches_in_train
-        self.linac1.rep_rate_trains = self.rep_rate_trains
-        self.linac2.bunch_separation = self.bunch_separation
-        self.linac2.num_bunches_in_train = self.num_bunches_in_train
-        self.linac2.rep_rate_trains = self.rep_rate_trains
-
+        if self.bunch_separation is not None:
+            self.linac1.bunch_separation = self.bunch_separation
+            self.linac2.bunch_separation = self.bunch_separation
+        if self.num_bunches_in_train is not None:
+            self.linac1.num_bunches_in_train = self.num_bunches_in_train
+            self.linac2.num_bunches_in_train = self.num_bunches_in_train
+        if self.rep_rate_trains is not None:
+            self.linac1.rep_rate_trains = self.rep_rate_trains
+            self.linac2.rep_rate_trains = self.rep_rate_trains
+        
         # assemble the linacs
         self.linac1.assemble_trackables()
         self.linac2.assemble_trackables()
@@ -189,7 +191,7 @@ class Collider(Runnable, CostModeled):
     
     def energy_cost(self):
         "Integrated cost of energy [ILC units]"
-        return self.integrated_energy_usage() * self.cost_per_energy
+        return self.integrated_energy_usage() * CostModeled.cost_per_energy
         
     def construction_cost(self):
         "Cost of construction [ILC units]"
@@ -271,10 +273,10 @@ class Collider(Runnable, CostModeled):
         print('-------------------------------------------------')
 
     def print_power(self):
-        print(f"-- POWER {'_'.ljust(38,'-')}")
-        print('>> Linac 1:                     {:.0f} MW'.format(self.linac1.wallplug_power()/1e6))
-        print('>> Linac2:                      {:.0f} MW'.format(self.linac2.wallplug_power()/1e6))
-        print('>> Overhead:                    {:.0f} MW'.format(self.power_overhead()/1e6))
+        print(f"-- POWER {'-'.ljust(40,'-')}")
+        print(f">> {self.linac1.name}:                       {self.linac1.wallplug_power()/1e6:.0f} MW")
+        print(f">> {self.linac2.name}:                 {self.linac2.wallplug_power()/1e6:.0f} MW")
+        print('>> Overhead:                          {:.0f} MW'.format(self.power_overhead()/1e6))
         print('-------------------------------------------------')
         print('>> Total power:                 {:.0f} MW'.format(self.wallplug_power()/1e6))
         print('-------------------------------------------------')
@@ -413,6 +415,83 @@ class Collider(Runnable, CostModeled):
         ax.legend(loc='upper left', ncol=4, reverse=True)
         plt.show()
 
+
+
+    ## SCAN PLOTS
+
+    def plot_cost_variation_for_parameter(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=True, overwrite=True):
+
+        # make copy of the object
+        scan_self = copy.deepcopy(self)
+        
+        # set default scan name
+        if scan_name is None:
+            scan_name = 'param_scan_' + param + '_' + datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # set default upper and lower bounds
+        if lower is None:
+            lower = self.get_nested_attr(param)*0.7
+        if upper is None:
+            upper = self.get_nested_attr(param)*1.3
+
+        # default label
+        if label is None:
+            label = param
+
+        # set values based on type of scale
+        if xscale == 'log':
+            scan_vals = np.logspace(np.log10(lower), np.log10(upper), num_steps)
+        elif xscale == 'linear':
+            scan_vals = np.linspace(lower, upper, num_steps)
+        
+        # perform scan
+        scan_self.scan(scan_name, 
+           lambda obj, val: obj.set_attr(param, val) or obj, 
+           scan_vals,
+           label=label, scale=scale,
+           num_shots_per_step=num_shots_per_step,
+           parallel=parallel, overwrite=overwrite, verbose=False);
+
+        # extract values
+        full_programme_cost, _ = scan_self.extract_function(Collider.full_programme_cost)
+        construction_cost, _ = scan_self.extract_function(Collider.construction_cost)
+        overhead_cost, _ = scan_self.extract_function(Collider.overhead_cost)
+        energy_cost, _ = scan_self.extract_function(Collider.energy_cost)
+        maintenance_cost, _ = scan_self.extract_function(Collider.maintenance_cost)
+        carbon_tax_cost, _ = scan_self.extract_function(Collider.carbon_tax_cost)
+        
+        # plot cost breakdown
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.6)
+
+        cumul_cost = construction_cost
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.zeros_like(scan_vals))), label='Construction cost')
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += overhead_cost
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Overhead cost')
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += energy_cost
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Energy cost')
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += maintenance_cost
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Maintenance cost')
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += carbon_tax_cost
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Carbon tax')
+        ax.plot(scan_vals/scale, full_programme_cost/1e9, ls='-', color='k', label='Full programme cost')
+        
+        ax.set_xlabel(label)
+        ax.set_ylabel('Collider cost (BILCU)')
+        ax.set_xscale(xscale)
+        ax.set_yscale('linear')
+        ax.set_xlim(lower/scale, upper/scale)
+        ax.set_ylim(0, 1.1*max(full_programme_cost/1e9))
+        ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.1*max(full_programme_cost/1e9)], ls=':', color='gray')
+        plt.legend(reverse=True)
+
+        return scan_self
+        
     
     # plot the distribution of luminosity per power
     def plot_luminosity_per_power(self):

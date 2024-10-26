@@ -11,6 +11,8 @@ class CombinerRing(Trackable, CostModeled):
     @abstractmethod
     def __init__(self, nom_energy=None, compression_factor=None, bunch_separation_incoming=None, exit_angle=default_exit_angle):
 
+        super().__init__()
+        
         self.nom_energy = nom_energy
         self.compression_factor = compression_factor
         self.bunch_separation_incoming = bunch_separation_incoming

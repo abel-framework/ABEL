@@ -4,9 +4,9 @@ from abel.classes.damping_ring.damping_ring import DampingRing
 
 class DampingRingBasic(DampingRing):
     
-    def __init__(self, nom_energy=None, emit_nx_target=None, emit_ny_target=None, bunch_separation_in_ring=8e-9, num_bunches_in_train=None, rep_rate_trains=None, fill_factor=0.9, max_dipole_field=1, rel_energy_loss_per_turn=0.001, num_rings=1):
+    def __init__(self, nom_energy=None, emit_nx_target=None, emit_ny_target=None, bunch_separation_in_ring=8e-9, fill_factor=0.9, max_dipole_field=1, rel_energy_loss_per_turn=0.001, num_rings=1):
 
-        super().__init__(nom_energy, emit_nx_target, emit_ny_target, bunch_separation_in_ring, num_bunches_in_train, rep_rate_trains, num_rings)
+        super().__init__(nom_energy, emit_nx_target, emit_ny_target, bunch_separation_in_ring, num_rings)
         
         self.fill_factor = fill_factor
         self.max_dipole_field = max_dipole_field

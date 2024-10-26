@@ -9,7 +9,9 @@ class ConventionalLinac(Linac):
     
     def __init__(self, source=None, rf_injector=None, damping_ring=None, rf_accelerator=None, turnaround=None, bds=None, nom_energy=None, num_bunches_in_train=None,  bunch_separation=None, rep_rate_trains=None):
         
-        self.source = source
+        super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
+        
+        #self.source = source
         self.rf_injector = rf_injector
         self.damping_ring = damping_ring
         self.rf_accelerator = rf_accelerator
@@ -18,7 +20,6 @@ class ConventionalLinac(Linac):
         
         self.name = 'RF linac'
         
-        super().__init__(nom_energy, num_bunches_in_train, bunch_separation, rep_rate_trains)
 
     
     # assemble the trackables
@@ -45,7 +46,7 @@ class ConventionalLinac(Linac):
         # add RF accelerator
         assert(isinstance(self.rf_accelerator, RFAccelerator))
         self.trackables.append(self.rf_accelerator)
-
+        
         # add turnaround (optional)
         if self.turnaround is not None:
             assert(isinstance(self.turnaround, Turnaround))

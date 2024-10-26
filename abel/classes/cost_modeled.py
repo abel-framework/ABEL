@@ -71,6 +71,17 @@ class CostModeled(ABC):
 
     # cost of beam dumps (TODO: add more detail and per power costs)
     cost_per_driver_dump = 1e6 # [ILCU]
+
+    # cost of energy
+    cost_per_energy = 0.05/(3600*1000)# ILCU/J (50 euros per MWh, based on CERN estimate)
+
+    # cost of nitrogen reliquification plant per (cold) power
+    # REF: https://accelconf.web.cern.ch/ipac2023/pdf/WEZG2_talk.pdf (page 25)
+    cost_per_power_reliquification_plant_nitrogen = 18.0 * 0.75 # ILCU/W (18M$/MW in 2023)
+
+    # cost of helium reliquification plant per (cold) power (TODO)
+    cost_per_coldpower_reliquification_plant_helium = None
+    
     
     @classmethod
     def cost_per_klystron(cls, num_klystrons, rf_frequency, avarage_power_klystron, peak_power_klystron):

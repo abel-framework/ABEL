@@ -10,6 +10,8 @@ class Source(Trackable, CostModeled):
     
     @abstractmethod
     def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
+
+        super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
         self.length = length
         self.energy = energy
@@ -35,11 +37,6 @@ class Source(Trackable, CostModeled):
         self.jitter.E = 0
 
         self.is_polarized = False
-        
-        self.num_bunches_in_train = num_bunches_in_train
-        self.bunch_separation = bunch_separation
-        self.rep_rate_trains = rep_rate_trains
-
     
     
     @abstractmethod

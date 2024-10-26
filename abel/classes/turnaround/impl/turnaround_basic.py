@@ -6,7 +6,7 @@ class TurnaroundBasic(Turnaround):
     
     def __init__(self, nom_energy=None, use_semi_circle=False, fill_factor=0.9, max_dipole_field=1.4, max_rel_energy_loss=0.005):
 
-        super().__init__(nom_energy, use_semi_circle)
+        super().__init__(nom_energy=nom_energy, use_semi_circle=use_semi_circle)
         
         self.fill_factor = fill_factor
         self.max_dipole_field = max_dipole_field

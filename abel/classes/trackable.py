@@ -6,7 +6,7 @@ class Trackable(ABC):
     
     # constructor
     @abstractmethod
-    def __init__(self, num_bunches_in_train=1, bunch_separation=None, rep_rate_trains=None):
+    def __init__(self, num_bunches_in_train=None, bunch_separation=None, rep_rate_trains=None, name=None):
         
         # bunch train pattern, through @property setters/getters
         # Actually stored in _bunch_separation, _num_bunches_in_train, _rep_rate_trains.
@@ -14,8 +14,8 @@ class Trackable(ABC):
         self.bunch_separation = bunch_separation # [s]
         self.num_bunches_in_train = num_bunches_in_train
         self.rep_rate_trains = rep_rate_trains # [Hz]
-
-        self._name = None
+        
+        self.name = name
 
     #-----------------------------------------#
     # Little helper functions                 #
@@ -54,12 +54,10 @@ class Trackable(ABC):
     @property
     def bunch_separation(self) -> float:
         "The time [s] between each bunch in the train"
-        #if self._bunch_separation == None:
-        #    raise TrackableInitializationException("bunch_separation not yet initialized")
         return self._bunch_separation
     @bunch_separation.setter
     def bunch_separation(self, bunch_separation : float):
-        self._bunch_separation = self._ensureFloat(bunch_separation,True)
+        self._bunch_separation = bunch_separation
 
     @property
     def bunch_frequency(self) -> float:
@@ -123,7 +121,7 @@ class Trackable(ABC):
         return self._rep_rate_trains
     @rep_rate_trains.setter
     def rep_rate_trains(self,rep_rate_trains : float):
-        self._rep_rate_trains = self._ensureFloat(rep_rate_trains,True)
+        self._rep_rate_trains = rep_rate_trains
     def get_rep_rate_trains(self):
         "Get the train repetition rate [Hz] - alias for self.rep_rate_trains"
         return self.rep_rate_trains

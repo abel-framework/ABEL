@@ -304,6 +304,9 @@ class RFAccelerator(Trackable, CostModeled):
         "Calculate the wall-plug power for klystrons [W]"
         return self.energy_usage_rf() * self.get_rep_rate_average()
 
+    def heat_power_at_cryo_temperature(self) -> float:
+        return self.heat_energy_at_cryo_temperature() * self.get_rep_rate_average()
+    
     def get_klystron_average_power(self) -> float:
         "Calculate the average power per klystron [W]"
         return self.wallplug_power_rf() / self.get_num_klystrons()
@@ -327,6 +330,15 @@ class RFAccelerator(Trackable, CostModeled):
         "Cost of the beamline between structures [ILC units]"
         return self.length * (1-self.fill_factor) * CostModeled.cost_per_length_instrumented_beamline
 
+    def get_cost_cryo_infrastructure(self):
+        "Cost of the cryo infrastructure [ILC units]"
+        if self.operating_temperature <= 77 and self.operating_temperature > 40:
+            return self.heat_power_at_cryo_temperature() * CostModeled.cost_per_power_reliquification_plant_nitrogen
+        elif self.operating_temperature >= 2 and self.operating_temperature <= 4:
+            return self.heat_power_at_cryo_temperature() * CostModeled.cost_per_power_reliquification_plant_helium
+        else:
+            return None
+        
     def get_cost_klystrons(self):
         "Cost of the klystrons and modulators [ILC units]"
         return self.get_num_klystrons() * CostModeled.cost_per_klystron(self.get_num_klystrons(), self.rf_frequency, self.get_klystron_average_power(), self.get_klystron_peak_power())
@@ -337,6 +349,9 @@ class RFAccelerator(Trackable, CostModeled):
         breakdown.append((f"Instrumented beamline ({(1-self.fill_factor)*100:.0f}%)", self.get_cost_remaining_beamline()))
         breakdown.append((f"RF structures ({self.get_num_structures():.0f}x)", self.get_cost_structures()))
         breakdown.append((f"Klystrons ({self.get_num_klystrons():.0f}x, {self.get_klystron_peak_power()/1e6:.0f} MW peak, {self.get_klystron_average_power()/1e3:.0f} kW avg)", self.get_cost_klystrons()))
+        cooling_cost = self.get_cost_cryo_infrastructure()
+        if cooling_cost is not None:
+            breakdown.append((f"Cryo plants ({self.heat_power_at_cryo_temperature()/1e6:.1f} MW at {self.operating_temperature:.0f} K)", cooling_cost))
         return (self.name, breakdown)
 
 class RFAcceleratorInitializationException(Exception):
