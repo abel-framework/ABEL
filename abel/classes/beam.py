@@ -497,46 +497,6 @@ class Beam():
             plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
         
         return beam_quant_centroids, z_centroids
-
-    ## ==================================================
-    #def slice_centroids(self, beam_quant, bin_number=None, cut_off=None, make_plot=False):
-    #    
-    #    zs = self.zs()
-    #    mean_z = self.z_offset()
-    #    weights = self.weightings()
-#
-    #    if cut_off is None:
-    #        cut_off = 1.5 * self.bunch_length()
-#
-    #    # Sort the arrays
-    #    indices = np.argsort(zs)
-    #    zs_sorted = zs[indices]  # Particle quantity.
-    #    weights_sorted = weights[indices]  # Particle quantity.
-    #    beam_quant_sorted = beam_quant[indices]  # Particle quantity.
-#
-    #    # Filter out elements outside the region of interest
-    #    bool_indices = (zs_sorted <= mean_z + cut_off) & (zs_sorted >= mean_z - cut_off)
-    #    zs_roi = zs_sorted[bool_indices]
-    #    weights_roi = weights_sorted[bool_indices]
-    #    beam_quant_roi = beam_quant_sorted[bool_indices]
-#
-    #    if bin_number is None:
-    #        bin_number = int(np.sqrt(len(zs_roi)/2))
-#
-    #    # 2D number distribution
-    #    counts, hedges, vedges = np.histogram2d(zs_roi, beam_quant_roi, weights=weights_roi, bins=(bin_number, bin_number))
-    #    hctrs = (hedges[0:-1] + hedges[1:])/2
-    #    vctrs = (vedges[0:-1] + vedges[1:])/2
-    #    
-    #    beam_quant_centroids = np.sum(counts * vctrs[:, np.newaxis], axis=0)/np.sum(counts, axis=0)
-#
-    #    if make_plot is True:
-    #        plt.figure()
-    #        plt.scatter(zs*1e6, beam_quant)
-    #        plt.plot(hctrs*1e6, beam_quant_centroids, 'rx-')
-    #        plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
-    #    
-    #    return beam_quant_centroids, hctrs
         
     
     # ==================================================
