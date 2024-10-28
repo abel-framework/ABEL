@@ -15,7 +15,7 @@ from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, b
 class Stage(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None, length=None):
+    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None):
 
         super().__init__()
         
@@ -25,8 +25,7 @@ class Stage(Trackable, CostModeled):
         self.plasma_density = plasma_density
         self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
-        self.length = length
-
+        
         self.stage_number = None
         
         # nominal initial energy
@@ -64,6 +63,12 @@ class Stage(Trackable, CostModeled):
 
         self.name = 'Plasma stage'
 
+    
+    @abstractmethod   
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        beam.stage_number += 1
+        return super().track(beam, savedepth, runnable, verbose)
+
     # upramp to be tracked before the main tracking
     def track_upramp(self, beam0, driver0=None):
         if self.upramp is not None and isinstance(self.upramp, Stage):
@@ -71,17 +76,19 @@ class Stage(Trackable, CostModeled):
             # set driver
             self.upramp.driver_source = SourceCapsule(beam=driver0)
 
-            # determine length and density if not already set
-            if self.upramp.length is None and self.upramp.plasma_density is None:
-                
-                # set ramp density
+            # determine density if not already set
+            if self.upramp.plasma_density is None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-                # set ramp length
+            # determine length if not already set
+            if self.upramp.length is None:
+            
+                # set ramp length (uniform step ramp)
                 if self.nom_energy is None:
                     self.nom_energy = beam0.energy()
+                
                 self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-
+            
             # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
@@ -101,17 +108,21 @@ class Stage(Trackable, CostModeled):
             # set driver
             self.downramp.driver_source = SourceCapsule(beam=driver0)
             
-            # determine length and density if not already set
-            if self.downramp.length is None and self.downramp.plasma_density is None:
+            # determine density if not already set
+            if self.downramp.plasma_density is None:
                 
                 # set ramp density
                 self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
-
-                # set ramp length
+            
+            # determine length if not already set
+            if self.downramp.length is None:
+                
+                # set ramp length (uniform step ramp)
                 if self.nom_energy is None:
                     self.nom_energy = beam0.energy()
+                
                 self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-
+            
             # perform tracking
             self.downramp._return_tracked_driver = True
             beam, driver = self.downramp.track(beam0)
@@ -124,23 +135,72 @@ class Stage(Trackable, CostModeled):
             
         return beam, driver
     
-    @abstractmethod   
-    def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        beam.stage_number += 1
-        return super().track(beam, savedepth, runnable, verbose)
 
+    @property
+    def length_flattop(self) -> float:
+        if hasattr(self, '_length_flattop'):
+            if self.nom_energy_gain is not None:
+                self.nom_accel_gradient = self.nom_energy_gain/self._length_flattop
+                del self._length_flattop
+            elif self.nom_accel_gradient is not None:
+                self.nom_energy_gain = self.nom_accel_gradient*self._length_flattop
+                del self._length_flattop
+            else:
+                return self._length_flattop
+        elif self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
+            return self.nom_energy_gain/self.nom_accel_gradient
+        else:
+            return None
+    @length_flattop.setter
+    def length_flattop(self, length_flattop : float):
+        if self.nom_energy_gain is not None:
+            self.nom_accel_gradient = self.nom_energy_gain/length_flattop
+        elif self.nom_accel_gradient is not None:
+            self.nom_energy_gain = self.nom_accel_gradient*length_flattop
+        else:
+            self._length_flattop = length_flattop
+
+    @property
+    def length(self) -> float:
+        if self.length_flattop is None:
+            return None
+        else:
+            L = self.length_flattop
+            if self.length_upramp is not None:
+                L += self.length_upramp
+            if self.length_downramp is not None:
+                L += self.length_downramp
+            return L
+    @length.setter
+    def length(self, length : float):
+        if self.length_upramp is not None or self.length_downramp is not None:
+            print('This stage has ramps, setting the flattop length only (ramp lengths are added)')
+        self.length_flattop = length
+
+    @property
+    def length_upramp(self) -> float:
+        if self.upramp is not None:
+            return self.upramp.length
+        else:
+            return None
+    @length_upramp.setter
+    def length_upramp(self, length_upramp : float):
+        assert self.upramp is not None, "No upramp to set length of"
+        self.upramp.length = length_upramp
+    
+    @property
+    def length_downramp(self) -> float:
+        if self.downramp is not None:
+            return self.downramp.length
+        else:
+            return None
+    @length_downramp.setter
+    def length_downramp(self, length_downramp : float):
+        assert self.downramp is not None, "No downramp to set length of"
+        self.downramp.length = length_downramp
     
     def get_length(self):
-        if self.length is not None:
-            if self.nom_energy_gain is not None:
-                self.nom_accel_gradient = self.nom_energy_gain/self.length
-                self.length = None
-            elif self.nom_accel_gradient is not None:
-                self.nom_energy_gain = self.nom_accel_gradient*self.length
-                self.length = None
-            else:
-                return self.length
-        return self.nom_energy_gain/self.nom_accel_gradient
+        return self.length
 
     def get_cost_breakdown(self):
         breakdown = []
@@ -158,9 +218,7 @@ class Stage(Trackable, CostModeled):
         return self.nom_accel_gradient
 
     def matched_beta_function(self, energy_incoming):
-        if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
-            return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
-        elif self.ramp_beta_mag is not None:
+        if self.ramp_beta_mag is not None:
             return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
         else:
             return beta_matched(self.plasma_density, energy_incoming)
@@ -346,14 +404,14 @@ class Stage(Trackable, CostModeled):
         
         # plot longitudinal offset
         axs[2,0].plot(evol.location, evol.plasma_density / 1e6, color=col1)
-        axs[2,0].set_ylabel('Plasma density [$\mathrm{cm}^{-3}$]')
+        axs[2,0].set_ylabel(r'Plasma density [$\mathrm{cm}^{-3}$]')
         axs[2,0].set_xlabel(long_label)
         axs[2,0].set_xlim(long_limits)
         axs[2,0].set_yscale('log')
         
         # plot longitudinal offset
         axs[2,1].plot(evol.location, evol.z * 1e6, color=col1)
-        axs[2,1].set_ylabel('Longitudinal offset [$\mathrm{\mu}$m]')
+        axs[2,1].set_ylabel(r'Longitudinal offset [$\mathrm{\mu}$m]')
         axs[2,1].set_xlabel(long_label)
         axs[2,1].set_xlim(long_limits)
         

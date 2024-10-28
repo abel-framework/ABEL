@@ -38,7 +38,7 @@ from .classes.beamline.impl.experiment.impl.experiment_apl import ExperimentAPL
 from .classes.collider.collider import Collider
 
 from .classes.source.impl.source_basic import *
-from .classes.source.impl.source_trapezoid import *
+from .classes.source.impl.source_trapezoid import SourceTrapezoid
 from .classes.source.impl.source_combiner import *
 from .classes.source.impl.source_from_file import *
 from .classes.source.impl.source_flattop import *

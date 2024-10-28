@@ -106,7 +106,7 @@ class StageHipace(Stage):
             density_table_file = os.path.basename(self.plasma_density_from_file)
             shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
 
-            self.length = self.get_length()
+            self.length = self.get_length() # TODO: fix this
             self.plasma_density = self.get_plasma_density()
         else:
             density_table_file = None
@@ -136,7 +136,7 @@ class StageHipace(Stage):
         dz = beta_matched/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)
-        self.num_steps = np.ceil(self.get_length()/dz)
+        self.num_steps = np.ceil(self.length_flattop/dz)
         
         if self.output is not None:
             remainder = self.num_steps % self.output
@@ -145,7 +145,7 @@ class StageHipace(Stage):
             else:  # If remainder is less than 10, round down
                 self.num_steps = self.num_steps - remainder
         
-        time_step = self.get_length()/(self.num_steps*SI.c)
+        time_step = self.length_flattop/(self.num_steps*SI.c)
 
         # overwrite output period
         if self.output is not None:

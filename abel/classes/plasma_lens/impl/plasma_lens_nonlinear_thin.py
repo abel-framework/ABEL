@@ -7,10 +7,10 @@ class PlasmaLensNonlinearThin(PlasmaLens):
     
     def __init__(self, length=None, radius=None, current=None, rel_nonlinearity=0):
 
+        super().__init__(length, radius, current)
+        
         # set nonlinearity (defined as R/Dx)
         self.rel_nonlinearity = rel_nonlinearity
-        
-        super().__init__(length, radius, current)
         
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):

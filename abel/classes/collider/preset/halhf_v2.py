@@ -187,6 +187,8 @@ class HALHFv2(Collider):
         einjector.rf_frequency = paccel.rf_frequency
         einjector.num_rf_cells = paccel.num_rf_cells
         einjector.num_structures_per_klystron = paccel.num_structures_per_klystron
+        einjector.beta_x = stage.matched_beta_function(esource.energy + einjector.nom_energy_gain)
+        einjector.beta_y = einjector.beta_x
 
         # define electron linac
         elinac = PlasmaLinac()

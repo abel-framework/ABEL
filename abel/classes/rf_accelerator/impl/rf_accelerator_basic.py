@@ -28,6 +28,10 @@ class RFAcceleratorBasic(RFAccelerator):
         self.wallplug_energy_per_bunch_rf = None
         self.wallplug_energy_per_bunch_cooling = None
         self.heat_energy_per_bunch_heating = None
+
+        # output Twiss
+        self.beta_x = None
+        self.beta_y = None
         
     
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
@@ -45,6 +49,35 @@ class RFAcceleratorBasic(RFAccelerator):
         # perform energy increase
         beam = copy.deepcopy(beam0)
         beam.set_Es(beam0.Es() + self.nom_energy_gain)
+
+        # set output Twiss if given
+        if self.beta_x is not None and self.beta_y is not None:
+            
+            # transport phase spaces to waist (in each plane)
+            ds_x = beam.alpha_x()/beam.gamma_x()
+            ds_y = beam.alpha_y()/beam.gamma_y()
+            
+            # find waist beta functions (in each plane)
+            Rx = np.eye(4)
+            Rx[0,1] = ds_x
+            Rx[2,3] = ds_x
+            beamx = copy.deepcopy(beam)
+            beamx.set_transverse_vector(np.dot(Rx, beamx.transverse_vector()))
+    
+            Ry = np.eye(4)
+            Ry[0,1] = ds_y
+            Ry[2,3] = ds_y
+            beamy = copy.deepcopy(beam)
+            beamy.set_transverse_vector(np.dot(Ry, beamy.transverse_vector()))
+            
+            # scale the waist phase space by beta functions
+            X = beamx.transverse_vector()
+            Y = beamy.transverse_vector()
+            X[0,:] = X[0,:] * np.sqrt(self.beta_x/beamx.beta_x())
+            X[1,:] = X[1,:] / np.sqrt(self.beta_x/beamx.beta_x())
+            X[2,:] = Y[2,:] * np.sqrt(self.beta_y/beamy.beta_y())
+            X[3,:] = Y[3,:] / np.sqrt(self.beta_y/beamy.beta_y()) 
+            beam.set_transverse_vector(X)
         
         return super().track(beam, savedepth, runnable, verbose)
 
@@ -78,7 +111,10 @@ class RFAcceleratorBasic(RFAccelerator):
         
         # power lost to wall losses and beam loading (per length)
         dP_dz_losses = self.gradient_structure**2 / (norm_R_upon_Q * Q)
-        dP_dz_beamloading = self.gradient_structure * (self.bunch_charge / self.bunch_separation)
+        if self.bunch_separation is not None and self.bunch_separation > 0:
+            dP_dz_beamloading = self.gradient_structure * (self.bunch_charge / self.bunch_separation)
+        else:
+            dP_dz_beamloading = 0.0
         dP_dz_total = dP_dz_losses + dP_dz_beamloading
 
         # power input required

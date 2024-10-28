@@ -8,6 +8,8 @@ class PlasmaLens(Trackable):
     @abstractmethod
     def __init__(self, length, radius, current, offset_x=0, offset_y=0):
 
+        super().__init__()
+        
         # common variables
         self.length = length
         self.radius = radius

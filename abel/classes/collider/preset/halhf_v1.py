@@ -45,9 +45,9 @@ class HALHFv1(Collider):
         stage = StageBasic()
         stage.driver_source = driver_complex
         stage.nom_accel_gradient = 6.4e9 # [m]
-        stage.ramp_beta_mag = 5
-        charge = -1e10 * SI.e # [C]
-        stage.optimize_plasma_density(source=esource)
+        stage.nom_energy_gain = 30.9375e9 # [eV]
+        stage.ramp_beta_mag = 10
+        stage.plasma_density = 7e21 # [m^-3]
         
         # define rest of beam
         esource.bunch_length = 18e-6 # [m]
@@ -63,6 +63,8 @@ class HALHFv1(Collider):
         einjector.rf_frequency = 3e9
         einjector.structure_length = 5
         einjector.peak_power_klystron = 50e6
+        einjector.beta_x = stage.matched_beta_function(esource.energy + einjector.nom_energy_gain)
+        einjector.beta_y = einjector.beta_x
         
         # define interstage
         interstage = InterstageBasic()
@@ -85,7 +87,6 @@ class HALHFv1(Collider):
         elinac.interstage = interstage
         elinac.bds = ebds
         elinac.num_stages = 16
-
 
         # define positron source
         psource = SourceBasic()

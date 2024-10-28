@@ -13,12 +13,15 @@ class C3(Collider):
         self.num_bunches_in_train = 133
         self.rep_rate_trains = 120.0 # [Hz]
         self.bunch_separation_ns = 5.26 # [s]
+        #self.bunch_separation_ns = 8.2 # [s]
 
         self.bunch_charge = 1e10 * SI.e # [C]
 
         self.rf_frequency = 5.712e9 # [V/m]
         self.linac_gradient = 70e6 # [V/m]
+        #self.linac_gradient = 50e6 # [V/m]
         self.num_structures_per_klystron = 130
+        #self.num_structures_per_klystron = 270
 
         # from optimization @ 250 GeV: {'bunch_separation_ns': 8.192714440875887, 'linac_gradient': 51417581.36622494, 'num_structures_per_klystron': 270}
         # from optimization @ 550 GeV: {'bunch_separation_ns': 8.534381894337127, 'linac_gradient': 52715332.71703247, 'num_structures_per_klystron': 270}

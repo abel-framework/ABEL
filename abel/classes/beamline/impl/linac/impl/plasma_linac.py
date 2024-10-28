@@ -94,7 +94,7 @@ class PlasmaLinac(Linac):
             
         # add stages and interstages
         if self.stage is not None:
-
+            
             # check types
             assert(isinstance(self.stage, Stage))
             if self.first_stage is not None:
@@ -105,7 +105,7 @@ class PlasmaLinac(Linac):
                 assert(isinstance(self.interstage, Interstage))
             if self.last_interstage is not None:
                 assert(isinstance(self.last_interstage, Interstage))
-                    
+            
             # instantiate many stages
             for i in range(self.num_stages):
                 
@@ -118,26 +118,29 @@ class PlasmaLinac(Linac):
                     stage_instance = self.stage
                 else:
                     stage_instance = copy.deepcopy(self.stage)
-                if stage_instance.nom_energy is None:
-                    stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
-                    
+                
+                stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                
                 # reassign the same driver complex
                 if self.driver_complex is not None:
                     stage_instance.driver_source = self.driver_complex
-                    
+                
                 self.trackables.append(stage_instance)
                 self.stages.append(stage_instance)
-
+                
                 # add interstages
                 if (self.interstage is not None) and (i < self.num_stages-1):
+                    
                     if i == self.num_stages-2 and self.last_interstage is not None:
                         interstage_instance = self.last_interstage
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
-                    if interstage_instance.nom_energy is None:
-                        interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                        
+                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                    
                     if self.alternate_interstage_polarity:
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
+                        
                     self.trackables.append(interstage_instance)
                     self.interstages.append(interstage_instance)
             
@@ -146,7 +149,7 @@ class PlasmaLinac(Linac):
                 self.first_stage = self.stages[0]
             if self.last_stage is None:
                 self.last_stage = self.stages[-1]
-                    
+        
         # add beam delivery system
         if self.bds is not None:
             

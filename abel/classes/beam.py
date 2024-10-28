@@ -870,11 +870,6 @@ class Beam():
         
     # betatron damping (must be done before acceleration)
     def apply_betatron_damping(self, deltaE):
-        
-        # remove particles with subzero energy
-        del self[self.Es() < 0]
-        del self[np.isnan(self.Es())]
-        
         gammasBoosted = energy2gamma(abs(self.Es()+deltaE))
         betamag = np.sqrt(self.gammas()/gammasBoosted)
         self.magnify_beta_function(betamag)
@@ -1254,8 +1249,8 @@ class Beam():
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
         ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
+        xps_lab = r'$x\'$ [mrad]'
+        yps_lab = r'$y\'$ [mrad]'
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes

@@ -1,39 +1,64 @@
 from abel.classes.stage.stage import Stage
 import scipy.constants as SI
+import copy
 
 SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, transformer_ratio=1):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1):
         
-        super().__init__(nom_accel_gradient, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
-
+        super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
+        
         self.transformer_ratio = transformer_ratio
         
     
-    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
         
         # get the driver
-        driver0 = self.driver_source.track()
+        driver_incoming = self.driver_source.track()
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
             self.optimize_plasma_density()
-        
+
+        # plasma-density ramps (de-magnify beta function)
+        if self.upramp is not None:
+            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
+        else:
+            beam0 = copy.deepcopy(beam_incoming)
+            driver0 = copy.deepcopy(beam_incoming)
+            if self.ramp_beta_mag is not None:
+                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                
         # apply plasma-density up ramp (demagnify beta function)
-        beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+        beam = copy.deepcopy(beam0)
+        
+        # non-evolving driver
+        driver = copy.deepcopy(driver0)
         
         # betatron oscillations
-        beam.apply_betatron_motion(self.get_length(), self.plasma_density, self.get_nom_energy_gain(), x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+        beam.apply_betatron_motion(self.length_flattop, self.plasma_density, self.get_nom_energy_gain(), x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
         
         # accelerate beam
         beam.set_Es(beam.Es() + self.get_nom_energy_gain())
         
         # apply plasma-density down ramp (magnify beta function)
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+        if self.downramp is not None:
+            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
+        else:
+            beam_outgoing = copy.deepcopy(beam)
+            driver_outgoing = copy.deepcopy(driver)
+            if self.ramp_beta_mag is not None:
+                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
         
-        return super().track(beam, savedepth, runnable, verbose)
+        # return the beam (and optionally the driver)
+        if self._return_tracked_driver:
+            return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing
+        else:
+            return super().track(beam_outgoing, savedepth, runnable, verbose)
 
     
     def optimize_plasma_density(self, source):

@@ -3,9 +3,10 @@ from abel import Spectrometer
 class SpectrometerBasicCLEAR(Spectrometer):
     
     def __init__(self, use_otr_screen=True):
-
+        
+        super().__init__()
+        
         self.use_otr_screen = use_otr_screen
-
         self.location_otr_screen = 0.3 # [m]
     
     # lattice length
