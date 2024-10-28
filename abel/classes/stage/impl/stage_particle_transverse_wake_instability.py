@@ -37,7 +37,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, stage_number=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, stage_number=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
         """
         Parameters
         ----------
@@ -152,7 +152,7 @@ class StagePrtclTransWakeInstability(Stage):
         # Set the diagnostics directory
         self.run_path = runnable.run_path()
 
-        # Set the flag for displaying progress bar
+        # Override enable/disable progress bar
         self.show_prog_bar = verbose
 
         # Extract quantities
@@ -166,14 +166,16 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Get the drive beam ==========
-        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:                   #############################
+        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    #############################
             drive_beam0 = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
             drive_beam0 = self.driver_source.track()
-            self.drive_beam = drive_beam0  # Generate a drive beam with jitter.                   ############################# 
+            self.drive_beam = drive_beam0  # Generate a drive beam with jitter.     ############################# 
         
-        beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately.
         drive_beam_ramped = copy.deepcopy(drive_beam0)  # Make a deep copy to not affect the original drive beam.
+
+        drive_beam_wakeT = copy.deepcopy(drive_beam0)  # Wake-T requires not-ramped beams for now...
+        beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately.
 
         
         # ========== Apply plasma density up ramp (demagnify beta function) ========== 
@@ -184,14 +186,54 @@ class StagePrtclTransWakeInstability(Stage):
         main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
         self.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
         self.main_num_profile = main_num_profile
+
+        
+        # ========== Rotate the coordinate system of the beams ==========
+        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+
+            driver_x_angle = drive_beam_ramped.x_angle()
+            driver_y_angle = drive_beam_ramped.y_angle()
+            
+            beam0_x_angle = beam0.x_angle()
+            beam0_y_angle = beam0.y_angle()
+
+            # Calculate the angles that will be used to rotate the beams' frame
+            rotation_angle_x, rotation_angle_y = drive_beam_ramped.beam_alignment_angles()
+            rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+            # The model currently does not support beam tilt not aligned with beam propagation, so that active transformation is used to rotate the beam around x- and y-axis and align it to its own prapagation direction. 
+            drive_beam_ramped.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+            drive_beam_wakeT.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+
+            # Use passive transformation to rotate the frame of the beams
+            drive_beam_ramped.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
+            beam0.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+            
+            drive_beam_wakeT.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+            beam0_copy.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+
+            if np.abs( drive_beam_ramped.x_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'drive_beam_ramped x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_ramped x_angle after coordinate transformation: ' + str(drive_beam_ramped.x_angle())
+                warnings.warn(driver_error_string)
+
+            if np.abs( drive_beam_ramped.y_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'drive_beam_ramped y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_ramped y_angle after coordinate transformation: ' + str(drive_beam_ramped.y_angle())
+                warnings.warn(driver_error_string)
+
+    
+            if np.abs( -(beam0.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
+                
+            if np.abs( (beam0.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
         
 
         # ========== Wake-T simulation and extraction ==========
         # Define a Wake-T stage
         stage_wakeT = StageWakeT()
         #stage_wakeT.driver_source = self.driver_source
-        stage_wakeT.drive_beam = drive_beam0
-        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam0.gamma()/2))
+        stage_wakeT.drive_beam = drive_beam_wakeT
+        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam_wakeT.gamma()/2))
         lambda_betatron = (2*np.pi/k_beta)
         stage_wakeT.length = lambda_betatron/10  # [m]
         stage_wakeT.plasma_density = plasma_density  # [m^-3]
@@ -199,7 +241,7 @@ class StagePrtclTransWakeInstability(Stage):
         #stage_wakeT.keep_data = False  # TODO: Does not work yet.
         
         # Run the Wake-T stage
-        beam_wakeT = stage_wakeT.track(beam0_copy)
+        beam_wakeT = stage_wakeT.track(beam0_copy, verbose=self.show_prog_bar)
         
         # Read the Wake-T simulation data
         Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
@@ -224,11 +266,11 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead...
 
         if bubble_radius_wakeT.max() < 0.5 * blowout_radius(self.plasma_density, drive_beam_ramped.peak_current()) or bubble_radius_roi.any()==0:
-            warnings.warn("The bubbel radius may not have been correctly extracted.", UserWarning)
+            warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
 
         idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
         if idxs_bubble_peaks.size > 0:
-            warnings.warn("The bubbel radius may not be smooth.", UserWarning)
+            warnings.warn("The bubble radius may not be smooth.", UserWarning)
 
         # Save quantities to the stage
         self.Ez_fit_obj = Ez_fit
@@ -244,11 +286,11 @@ class StagePrtclTransWakeInstability(Stage):
         
         # Make plots for control if necessary
         #self.plot_Ez_rb_cut(z_slices, main_num_profile, zs_Ez_wakeT, Ez_axis_wakeT, Ez, zs_rho, bubble_radius_wakeT, bubble_radius_roi, zlab=r'$z$ [$\mathrm{\mu}$m]')
-        
 
+        
         # ========== Instability tracking ==========
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
-
+        
         if self.num_z_cells_main is None:
             self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
 
@@ -330,6 +372,33 @@ class StagePrtclTransWakeInstability(Stage):
             beam, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
 
             self.evolution = evolution
+
+        
+        # ========== Rotate the coordinate system of the beams back to original ==========
+        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+
+            # Angles of beam before rotating back to original coordinate system
+            beam_x_angle = beam.x_angle()
+            beam_y_angle = beam.y_angle()
+            
+            beam.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+
+            # Add drifts to the beam
+            x_drift = self.length * np.tan(driver_x_angle)
+            y_drift = self.length * np.tan(driver_y_angle)
+            xs = beam.xs()
+            ys = beam.ys()
+            beam.set_xs(xs + x_drift)
+            beam.set_ys(ys + y_drift)
+            
+            #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
+        
+            if drive_beam0.x_angle() != 0 and np.abs( (beam.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
+                
+            if drive_beam0.y_angle() != 0 and np.abs( -(beam.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
+        
         
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
@@ -1635,7 +1704,8 @@ class StagePrtclTransWakeInstability(Stage):
         # get initial beam
         beam_init = Beam()
         beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
-        
+
+        # Get max beam size beam
         max_sig_index = np.argmax(self.evolution.beam_size_y)
         max_sig_beam = Beam()
         max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
@@ -2252,7 +2322,6 @@ class StagePrtclTransWakeInstability(Stage):
                 print(f"Symmetrised drive beam:\t\t\t\t Not symmetrised.\n", file=f)
 
             print(f"Ramp beta magnification:\t\t\t {self.ramp_beta_mag :.3f}", file=f)
-            print(f"Radiation reaction enabled:\t\t\t {str(self.enable_radiation_reaction) :s}", file=f)
             print(f"Transverse wake instability enabled:\t\t {str(self.enable_tr_instability) :s}", file=f)
             print(f"Radiation reaction enabled:\t\t\t {str(self.enable_radiation_reaction) :s}", file=f)
             print(f"Ion motion enabled:\t\t\t\t {str(self.enable_ion_motion) :s}", file=f)
@@ -2307,11 +2376,16 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Current beam x angular offset [urad]:\t\t  \t\t\t {beam_out.x_angle(clean=clean)*1e6 :.3f}", file=f)
             print(f"Initial beam y angular offset [urad]:\t\t {drive_beam.y_angle(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.y_angle(clean=clean)*1e6 :.3f}", file=f)
             print(f"Current beam y angular offset [urad]:\t\t  \t\t\t {beam_out.y_angle(clean=clean)*1e6 :.3f}\n", file=f)
-    
-            print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=clean)*1e6 :.3f}", file=f)
-            print(f"Current normalised x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x(clean=clean)*1e6 :.3f}", file=f)
-            print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y(clean=clean)*1e6 :.3f}", file=f)
-            print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y(clean=clean)*1e6 :.3f}\n", file=f)
+
+            print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x(clean=False)*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=False)*1e6 :.3f}", file=f)
+            print(f"Current normalised x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x(clean=False)*1e6 :.3f}", file=f)
+            print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y(clean=False)*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y(clean=False)*1e6 :.3f}", file=f)
+            print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y(clean=False)*1e6 :.3f}\n", file=f)
+            
+            print(f"Initial cleaned norm. x emittance [mm mrad]:\t {drive_beam.norm_emittance_x(clean=True)*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=True)*1e6 :.3f}", file=f)
+            print(f"Current cleaned norm. x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x(clean=True)*1e6 :.3f}", file=f)
+            print(f"Initial cleaned norm. y emittance [mm mrad]:\t {drive_beam.norm_emittance_y(clean=True)*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y(clean=True)*1e6 :.3f}", file=f)
+            print(f"Current cleaned norm. y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y(clean=True)*1e6 :.3f}\n", file=f)
             
             print(f"Initial angular momentum [mm mrad]:\t\t {drive_beam.angular_momentum()*1e6 :.3f} \t\t\t {initial_main_beam.angular_momentum()*1e6 :.3f}", file=f)
             print(f"Current angular momentum [mm mrad]:\t\t  \t\t\t {beam_out.angular_momentum()*1e6 :.3f}\n", file=f)
