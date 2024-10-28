@@ -143,8 +143,8 @@ class StageQuasistatic2d(Stage):
             # interpolate for each particle
             rbs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
             Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
-
-            # perform tracking
+            
+            # perform tracking  # TODO: transverse_wake_instability_particles() signa has changed.
             beam = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length_flattop, show_prog_bar=True)
             
         else:
