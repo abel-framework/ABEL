@@ -250,17 +250,23 @@ class Beam():
             
         Returns
         ----------
-        Modified beam.xs(), beam.ys(), beam.zs(), beam.uxs(), beam.uys() and beam.uzs().
+        Modified beam xs, ys, zs, uxs, uys and uzs.
         """
 
+        # Check the inputs
+        if np.linalg.norm(axis1) != 1.0 or np.linalg.norm(axis2) != 1.0 or np.linalg.norm(axis3) != 1.0:
+            raise ValueError('The rotation axes have to be unit vectors.')
+
+        if angle1 < -np.pi or angle1 > np.pi or angle2 < -np.pi or angle2 > np.pi or angle3 < -np.pi or angle3 > np.pi:
+            raise ValueError('The rotation angles have to be in the interval [-pi, pi].')
+        
+        # Combine into (N, 3) arrays
         zs = self.zs()
         xs = self.xs()
         ys = self.ys()
         uzs = self.uzs()
         uxs = self.uxs()
         uys = self.uys()
-        
-        # Combine into (N, 3) arrays
         coords = np.column_stack((zs, xs, ys))
         u_vecs = np.column_stack((uzs, uxs, uys))
 
@@ -273,12 +279,8 @@ class Beam():
         combined_rotation = rotation1 * rotation2 * rotation3  # Rotation order is right-to-left, but effectively opposite when inverse=True in combined_rotation.apply().
 
         # Apply rotation to the arrays
-        if invert is False:
-            inverse = True  # Since combined_rotation.apply() performs active transformations by default, inverse must be set to True for passive transformation.
-        else:
-            inverse = False
-        rotated_coords = combined_rotation.apply(coords, inverse=inverse)
-        rotated_u_vecs = combined_rotation.apply(u_vecs, inverse=inverse)
+        rotated_coords = combined_rotation.apply(coords, inverse= not invert)  # Since combined_rotation.apply() performs active transformations by default, inverse must be set to True for passive transformation.
+        rotated_u_vecs = combined_rotation.apply(u_vecs, inverse= not invert)
 
         # Extract the rotated arrays
         rotated_zs, rotated_xs, rotated_ys = rotated_coords[:, 0], rotated_coords[:, 1], rotated_coords[:, 2]
@@ -290,34 +292,6 @@ class Beam():
         self.set_uzs(rotated_uzs)
         self.set_uxs(rotated_uxs)
         self.set_uys(rotated_uys)
-
-    
-    # ==================================================
-    def xy_rotate_coord_sys(self, x_angle, y_angle, invert=False):
-        """
-        Rotates the coordinate system of the beam first with x_angle around the y-axis then with y_angle around the x-axis.
-        
-        Parameters
-        ----------
-        x_angle: [rad] float
-            Angle to rotate the coordinate system with in the zx-plane.
-        
-        y_angle: [rad] float
-            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
-
-        invert: bool
-            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
-        
-            
-        Returns
-        ----------
-        Modified beam.xs(), beam.ys(), beam.zs(), beam.uxs(), beam.uys() and beam.uzs().
-        """
-
-        y_axis = np.array([0, 0, 1])
-        x_axis = np.array([0, 1, 0])
-        
-        self.rotate_coord_sys_3D(y_axis, x_angle, x_axis, y_angle, invert=invert)
         
 
     # ==================================================
@@ -349,44 +323,57 @@ class Beam():
 
         # Calculate the angles to be used for beam rotation
         z_axis = np.array([1, 0, 0])  # Axis as an unit vector
-        x_axis = np.array([0, 1, 0])
-        y_axis = np.array([0, 0, 1])
         
         zx_projection = point_vec * np.array([1, 1, 0])  # The projection of the pointing vector onto the zx-plane.
+
+        # Separate treatments for small angles to avoid numerical instability
+        if np.abs(self.x_angle()) < 1e-4:
+            x_angle = ux_offset/uz_offset
+        else:
+            x_angle = np.sign(point_vec[1]) * np.arccos( np.dot(zx_projection, z_axis) / np.linalg.norm(zx_projection) )  # The angle between zx_projection and z_axis.
+
         
-        x_angle = np.sign(point_vec[1]) * np.arccos( np.dot(zx_projection, z_axis) / np.linalg.norm(zx_projection) / np.linalg.norm(z_axis) )  # The angle between zx_projection and z_axis.
-
-        y_rotated_point_vec = np.array([ np.linalg.norm(zx_projection), 0, point_vec[2] ])  # The pointing vector after its zx-projection is aligned to the rotated z-axis.
-
-        y_angle = np.sign(point_vec[2]) * np.arccos( np.dot(y_rotated_point_vec, z_axis) / np.linalg.norm(y_rotated_point_vec) / np.linalg.norm(z_axis) )  # Note that due to the right hand rule, a positive y_angle corresponds to rotation from z-axis towards negative y. I.e. opposite sign convention of yps.
+        if np.abs(self.y_angle()) < 1e-4:
+            y_angle = point_vec[2]/np.linalg.norm(zx_projection)
+        else:
+            rotated_zy_projection = np.array([ np.linalg.norm(zx_projection), 0, point_vec[2] ])  # The new pointing vector after its zx-projection has been aligned to the rotated z-axis.
+    
+            y_angle = np.sign(point_vec[2]) * np.arccos( np.dot(rotated_zy_projection, z_axis) / np.linalg.norm(rotated_zy_projection) )  # Note that due to the right hand rule, a positive y_angle corresponds to rotation from z-axis towards negative y. I.e. opposite sign convention of yps.
 
         return x_angle, y_angle
-        
 
+    
     # ==================================================
-    def z_align_beam_u(self, invert=False):
+    def xy_rotate_coord_sys(self, x_angle=None, y_angle=None, invert=False):
         """
-        Rotates the coordinate system of the beam so that the rotated z-axis is aligned with the beam proper velocity.
+        Rotates the coordinate system of the beam first with x_angle around the y-axis then with y_angle around the x-axis.
         
         Parameters
         ----------
+        x_angle: [rad] float
+            Angle to rotate the coordinate system with in the zx-plane.
+        
+        y_angle: [rad] float
+            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+
         invert: bool
             Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
         
             
         Returns
         ----------
-        Modified beam.xs(), beam.ys(), beam.zs(), beam.uxs(), beam.uys() and beam.uzs().
+        Modified beam xs, ys, zs, uxs, uys and uzs.
         """
         
-        # Calculate the angles to be used for beam rotation
-        x_axis = np.array([0, 1, 0])  # Axis as an unit vector
+        x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
         y_axis = np.array([0, 0, 1])
 
-        x_angle, y_angle = self.beam_alignment_angles()
-        y_angle = -y_angle
-
-        # Rotate the beam 6D phase space
+        if x_angle is None:
+            x_angle, _ = self.beam_alignment_angles()
+        if y_angle is None:
+            _, y_angle = self.beam_alignment_angles()
+            y_angle = -y_angle
+        
         self.rotate_coord_sys_3D(y_axis, x_angle, x_axis, y_angle, invert=invert)
 
     
@@ -406,7 +393,7 @@ class Beam():
             
         Returns
         ----------
-        Modified beam.xs(), beam.ys(), beam.zs()
+        Modified beam xs, ys and zs.
         """
 
         if align_x_angle is None:
@@ -439,7 +426,143 @@ class Beam():
         self.set_zs(rotated_zs)
         self.set_xs(rotated_xs)
         self.set_ys(rotated_ys)
+
+
+    # ==================================================
+    def slice_centroids(self, beam_quant, bin_number=None, cut_off=None, make_plot=False):
+        """
+        Returns the slice centroids of a beam quantity beam_quant.
+
+        Parameters
+        ----------
+        beam_quant: 1D float array
+            Beam quantity to be binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+
+        bin_number: float
+            Number of beam slices.
+
+        cut_off: float
+            Determines the longitudinal coordinates inside the region of interest
+
+        make_plot: bool
+            Flag for making plots.
+
             
+        Returns
+        ----------
+        beam_quant_slices: 1D float array
+            beam_quant binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+
+        z_centroids: [m] 1D float array
+            z-coordinates of the beam slices.
+        """
+        
+        zs = self.zs()
+        mean_z = self.z_offset()
+        weights = self.weightings()
+
+        if cut_off is None:
+            cut_off = 1.5 * self.bunch_length()
+
+        # Sort the arrays
+        indices = np.argsort(zs)
+        zs_sorted = zs[indices]  # Particle quantity.
+        weights_sorted = weights[indices]  # Particle quantity.
+        beam_quant_sorted = beam_quant[indices]  # Particle quantity.
+
+        # Filter out elements outside the region of interest
+        bool_indices = (zs_sorted <= mean_z + cut_off) & (zs_sorted >= mean_z - cut_off)
+        zs_roi = zs_sorted[bool_indices]
+        weights_roi = weights_sorted[bool_indices]
+        beam_quant_roi = beam_quant_sorted[bool_indices]
+
+        if bin_number is None:
+            bin_number = int(np.sqrt(len(zs_roi)/2))
+
+        # Beam slice zs
+        _, edges = np.histogram(zs_roi, bins=bin_number)  # Get the edges of the histogram of z with bin_number bins.
+        z_centroids = (edges[0:-1] + edges[1:])/2  # Centres of the beam slices (z)
+        
+        # Compute the mean of beam_quant of all particles inside a z-bin
+        beam_quant_centroids = np.empty(len(z_centroids))
+        for i in range(0,len(edges)-1):
+            left = np.searchsorted(zs_roi, edges[i])  # zs_sorted[left:len(zs_sorted)] >= edges[i], left side of bin i.
+            right = np.searchsorted(zs_roi, edges[i+1], side='right')  # zs_sorted[0:right] <= edges[i+1], right (larger) side of bin i.
+            beam_quant_centroids[i] = weighted_mean(beam_quant_roi[left:right], weights_roi[left:right])
+
+        if make_plot is True:
+            plt.figure()
+            plt.scatter(zs*1e6, beam_quant)
+            plt.plot(z_centroids*1e6, beam_quant_centroids, 'rx-')
+            plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
+        
+        return beam_quant_centroids, z_centroids
+
+    ## ==================================================
+    #def slice_centroids(self, beam_quant, bin_number=None, cut_off=None, make_plot=False):
+    #    
+    #    zs = self.zs()
+    #    mean_z = self.z_offset()
+    #    weights = self.weightings()
+#
+    #    if cut_off is None:
+    #        cut_off = 1.5 * self.bunch_length()
+#
+    #    # Sort the arrays
+    #    indices = np.argsort(zs)
+    #    zs_sorted = zs[indices]  # Particle quantity.
+    #    weights_sorted = weights[indices]  # Particle quantity.
+    #    beam_quant_sorted = beam_quant[indices]  # Particle quantity.
+#
+    #    # Filter out elements outside the region of interest
+    #    bool_indices = (zs_sorted <= mean_z + cut_off) & (zs_sorted >= mean_z - cut_off)
+    #    zs_roi = zs_sorted[bool_indices]
+    #    weights_roi = weights_sorted[bool_indices]
+    #    beam_quant_roi = beam_quant_sorted[bool_indices]
+#
+    #    if bin_number is None:
+    #        bin_number = int(np.sqrt(len(zs_roi)/2))
+#
+    #    # 2D number distribution
+    #    counts, hedges, vedges = np.histogram2d(zs_roi, beam_quant_roi, weights=weights_roi, bins=(bin_number, bin_number))
+    #    hctrs = (hedges[0:-1] + hedges[1:])/2
+    #    vctrs = (vedges[0:-1] + vedges[1:])/2
+    #    
+    #    beam_quant_centroids = np.sum(counts * vctrs[:, np.newaxis], axis=0)/np.sum(counts, axis=0)
+#
+    #    if make_plot is True:
+    #        plt.figure()
+    #        plt.scatter(zs*1e6, beam_quant)
+    #        plt.plot(hctrs*1e6, beam_quant_centroids, 'rx-')
+    #        plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
+    #    
+    #    return beam_quant_centroids, hctrs
+        
+    
+    # ==================================================
+    def x_tilt_angle(self, z_cutoff=None):
+        if z_cutoff is None:
+            z_cutoff = 1.5 * self.bunch_length()
+            
+        x_centroids, z_centroids = self.slice_centroids(self.xs(), cut_off=z_cutoff, make_plot=False)
+        
+        # Perform linear regression
+        slope, _ = np.polyfit(z_centroids, x_centroids, 1)
+        
+        return np.arctan(slope)
+
+    
+    # ==================================================
+    def y_tilt_angle(self, z_cutoff=None):
+        if z_cutoff is None:
+            z_cutoff = 1.5 * self.bunch_length()
+        y_centroids, z_centroids = self.slice_centroids(self.ys(), cut_off=z_cutoff, make_plot=False)
+        
+        # Perform linear regression
+        slope, _ = np.polyfit(z_centroids, y_centroids, 1)
+        
+        return np.arctan(slope)
+
 
     
     ## BEAM STATISTICS
@@ -618,7 +741,6 @@ class Beam():
     
     def longitudinal_num_density(self, bins=None):
         dQdz, zs = self.projected_density(self.zs, bins=bins)
-        #dNdz = dQdz / SI.e
         dNdz = dQdz / SI.e / self.charge_sign()
         return dNdz, zs
     
