@@ -5,11 +5,13 @@ from abel.classes.cost_modeled import CostModeled
 from types import SimpleNamespace
 import numpy as np
 import scipy.constants as SI
+from abel.utilities.beam_physics import generate_trace_space
+from abel.utilities.relativity import energy2gamma
 
 class Source(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
+    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
 
         super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -23,6 +25,9 @@ class Source(Trackable, CostModeled):
         self.y_offset = y_offset
         self.x_angle = x_angle
         self.y_angle = y_angle
+
+        self.norm_jitter_emittance_x = norm_jitter_emittance_x
+        self.norm_jitter_emittance_y = norm_jitter_emittance_y
         
         self.waist_shift_x = waist_shift_x
         self.waist_shift_y = waist_shift_y
@@ -42,11 +47,20 @@ class Source(Trackable, CostModeled):
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
-        # add offsets and angles
-        beam.set_xs(beam.xs() + np.random.normal(loc=self.x_offset, scale=self.jitter.x))
-        beam.set_ys(beam.ys() + np.random.normal(loc=self.y_offset, scale=self.jitter.y))
-        beam.set_xps(beam.xps() + np.random.normal(loc=self.x_angle, scale=self.jitter.xp))
-        beam.set_yps(beam.yps() + np.random.normal(loc=self.y_angle, scale=self.jitter.yp))
+        # add offsets and angles and jitter (horizontal)
+        if self.norm_jitter_emittance_x is not None:
+            x_jitter, xp_jitter = generate_trace_space(self.norm_jitter_emittance_x/beam.gamma(), beam.beta_x(), beam.alpha_x(), 1)         
+        else:
+            x_jitter, xp_jitter = np.random.normal(scale=self.jitter.x), np.random.normal(scale=self.jitter.xp)
+        beam.set_xs(beam.xs() + self.x_offset + x_jitter)
+        beam.set_xps(beam.xps() + self.x_angle + xp_jitter)
+        
+        if self.norm_jitter_emittance_y is not None:
+            y_jitter, yp_jitter = generate_trace_space(self.norm_jitter_emittance_y/beam.gamma(), beam.beta_y(), beam.alpha_y(), 1)
+        else:
+            y_jitter, yp_jitter = np.random.normal(scale=self.jitter.y), np.random.normal(scale=self.jitter.yp)
+        beam.set_ys(beam.ys() + self.y_offset + y_jitter)
+        beam.set_yps(beam.yps() + self.y_angle + yp_jitter)
 
         # shift the waist location
         beam.set_xs(beam.xs()-self.waist_shift_x*beam.xps())

@@ -1,4 +1,5 @@
 from abel.classes.stage.stage import Stage
+from abel.classes.source.source import Source
 import numpy as np
 import scipy.constants as SI
 import copy
@@ -41,7 +42,7 @@ class StageBasic(Stage):
         driver = copy.deepcopy(driver0)
 
         # ========== Rotate the coordinate system of the beams ==========
-        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+        if isinstance(self.driver_source, Source) and (self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0):
             drive_beam_ramped = copy.deepcopy(driver0)
             #drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
 
@@ -88,7 +89,7 @@ class StageBasic(Stage):
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
-        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+        if isinstance(self.driver_source, Source) and (self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0):
 
             # Angles of beam before rotating back to original coordinate system
             beam_x_angle = beam.x_angle()

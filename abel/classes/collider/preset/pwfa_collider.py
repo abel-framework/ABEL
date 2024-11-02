@@ -11,20 +11,22 @@ class PWFACollider(Collider):
         # OPTIMIZATION VARIABLES
         self.com_energy = 10e12 # [eV]
         
-        self.num_bunches_in_train = 100
-        self.rep_rate_trains = 100.0 # [Hz]
+        self.num_bunches_in_train = 80
+        self.rep_rate_trains = 80.0 # [Hz]
         
-        self.driver_separation_num_buckets = 4
+        self.driver_separation_num_buckets = 6
         self.driver_linac_rf_frequency = 1e9 # [Hz]
-        self.driver_linac_gradient = 5e6 # [V/m]
+        self.driver_linac_gradient = 4.3e6 # [V/m]
         self.driver_linac_structure_num_rf_cells = 23
         self.driver_linac_num_structures_per_klystron = 1.0
 
         self.combiner_ring_compression_factor = 5
         
-        self.pwfa_num_stages = 32
+        self.pwfa_num_stages = 100
         self.pwfa_transformer_ratio = 2
-        self.pwfa_gradient = 1e9
+        self.pwfa_gradient = 2e9
+
+        self.target_integrated_luminosity = 20e46
         
         
 
@@ -64,7 +66,7 @@ class PWFACollider(Collider):
         driver_complex.source = driver_source
         driver_complex.rf_accelerator = driver_accel
         driver_complex.bunch_separation = driver_separation
-        #driver_complex.turnaround = TurnaroundBasic()
+        driver_complex.turnaround = TurnaroundBasic()
         
         # define beam
         esource = SourceBasic()

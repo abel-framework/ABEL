@@ -251,9 +251,9 @@ class Collider(Runnable, CostModeled):
         breakdown = []
         breakdown.append(self.get_cost_breakdown_construction())
         breakdown.append(self.get_cost_breakdown_overheads())
-        breakdown.append((f'Energy ({self.wallplug_power()/1e6:.0f} MW, {self.programme_duration(in_years=True):.1f} yrs)', self.energy_cost()))
+        breakdown.append((f'Energy ({self.wallplug_power()/1e6:.0f} MW, {self.target_integrated_luminosity/1e46:.0f}/ab, {self.programme_duration(in_years=True):.1f} yrs)', self.energy_cost()))
         breakdown.append(('Maintenance', self.maintenance_cost()))
-        breakdown.append(('Carbon tax', self.carbon_tax_cost()))
+        breakdown.append((f'Carbon tax ({self.total_emissions()/1e3:.0f} kton CO2e)', self.carbon_tax_cost()))
         return ('Collider', breakdown)
     
     # total cost of construction and running

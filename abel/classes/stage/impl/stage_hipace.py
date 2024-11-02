@@ -106,7 +106,7 @@ class StageHipace(Stage):
             density_table_file = os.path.basename(self.plasma_density_from_file)
             shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
 
-            self.length = self.get_length() # TODO: fix this
+            self.length = self.get_length() # TODO: ensure that the length from a density profile is correct
             self.plasma_density = self.get_plasma_density()
         else:
             density_table_file = None

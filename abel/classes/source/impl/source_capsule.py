@@ -2,6 +2,9 @@ from abel.classes.source.source import Source
 import copy
 
 class SourceCapsule(Source):
+    """
+    Source class used for "encapsulating" a predefined beam, used e.g. between ramps in plasma stages.
+    """
     
     def __init__(self, length=0, beam=None, energy=None, charge=None, x_offset=0, y_offset=0, x_angle=0, y_angle=0, wallplug_efficiency=1, accel_gradient=None):
         
