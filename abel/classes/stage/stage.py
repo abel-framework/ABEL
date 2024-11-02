@@ -315,7 +315,10 @@ class Stage(Trackable, CostModeled):
 
         # add upramp evolution
         if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
-            upramp_evol = self.upramp.evolution.beam
+            if bunch == 'beam':
+                upramp_evol = self.upramp.evolution.beam
+            elif bunch == 'driver':
+                upramp_evol = self.upramp.evolution.driver
             evol.location = np.append(upramp_evol.location, evol.location-np.min(evol.location)+np.max(upramp_evol.location))
             evol.energy = np.append(upramp_evol.energy, evol.energy)
             evol.charge = np.append(upramp_evol.charge, evol.charge)
@@ -334,7 +337,10 @@ class Stage(Trackable, CostModeled):
 
         # add downramp evolution
         if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
-            downramp_evol = self.downramp.evolution.beam
+            if bunch == 'beam':
+                downramp_evol = self.downramp.evolution.beam
+            elif bunch == 'driver':
+                downramp_evol = self.downramp.evolution.driver
             evol.location = np.append(evol.location, downramp_evol.location-np.min(downramp_evol.location)+np.max(evol.location))
             evol.energy = np.append(evol.energy, downramp_evol.energy)
             evol.charge = np.append(evol.charge, downramp_evol.charge)
