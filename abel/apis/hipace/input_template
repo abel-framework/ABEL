@@ -30,6 +30,9 @@ driver.injection_type = from_file
 driver.input_file = $filename_driver
 driver.iteration = 0
 
+# external focusing
+${external_focusing_radial_comment}beams.external_B(x,y,z,t) = "$external_focusing_radial*y" "-$external_focusing_radial*x" "0.0"
+
 plasmas.names = $plasma_components # 'plasma' or 'electrons ions'
 
 # if ion motion disabled

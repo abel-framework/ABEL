@@ -1,7 +1,5 @@
 import scipy.constants as SI
 import numpy as np
-import RF_Track as RFT
-from RF_Track import SpaceCharge_Field, Bunch6dT
 from abel import Beam
 import warnings
 #from abel.utilities.relativity import momentum2energy
@@ -12,6 +10,8 @@ def abel_beam2rft_beam(beam):
     """
     Converts an ABEL beam object to a RF-Track beam object.
     """
+
+    from RF_Track import Bunch6dT
 
     xs_abel = beam.xs()    # [m]
     pxs_abel = beam.pxs()  # [kg m/s]
@@ -81,6 +81,8 @@ def rft_beam2abel_beam(beam_rft):
 # ==================================================
 def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1):
 
+    from RF_Track import SpaceCharge_Field
+    
     if num_z_cells is None:
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
 

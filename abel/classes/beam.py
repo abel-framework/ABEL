@@ -2,7 +2,8 @@ import numpy as np
 import openpmd_api as io
 from datetime import datetime
 from pytz import timezone
-from abel import CONFIG
+from abel.CONFIG import CONFIG
+from types import SimpleNamespace
 import scipy.constants as SI
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
@@ -18,14 +19,18 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
 
         # the phase space variable is private
         if phasespace is not None:
             self.__phasespace = phasespace
         else:
             self.__phasespace = self.reset_phase_space(num_particles)
-            
+
+        # bunch pattern information
+        self.num_bunches_in_train = num_bunches_in_train
+        self.bunch_separation = bunch_separation # [s]
+        
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
         self.location = 0        
@@ -116,7 +121,27 @@ class Beam():
         return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC, {self.energy()/1e9:.2f} GeV"
         
         
+    ## BUNCH PATTERN
+
+    def bunch_frequency(self) -> float:
+        if self.num_bunches_in_train == 1:
+            return None
+        elif self.bunch_separation == 0.0:
+            return None
+        else:
+            return 1/self.bunch_separation
+
+    def train_duration(self) -> float:
+        if self.num_bunches_in_train == 1:
+            return 0.0
+        elif self.bunch_separation == 0.0:
+            return None
+        else:
+            return self.bunch_separation * (self.num_bunches_in_train-1)
     
+    def average_current_train(self) -> float:
+        return self.charge()*self.bunch_frequency()
+
     
     ## BEAM ARRAYS
 
@@ -1097,6 +1122,16 @@ class Beam():
         ax.set_title('Transverse profile')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um^2)')
+
+    
+    def plot_bunch_pattern(self):
+        
+        fig, ax = plt.subplots()
+        fig.set_figwidth(6)
+        fig.set_figheight(4)        
+        ax.plot(ts*SI.c*1e6, -dQdt/1e3)
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('Beam current (kA)')
         
         
     
@@ -1120,14 +1155,19 @@ class Beam():
         z_mean = self.z_offset()
         zs_scaled = z_mean + (self.zs()-z_mean)*bunch_length/self.bunch_length()
         self.set_zs(zs_scaled)
+
+    def scale_norm_emittance_x(self, norm_emit_nx):
+        scale_factor = norm_emit_nx/self.norm_emittance_x()
+        self.set_xs(self.xs() * np.sqrt(scale_factor))
+        self.set_uxs(self.uxs() * np.sqrt(scale_factor))
+
+    def scale_norm_emittance_y(self, norm_emit_ny):
+        scale_factor = norm_emit_ny/self.norm_emittance_y()
+        self.set_ys(self.ys() * np.sqrt(scale_factor))
+        self.set_uys(self.uys() * np.sqrt(scale_factor))
         
     # betatron damping (must be done before acceleration)
     def apply_betatron_damping(self, deltaE):
-        
-        # remove particles with subzero energy
-        del self[self.Es() < 0]
-        del self[np.isnan(self.Es())]
-        
         gammasBoosted = energy2gamma(abs(self.Es()+deltaE))
         betamag = np.sqrt(self.gammas()/gammasBoosted)
         self.magnify_beta_function(betamag)
@@ -1154,8 +1194,14 @@ class Beam():
         self.set_ys((self.ys()-y_offset)*mag + y_offset)
         self.set_uxs((self.uxs()-ux_offset)/mag + ux_offset)
         self.set_uys((self.uys()-uy_offset)/mag + uy_offset)
-        
-        
+
+    
+    # transport in a drift
+    def transport(self, L):
+        self.set_xs(self.xs() + L*self.xps())
+        self.set_ys(self.ys() + L*self.yps())
+
+    
     def flip_transverse_phase_spaces(self, flip_momenta=True, flip_positions=False):
         if flip_momenta:
             self.set_uxs(-self.uxs())
@@ -1165,7 +1211,7 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
         
         # remove particles with subzero energy
         del self[self.Es() < 0]
@@ -1177,6 +1223,49 @@ class Beam():
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
+        if calc_evolution:
+                
+            # calculate evolution
+            num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
+            evol = SimpleNamespace()
+            evol.location = np.linspace(0, L, num_evol_steps)
+            evol.x, evol.ux, evol.ux, evol.y, evol.uy, evol.energy, evol.energy_spread, evol.rel_energy_spread, evol.beam_size_x, evol.beam_size_y, evol.emit_nx, evol.emit_ny, evol.beta_x, evol.beta_y = (np.empty(evol.location.shape) for _ in range(14))
+
+            # select a given subset of the particles (for faster calculation)
+            sample_fraction = round(2*np.sqrt(len(self))) #
+            inds_sample = np.arange(0, len(self), sample_fraction, dtype=int) # not random, to be consistent across ramps and stages
+            xs_sample, uxs_sample = self.xs()[inds_sample], self.uxs()[inds_sample]
+            ys_sample, uys_sample = self.ys()[inds_sample], self.uys()[inds_sample]
+            gamma0s_sample, dgamma_ds_sample = gamma0s[inds_sample], dgamma_ds[inds_sample]
+            Es_sample, deltaEs_sample = self.Es()[inds_sample], deltaEs[inds_sample]
+
+            # go through steps
+            for i in range(num_evol_steps):
+                
+                # evolve the beam (no radiation reaction)
+                xs_i, uxs_i = evolve_hills_equation_analytic(xs_sample-x0_driver, uxs_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
+                ys_i, uys_i = evolve_hills_equation_analytic(ys_sample-y0_driver, uys_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
+                Es_i = Es_sample+deltaEs_sample*i/(num_evol_steps-1)
+                uzs_i = energy2proper_velocity(Es_i)
+                
+                # save the parameters
+                evol.x[i], evol.ux[i] = np.mean(xs_i), np.mean(uxs_i)
+                evol.y[i], evol.uy[i] = np.mean(ys_i), np.mean(uys_i)
+                evol.energy[i], evol.energy_spread[i] = np.mean(Es_i), np.std(Es_i)
+                evol.beam_size_x[i], evol.beam_size_y[i] = np.std(xs_i), np.std(ys_i)
+                evol.emit_nx[i] = np.sqrt(np.linalg.det(np.cov(xs_i, uxs_i/SI.c))) # only works for equal weight particles
+                evol.emit_ny[i] = np.sqrt(np.linalg.det(np.cov(ys_i, uys_i/SI.c))) # only works for equal weight particles
+                covx, covy = np.cov(xs_i, uxs_i/uzs_i), np.cov(ys_i, uys_i/uzs_i)
+                evol.beta_x[i] = covx[0,0]/np.sqrt(np.linalg.det(covx))
+                evol.beta_y[i] = covy[0,0]/np.sqrt(np.linalg.det(covy))
+
+            evol.rel_energy_spread = evol.energy_spread/evol.energy
+            evol.charge = self.charge()*np.ones(evol.location.shape)
+            evol.z = self.z_offset()*np.ones(evol.location.shape)
+            evol.bunch_length = self.bunch_length()*np.ones(evol.location.shape)
+            evol.plasma_density = n0*np.ones(evol.location.shape)
+            
+            
         # calculate final positions and angles after betatron motion
         if radiation_reaction:
             xs, uxs, ys, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.uxs(), self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
@@ -1190,7 +1279,10 @@ class Beam():
         self.set_ys(ys+y0_driver)
         self.set_uys(uys)
 
-        return Es_final
+        if calc_evolution:
+            return Es_final, evol
+        else:
+            return Es_final
         
   
     ## SAVE AND LOAD BEAM
@@ -1248,6 +1340,9 @@ class Beam():
         dset_q = io.Dataset(np.dtype('float64'), extent=[1])
         dset_m = io.Dataset(np.dtype('float64'), extent=[1])
         
+        dset_n = io.Dataset(self.ids().dtype, extent=[1])
+        dset_f = io.Dataset(np.dtype('float64'), extent=[1])
+        
         # prepare for writing
         particles['position']['z'].reset_dataset(dset_z)
         particles['position']['x'].reset_dataset(dset_x)
@@ -1275,9 +1370,9 @@ class Beam():
         particles['momentum']['y'].store_chunk(self.uys())
         particles['weighting'][io.Record_Component.SCALAR].store_chunk(self.weightings())
         particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
-        particles["charge"][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
-        particles["mass"][io.Record_Component.SCALAR].make_constant(SI.m_e)
-
+        particles['charge'][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
+        particles['mass'][io.Record_Component.SCALAR].make_constant(SI.m_e)
+        
         # set SI units (scaling factor)
         particles['momentum']['z'].unit_SI = SI.m_e
         particles['momentum']['x'].unit_SI = SI.m_e
@@ -1334,14 +1429,18 @@ class Beam():
         beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
         
         # add metadata to beam
-        try: 
+        try:
             beam.trackable_number = series.iterations[index].get_attribute("trackable_number")
             beam.stage_number = series.iterations[index].get_attribute("stage_number")
-            beam.location = series.iterations[index].get_attribute("location")  
+            beam.location = series.iterations[index].get_attribute("location")
+            beam.num_bunches_in_train = series.iterations[index].get_attribute("num_bunches_in_train")
+            beam.bunch_separation = series.iterations[index].get_attribute("bunch_separation")
         except:
             beam.trackable_number = None
             beam.stage_number = None
             beam.location = None
+            beam.num_bunches_in_train = None
+            beam.bunch_separation = None
         
         return beam
 
@@ -1448,8 +1547,8 @@ class Beam():
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
         ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
+        xps_lab = r'$x\'$ [mrad]'
+        yps_lab = r'$y\'$ [mrad]'
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes

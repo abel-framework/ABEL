@@ -6,7 +6,7 @@ class Spectrometer(Trackable):
     
     @abstractmethod
     def __init__(self):
-        pass
+        super().__init__()
         
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)

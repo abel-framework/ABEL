@@ -1,27 +1,45 @@
 from abc import abstractmethod
 from matplotlib import patches
 from abel import Trackable, CONFIG
+from abel.classes.cost_modeled import CostModeled
+from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.utilities.plasma_physics import beta_matched
 import numpy as np
+import copy
 import scipy.constants as SI
 from matplotlib import pyplot as plt
 from types import SimpleNamespace
 from matplotlib.colors import LogNorm
-from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius
+from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
 
-class Stage(Trackable):
+class Stage(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, length, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=1):
+    def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None):
 
+        super().__init__()
+        
         # common variables
-        self.length = length
+        self.nom_accel_gradient = nom_accel_gradient
         self.nom_energy_gain = nom_energy_gain
         self.plasma_density = plasma_density
         self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
         
+        self.stage_number = None
+        
+        # nominal initial energy
+        self.nom_energy = None 
+
+        self.upramp = None
+        self.downramp = None
+        self._return_tracked_driver = False
+        
         self.evolution = SimpleNamespace()
+        self.evolution.beam = SimpleNamespace()
+        self.evolution.beam.slices = SimpleNamespace()
+        self.evolution.driver = SimpleNamespace()
+        self.evolution.driver.slices = SimpleNamespace()
         
         self.efficiency = SimpleNamespace()
         
@@ -43,26 +61,180 @@ class Stage(Trackable):
         self.final.plasma.wakefield = SimpleNamespace()
         self.final.plasma.wakefield.onaxis = SimpleNamespace()
 
+        self.name = 'Plasma stage'
+
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         beam.stage_number += 1
         return super().track(beam, savedepth, runnable, verbose)
+
+    # upramp to be tracked before the main tracking
+    def track_upramp(self, beam0, driver0=None):
+        if self.upramp is not None and isinstance(self.upramp, Stage):
+
+            # set driver
+            self.upramp.driver_source = SourceCapsule(beam=driver0)
+
+            # determine density if not already set
+            if self.upramp.plasma_density is None:
+                self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
+
+            # determine length if not already set
+            if self.upramp.length is None:
+            
+                # set ramp length (uniform step ramp)
+                if self.nom_energy is None:
+                    self.nom_energy = beam0.energy()
+                
+                self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+            
+            # perform tracking
+            self.upramp._return_tracked_driver = True
+            beam, driver = self.upramp.track(beam0)
+            beam.stage_number -= 1
+            driver.stage_number -= 1
+            
+        else:
+            beam = beam0
+            driver = driver0
+            
+        return beam, driver
+
+    # downramp to be tracked after the main tracking
+    def track_downramp(self, beam0, driver0):
+        if self.downramp is not None and isinstance(self.downramp, Stage):
+
+            # set driver
+            self.downramp.driver_source = SourceCapsule(beam=driver0)
+            
+            # determine density if not already set
+            if self.downramp.plasma_density is None:
+                
+                # set ramp density
+                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
+            
+            # determine length if not already set
+            if self.downramp.length is None:
+                
+                # set ramp length (uniform step ramp)
+                if self.nom_energy is None:
+                    self.nom_energy = beam0.energy()
+                
+                self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+            
+            # perform tracking
+            self.downramp._return_tracked_driver = True
+            beam, driver = self.downramp.track(beam0)
+            beam.stage_number -= 1
+            driver.stage_number -= 1
+            
+        else:
+            beam = beam0
+            driver = driver0
+            
+        return beam, driver
+    
+
+    @property
+    def length_flattop(self) -> float:
+        if hasattr(self, '_length_flattop'):
+            if self.nom_energy_gain is not None:
+                self.nom_accel_gradient = self.nom_energy_gain/self._length_flattop
+                del self._length_flattop
+            elif self.nom_accel_gradient is not None:
+                self.nom_energy_gain = self.nom_accel_gradient*self._length_flattop
+                del self._length_flattop
+            else:
+                return self._length_flattop
+        elif self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
+            return self.nom_energy_gain/self.nom_accel_gradient
+        else:
+            return None
+    @length_flattop.setter
+    def length_flattop(self, length_flattop : float):
+        if self.nom_energy_gain is not None:
+            self.nom_accel_gradient = self.nom_energy_gain/length_flattop
+        elif self.nom_accel_gradient is not None:
+            self.nom_energy_gain = self.nom_accel_gradient*length_flattop
+        else:
+            self._length_flattop = length_flattop
+
+    @property
+    def length(self) -> float:
+        if self.length_flattop is None:
+            return None
+        else:
+            L = self.length_flattop
+            if self.length_upramp is not None:
+                L += self.length_upramp
+            if self.length_downramp is not None:
+                L += self.length_downramp
+            return L
+    @length.setter
+    def length(self, length : float):
+        if self.length_upramp is not None or self.length_downramp is not None:
+            print('This stage has ramps, setting the flattop length only (ramp lengths are added)')
+        self.length_flattop = length
+
+    @property
+    def length_upramp(self) -> float:
+        if self.upramp is not None:
+            return self.upramp.length
+        else:
+            return None
+    @length_upramp.setter
+    def length_upramp(self, length_upramp : float):
+        assert self.upramp is not None, "No upramp to set length of"
+        self.upramp.length = length_upramp
+    
+    @property
+    def length_downramp(self) -> float:
+        if self.downramp is not None:
+            return self.downramp.length
+        else:
+            return None
+    @length_downramp.setter
+    def length_downramp(self, length_downramp : float):
+        assert self.downramp is not None, "No downramp to set length of"
+        self.downramp.length = length_downramp
     
     def get_length(self):
         return self.length
+
+    def get_cost_breakdown(self):
+        breakdown = []
+        breakdown.append(('Plasma cell', self.get_length() * CostModeled.cost_per_length_plasma_stage))
+        breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
+        return (self.name, breakdown)
     
     def get_nom_energy_gain(self):
+        if self.nom_energy_gain is None:
+            self.nom_energy_gain = self.nom_accel_gradient*self.length
+            self.length = None
         return self.nom_energy_gain
 
-    def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy)*self.ramp_beta_mag
+    def get_nom_accel_gradient(self):
+        return self.nom_accel_gradient
+
+    def matched_beta_function(self, energy_incoming):
+        if self.ramp_beta_mag is not None:
+            return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
+        else:
+            return beta_matched(self.plasma_density, energy_incoming)
+            
+    def matched_beta_function_flattop(self, energy):
+        return beta_matched(self.plasma_density, energy)
     
     def energy_usage(self):
         return self.driver_source.energy_usage()
     
     def energy_efficiency(self):
         return self.efficiency
+
+    #@abstractmethod   # TODO: calculate the dumped power and use it for the dump cost model.
+    def dumped_power(self):
+        return None
 
     
     def calculate_efficiency(self, beam0, driver0, beam, driver):
@@ -91,62 +263,171 @@ class Stage(Trackable):
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
 
-    
-    def plot_evolution(self):
+    def save_driver_to_file(self, driver, runnable):
+        driver.save(runnable, beam_name='driver_stage' + str(driver.stage_number+1))
 
+    
+    def save_evolution_to_file(self, bunch='beam'):
+    
+        # select bunch
+        if bunch == 'beam':
+            evol = self.evolution.beam
+        elif bunch == 'driver':
+            evol = self.evolution.driver
+
+        # arrange numbers into a matrix
+        matrix = np.empty((len(evol.location),14))
+        matrix[:,0] = evol.location
+        matrix[:,1] = evol.charge
+        matrix[:,2] = evol.energy
+        matrix[:,3] = evol.x
+        matrix[:,4] = evol.y
+        matrix[:,5] = evol.rel_energy_spread
+        matrix[:,6] = evol.rel_energy_spread_fwhm
+        matrix[:,7] = evol.beam_size_x
+        matrix[:,8] = evol.beam_size_y
+        matrix[:,9] = evol.emit_nx
+        matrix[:,10] = evol.emit_ny
+        matrix[:,11] = evol.beta_x
+        matrix[:,12] = evol.beta_y
+        matrix[:,13] = evol.peak_spectral_density
+
+        # save to CSV file
+        filename = bunch + '_evolution.csv'
+        np.savetxt(filename, matrix, delimiter=',')
+        
+    
+    def plot_driver_evolution(self):
+        self.plot_evolution(bunch='driver')
+    
+    def plot_evolution(self, bunch='beam'):
+        
+        # select bunch
+        if bunch == 'beam':
+            evol = copy.deepcopy(self.evolution.beam)
+        elif bunch == 'driver':
+            evol = copy.deepcopy(self.evolution.driver)
+            
         # extract wakefield if not already existing
-        if not hasattr(self.evolution, 'location'):
+        if not hasattr(evol, 'location'):
             print('No evolution calculated')
             return
 
+        # add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                upramp_evol = self.upramp.evolution.beam
+            elif bunch == 'driver':
+                upramp_evol = self.upramp.evolution.driver
+            evol.location = np.append(upramp_evol.location, evol.location-np.min(evol.location)+np.max(upramp_evol.location))
+            evol.energy = np.append(upramp_evol.energy, evol.energy)
+            evol.charge = np.append(upramp_evol.charge, evol.charge)
+            evol.emit_nx = np.append(upramp_evol.emit_nx, evol.emit_nx)
+            evol.emit_ny = np.append(upramp_evol.emit_ny, evol.emit_ny)
+            evol.rel_energy_spread = np.append(upramp_evol.rel_energy_spread, evol.rel_energy_spread)
+            evol.beam_size_x = np.append(upramp_evol.beam_size_x, evol.beam_size_x)
+            evol.beam_size_y = np.append(upramp_evol.beam_size_y, evol.beam_size_y)
+            evol.bunch_length = np.append(upramp_evol.bunch_length, evol.bunch_length)
+            evol.x = np.append(upramp_evol.x, evol.x)
+            evol.y = np.append(upramp_evol.y, evol.y)
+            evol.z = np.append(upramp_evol.z, evol.z)
+            evol.beta_x = np.append(upramp_evol.beta_x, evol.beta_x)
+            evol.beta_y = np.append(upramp_evol.beta_y, evol.beta_y)
+            evol.plasma_density = np.append(upramp_evol.plasma_density, evol.plasma_density)
+
+        # add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                downramp_evol = self.downramp.evolution.beam
+            elif bunch == 'driver':
+                downramp_evol = self.downramp.evolution.driver
+            evol.location = np.append(evol.location, downramp_evol.location-np.min(downramp_evol.location)+np.max(evol.location))
+            evol.energy = np.append(evol.energy, downramp_evol.energy)
+            evol.charge = np.append(evol.charge, downramp_evol.charge)
+            evol.emit_ny = np.append(evol.emit_ny, downramp_evol.emit_ny)
+            evol.emit_nx = np.append(evol.emit_nx, downramp_evol.emit_nx)
+            evol.rel_energy_spread = np.append(evol.rel_energy_spread, downramp_evol.rel_energy_spread)
+            evol.beam_size_x = np.append(evol.beam_size_x, downramp_evol.beam_size_x)
+            evol.beam_size_y = np.append(evol.beam_size_y, downramp_evol.beam_size_y)
+            evol.bunch_length = np.append(evol.bunch_length, downramp_evol.bunch_length)
+            evol.x = np.append(evol.x, downramp_evol.x)
+            evol.y = np.append(evol.y, downramp_evol.y)
+            evol.z = np.append(evol.z, downramp_evol.z)
+            evol.beta_x = np.append(evol.beta_x, downramp_evol.beta_x)
+            evol.beta_y = np.append(evol.beta_y, downramp_evol.beta_y)
+            evol.plasma_density = np.append(evol.plasma_density, downramp_evol.plasma_density)
+        
         # preprate plot
-        fig, axs = plt.subplots(2,3)
-        fig.set_figwidth(CONFIG.plot_fullwidth_default)
-        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        fig, axs = plt.subplots(3,3)
+        fig.set_figwidth(20)
+        fig.set_figheight(12)
         col0 = "tab:gray"
         col1 = "tab:blue"
         col2 = "tab:orange"
         long_label = 'Location [m]'
-        long_limits = [min(self.evolution.location), max(self.evolution.location)]
+        long_limits = [min(evol.location), max(evol.location)]
 
         # plot energy
-        axs[0,0].plot(self.evolution.location, self.evolution.energy / 1e9, color=col1)
+        axs[0,0].plot(evol.location, evol.energy / 1e9, color=col1)
         axs[0,0].set_ylabel('Energy [GeV]')
+        axs[0,0].set_xlabel(long_label)
         axs[0,0].set_xlim(long_limits)
-
+        
         # plot charge
-        axs[0,1].plot(self.evolution.location, -self.evolution.charge[0] * np.ones(self.evolution.location.shape) * 1e9, ':', color=col0)
-        axs[0,1].plot(self.evolution.location, -self.evolution.charge * 1e9, color=col1)
+        axs[0,1].plot(evol.location, abs(evol.charge[0]) * np.ones(evol.location.shape) * 1e9, ':', color=col0)
+        axs[0,1].plot(evol.location, abs(evol.charge) * 1e9, color=col1)
         axs[0,1].set_ylabel('Charge [nC]')
         axs[0,1].set_xlim(long_limits)
-        axs[0,1].set_ylim(0, -self.evolution.charge[0] * 1.3 * 1e9)
+        axs[0,1].set_ylim(0, abs(evol.charge[0]) * 1.3 * 1e9)
         
         # plot normalized emittance
-        axs[0,2].plot(self.evolution.location, self.evolution.emit_ny*1e6, color=col2)
-        axs[0,2].plot(self.evolution.location, self.evolution.emit_nx*1e6, color=col1)
+        axs[0,2].plot(evol.location, evol.emit_ny*1e6, color=col2)
+        axs[0,2].plot(evol.location, evol.emit_nx*1e6, color=col1)
         axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
         axs[0,2].set_xlim(long_limits)
+        axs[0,2].set_yscale('log')
         
         # plot energy spread
-        axs[1,0].plot(self.evolution.location, self.evolution.rel_energy_spread*1e2, color=col1)
+        axs[1,0].plot(evol.location, evol.rel_energy_spread*1e2, color=col1)
         axs[1,0].set_ylabel('Energy spread, rms [%]')
         axs[1,0].set_xlabel(long_label)
         axs[1,0].set_xlim(long_limits)
-        
-        # plot beam size
-        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_y*1e6, color=col2)
-        axs[1,2].plot(self.evolution.location, self.evolution.beam_size_x*1e6, color=col1)
-        axs[1,2].set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
-        axs[1,2].set_xlabel(long_label)
-        axs[1,2].set_xlim(long_limits)
+        axs[1,0].set_yscale('log')
 
-        # plot transverse offset
-        axs[1,1].plot(self.evolution.location, np.zeros(self.evolution.location.shape), ':', color=col0)
-        axs[1,1].plot(self.evolution.location, self.evolution.y*1e6, color=col2)  
-        axs[1,1].plot(self.evolution.location, self.evolution.x*1e6, color=col1)
-        axs[1,1].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
+        # plot bunch length
+        axs[1,1].plot(evol.location, evol.bunch_length*1e6, color=col1)
+        axs[1,1].set_ylabel(r'Bunch length, rms [$\mathrm{\mu}$m]')
         axs[1,1].set_xlabel(long_label)
         axs[1,1].set_xlim(long_limits)
+
+        # plot beta function
+        axs[1,2].plot(evol.location, evol.beta_y*1e3, color=col2)  
+        axs[1,2].plot(evol.location, evol.beta_x*1e3, color=col1)
+        axs[1,2].set_ylabel('Beta function [mm]')
+        axs[1,2].set_xlabel(long_label)
+        axs[1,2].set_xlim(long_limits)
+        axs[1,2].set_yscale('log')
+        
+        # plot longitudinal offset
+        axs[2,0].plot(evol.location, evol.plasma_density / 1e6, color=col1)
+        axs[2,0].set_ylabel(r'Plasma density [$\mathrm{cm}^{-3}$]')
+        axs[2,0].set_xlabel(long_label)
+        axs[2,0].set_xlim(long_limits)
+        axs[2,0].set_yscale('log')
+        
+        # plot longitudinal offset
+        axs[2,1].plot(evol.location, evol.z * 1e6, color=col1)
+        axs[2,1].set_ylabel(r'Longitudinal offset [$\mathrm{\mu}$m]')
+        axs[2,1].set_xlabel(long_label)
+        axs[2,1].set_xlim(long_limits)
+        
+        # plot transverse offset
+        axs[2,2].plot(evol.location, np.zeros(evol.location.shape), ':', color=col0)
+        axs[2,2].plot(evol.location, evol.y*1e6, color=col2)  
+        axs[2,2].plot(evol.location, evol.x*1e6, color=col1)
+        axs[2,2].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
+        axs[2,2].set_xlabel(long_label)
+        axs[2,2].set_xlim(long_limits)
         
         plt.show()
 
@@ -315,5 +596,12 @@ class Stage(Trackable):
 
     
     def survey_object(self):
-        return patches.Rectangle((0, -1), self.get_length(), 2)
+        npoints = 10
+        x_points = np.linspace(0, self.get_length(), npoints)
+        y_points = np.linspace(0, 0, npoints)
+        final_angle = 0 
+        label = 'Plasma stage'
+        color = 'red'
+        return x_points, y_points, final_angle, label, color
+        
     

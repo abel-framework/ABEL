@@ -134,22 +134,8 @@ dmypy.json
 # Jupyter files
 *.jupyter/
 
-# OPAL specific
-*rundata/
+# ABEL specific
 *run_data/
-abel/examples/*
-.temp/
-CONFIG.py
-examples/FACETII_slice_instability_stages_interstages.ipynb
-examples/HALHFv3_optimise.ipynb
-examples/HALHFv3_scans.ipynb
-examples/InterstageElegant_tests.ipynb
-examples/plot_Er.png
-examples/test_transverse_electric_field_solver.ipynb
-examples/transverse_electric_field_solver_benchmarks.ipynb
 examples/Untitled.ipynb
-examples/RF-Track_test.ipynb
-examples/rf_track_vs_hipace.ipynb
 abel/CONFIG.py
-/examples/
 

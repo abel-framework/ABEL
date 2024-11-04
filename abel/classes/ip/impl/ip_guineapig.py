@@ -9,6 +9,7 @@ from abel.apis.guineapig.guineapig_api import guineapig_run
 class InteractionPointGuineaPig(InteractionPoint):
     
     def __init__(self, enable_waist_shift = False):
+        super().__init__()
         self.enable_waist_shift = enable_waist_shift
         self.waist_shift_frac = 1 # fraction of bunch length
         

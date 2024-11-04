@@ -30,5 +30,5 @@ CPU_BIND="map_cpu:49,57,17,25,1,9,33,41"
 # local runner to find the input filename
 # filename_input "$filename_input"
 
-srun --cpu-bind=$${CPU_BIND} ./select_gpu $$PROJECT/software/hipace/build/bin/hipace $filename_input
+srun --cpu-bind=$${CPU_BIND} ./select_gpu $hipace_binary_path $filename_input
 rm -rf ./select_gpu

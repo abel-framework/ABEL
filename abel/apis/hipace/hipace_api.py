@@ -8,7 +8,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -47,7 +47,13 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     if not num_cell_xy == new_num_cell_xy:
         print('>> HiPACE++: Changing from', num_cell_xy, 'to', new_num_cell_xy, ' (i.e., 2^n-1) for better performance.')
         num_cell_xy = new_num_cell_xy
-        
+
+    # plasma-density profile from file
+    if abs(external_focusing_radial) > 0:
+        external_focusing_radial_comment = ''
+    else:
+        external_focusing_radial_comment = '#'
+    
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
               'num_cell_y': int(num_cell_xy), 
@@ -70,6 +76,8 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'density_comment2': density_comment2,
               'ion_species': ion_species,
               'beam_ionization': int(beam_ionization),
+              'external_focusing_radial': abs(external_focusing_radial),
+              'external_focusing_radial_comment': external_focusing_radial_comment,
               'filename_beam': filename_beam,
               'filename_driver': filename_driver}
 
@@ -100,6 +108,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
               'memory': str(int(memory_per_gpu*num_tasks_per_node))+'g',
               'num_nodes': num_nodes,
               'num_tasks_per_node': num_tasks_per_node,
+              'hipace_binary_path': CONFIG.hipace_binary,
               'filename_input': filename_input}
     
     # fill in template file
@@ -114,11 +123,11 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
 
-    #Extract runfolder from job script name
+    # extract runfolder from job script name
     if runfolder == None:
         runfolder = os.path.dirname(filename_job_script)
 
-    #Run HIPACE++
+    # run HIPACE++
     if CONFIG.cluster_name == 'LOCAL':
         _hipace_run_local(filename_job_script, runfolder, quiet=False)
     else:
@@ -134,6 +143,7 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     driver = Beam.load(filename, beam_name='driver')
     
     return beam, driver
+
 
 def _hipace_run_local(filename_job_script, runfolder, quiet=False):
     "Helper for running HiPACE++ on the local machine. Returns when job is complete."
@@ -224,7 +234,7 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
                     pbar.set_description('>>> Running HiPACE++ (job ' + str(jobid) + ')')
                     
                 # read progress from output file
-                outputfile = runfolder + 'hipace-' + str(jobid) + '.out'
+                outputfile = os.path.join(runfolder,'hipace-' + str(jobid) + '.out')
                 if os.path.exists(outputfile) and not quiet:
                     with open(outputfile, 'rb') as f:
                         try:  # catch OSError in case of a one line file 

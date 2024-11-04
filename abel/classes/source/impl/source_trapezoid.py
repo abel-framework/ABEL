@@ -6,12 +6,15 @@ from abel.utilities.relativity import energy2gamma
 
 class SourceTrapezoid(Source):
     
-    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, current_head=0, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, front_heavy_distribution=False):
+    def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, gaussian_blur=0, current_head=0, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, front_heavy_distribution=False):
+        
+        super().__init__(length, charge, energy, accel_gradient, wallplug_efficiency, x_offset, y_offset, x_angle, y_angle)
         
         self.energy_spread = energy_spread # [eV]
         self.rel_energy_spread = rel_energy_spread # [eV]
         self.current_head = current_head # [A]
         self.bunch_length = bunch_length # [m]
+        self.gaussian_blur = gaussian_blur # [m]
         self.z_offset = z_offset # [m]
         self.num_particles = num_particles
         self.emit_nx = emit_nx # [m rad]
@@ -24,8 +27,6 @@ class SourceTrapezoid(Source):
         self.symmetrize = symmetrize
         self.front_heavy_distribution = front_heavy_distribution
         
-        super().__init__(length, charge, energy, accel_gradient, wallplug_efficiency, x_offset, y_offset, x_angle, y_angle)
-    
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
         
@@ -72,6 +73,9 @@ class SourceTrapezoid(Source):
         zs[mask_uniform] = np.random.uniform(low=self.z_offset-self.bunch_length, high=self.z_offset, size=len(mask_uniform))
         zs[mask_triangle] = np.random.triangular(left=self.z_offset-self.bunch_length, right=self.z_offset, mode=zmode, size=len(mask_triangle))
 
+        # add Gaussian blur/convolve with Gaussian
+        zs = zs + np.random.normal(scale=self.gaussian_blur, size=len(zs))
+        
         # make particle distribution front-heavy (more particles at the bunch head)
         if self.front_heavy_distribution:
 

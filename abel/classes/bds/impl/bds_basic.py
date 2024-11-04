@@ -5,6 +5,7 @@ from abel import BeamDeliverySystem
 class BeamDeliverySystemBasic(BeamDeliverySystem):
     
     def __init__(self, beta_x=None, beta_y=None, bunch_length=None, length=0, nom_energy=None):
+        super().__init__()
         self.beta_x = beta_x
         self.beta_y = beta_y
         self.bunch_length = bunch_length
@@ -12,8 +13,8 @@ class BeamDeliverySystemBasic(BeamDeliverySystem):
         self.nom_energy = nom_energy
     
     def get_length(self):
-        if self.nom_energy is not None:
-            return np.sqrt(self.nom_energy/500e9)*2250 # [m] scaled from ILC
+        if self.length is None:
+            return np.sqrt(self.get_nom_energy()/500e9)*2250 # [m] scaled from ILC
         else:
             return self.length
     

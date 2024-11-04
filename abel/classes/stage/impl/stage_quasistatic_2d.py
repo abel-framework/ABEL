@@ -13,28 +13,41 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, enable_transverse_instability=False, enable_radiation_reaction=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_transverse_instability=False, enable_radiation_reaction=False, calculate_evolution=False):
         
-        super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
+        super().__init__(nom_accel_gradient, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # physics flags
         self.enable_transverse_instability = enable_transverse_instability
         self.enable_radiation_reaction = enable_radiation_reaction
+
+        # simulation flags
+        self.calculate_evolution = calculate_evolution
     
         
     # track the particles through
-    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
         # suppress numba warnings from Ocelot
         import warnings
         warnings.simplefilter('ignore', category=RuntimeWarning)
         
         # make driver (and convert to WakeT bunch)
-        driver0 = self.driver_source.track()
-        
-        # apply plasma-density up ramp (demagnify beta function)
-        driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
-        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+        driver_incoming = self.driver_source.track()
+
+        # plasma-density ramps (de-magnify beta function)
+        if self.upramp is not None:
+            self.upramp.calculate_evolution = self.calculate_evolution
+            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
+        else:
+            beam0 = copy.deepcopy(beam_incoming)
+            driver0 = copy.deepcopy(driver_incoming)
+            if self.ramp_beta_mag is not None:
+                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+
+        # make copy of the beam to update later
+        beam = copy.deepcopy(beam0)
         
         # convert beams to WakeT bunches
         driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
@@ -79,8 +92,8 @@ class StageQuasistatic2d(Stage):
             bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
         
         # convert back to ABEL beams
-        beam = wake_t_bunch2beam(bunches[1][-1])
-        driver = wake_t_bunch2beam(bunches[0][-1])
+        beam_waket = wake_t_bunch2beam(bunches[1][-1])
+        driver_waket = wake_t_bunch2beam(bunches[0][-1])
         
         # save evolution of the beam and driver
         self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
@@ -130,44 +143,60 @@ class StageQuasistatic2d(Stage):
             # interpolate for each particle
             rbs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
             Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
-
+            
             # perform tracking  # TODO: transverse_wake_instability_particles() signa has changed.
-            beam = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length, show_prog_bar=True)
+            beam = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length_flattop, show_prog_bar=True)
             
         else:
             
             # calculate energy gain
-            delta_Es = self.length*(beam.Es() - beam0.Es())/dz
-            
+            delta_Es = self.length_flattop*(beam_waket.Es() - beam.Es())/dz
+
             # find driver offset (to shift the beam relative) and apply betatron motion
-            Es_final = beam.apply_betatron_motion(self.length, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction)
+            output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, calc_evolution=self.calculate_evolution)
+            if self.calculate_evolution:
+                Es_final, self.evolution.beam = output
+            else:
+                Es_final = output
             
             # accelerate beam (and remove nans)
             beam.set_Es(Es_final)
             
         # decelerate driver (and remove nans)
-        delta_Es_driver = self.length*(driver0.Es()-driver.Es())/dz
+        delta_Es_driver = self.length_flattop*(driver0.Es()-driver_waket.Es())/dz
+        driver = copy.deepcopy(driver0)
         driver.apply_betatron_damping(delta_Es_driver)
         driver.set_Es(driver0.Es() + delta_Es_driver)
         
         # apply plasma-density down ramp (magnify beta function)
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-        driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+        if self.downramp is not None:
+            self.downramp.calculate_evolution = self.calculate_evolution
+            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
+        else:
+            beam_outgoing = copy.deepcopy(beam)
+            driver_outgoing = copy.deepcopy(driver)
+            if self.ramp_beta_mag is not None:
+                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
         
         # copy meta data from input beam (will be iterated by super)
-        beam.trackable_number = beam0.trackable_number
-        beam.stage_number = beam0.stage_number
-        beam.location = beam0.location
+        beam_outgoing.trackable_number = beam_incoming.trackable_number
+        beam_outgoing.stage_number = beam_incoming.stage_number
+        beam_outgoing.location = beam_incoming.location
         
         # clean nan particles and extreme outliers
         beam.remove_nans()
         beam.remove_halo_particles()
         
         # calculate efficiency
-        self.calculate_efficiency(beam0, driver0, beam, driver)
+        self.calculate_efficiency(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
         
         # save current profile
-        self.calculate_beam_current(beam0, driver0, beam, driver)
+        self.calculate_beam_current(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
         
-        return super().track(beam, savedepth, runnable, verbose)
-    
+        # return the beam (and optionally the driver)
+        if self._return_tracked_driver:
+            return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing
+        else:
+            return super().track(beam_outgoing, savedepth, runnable, verbose)
+        
