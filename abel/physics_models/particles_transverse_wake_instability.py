@@ -1,39 +1,6 @@
 """
 Transverse wake instability model as described in thesis "Instability and Beam-Beam Study for Multi-TeV PWFA e+e- and gamma gamma Linear Colliders" (https://cds.cern.ch/record/2754022?ln=en).
 
-Parameters
-----------
-beam: Beam object
-
-plasma_density: [m^-3] float
-    Plasma density.
-    
-Ez_fit_obj: [V/m] interpolation object
-    1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
-    
-rb_fit_obj: [m] interpolation object
-    1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
-    
-stage_length: [m] float
-    Length of the plasma stage.
-
-time_step_mod: float
-    Determines the time step of the instability tracking in units of beta_wave_length/c.
-
-enable_radiation_reaction: bool
-    Flag for enabling radiation reactions.
-
-show_prog_bar: bool
-    Flag for displaying the progress bar.
-
-...
-
-    
-Returns
-----------
-beam_out
-
-
 Ben Chen, 5 October 2023, University of Oslo
 """
 
@@ -231,6 +198,46 @@ def calc_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_ste
 
 ###################################################
 def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_obj, trans_wake_config):
+    """
+    Parameters
+    ----------
+    beam: Beam object
+    
+    #plasma_density: [m^-3] float
+        Plasma density.
+        
+    #Ez_fit_obj: [V/m] interpolation object
+        1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
+        
+    #rb_fit_obj: [m] interpolation object
+        1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
+        
+    #stage_length: [m] float
+        Length of the plasma stage.
+    
+    #time_step_mod: float
+        Determines the time step of the instability tracking in units of beta_wave_length/c.
+    
+    #enable_radiation_reaction: bool
+        Flag for enabling radiation reactions.
+    
+    #show_prog_bar: bool
+        Flag for displaying the progress bar.
+
+    trans_wake_config: ...
+        ...
+    
+    ...
+    
+        
+    Returns
+    ----------
+    beam_out: Beam object
+        ...
+    
+    evolution: ...
+        ...
+    """
     
     plasma_density = trans_wake_config.plasma_density
     stage_length = trans_wake_config.stage_length

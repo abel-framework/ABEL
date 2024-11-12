@@ -1214,8 +1214,12 @@ class Beam():
     def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
         
         # remove particles with subzero energy
-        del self[self.Es() < 0]
-        del self[np.isnan(self.Es())]
+        neg_indices = self.Es() < 0
+        del self[neg_indices]
+        deltaEs = np.delete(deltaEs, neg_indices)
+        nan_indices = np.isnan(self.Es())
+        del self[nan_indices]
+        deltaEs = np.delete(deltaEs, nan_indices)
         
         # determine initial and final Lorentz factor
         gamma0s = energy2gamma(self.Es())
@@ -1547,8 +1551,8 @@ class Beam():
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
         ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = r'$x\'$ [mrad]'
-        yps_lab = r'$y\'$ [mrad]'
+        xps_lab = '$x\'$ [mrad]'
+        yps_lab = '$y\'$ [mrad]'
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes

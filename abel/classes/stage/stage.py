@@ -5,7 +5,7 @@ from abel.classes.cost_modeled import CostModeled
 from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.utilities.plasma_physics import beta_matched
 import numpy as np
-import copy
+import copy, warnings
 import scipy.constants as SI
 from matplotlib import pyplot as plt
 from types import SimpleNamespace
@@ -135,25 +135,32 @@ class Stage(Trackable, CostModeled):
             
         return beam, driver
     
-
+    
     @property
     def length_flattop(self) -> float:
         if hasattr(self, '_length_flattop'):
             if self.nom_energy_gain is not None:
                 self.nom_accel_gradient = self.nom_energy_gain/self._length_flattop
-                del self._length_flattop
+                length_flattop = self._length_flattop 
+                del self._length_flattop  # Delete self._length_flattop after both self.nom_energy_gain and self.nom_accel_gradient have been set, so that self.length_flattop henceforth is given by self.nom_energy_gain/self.nom_accel_gradient.
+                return length_flattop  # Prevents None being returned for self.length_flattop when only self.nom_energy_gain have been set initially.
             elif self.nom_accel_gradient is not None:
                 self.nom_energy_gain = self.nom_accel_gradient*self._length_flattop
+                length_flattop = self._length_flattop 
                 del self._length_flattop
+                return length_flattop
             else:
                 return self._length_flattop
         elif self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
             return self.nom_energy_gain/self.nom_accel_gradient
         else:
+            #raise ValueError('Need to set either nom_energy_gain or nom_accel_gradient before setting length or length_flattop.')
             return None
     @length_flattop.setter
     def length_flattop(self, length_flattop : float):
-        if self.nom_energy_gain is not None:
+        if self.nom_energy_gain is not None:  # Nominal energy gain is prioritised over nominal acceleration gradient.
+            if self.nom_accel_gradient is not None and self.nom_energy_gain/self.nom_accel_gradient != length_flattop:
+                warnings.warn('The given plasma acceleration stage length is not consistent with the values of self.nom_energy_gain and self.nom_accel_gradient. Resetting self.nom_accel_gradient.')
             self.nom_accel_gradient = self.nom_energy_gain/length_flattop
         elif self.nom_accel_gradient is not None:
             self.nom_energy_gain = self.nom_accel_gradient*length_flattop
@@ -174,7 +181,7 @@ class Stage(Trackable, CostModeled):
     @length.setter
     def length(self, length : float):
         if self.length_upramp is not None or self.length_downramp is not None:
-            print('This stage has ramps, setting the flattop length only (ramp lengths are added)')
+            warnings.warn('This stage has ramps, setting the flattop length only (ramp lengths are added).')
         self.length_flattop = length
 
     @property
