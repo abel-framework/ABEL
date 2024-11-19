@@ -1547,8 +1547,8 @@ class Beam():
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
         ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = r'$x\'$ [mrad]'
-        yps_lab = r'$y\'$ [mrad]'
+        xps_lab = r"$x'$ [mrad]"
+        yps_lab = r"$y'$ [mrad]"
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
