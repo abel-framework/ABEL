@@ -179,8 +179,8 @@ class StagePrtclTransWakeInstability(Stage):
         
         drive_beam_ramped = copy.deepcopy(drive_beam0)  # Make a deep copy to not affect the original drive beam.
 
-        drive_beam_wakeT = copy.deepcopy(drive_beam0)  # Wake-T requires not-ramped beams for now... ############
-        beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately. ############
+        #drive_beam_wakeT = copy.deepcopy(drive_beam0)  # Wake-T requires not-ramped beams for now... ############
+        #beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately. ############
 
         
         # ========== Apply plasma density up ramp (demagnify beta function) ========== 
@@ -234,62 +234,66 @@ class StagePrtclTransWakeInstability(Stage):
         
 
         # ========== Wake-T simulation and extraction ==========
-        ## Set up a Wake-T plasma acceleration stage
-        #drive_beam_wakeT = copy.deepcopy(drive_beam_ramped)
-        #beam0_copy = copy.deepcopy(beam0)
-        #plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_copy)
-#
-        ## Make temp folder
-        #if not os.path.exists(CONFIG.temp_path):
-        #    os.mkdir(CONFIG.temp_path)
-        #tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
-        #if not os.path.exists(tmpfolder):
-        #    os.mkdir(tmpfolder)
-#
-        ## Convert beams to Wake-T bunches
-        #driver0_wake_t = beam2wake_t_bunch(drive_beam_wakeT, name='driver')
-        #beam0_wake_t = beam2wake_t_bunch(beam0_copy, name='beam')
-#
-        #bunches = plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
-        #
-        #wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
-        #
-        ## remove temporary directory
-        #shutil.rmtree(tmpfolder)
-#
-        ## Read the Wake-T simulation data
-        #Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
-        #zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
-        #rho = wake_t_evolution.initial.plasma.density.rho*-e
-        #plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
-        #info_rho = wake_t_evolution.initial.plasma.density.metadata
-        #zs_rho = info_rho.z
-        #rs_rho = info_rho.r
+        # Set up a Wake-T plasma acceleration stage
+        drive_beam_wakeT = copy.deepcopy(drive_beam_ramped)
+        beam0_copy = copy.deepcopy(beam0)
+
+        # TODO: Need to subtract driver offsets from both beams?
+        
+        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_copy)
+
+        # Make temp folder
+        if not os.path.exists(CONFIG.temp_path):
+            os.mkdir(CONFIG.temp_path)
+        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+        if not os.path.exists(tmpfolder):
+            os.mkdir(tmpfolder)
+
+        # Convert beams to Wake-T bunches
+        driver0_wake_t = beam2wake_t_bunch(drive_beam_wakeT, name='driver')
+        beam0_wake_t = beam2wake_t_bunch(beam0_copy, name='beam')
+
+        bunches = plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
+        
+        wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
+        
+        # remove temporary directory
+        shutil.rmtree(tmpfolder)
+
+        # Read the Wake-T simulation data
+        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
+        rho = wake_t_evolution.initial.plasma.density.rho*-e
+        plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
+        info_rho = wake_t_evolution.initial.plasma.density.metadata
+        zs_rho = info_rho.z
+        rs_rho = info_rho.r
         
 
         # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-        # Define a Wake-T stage
-        stage_wakeT = StageWakeT()
-        #stage_wakeT.driver_source = self.driver_source
-        stage_wakeT.drive_beam = drive_beam_wakeT
-        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam_wakeT.gamma()/2))
-        lambda_betatron = (2*np.pi/k_beta)
-        stage_wakeT.length = lambda_betatron/10  # [m]
-        stage_wakeT.plasma_density = plasma_density  # [m^-3]
-        stage_wakeT.ramp_beta_mag = self.ramp_beta_mag
-        #stage_wakeT.keep_data = False  # TODO: Does not work yet.
-        
-        # Run the Wake-T stage
-        beam_wakeT = stage_wakeT.track(beam0_copy, verbose=self.show_prog_bar)
-        
-        # Read the Wake-T simulation data
-        Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
-        zs_Ez_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.zs
-        rho = stage_wakeT.initial.plasma.density.rho*-e
-        plasma_num_density = stage_wakeT.initial.plasma.density.rho/stage_wakeT.plasma_density
-        info_rho = stage_wakeT.initial.plasma.density.metadata
-        zs_rho = info_rho.z
-        rs_rho = info_rho.r
+        ## Define a Wake-T stage
+        #stage_wakeT = StageWakeT()
+        ##stage_wakeT.driver_source = self.driver_source
+        #stage_wakeT.drive_beam = drive_beam_wakeT
+        ##stage_wakeT.drive_beam = drive_beam0
+        #k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam_wakeT.gamma()/2))
+        #lambda_betatron = (2*np.pi/k_beta)
+        #stage_wakeT.length = lambda_betatron/10  # [m]
+        #stage_wakeT.plasma_density = plasma_density  # [m^-3]
+        #stage_wakeT.ramp_beta_mag = self.ramp_beta_mag
+        ##stage_wakeT.keep_data = False  # TODO: Does not work yet.
+        #
+        ## Run the Wake-T stage
+        #beam_wakeT = stage_wakeT.track(beam0_copy, verbose=self.show_prog_bar)
+        #
+        ## Read the Wake-T simulation data
+        #Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
+        #zs_Ez_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.zs
+        #rho = stage_wakeT.initial.plasma.density.rho*-e
+        #plasma_num_density = stage_wakeT.initial.plasma.density.rho/stage_wakeT.plasma_density
+        #info_rho = stage_wakeT.initial.plasma.density.metadata
+        #zs_rho = info_rho.z
+        #rs_rho = info_rho.r
         # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         
         # Cut out axial Ez over the ROI
@@ -332,9 +336,6 @@ class StagePrtclTransWakeInstability(Stage):
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
         
         if len(beam_filtered) == 0:
-            #self.plot_wake()
-            #self.plot_wakefield()
-            #beam0.density_map_diags()
             zs = beam0.zs()
             indices = np.argsort(zs)
             zs_sorted = zs[indices]
@@ -2170,7 +2171,7 @@ class StagePrtclTransWakeInstability(Stage):
         print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y()*1e6 :.3f} \t\t {main_beam.norm_emittance_y()*1e6 :.3f}")
         print(f"Initial angular momentum [mm mrad]:\t\t {drive_beam.angular_momentum()*1e6 :.3f} \t\t\t {main_beam.angular_momentum()*1e6 :.3f}\n")
         
-        print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(main_beam.energy())*1e3 :.3f}")
+        print(f"Initial matched beta function [mm]:\t\t {self.matched_beta_function(drive_beam.energy())*1e3 :.3f} \t\t {self.matched_beta_function(main_beam.energy())*1e3 :.3f}")
         print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x()*1e3 :.3f} \t\t {main_beam.beta_x()*1e3 :.3f}")
         print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y()*1e3 :.3f} \t\t {main_beam.beta_y()*1e3 :.3f}\n")
 
@@ -2285,10 +2286,10 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Initial angular momentum [mm mrad]:\t\t {drive_beam.angular_momentum()*1e6 :.3f} \t\t\t {initial_main_beam.angular_momentum()*1e6 :.3f}", file=f)
             print(f"Current angular momentum [mm mrad]:\t\t  \t\t\t {beam_out.angular_momentum()*1e6 :.3f}\n", file=f)
             
-            print(f"Initial matched beta function [mm]:\t\t\t      {self.matched_beta_function(initial_main_beam.energy(clean=clean))*1e3 :.3f}", file=f)
-            print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x(clean=clean)*1e3 :.3f} \t\t\t {initial_main_beam.beta_x(clean=clean)*1e3 :.3f}", file=f)
+            print(f"Initial matched beta function [mm]:\t\t {self.matched_beta_function(drive_beam.energy(clean=clean))*1e3 :.3f} \t\t {self.matched_beta_function(initial_main_beam.energy(clean=clean))*1e3 :.3f}", file=f)
+            print(f"Initial x beta function [mm]:\t\t\t {drive_beam.beta_x(clean=clean)*1e3 :.3f} \t\t {initial_main_beam.beta_x(clean=clean)*1e3 :.3f}", file=f)
             print(f"Current x beta function [mm]:\t\t\t \t \t\t {beam_out.beta_x(clean=clean)*1e3 :.3f}", file=f)
-            print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y(clean=clean)*1e3 :.3f} \t\t\t {initial_main_beam.beta_y(clean=clean)*1e3 :.3f}", file=f)
+            print(f"Initial y beta function [mm]:\t\t\t {drive_beam.beta_y(clean=clean)*1e3 :.3f} \t\t {initial_main_beam.beta_y(clean=clean)*1e3 :.3f}", file=f)
             print(f"Current y beta function [mm]:\t\t\t \t \t\t {beam_out.beta_y(clean=clean)*1e3 :.3f}\n", file=f)
     
             print(f"Initial x beam size [um]:\t\t\t {drive_beam.beam_size_x(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.beam_size_x(clean=clean)*1e6 :.3f}", file=f)
