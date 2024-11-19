@@ -1099,6 +1099,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         ax.set_ylabel(ylab)
         ax.set_xlabel(xlab)
+
     
     # ==================================================
     def scatter_diags(self, beam=None, n_th_particle=1):
