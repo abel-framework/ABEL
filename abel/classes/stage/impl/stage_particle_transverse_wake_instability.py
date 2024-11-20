@@ -319,7 +319,6 @@ class StagePrtclTransWakeInstability(Stage):
         # Save quantities to the stage
         self.Ez_fit_obj = Ez_fit
         self.rb_fit_obj = rb_fit
-        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam0)
         
         self.Ez_roi = Ez
         #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
@@ -333,8 +332,10 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Instability tracking ==========
+        # Filter out beam particles outside of the plasma bubble
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
-        
+
+        # Make plots if all beam particles are outside the bubble.
         if len(beam_filtered) == 0:
             zs = beam0.zs()
             indices = np.argsort(zs)
@@ -344,18 +345,20 @@ class StagePrtclTransWakeInstability(Stage):
             axs[0].plot(zs_sorted*1e6, rb_fit(zs_sorted)*1e6, 'r')
             axs[0].plot(zs_sorted*1e6, -rb_fit(zs_sorted)*1e6, 'r')
             axs[0].scatter(beam0.zs()*1e6, beam0.xs()*1e6)
-            axs[0].set_xlabel('$z$ [µm]')
-            axs[0].set_ylabel('$x$ [µm]')
+            axs[0].set_xlabel(r'$z$ [µm]')
+            axs[0].set_ylabel(r'$x$ [µm]')
             axs[1].plot(zs_sorted*1e6, rb_fit(zs_sorted)*1e6, 'r')
             axs[1].plot(zs_sorted*1e6, -rb_fit(zs_sorted)*1e6, 'r')
             axs[1].scatter(beam0.zs()*1e6, beam0.ys()*1e6)
-            axs[1].set_xlabel('$z$ [µm]')
-            axs[1].set_ylabel('$y$ [µm]')
+            axs[1].set_xlabel(r'$z$ [µm]')
+            axs[1].set_ylabel(r'$y$ [µm]')
             raise ValueError('No beam particle left.')
         
         if self.num_z_cells_main is None:
             self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
 
+        
+        # Set up animations for beam evolution inside the stage
         if self.make_animations:
             # Create the temporary folder
             parent_dir = CONFIG.temp_path
@@ -365,7 +368,8 @@ class StagePrtclTransWakeInstability(Stage):
             os.mkdir(tmpfolder)
         else:
             tmpfolder = None
-            
+
+        # Set up the configuration for the instability model
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
             stage_length=self.length, 
@@ -401,8 +405,13 @@ class StagePrtclTransWakeInstability(Stage):
             none_indices = [i for i, x in enumerate(inputs) if x is None]
             print(none_indices)
             raise ValueError('At least one input is set to None.')
+
         
+        # Save the initial step with ramped beams in rotated coordinate system
+        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
+
         
+        # Start tracking
         if self.parallel_track_2D is True:
             
             with joblib_progress('Tracking x and y in parallel:', 2):
@@ -435,6 +444,11 @@ class StagePrtclTransWakeInstability(Stage):
 
             self.evolution = evolution
 
+            
+        # Save the final step with ramped beams in rotated coordinate system
+        instability_out_drive_beam = drive_beam_ramped
+        self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, instability_out_drive_beam, beam)
+
         
         # ========== Rotate the coordinate system of the beams back to original ==========
         if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
@@ -460,7 +474,7 @@ class StagePrtclTransWakeInstability(Stage):
                 
             if drive_beam0.y_angle() != 0 and np.abs( -(beam.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
-        
+                
         
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
@@ -482,7 +496,6 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ========== Bookkeeping ==========
         self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/drive_beam_ramped.energy() * beam.abs_charge()/drive_beam_ramped.abs_charge()
-        self.main_beam = copy.deepcopy(beam)  # Need to make a deepcopy, or changes to beam may affect the Beam object saved here.
         
         # Copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number
@@ -505,6 +518,10 @@ class StagePrtclTransWakeInstability(Stage):
         self.initial.plasma.density.rs_rho = metadata_rho0.r
         self.initial.plasma.density.zs_rho = metadata_rho0.z
         self.initial.plasma.density.extent = metadata_rho0.imshow_extent  # array([z_min, z_max, x_min, x_max])
+
+        # ========== Save initial drive beam and main beam ==========
+        self.initial.driver.instance = copy.deepcopy(driver0)
+        self.initial.beam.instance = copy.deepcopy(beam0)
 
         # ========== Calculate and save initial beam particle density ==========
         zs_beams = np.append(driver0.zs(), beam0.zs())
@@ -535,15 +552,76 @@ class StagePrtclTransWakeInstability(Stage):
         self.initial.beam.density.rho = projection_zx
         
         # ========== Save initial beam currents ==========
-        self.calculate_beam_current(beam0, driver0)
+        self.calculate_beam_current(beam0, driver0) # Saves to self.initial.beam.current.zs and self.initial.beam.current.Is.
+
 
     
+    # ==================================================
+    # Save final electric field, plasma and beam quantities
+    def __save_final_step(self, Ez_axial, zs_Ez, rho, metadata_rho, driver, beam):
+        
+        # ========== Save final axial wakefield info ========== 
+        self.final.plasma.wakefield.onaxis.zs = zs_Ez
+        self.final.plasma.wakefield.onaxis.Ezs = Ez_axial
+
+        # ========== Save plasma electron number density ========== 
+        self.final.plasma.density.rho = rho/-SI.e
+        self.final.plasma.density.rs_rho = metadata_rho.r
+        self.final.plasma.density.zs_rho = metadata_rho.z
+        self.final.plasma.density.extent = metadata_rho.imshow_extent  # array([z_min, z_max, x_min, x_max])
+
+        # ========== Save final drive beam and main beam ==========
+        self.final.driver.instance = copy.deepcopy(driver)
+        self.final.beam.instance = copy.deepcopy(beam)
+
+        # ========== Calculate and save final beam particle density ==========
+        zs_beams = np.append(driver.zs(), beam.zs())
+        xs_beams = np.append(driver.xs(), beam.xs())
+        ys_beams = np.append(driver.ys(), beam.ys())
+        w = np.append(driver.weightings(), beam.weightings())  # The weights for the macroparticles. Append in same order as zs_beams.
+        nbins = int(np.sqrt(len(w)/2))
+
+        # Create a 3D histogram
+        hist, edges = np.histogramdd((zs_beams, xs_beams, ys_beams), bins=(nbins, nbins, nbins), weights=w)
+        edges_z = edges[0]
+        edges_x = edges[1]
+        edges_y = edges[2]
+        
+        # Calculate volume of each bin
+        bin_volumes = np.diff(edges_z) * np.diff(edges_x) * np.diff(edges_y)
+
+        # Calculate particle density per unit volume
+        particle_density = hist / bin_volumes
+
+        # Sum along the y-axis to obtain a 2D projection onto the zx plane
+        projection_zx = np.sum(particle_density, axis=2)
+        projection_zx = projection_zx.T
+        extent_beams = np.array([edges_z[0], edges_z[-1], edges_x[0], edges_x[-1]])
+        #TODO: projection_zy?
+
+        self.final.beam.density.extent = extent_beams  # array([z_min, z_max, x_min, x_max])
+        self.final.beam.density.rho = projection_zx
+        
+        # ========== Save final beam currents ==========
+        dz = 40*np.mean([driver.bunch_length(clean=True)/np.sqrt(len(driver)), beam.bunch_length(clean=True)/np.sqrt(len(beam))])
+        num_sigmas = 6
+        z_min = beam.z_offset() - num_sigmas * beam.bunch_length()
+        z_max = driver.z_offset() + num_sigmas * driver.bunch_length()
+        tbins = np.arange(z_min, z_max, dz)/SI.c
+        
+        Is, ts = (driver + beam).current_profile(bins=tbins)
+        self.final.beam.current.zs = ts*SI.c
+        self.final.beam.current.Is = Is       
+
+
+        
     # ==================================================
     # May not be needed, as saving evolution to this stage is trivial.
     #def __extract_evolution(self, evolution):
     #    self.evolution = evolution
 
 
+    
     # ==================================================
     # Filter out particles that collide into bubble
     def bubble_filter(self, beam, sort_zs=True):
@@ -814,7 +892,7 @@ class StagePrtclTransWakeInstability(Stage):
     # Determine the number of beam slices based on the Freedman–Diaconis rule
     def FD_rule_num_slice(self, zs=None):
         if zs is None:
-            zs = self.main_beam.zs()
+            zs = self.final.beam.instance.zs()
         q3, q1 = np.percentile(zs, [75 ,25])
         iqr = q3 - q1  # Calculate the interquartile range
         beam_slice_thickness = 2*iqr*len(zs)**(-1/3)
@@ -889,10 +967,10 @@ class StagePrtclTransWakeInstability(Stage):
         
     
     # ==================================================
-    def __get_initial_driver(self, resample=False):
-        if resample or self.driver_initial is None:
-            self.driver_initial = self.driver_source.track()
-        return self.driver_initial
+    #def __get_initial_driver(self, resample=False):
+    #    if resample or self.driver_initial is None:
+    #        self.driver_initial = self.driver_source.track()
+    #    return self.driver_initial
 
     
     # ==================================================
@@ -904,7 +982,7 @@ class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
     # Overloads the plot_wakefield method in the Stage class.
-    def plot_wakefield(self, beam=None, saveToFile=None, includeWakeRadius=True):
+    def plot_wakefield(self, saveToFile=None, includeWakeRadius=True):
         
         # Get wakefield
         #Ezs = self.Ez_axial
@@ -915,8 +993,8 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius = self.bubble_radius_axial
         
         # get current profile
-        Is = self.initial.beam.current.Is
-        zs0 = self.initial.beam.current.zs
+        Is = self.final.beam.current.Is
+        zs0 = self.final.beam.current.zs
         
         # plot it
         fig, axs = plt.subplots(1, 2+int(includeWakeRadius))
@@ -932,14 +1010,14 @@ class StagePrtclTransWakeInstability(Stage):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs_Ez*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs_Ez.shape)/1e9, ':', color=col0)
         axs[0].plot(zs_Ez*1e6, Ezs/1e9, '-', color=col1)
-        axs[0].set_xlabel(r'z [$\mathrm{\mu}$m]')
+        axs[0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
         axs[0].set_ylabel('Longitudinal electric field [GV/m]')
         axs[0].set_xlim(zlims)
         axs[0].set_ylim(bottom=1.05*min(Ezs)/1e9, top=1.3*max(Ezs)/1e9)
         
         axs[1].fill(np.concatenate((zs0, np.flip(zs0)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
         axs[1].plot(zs0*1e6, -Is/1e3, '-', color=col1)
-        axs[1].set_xlabel(r'z [$\mathrm{\mu}$m]')
+        axs[1].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
         axs[1].set_ylabel('Beam current [kA]')
         axs[1].set_xlim(zlims)
         axs[1].set_ylim(bottom=0, top=1.2*max(-Is)/1e3)
@@ -1016,9 +1094,9 @@ class StagePrtclTransWakeInstability(Stage):
             clims = np.array([1e-2, 1e3])*self.plasma_density
             
             # plot plasma electrons
-            initial = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float))
-            cb = plt.colorbar(initial, cax=cax1)
-            initial.set_clim(clims/1e6)
+            plasma_plot = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float))
+            cb = plt.colorbar(plasma_plot, cax=cax1)
+            plasma_plot.set_clim(clims/1e6)
             cb.ax.tick_params(axis='y',which='both', direction='in')
             cb.set_ticklabels([])
             
@@ -1113,7 +1191,7 @@ class StagePrtclTransWakeInstability(Stage):
         cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
                 
         if beam is None:
-            beam = self.main_beam
+            beam = self.final.beam.instance
 
         # Macroparticles data
         zs = beam.zs()
@@ -1129,8 +1207,8 @@ class StagePrtclTransWakeInstability(Stage):
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
         ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
+        xps_lab = r"$x'$ [mrad]"
+        yps_lab = r"$y'$ [mrad]"
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
@@ -1218,26 +1296,23 @@ class StagePrtclTransWakeInstability(Stage):
         if main_num_profile is None:
             main_num_profile = self.main_num_profile
         if zs_Ez is None:
-            #zs_Ez = self.zs_Ez_axial
             zs_Ez = self.initial.plasma.wakefield.onaxis.zs
         if Ez is None:
-            #Ez = self.Ez_axial
             Ez = self.initial.plasma.wakefield.onaxis.Ezs
         if Ez_cut is None:
-            #Ez_cut = self.Ez_roi
-            zs = self.main_beam.zs()
+            zs = self.initial.beam.instance.zs()
             indices = np.argsort(zs)
             zs_sorted = zs[indices]
             Ez_cut = self.Ez_fit_obj(zs_sorted)
             bubble_radius_cut = self.rb_fit_obj(zs_sorted)
         if zs_rho is None:
-            zs_rho =  self.zs_bubble_radius_axial
+            zs_rho = self.zs_bubble_radius_axial
         if bubble_radius is None:
             bubble_radius = self.bubble_radius_axial
-        if self.drive_beam is None:
+        if self.initial.driver.instance is None:
             drive_beam = self.driver_source.track()
         else:
-            drive_beam = self.drive_beam
+            drive_beam = self.initial.driver.instance
         driver_num_profile, driver_z_slices = self.longitudinal_number_distribution(beam=drive_beam)
         
         
@@ -1305,7 +1380,7 @@ class StagePrtclTransWakeInstability(Stage):
         norm_emittance_ys = evolution.norm_emittance_y
         
         #long_label = '$s_\mathrm{stage}$ [m]'
-        long_label = '$\Delta s$ [m]'
+        long_label = r'$\Delta s$ [m]'
         xlim_max = prop_length.max()
         xlim_min = prop_length.min()
 
@@ -1352,8 +1427,8 @@ class StagePrtclTransWakeInstability(Stage):
         #axs[1,1].set_xlabel(long_label)
         #axs[1,1].set_ylabel(r'Bunch length [$\mathrm{\mu}$m]')
 
-        axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label='$\sigma_{x\'} $')
-        axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label='$\sigma_{y\'} $')
+        axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label=r"$\sigma_{x'} $")
+        axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label=r"$\sigma_{y'} $")
         #axs[1,1].set_xlabel(long_label)
         axs[1,1].set(xticklabels=[])
         axs[1,1].set_ylabel(r'Divergence [$\mathrm{\mu}$rad]')
@@ -1522,7 +1597,7 @@ class StagePrtclTransWakeInstability(Stage):
             axs[2,0].set_xlim([np.min(zs0)*1e6, np.max(zs0)*1e6])
             axs[2,0].set_ylim([0, np.max([np.max(-Is0), np.max(-Is_final)])*1.3e-3])
             axs[2,0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
-            axs[2,0].set_ylabel('$I$ [kA]')
+            axs[2,0].set_ylabel(r'$I$ [kA]')
             
             # plot position projection
             dQdx, xs2 = beam.projected_density(beam.xs, bins=xs0)
@@ -1686,7 +1761,7 @@ class StagePrtclTransWakeInstability(Stage):
             axs[2,0].set_xlim([np.min(zs0)*1e6, np.max(zs0)*1e6])
             axs[2,0].set_ylim([0, np.max([np.max(-Is0), np.max(-Is_final)])*1.3e-3])
             axs[2,0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
-            axs[2,0].set_ylabel('$I$ [kA]')
+            axs[2,0].set_ylabel(r'$I$ [kA]')
             
             # plot position projection
             dQdy, ys2 = beam.projected_density(beam.ys, bins=ys0)

@@ -44,7 +44,10 @@ class Stage(Trackable, CostModeled):
         self.efficiency = SimpleNamespace()
         
         self.initial = SimpleNamespace()
+        self.initial.driver = SimpleNamespace()
+        self.initial.driver.instance = SimpleNamespace()
         self.initial.beam = SimpleNamespace()
+        self.initial.beam.instance = SimpleNamespace()
         self.initial.beam.current = SimpleNamespace()
         self.initial.beam.density = SimpleNamespace()
         self.initial.plasma = SimpleNamespace()
@@ -53,7 +56,10 @@ class Stage(Trackable, CostModeled):
         self.initial.plasma.wakefield.onaxis = SimpleNamespace()
         
         self.final = SimpleNamespace()
+        self.final.driver = SimpleNamespace()
+        self.final.driver.instance = SimpleNamespace()
         self.final.beam = SimpleNamespace()
+        self.final.beam.instance = SimpleNamespace()
         self.final.beam.current = SimpleNamespace()
         self.final.beam.density = SimpleNamespace()
         self.final.plasma = SimpleNamespace()
@@ -158,10 +164,9 @@ class Stage(Trackable, CostModeled):
             return None
     @length_flattop.setter
     def length_flattop(self, length_flattop : float):
-
-        if self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
-            raise ValueError("Both nominal energy gain and nominal acceleration gradient are already set.")
-        elif self.nom_energy_gain is not None:  # Nominal energy gain is prioritised over nominal acceleration gradient.
+        if self.nom_energy_gain is not None:  # Nominal energy gain is prioritised over nominal acceleration gradient.
+            if self.nom_accel_gradient is not None and self.nom_energy_gain/self.nom_accel_gradient != length_flattop:
+                warnings.warn('The given plasma acceleration stage length is not consistent with the values of self.nom_energy_gain and self.nom_accel_gradient. Resetting self.nom_accel_gradient.')
             self.nom_accel_gradient = self.nom_energy_gain/length_flattop
         elif self.nom_accel_gradient is not None:
             self.nom_energy_gain = self.nom_accel_gradient*length_flattop
