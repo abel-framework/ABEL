@@ -134,31 +134,69 @@ class Stage(Trackable, CostModeled):
             driver = driver0
             
         return beam, driver
-    
+
+    #length/length_flattop, nom_accel_gradient, and nom_energy_gain are interdependent
+    # Allow explicitly setting 2 out of 3, and overwriting
+    # Setting variable to None means it is not set.
+    def _lengthGradientEnergy_rdy(self):
+        hasData = 0
+        if self._length_flattop     is not None:
+            hasData += 1
+        if self._nom_energy_gain    is not None:
+            hasData += 1
+        if self._nom_accel_gradient is not None:
+            hasData += 1
+
+        if hasData == 2:
+            return True
+        if hasData > 2:
+            raise VariablesOverspecifiedError("Internal error, length/gradient/energy overspecified")
+        return False
+
+    #Define all 3 as undefined
+    _length_flattop     = None
+    _nom_accel_gradient = None
+    _nom_energy_gain    = None
 
     @property
     def length_flattop(self) -> float:
-        if hasattr(self, '_length_flattop'):
-            if self.nom_energy_gain is not None:
-                self.nom_accel_gradient = self.nom_energy_gain/self._length_flattop
-                del self._length_flattop
-            elif self.nom_accel_gradient is not None:
-                self.nom_energy_gain = self.nom_accel_gradient*self._length_flattop
-                del self._length_flattop
-            else:
-                return self._length_flattop
-        elif self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
+        if self._length_flattop is not None:
+            return self._length_flattop
+        if self._lengthGradientEnergy_rdy():
             return self.nom_energy_gain/self.nom_accel_gradient
-        else:
-            return None
+        return None
     @length_flattop.setter
     def length_flattop(self, length_flattop : float):
-        if self.nom_energy_gain is not None:
-            self.nom_accel_gradient = self.nom_energy_gain/length_flattop
-        elif self.nom_accel_gradient is not None:
-            self.nom_energy_gain = self.nom_accel_gradient*length_flattop
-        else:
+        if self._length_flattop is not None:
             self._length_flattop = length_flattop
+            return
+        if self._lengthGradientEnergy_rdy():
+            raise VariablesOverspecifiedError("Have already set enough length/gradient/energy variables.")
+        self._length_flattop = length_flattop
+
+    @property
+    def length_upramp(self) -> float:
+        if self.upramp is not None:
+            return self.upramp.length
+        else:
+            return None
+    @length_upramp.setter
+    def length_upramp(self, length_upramp : float):
+        if self.upramp is None:
+            raise("No upramp to set length of")
+        self.upramp.length = length_upramp
+
+    @property
+    def length_downramp(self) -> float:
+        if self.downramp is not None:
+            return self.downramp.length
+        else:
+            return None
+    @length_downramp.setter
+    def length_downramp(self, length_downramp : float):
+        if self.downramp is None:
+            raise StageError("No downramp to set length of")
+        self.downramp.length = length_downramp
 
     @property
     def length(self) -> float:
@@ -173,49 +211,59 @@ class Stage(Trackable, CostModeled):
             return L
     @length.setter
     def length(self, length : float):
+        #CONSIDER: Set length flatop = length - length_upramp - length_downramp;
+        #          If this results in length_flattop < 0 then raise ValueError
+        #CONSIDER: When setting length, save it explicitly, and calculate length_flattop on-the-fly instead of length
+        #          This ensures that set=get, in the case of roundoff errors
+        #          (assumes we have accepted the above CONSIDER)
         if self.length_upramp is not None or self.length_downramp is not None:
             print('This stage has ramps, setting the flattop length only (ramp lengths are added)')
         self.length_flattop = length
-
-    @property
-    def length_upramp(self) -> float:
-        if self.upramp is not None:
-            return self.upramp.length
-        else:
-            return None
-    @length_upramp.setter
-    def length_upramp(self, length_upramp : float):
-        assert self.upramp is not None, "No upramp to set length of"
-        self.upramp.length = length_upramp
-    
-    @property
-    def length_downramp(self) -> float:
-        if self.downramp is not None:
-            return self.downramp.length
-        else:
-            return None
-    @length_downramp.setter
-    def length_downramp(self, length_downramp : float):
-        assert self.downramp is not None, "No downramp to set length of"
-        self.downramp.length = length_downramp
-    
     def get_length(self):
         return self.length
+
+    @property
+    def nom_energy_gain(self):
+        if self._nom_energy_gain is not None:
+            return self._nom_energy_gain
+        if self._lengthGradientEnergy_rdy():
+            # CHECK: Should this be length_flattop?
+            return self.nom_accel_gradient*self.length
+        return None
+    @nom_energy_gain.setter
+    def nom_energy_gain(self, nom_energy_gain : float):
+        if self._nom_energy_gain is not None:
+            self._nom_energy_gain = nom_energy_gain
+            return
+        if self._lengthGradientEnergy_rdy():
+            raise VariablesOverspecifiedError("Have already set enough length/gradient/energy variables.")
+        self._nom_energy_gain = nom_energy_gain
+    def get_nom_energy_gain(self):
+        return self.nom_energy_gain
+
+    @property
+    def nom_accel_gradient(self) -> float:
+        if self._nom_accel_gradient is not None:
+            return self._nom_accel_gradient
+        if self._lengthGradientEnergy_rdy():
+            return self.nom_energy_gain/self.length_flattop
+        return None
+    @nom_accel_gradient.setter
+    def nom_accel_gradient(self, nom_accel_gradient : float):
+        if self._nom_accel_gradient is not None:
+            self._nom_accel_gradient = nom_accel_gradient
+            return
+        if self._lengthGradientEnergy_rdy():
+            raise VariablesOverspecifiedError("Have already set enough length/gradient/energy variables.")
+        self._nom_accel_gradient = nom_accel_gradient
+    def get_nom_accel_gradient(self):
+        return self.nom_accel_gradient
 
     def get_cost_breakdown(self):
         breakdown = []
         breakdown.append(('Plasma cell', self.get_length() * CostModeled.cost_per_length_plasma_stage))
         breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
         return (self.name, breakdown)
-    
-    def get_nom_energy_gain(self):
-        if self.nom_energy_gain is None:
-            self.nom_energy_gain = self.nom_accel_gradient*self.length
-            self.length = None
-        return self.nom_energy_gain
-
-    def get_nom_accel_gradient(self):
-        return self.nom_accel_gradient
 
     def matched_beta_function(self, energy_incoming):
         if self.ramp_beta_mag is not None:
@@ -604,4 +652,9 @@ class Stage(Trackable, CostModeled):
         color = 'red'
         return x_points, y_points, final_angle, label, color
         
-    
+class VariablesOverspecifiedError(Exception):
+    "Exception class to throw when trying to set too many overlapping variables"
+    pass
+class StageError(Exception):
+    "Exception class for Stege to throw in other cases"
+

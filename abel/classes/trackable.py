@@ -204,9 +204,10 @@ class Trackable(ABC):
     
     # length of the trackable element
     @abstractmethod
-    def get_length(self):
+    def get_length(self) -> float:
         "Length of the trackable element, added to the Beam location after tracking [m]"
         pass
+        #WTF - if not defined we should rather raise an NotImplementerError than just "pass"?
 
     
     # abbreviation of the get_length() function
@@ -214,7 +215,7 @@ class Trackable(ABC):
     def __len__(self):
         "Alias of the get_length() function [m]"
         return self.get_length()
-        
+        #WTF - Se TODO! This abomination should not exist...
     
     # object for survey plotting
     def survey_object(self):
