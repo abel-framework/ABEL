@@ -1243,7 +1243,7 @@ class StagePrtclTransWakeInstability(Stage):
         norm_emittance_ys = evolution.norm_emittance_y
         
         #long_label = '$s_\mathrm{stage}$ [m]'
-        long_label = '$\Delta s$ [m]'
+        long_label = r'$\Delta s$ [m]'
         xlim_max = prop_length.max()
         xlim_min = prop_length.min()
 
@@ -1290,8 +1290,8 @@ class StagePrtclTransWakeInstability(Stage):
         #axs[1,1].set_xlabel(long_label)
         #axs[1,1].set_ylabel(r'Bunch length [$\mathrm{\mu}$m]')
 
-        axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label='$\sigma_{x\'} $')
-        axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label='$\sigma_{y\'} $')
+        axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label=r"$\sigma_{x'} $")
+        axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label=r"$\sigma_{y'} $")
         #axs[1,1].set_xlabel(long_label)
         axs[1,1].set(xticklabels=[])
         axs[1,1].set_ylabel(r'Divergence [$\mathrm{\mu}$rad]')
