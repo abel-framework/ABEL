@@ -348,7 +348,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                                          weightings=weights_sorted,
                                          particle_mass=particle_mass)
             
-            evolution.save_evolution(prop_length, current_beam, clean=False)
+            evolution.save_evolution(prop_length, current_beam, drive_beam, clean=False)
             
             if trans_wake_config.make_animations:
                 save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
@@ -495,9 +495,9 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                              particle_mass=particle_mass)
 
     # ============= Save evolution =============
-    if trans_wake_config.probe_evolution and evolution.index < len(evolution.prop_length):
+    if trans_wake_config.probe_evolution and evolution.index < len(evolution.beam.location):
         # Last step in the evolution arrays already written to if num_time_steps % probe_data_freq != 0.
-        evolution.save_evolution(prop_length, beam_out, clean=False)
+        evolution.save_evolution(prop_length, beam_out, drive_beam, clean=False)
         
         if trans_wake_config.make_animations:
                 save_beam(beam_out, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
@@ -530,49 +530,95 @@ class Evolution:
     # =============================================
     def __init__(self, data_length):
         self.index = 0  # Keeping track of the current index.
-        self.prop_length = np.empty(data_length)
-        self.x_offset = np.empty(data_length)
-        self.y_offset = np.empty(data_length)
-        self.z_offset = np.empty(data_length)
-        self.energy = np.empty(data_length)
-        self.x_angle = np.empty(data_length)
-        self.y_angle = np.empty(data_length)
-        self.beam_size_x = np.empty(data_length)
-        self.beam_size_y = np.empty(data_length)
-        self.bunch_length = np.empty(data_length)
-        self.rel_energy_spread = np.empty(data_length)
-        self.divergence_x = np.empty(data_length)
-        self.divergence_y = np.empty(data_length)
-        self.beta_x = np.empty(data_length)
-        self.beta_y = np.empty(data_length)
-        self.norm_emittance_x = np.empty(data_length)
-        self.norm_emittance_y = np.empty(data_length)
-        self.num_particles = np.empty(data_length)
-        self.charge = np.empty(data_length)
+        self.beam = SimpleNamespace()
+        self.driver = SimpleNamespace()
+        
+        self.beam.location = np.empty(data_length)
+        self.beam.x = np.empty(data_length)
+        self.beam.y = np.empty(data_length)
+        self.beam.z = np.empty(data_length)
+        self.beam.energy = np.empty(data_length)
+        self.beam.x_angle = np.empty(data_length)
+        self.beam.y_angle = np.empty(data_length)
+        self.beam.beam_size_x = np.empty(data_length)
+        self.beam.beam_size_y = np.empty(data_length)
+        self.beam.bunch_length = np.empty(data_length)
+        self.beam.rel_energy_spread = np.empty(data_length)
+        self.beam.divergence_x = np.empty(data_length)
+        self.beam.divergence_y = np.empty(data_length)
+        self.beam.beta_x = np.empty(data_length)
+        self.beam.beta_y = np.empty(data_length)
+        self.beam.emit_nx = np.empty(data_length)
+        self.beam.emit_ny = np.empty(data_length)
+        self.beam.num_particles = np.empty(data_length)
+        self.beam.charge = np.empty(data_length)
+        
+        self.driver.location = np.empty(data_length)
+        self.driver.x = np.empty(data_length)
+        self.driver.y = np.empty(data_length)
+        self.driver.z = np.empty(data_length)
+        self.driver.energy = np.empty(data_length)
+        self.driver.x_angle = np.empty(data_length)
+        self.driver.y_angle = np.empty(data_length)
+        self.driver.beam_size_x = np.empty(data_length)
+        self.driver.beam_size_y = np.empty(data_length)
+        self.driver.bunch_length = np.empty(data_length)
+        self.driver.rel_energy_spread = np.empty(data_length)
+        self.driver.divergence_x = np.empty(data_length)
+        self.driver.divergence_y = np.empty(data_length)
+        self.driver.beta_x = np.empty(data_length)
+        self.driver.beta_y = np.empty(data_length)
+        self.driver.emit_nx = np.empty(data_length)
+        self.driver.emit_ny = np.empty(data_length)
+        self.driver.num_particles = np.empty(data_length)
+        self.driver.charge = np.empty(data_length)
 
     # =============================================
-    def save_evolution(self, prop_length, beam, clean):
-        if self.index == len(self.prop_length):
+    def save_evolution(self, location, beam, driver, clean):
+        if self.index >= len(self.beam.location):
             raise ValueError('Data recording already completed.')
-        self.prop_length[self.index] = prop_length
-        self.x_offset[self.index] = beam.x_offset(clean=clean)
-        self.y_offset[self.index] = beam.y_offset(clean=clean)
-        self.z_offset[self.index] = beam.z_offset(clean=clean)
-        self.energy[self.index] = beam.energy(clean=clean)
-        self.x_angle[self.index] = beam.x_angle(clean=clean)
-        self.y_angle[self.index] = beam.y_angle(clean=clean)
-        self.beam_size_x[self.index] = beam.beam_size_x(clean=clean)
-        self.beam_size_y[self.index] = beam.beam_size_y(clean=clean)
-        self.bunch_length[self.index] = beam.bunch_length(clean=clean)
-        self.rel_energy_spread[self.index] = beam.rel_energy_spread(clean=clean)
-        self.divergence_x[self.index] = beam.divergence_x(clean=clean)
-        self.divergence_y[self.index] = beam.divergence_y(clean=clean)
-        self.beta_x[self.index] = beam.beta_x(clean=clean)
-        self.beta_y[self.index] = beam.beta_y(clean=clean)
-        self.norm_emittance_x[self.index] = beam.norm_emittance_x(clean=clean)
-        self.norm_emittance_y[self.index] = beam.norm_emittance_y(clean=clean)
-        self.num_particles[self.index] = len(beam)
-        self.charge[self.index] = beam.charge()
+            
+        self.beam.location[self.index] = location
+        self.beam.x[self.index] = beam.x_offset(clean=clean)
+        self.beam.y[self.index] = beam.y_offset(clean=clean)
+        self.beam.z[self.index] = beam.z_offset(clean=clean)
+        self.beam.energy[self.index] = beam.energy(clean=clean)
+        self.beam.x_angle[self.index] = beam.x_angle(clean=clean)
+        self.beam.y_angle[self.index] = beam.y_angle(clean=clean)
+        self.beam.beam_size_x[self.index] = beam.beam_size_x(clean=clean)
+        self.beam.beam_size_y[self.index] = beam.beam_size_y(clean=clean)
+        self.beam.bunch_length[self.index] = beam.bunch_length(clean=clean)
+        self.beam.rel_energy_spread[self.index] = beam.rel_energy_spread(clean=clean)
+        self.beam.divergence_x[self.index] = beam.divergence_x(clean=clean)
+        self.beam.divergence_y[self.index] = beam.divergence_y(clean=clean)
+        self.beam.beta_x[self.index] = beam.beta_x(clean=clean)
+        self.beam.beta_y[self.index] = beam.beta_y(clean=clean)
+        self.beam.emit_nx[self.index] = beam.norm_emittance_x(clean=clean)
+        self.beam.emit_ny[self.index] = beam.norm_emittance_y(clean=clean)
+        self.beam.num_particles[self.index] = len(beam)
+        self.beam.charge[self.index] = beam.charge()
+        #self.beam.plasma_density = plasma_density
+        
+        self.driver.location[self.index] = location
+        self.driver.x[self.index] = driver.x_offset(clean=clean)
+        self.driver.y[self.index] = driver.y_offset(clean=clean)
+        self.driver.z[self.index] = driver.z_offset(clean=clean)
+        self.driver.energy[self.index] = driver.energy(clean=clean)
+        self.driver.x_angle[self.index] = driver.x_angle(clean=clean)
+        self.driver.y_angle[self.index] = driver.y_angle(clean=clean)
+        self.driver.beam_size_x[self.index] = driver.beam_size_x(clean=clean)
+        self.driver.beam_size_y[self.index] = driver.beam_size_y(clean=clean)
+        self.driver.bunch_length[self.index] = driver.bunch_length(clean=clean)
+        self.driver.rel_energy_spread[self.index] = driver.rel_energy_spread(clean=clean)
+        self.driver.divergence_x[self.index] = driver.divergence_x(clean=clean)
+        self.driver.divergence_y[self.index] = driver.divergence_y(clean=clean)
+        self.driver.beta_x[self.index] = driver.beta_x(clean=clean)
+        self.driver.beta_y[self.index] = driver.beta_y(clean=clean)
+        self.driver.emit_nx[self.index] = driver.norm_emittance_x(clean=clean)
+        self.driver.emit_ny[self.index] = driver.norm_emittance_y(clean=clean)
+        self.driver.num_particles[self.index] = len(driver)
+        self.driver.charge[self.index] = driver.charge()
+
         self.index += 1
 
 

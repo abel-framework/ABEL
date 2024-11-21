@@ -447,7 +447,7 @@ class StagePrtclTransWakeInstability(Stage):
             
         # Save the final step with ramped beams in rotated coordinate system
         instability_out_drive_beam = drive_beam_ramped
-        self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, instability_out_drive_beam, beam)
+        #self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, instability_out_drive_beam, beam)
 
         
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -483,7 +483,6 @@ class StagePrtclTransWakeInstability(Stage):
         
         # ==========  Make animations ==========
         if self.probe_evolution and self.make_animations:
-        #if self.make_animations and self.stage_number == 9:
             self.animate_sideview_x(tmpfolder)
             self.animate_sideview_y(tmpfolder)
             self.animate_phasespace_x(tmpfolder)
@@ -892,7 +891,7 @@ class StagePrtclTransWakeInstability(Stage):
     # Determine the number of beam slices based on the Freedman–Diaconis rule
     def FD_rule_num_slice(self, zs=None):
         if zs is None:
-            zs = self.final.beam.instance.zs()
+            zs = self.initial.beam.instance.zs()
         q3, q1 = np.percentile(zs, [75 ,25])
         iqr = q3 - q1  # Calculate the interquartile range
         beam_slice_thickness = 2*iqr*len(zs)**(-1/3)
@@ -993,8 +992,15 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius = self.bubble_radius_axial
         
         # get current profile
-        Is = self.final.beam.current.Is
-        zs0 = self.final.beam.current.zs
+        has_final_step = hasattr(self.final.beam.current, 'Is')
+        if has_final_step:
+            Is = self.final.beam.current.Is
+            zs = self.final.beam.current.zs
+            title = 'Final step'
+        else:
+            Is = self.initial.beam.current.Is
+            zs = self.initial.beam.current.zs
+            title = 'Initial step'
         
         # plot it
         fig, axs = plt.subplots(1, 2+int(includeWakeRadius))
@@ -1015,8 +1021,8 @@ class StagePrtclTransWakeInstability(Stage):
         axs[0].set_xlim(zlims)
         axs[0].set_ylim(bottom=1.05*min(Ezs)/1e9, top=1.3*max(Ezs)/1e9)
         
-        axs[1].fill(np.concatenate((zs0, np.flip(zs0)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
-        axs[1].plot(zs0*1e6, -Is/1e3, '-', color=col1)
+        axs[1].fill(np.concatenate((zs, np.flip(zs)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
+        axs[1].plot(zs*1e6, -Is/1e3, '-', color=col1)
         axs[1].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
         axs[1].set_ylabel('Beam current [kA]')
         axs[1].set_xlim(zlims)
@@ -1031,6 +1037,8 @@ class StagePrtclTransWakeInstability(Stage):
             axs[2].set_ylabel(r'Plasma-wake radius [$\mathrm{\mu}$m]')
             axs[2].set_xlim(zlims)
             axs[2].set_ylim(bottom=0, top=max(bubble_radius*1.2)*1e6)
+
+        fig.suptitle(title)
         
         # save to file
         if saveToFile is not None:
@@ -1180,7 +1188,7 @@ class StagePrtclTransWakeInstability(Stage):
 
     
     # ==================================================
-    def scatter_diags(self, beam=None, n_th_particle=1):
+    def scatter_diags(self, beam, n_th_particle=1):
         '''
         n_th_particle:  Use this to reduce the amount of plotted particles by only plotting every n_th_particle particle.
         '''
@@ -1189,9 +1197,6 @@ class StagePrtclTransWakeInstability(Stage):
         colors = ['black', 'red', 'orange', 'yellow']
         bounds = [0, 0.2, 0.4, 0.8, 1]
         cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
-                
-        if beam is None:
-            beam = self.final.beam.instance
 
         # Macroparticles data
         zs = beam.zs()
@@ -1345,27 +1350,34 @@ class StagePrtclTransWakeInstability(Stage):
         ax_rb_cut_wakeT2.plot(zs_sorted*1e6, bubble_radius_cut*1e6, 'r', label=r'Cut-out $r_\mathrm{b}$')
         ax_rb_cut_wakeT2.set_ylabel(r'Bubble radius [$\mathrm{\mu}$m]')
         ax_rb_cut_wakeT2.legend(loc='upper right')
+        fig_wakeT_cut.suptitle('Initial step')
         
 
     # ==================================================
-    def plot_evolution(self):
+    def plot_flattop_evolution(self, beam='beam'):
         """
         Plot the evolution of various beam parameters as a function of s.
         """
 
-        evolution = self.evolution
-        if len(evolution.prop_length) == 0:
+        # Select beam
+        if beam == 'beam':
+            evolution = self.evolution.beam
+        elif beam == 'driver':
+            evolution = self.evolution.driver
+
+        # Check whether evolution data exist
+        if len(evolution.location) == 0:
             print('No beam parameter evolution data found.')
             return
 
         energies = evolution.energy
         nom_energy = self.nom_energy_gain + energies[0]
-        prop_length = evolution.prop_length
+        prop_length = evolution.location
         #num_particles = evolution.num_particles
         charges = evolution.charge
         
-        x_offsets = evolution.x_offset
-        y_offsets = evolution.y_offset
+        x_offsets = evolution.x
+        y_offsets = evolution.y
         #z_offsets = evolution.z_offset
         beam_size_xs = evolution.beam_size_x
         beam_size_ys = evolution.beam_size_y
@@ -1376,8 +1388,8 @@ class StagePrtclTransWakeInstability(Stage):
         rel_energy_offsets = energies/nom_energy-1
         beta_xs = evolution.beta_x
         beta_ys = evolution.beta_y
-        norm_emittance_xs = evolution.norm_emittance_x
-        norm_emittance_ys = evolution.norm_emittance_y
+        norm_emittance_xs = evolution.emit_nx
+        norm_emittance_ys = evolution.emit_ny
         
         #long_label = '$s_\mathrm{stage}$ [m]'
         long_label = r'$\Delta s$ [m]'
