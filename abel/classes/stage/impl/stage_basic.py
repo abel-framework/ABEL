@@ -24,10 +24,10 @@ class StageBasic(Stage):
         # set ideal plasma density if not defined
         if self.plasma_density is None:
             self.optimize_plasma_density()
-
+            
         # plasma-density ramps (de-magnify beta function)
         if self.upramp is not None:
-            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
+            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)  # upramp calls the same track(), but with self.upramp=None.
         else:
             beam0 = copy.deepcopy(beam_incoming)
             driver0 = copy.deepcopy(driver_incoming)
@@ -51,8 +51,7 @@ class StageBasic(Stage):
             
             beam0_x_angle = beam.x_angle()
             beam0_y_angle = beam.y_angle()
-
-
+            
             # Calculate the angles that will be used to rotate the beams' frame
             rotation_angle_x, rotation_angle_y = drive_beam_ramped.beam_alignment_angles()
             rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
