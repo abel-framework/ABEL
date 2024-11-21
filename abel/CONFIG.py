@@ -123,10 +123,6 @@ class CONFIG:
         # External codes - GuineaPig
         cls.guineapig_path = parsePath(cfdata['external_codes']['hipace']['hipace_binary'])
 
-        #Debugging - print it here before we load the rest of ABEL (and potentially crash):
-        # Also good for remotely debugging other peoples issues
-        cls.printCONFIG()
-
     @classmethod
     def printCONFIG(cls):
         ls = dir(cls)

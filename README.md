@@ -10,3 +10,13 @@ The ABEL simulation framework is a particle-tracking framework for plasma-accele
    folder in your local clone will effectively be put into your `$PYTHONPATH`.
 
 To remove ABEL, run `pip uninstall abel`.
+
+## Configuration of ABEL
+To use ABEL, you must configure it. This is done with the file `.abelconfig.toml`, which is automatically created in your home directory the first time you import ABEL.
+Edit this file with your text editor to tell ABEL where to find tools such as ELEGANT, HIPACE, and GUINEAPIG, as well as configure it for your computingcluster, if needed.
+
+How to edit it is explained with comments in the file. It uses the file format "TOML", which is a simple text file similar to .ini, but better defined.
+
+Please do not edit the template file `abelconfig.toml` or `CONFIG.py` in the source code folder.
+
+The as-loaded configuration of ABEL is printed to the terminal when abel starts, along with the name of the config file it has loaded.

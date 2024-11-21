@@ -7,6 +7,7 @@ warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 # import configuration class
 from .CONFIG import CONFIG
 CONFIG.initialize()
+CONFIG.printCONFIG()
 
 # import all other classes
 from .classes.beam import Beam
