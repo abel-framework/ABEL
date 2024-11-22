@@ -159,13 +159,13 @@ class Stage(Trackable, CostModeled):
     _nom_energy_gain    = None
 
     #Can we get the length of the total thing?
-    def _length_rdy(self):
+    def _length_rdy(self) -> bool:
         if self._length is not None or self._length_flattop is not None:
             return True
         return False
     #Negative length_flattop?
     def _length_sanitycheck(self):
-        if self._length_rdy() and self.length_flattop < 0:
+        if self._length_rdy() and self.length_flattop < 0.0:
             print(f"WARNING: The current total length and ramp length settings implicitly makes length_flattop = {self.length_flattop} < 0")
 
     #Similar, between length/length_flattop
@@ -254,7 +254,7 @@ class Stage(Trackable, CostModeled):
         return self.length
 
     @property
-    def nom_energy_gain(self):
+    def nom_energy_gain(self) -> float:
         if self._nom_energy_gain is not None:
             return self._nom_energy_gain
         if self._lengthGradientEnergy_rdy():
@@ -266,7 +266,7 @@ class Stage(Trackable, CostModeled):
             self._nom_energy_gain = nom_energy_gain
             return
         if self._lengthGradientEnergy_rdy():
-            raise VariablesOverspecifiedError("Have already set enough length/gradient/energy variables.")
+            raise VariablesOverspecifiedError("Have already set length/gradient, cannot also set energy")
         self._nom_energy_gain = nom_energy_gain
     def get_nom_energy_gain(self):
         return self.nom_energy_gain
@@ -284,7 +284,7 @@ class Stage(Trackable, CostModeled):
             self._nom_accel_gradient = nom_accel_gradient
             return
         if self._lengthGradientEnergy_rdy():
-            raise VariablesOverspecifiedError("Have already set enough length/gradient/energy variables.")
+            raise VariablesOverspecifiedError("Have already set length/energy, cannot also set gradient.")
         self._nom_accel_gradient = nom_accel_gradient
     def get_nom_accel_gradient(self):
         return self.nom_accel_gradient
