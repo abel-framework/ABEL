@@ -203,22 +203,20 @@ class Trackable(ABC):
     
     
     # length of the trackable element
-    # Note: Not sure if these really need to be abstract?
-    _length = None
-    @property
     @abstractmethod
-    def length(self) -> float:
-        "Length of the trackable element, added to the Beam location after tracking [m]"
-        #Simplest possible implementation of the `length` property
-        return self._length
-    @length.setter
-    @abstractmethod
-    def length(self, length : float):
-        self._length = length
     def get_length(self) -> float:
         "Length of the trackable element, added to the Beam location after tracking [m]"
-        return self.length
+        pass
+        #WTF - if not defined we should rather raise an NotImplementerError than just "pass"?
 
+    
+    # abbreviation of the get_length() function
+    #TODO: Maybe not a good idea, since this is usually "number of elements" type length?
+    def __len__(self):
+        "Alias of the get_length() function [m]"
+        return self.get_length()
+        #WTF - Se TODO! This abomination should not exist...
+    
     # object for survey plotting
     def survey_object(self):
         #return patches.Rectangle((0, -1), self.get_length(), 2)
