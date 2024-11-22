@@ -212,6 +212,19 @@ class Stage(Trackable, CostModeled):
         self._length_sanitycheck()
 
     @property
+    def length_downramp(self) -> float:
+        if self.downramp is not None:
+            return self.downramp.length
+        else:
+            return None
+    @length_downramp.setter
+    def length_downramp(self, length_downramp : float):
+        if self.downramp is None:
+            raise StageError("No downramp to set length of")
+        self.downramp.length = length_downramp
+        self._length_sanitycheck()
+
+    @property
     def length(self) -> float:
         if self._length is not None:
             return self._length
