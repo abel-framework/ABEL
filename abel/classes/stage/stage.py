@@ -81,7 +81,7 @@ class Stage(Trackable, CostModeled):
 
     # upramp to be tracked before the main tracking
     def track_upramp(self, beam0, driver0=None):
-        if self.has_upramp:
+        if self.has_upramp():
 
             # set driver
             self.upramp.driver_source = SourceCapsule(beam=driver0)
@@ -233,12 +233,6 @@ class Stage(Trackable, CostModeled):
             return True
         return False
 
-    #Negative length_flattop?
-    def _length_sanitycheck(self):
-        if self._length_flattop_rdy():
-            if self.length_flattop < 0.0:
-                print(f"WARNING: The current total length and ramp length settings implicitly makes length_flattop = {self.length_flattop} < 0")
-
     @property
     def length_flattop(self) -> float:
         "Length of the plasma flattop, either directly, or calculated from overall length minus ramp lengths, (or from flattop gradient/energy - TODO) [m], or None if not valid."
@@ -301,7 +295,6 @@ class Stage(Trackable, CostModeled):
     def length(self, length : float):
         if self._length is not None:
             self._length = length
-            self._length_sanitycheck()
             return
         elif length is None:
             return
@@ -310,7 +303,6 @@ class Stage(Trackable, CostModeled):
         if self._lengthGradientEnergy_rdy():
             raise VariablesOverspecifiedError("Have already set gradient/energy, cannot also set length_flattop/length")
         self._length = length
-        self._length_sanitycheck()
     def get_length(self) -> float:
         return self.length
 
