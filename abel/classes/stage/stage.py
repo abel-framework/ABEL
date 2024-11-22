@@ -227,8 +227,7 @@ class Stage(Trackable, CostModeled):
         if self._nom_energy_gain is not None:
             return self._nom_energy_gain
         if self._lengthGradientEnergy_rdy():
-            # CHECK: Should this be length_flattop?
-            return self.nom_accel_gradient*self.length
+            return self.nom_accel_gradient*self.length_flattop
         return None
     @nom_energy_gain.setter
     def nom_energy_gain(self, nom_energy_gain : float):
