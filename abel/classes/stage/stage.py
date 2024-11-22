@@ -31,8 +31,6 @@ class Stage(Trackable, CostModeled):
         # nominal initial energy
         self.nom_energy = None 
 
-        self.upramp = None
-        self.downramp = None
         self._return_tracked_driver = False
         
         self.evolution = SimpleNamespace()
@@ -63,7 +61,19 @@ class Stage(Trackable, CostModeled):
 
         self.name = 'Plasma stage'
 
+    #Define upramp/downramp attributes
+    upramp = None
+    downramp = None
     
+    def has_upramp(self):
+        if self.upramp is not None and isinstance(self.upramp, Stage):
+            return True
+        return False
+    def has_downramp(self):
+        if self.downramp is not None and isinstance(self.downramp, Stage):
+            return True
+        return False
+
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         beam.stage_number += 1
@@ -71,7 +81,7 @@ class Stage(Trackable, CostModeled):
 
     # upramp to be tracked before the main tracking
     def track_upramp(self, beam0, driver0=None):
-        if self.upramp is not None and isinstance(self.upramp, Stage):
+        if self.has_upramp:
 
             # set driver
             self.upramp.driver_source = SourceCapsule(beam=driver0)
@@ -103,7 +113,7 @@ class Stage(Trackable, CostModeled):
 
     # downramp to be tracked after the main tracking
     def track_downramp(self, beam0, driver0):
-        if self.downramp is not None and isinstance(self.downramp, Stage):
+        if self.has_downramp():
 
             # set driver
             self.downramp.driver_source = SourceCapsule(beam=driver0)
@@ -140,11 +150,11 @@ class Stage(Trackable, CostModeled):
     # Setting variable to None means it is not set.
     def _lengthGradientEnergy_rdy(self):
         hasData = 0
-        if self._length_rdy():
+        if self._length_rdy(fromOverall=False):
             hasData += 1
-        if self._nom_energy_gain    is not None:
+        if self._nom_energy_gain_rdy(fromOverall=False):
             hasData += 1
-        if self._nom_accel_gradient is not None:
+        if self._nom_accel_gradient_rdy(fromOverall=False):
             hasData += 1
 
         if hasData == 2:
@@ -158,33 +168,98 @@ class Stage(Trackable, CostModeled):
     _nom_accel_gradient = None
     _nom_energy_gain    = None
 
-    #Can we get the length of the total thing?
-    def _length_rdy(self) -> bool:
-        if self._length is not None or self._length_flattop is not None:
+    #Can we get the length of the total Stage? (flag to avoid recursive def.)
+    def _length_rdy(self,fromRamp=True,fromOverall=True) -> bool:
+        #Defined directly?
+        if self._length is not None:
+            return True
+        #Via energy gain/gradient
+        if fromOverall:
+            if self._nom_energy_gain_rdy(fromOverall=False) and \
+               self._nom_accel_gradient_rdy(fromOverall=False):
+                return True
+        #Via upramp/downramp/flattop
+        if fromRamp:
+            if self.has_upramp():
+                if self.upramp.length is None:
+                    return False
+            if self.has_downramp():
+                if self.downramp.length is None:
+                    return False
+            if not self._length_flattop_rdy(fromOverall=False):
+                return False
             return True
         return False
-    #Negative length_flattop?
-    def _length_sanitycheck(self):
-        if self._length_rdy() and self.length_flattop < 0.0:
-            print(f"WARNING: The current total length and ramp length settings implicitly makes length_flattop = {self.length_flattop} < 0")
+    #Can we get the nominal energy gain of the total Stage?
+    def _nom_energy_gain_rdy(self, fromOverall=True) -> bool:
+        #Defined directly
+        if self._nom_energy_gain is not None:
+            return True
+        if fromOverall:
+            if self._length_rdy(fromOverall=False) and \
+               self._nom_accel_gradient_rdy(fromOverall=False):
+                return True
+        return False
+    #Can we get the nominal acclerating gradient of the total Stage?
+    def _nom_accel_gradient_rdy(self, fromOverall=True) -> bool:
+        if self._nom_accel_gradient is not None:
+            return True
+        if fromOverall:
+            if self._length_rdy(fromOverall=False) and \
+               self._nom_energy_gain_rdy(fromOverall=False):
+                return True
+        return False
 
     #Similar, between length/length_flattop
     _length_flattop             = None
     #_nom_accel_gradient_flattop = None
     #_nom_energy_gain_flattop    = None
 
+    #Gan we get the length of the flattop? (flag to avoid recursive def.)
+    def _length_flattop_rdy(self, fromOverall=True) -> bool:
+        #Defined directly?
+        if self._length_flattop is not None:
+            return True
+        #Via length/upramp/downramp?
+        if fromOverall:
+            if self.has_upramp():
+                if self.upramp.length is None:
+                    return False
+            if self.has_downramp():
+                if self.downramp.length is None:
+                    return False
+            if not self._length_rdy(fromRamp=False):
+                return False
+            return True
+        return False
+
+    #Negative length_flattop?
+    def _length_sanitycheck(self):
+        if self._length_flattop_rdy():
+            if self.length_flattop < 0.0:
+                print(f"WARNING: The current total length and ramp length settings implicitly makes length_flattop = {self.length_flattop} < 0")
+
     @property
     def length_flattop(self) -> float:
+        "Length of the plasma flattop, either directly, or calculated from overall length minus ramp lengths, (or from flattop gradient/energy - TODO) [m], or None if not valid."
         if self._length_flattop is not None:
+            #By itself
             return self._length_flattop
-        if self._length_rdy():
+        if self._length_rdy(fromRamp=False):
+            #By local cluster of variables?
             L = self.length
-            if self.length_upramp is not None:
-                L -= self.length_upramp
-            if self.length_downramp is not None:
-                L -= self.length_downramp
+            if self.has_upramp():
+                if self.upramp.length is None:
+                    return None
+                L -= self.upramp.length
+            if self.has_downramp():
+                if self.downramp.length is None:
+                    return None
+                L -= self.downramp.length
             return L
         if self._lengthGradientEnergy_rdy():
+            #By overall gradient/energy?
+            #TODO: Not really correct, flattop VS total
             return self.nom_energy_gain/self.nom_accel_gradient
         return None
     @length_flattop.setter
@@ -192,57 +267,43 @@ class Stage(Trackable, CostModeled):
         if self._length_flattop is not None:
             self._length_flattop = length_flattop
             return
-        if self._length_rdy():
-            raise VariablesOverspecifiedError("Have already set length, cannot also set length_flattop")
+        elif (length_flattop is None):
+            return
+        if self._length_rdy(fromRamp=False):
+            raise VariablesOverspecifiedError("Have already set length, cannot also set length_flattop - consider setting upramp/downramp length")
         if self._lengthGradientEnergy_rdy():
             raise VariablesOverspecifiedError("Have already set gradient/energy, cannot also set length_flattop/length")
         self._length_flattop = length_flattop
 
     @property
-    def length_upramp(self) -> float:
-        if self.upramp is not None:
-            return self.upramp.length
-        else:
-            return None
-    @length_upramp.setter
-    def length_upramp(self, length_upramp : float):
-        if self.upramp is None:
-            raise("No upramp to set length of")
-        self.upramp.length = length_upramp
-        self._length_sanitycheck()
-
-    @property
-    def length_downramp(self) -> float:
-        if self.downramp is not None:
-            return self.downramp.length
-        else:
-            return None
-    @length_downramp.setter
-    def length_downramp(self, length_downramp : float):
-        if self.downramp is None:
-            raise StageError("No downramp to set length of")
-        self.downramp.length = length_downramp
-        self._length_sanitycheck()
-
-    @property
     def length(self) -> float:
+        "Total length of the trackable stage element [m], or None if not valid"
         if self._length is not None:
+            #By itself
             return self._length
-        if self._length_rdy():
+        if self._length_flattop_rdy(fromOverall=False):
+            #By local cluster of variables?
             L = self.length_flattop
-            if self.length_upramp is not None:
-                L += self.length_upramp
-            if self.length_downramp is not None:
-                L += self.length_downramp
+            if self.has_upramp():
+                if self.upramp.length is None:
+                    return None
+                L += self.upramp.length
+            if self.has_downramp():
+                if self.downramp.length is None:
+                    return None
+                L += self.downramp.length
             return L
         if self._lengthGradientEnergy_rdy():
-            return self.nom_energy/self.nom_accel_gradient
+            #By overall gradient/energy?
+            return self.nom_energy_gain/self.nom_accel_gradient
         return None
     @length.setter
     def length(self, length : float):
         if self._length is not None:
             self._length = length
             self._length_sanitycheck()
+            return
+        elif length is None:
             return
         if self._length_rdy():
             raise VariablesOverspecifiedError("Have already set length_flattop, cannot also set length")
@@ -255,6 +316,7 @@ class Stage(Trackable, CostModeled):
 
     @property
     def nom_energy_gain(self) -> float:
+        "Total nominal energy gain of the stage [eV]"
         if self._nom_energy_gain is not None:
             return self._nom_energy_gain
         if self._lengthGradientEnergy_rdy():
@@ -265,6 +327,8 @@ class Stage(Trackable, CostModeled):
         if self._nom_energy_gain is not None:
             self._nom_energy_gain = nom_energy_gain
             return
+        elif nom_energy_gain is None:
+            return
         if self._lengthGradientEnergy_rdy():
             raise VariablesOverspecifiedError("Have already set length/gradient, cannot also set energy")
         self._nom_energy_gain = nom_energy_gain
@@ -273,6 +337,7 @@ class Stage(Trackable, CostModeled):
 
     @property
     def nom_accel_gradient(self) -> float:
+        "Total nominal accelerating gradient of the stage [eV/m]"
         if self._nom_accel_gradient is not None:
             return self._nom_accel_gradient
         if self._lengthGradientEnergy_rdy():
@@ -282,6 +347,8 @@ class Stage(Trackable, CostModeled):
     def nom_accel_gradient(self, nom_accel_gradient : float):
         if self._nom_accel_gradient is not None:
             self._nom_accel_gradient = nom_accel_gradient
+            return
+        elif nom_accel_gradient is None:
             return
         if self._lengthGradientEnergy_rdy():
             raise VariablesOverspecifiedError("Have already set length/energy, cannot also set gradient.")
