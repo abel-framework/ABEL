@@ -1497,6 +1497,8 @@ class StagePrtclTransWakeInstability(Stage):
         axs[2,2].legend()
         axs[2,2].set_xlim(xlim_min, xlim_max)
 
+        fig.suptitle('Stage ' + str(self.stage_number) + ', ' + beam)
+
     
     # ==================================================
     # Animate the horizontal sideview (top view)

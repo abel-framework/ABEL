@@ -327,7 +327,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
             probe_data_freq = trans_wake_config.probe_every_nth_time_step
         
         current_beam = Beam()
-        evolution = Evolution( data_length=1+int(np.ceil((num_time_steps - 1)/probe_data_freq)) )
+        evolution = Evolution( data_length=1+int(np.ceil( (num_time_steps - 1)/probe_data_freq ) ) )
             
     else:
         evolution = Evolution( data_length=0 )
@@ -493,16 +493,20 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                              pzs=pzs_sorted,
                              weightings=weights_sorted,
                              particle_mass=particle_mass)
-
-    # ============= Save evolution =============
-    if trans_wake_config.probe_evolution and evolution.index < len(evolution.beam.location):
-        # Last step in the evolution arrays already written to if num_time_steps % probe_data_freq != 0.
-        evolution.save_evolution(prop_length, beam_out, drive_beam, clean=False)
-        
-        if trans_wake_config.make_animations:
-                save_beam(beam_out, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
-            
     
+    
+    # ============= Save evolution =============
+    if trans_wake_config.probe_evolution:
+        evolution.beam.plasma_density = plasma_density*np.ones_like(evolution.beam.location)
+        evolution.driver.plasma_density = plasma_density*np.ones_like(evolution.driver.location)
+
+        if evolution.index < len(evolution.beam.location):
+        # Last step in the evolution arrays already written to if num_time_steps % probe_data_freq != 0.
+            evolution.save_evolution(prop_length, beam_out, drive_beam, clean=False)
+        
+    if trans_wake_config.make_animations:
+        save_beam(beam_out, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
+            
     return beam_out, evolution
 
 
@@ -530,6 +534,7 @@ class Evolution:
     # =============================================
     def __init__(self, data_length):
         self.index = 0  # Keeping track of the current index.
+        
         self.beam = SimpleNamespace()
         self.driver = SimpleNamespace()
         
@@ -552,6 +557,7 @@ class Evolution:
         self.beam.emit_ny = np.empty(data_length)
         self.beam.num_particles = np.empty(data_length)
         self.beam.charge = np.empty(data_length)
+        self.beam.plasma_density = np.empty(data_length)  # [m^-3]
         
         self.driver.location = np.empty(data_length)
         self.driver.x = np.empty(data_length)
@@ -572,6 +578,7 @@ class Evolution:
         self.driver.emit_ny = np.empty(data_length)
         self.driver.num_particles = np.empty(data_length)
         self.driver.charge = np.empty(data_length)
+        self.driver.plasma_density = np.empty(data_length)  # [m^-3]
 
     # =============================================
     def save_evolution(self, location, beam, driver, clean):
