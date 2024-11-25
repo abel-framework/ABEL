@@ -74,9 +74,13 @@ class Stage(Trackable, CostModeled):
             return True
         return False
 
-    @abstractmethod   
+    @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         beam.stage_number += 1
+        if self.length < 0.0:
+            raise ValueError(f"Length = {self.length} [m] < 0.0")
+        if self.length_flattop < 0.0:
+            raise ValueError(f"Flattop length = {self.length_flattop} [m] < 0.0")
         return super().track(beam, savedepth, runnable, verbose)
 
     # upramp to be tracked before the main tracking
@@ -92,14 +96,14 @@ class Stage(Trackable, CostModeled):
 
             # determine length if not already set
             if self.upramp.length is None:
-            
                 # set ramp length (uniform step ramp)
                 if self.nom_energy is None:
                     self.nom_energy = beam0.energy()
-                
                 self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-            
-            # perform tracking
+            if self.upramp.length < 0.0:
+                raise ValueError(f"upramp.length = {self.upramp.length} [m] < 0.0")
+
+             # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
             beam.stage_number -= 1
@@ -120,18 +124,17 @@ class Stage(Trackable, CostModeled):
             
             # determine density if not already set
             if self.downramp.plasma_density is None:
-                
                 # set ramp density
                 self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
             
             # determine length if not already set
             if self.downramp.length is None:
-                
                 # set ramp length (uniform step ramp)
                 if self.nom_energy is None:
                     self.nom_energy = beam0.energy()
-                
                 self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+            if self.downramp.length < 0.0:
+                raise ValueError(f"downramp.length = {self.downramp.length} [m] < 0.0")
             
             # perform tracking
             self.downramp._return_tracked_driver = True
