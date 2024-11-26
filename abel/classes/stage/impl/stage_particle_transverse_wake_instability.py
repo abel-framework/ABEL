@@ -152,10 +152,14 @@ class StagePrtclTransWakeInstability(Stage):
     
     # ==================================================
     # Track the particles through. Note that when called as part of a Linac object, a copy of the original stage (where no changes has been made) is sent to track() every time. All changes done to self here are saved to a separate stage under the Linac object.
-    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
         # Set the diagnostics directory
-        self.run_path = runnable.run_path()
+        if runnable is not None:
+            self.run_path = runnable.run_path()
+            shot_path = runnable.shot_path()
+        else:
+            shot_path = None
 
         # Override enable/disable progress bar
         self.show_prog_bar = verbose
@@ -163,29 +167,38 @@ class StagePrtclTransWakeInstability(Stage):
         # Extract quantities
         plasma_density = self.plasma_density
         stage_length = self.length
-        gamma0 = beam0.gamma()
+        gamma0 = beam_incoming.gamma()
         time_step_mod = self.time_step_mod
 
-        particle_mass = beam0.particle_mass
-        self.stage_number = beam0.stage_number
+        particle_mass = beam_incoming.particle_mass
+        self.stage_number = beam_incoming.stage_number
 
         
         # ========== Get the drive beam ==========
         if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    #############################
-            drive_beam0 = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
+            driver_incoming = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
-            drive_beam0 = self.driver_source.track() # Generate a drive beam with jitter. 
-            self.drive_beam = drive_beam0                    ######################
+            driver_incoming = self.driver_source.track() # Generate a drive beam with jitter. 
+            self.drive_beam = driver_incoming                    ######################
         
-        drive_beam_ramped = copy.deepcopy(drive_beam0)  # Make a deep copy to not affect the original drive beam.
+        drive_beam_ramped = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
 
-        #drive_beam_wakeT = copy.deepcopy(drive_beam0)  # Wake-T requires not-ramped beams for now... ############
-        #beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately. ############
+        #drive_beam_wakeT = copy.deepcopy(driver_incoming)  # Wake-T requires not-ramped beams for now... ############
+        #beam0_copy = copy.deepcopy(beam_incoming)  # Make a deep copy of beam_incoming for use in StageWakeT, which applies magnify_beta_function() separately. ############
 
         
         # ========== Apply plasma density up ramp (demagnify beta function) ========== 
-        drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
-        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
+        #drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        #beam_incoming.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+
+        if self.upramp is not None:
+            beam0, drive_beam_ramped = self.track_upramp(beam_incoming, drive_beam_ramped) # TODO: check if track_upramp rotates the beams correctly
+        else:
+            beam0 = copy.deepcopy(beam_incoming)
+            #driver0 = copy.deepcopy(driver_incoming)
+            if self.ramp_beta_mag is not None:
+                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
         
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
         main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
@@ -206,7 +219,7 @@ class StagePrtclTransWakeInstability(Stage):
             rotation_angle_x, rotation_angle_y = drive_beam_ramped.beam_alignment_angles()
             rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
 
-            # The model currently does not support beam tilt not aligned with beam propagation, so that active transformation is used to rotate the beam around x- and y-axis and align it to its own prapagation direction. 
+            # The model currently does not support beam tilt not aligned with beam propagation, so that active transformation is used to rotate the beam around x- and y-axis and align it to its own propagation direction. 
             drive_beam_ramped.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
             #drive_beam_wakeT.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
 
@@ -275,7 +288,7 @@ class StagePrtclTransWakeInstability(Stage):
         #stage_wakeT = StageWakeT()
         ##stage_wakeT.driver_source = self.driver_source
         #stage_wakeT.drive_beam = drive_beam_wakeT
-        ##stage_wakeT.drive_beam = drive_beam0
+        ##stage_wakeT.drive_beam = driver_incoming
         #k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam_wakeT.gamma()/2))
         #lambda_betatron = (2*np.pi/k_beta)
         #stage_wakeT.length = lambda_betatron/10  # [m]
@@ -381,7 +394,7 @@ class StagePrtclTransWakeInstability(Stage):
             probe_every_nth_time_step=self.probe_every_nth_time_step, 
             make_animations=self.make_animations, 
             tmpfolder=tmpfolder, 
-            shot_path=runnable.shot_path(), 
+            shot_path=shot_path, 
             stage_num=beam0.stage_number, 
             enable_tr_instability=self.enable_tr_instability, 
             enable_radiation_reaction=self.enable_radiation_reaction, 
@@ -446,8 +459,8 @@ class StagePrtclTransWakeInstability(Stage):
 
             
         # Save the final step with ramped beams in rotated coordinate system
-        instability_out_drive_beam = drive_beam_ramped
-        #self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, instability_out_drive_beam, beam)
+        driver = drive_beam_ramped  # TODO: output the evolved driver from the model
+        #self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
 
         
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -456,8 +469,10 @@ class StagePrtclTransWakeInstability(Stage):
             # Angles of beam before rotating back to original coordinate system
             beam_x_angle = beam.x_angle()
             beam_y_angle = beam.y_angle()
-            
+
+            driver.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True) # TODO: check if this roates back correctly.
             beam.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+            
 
             # Add drifts to the beam
             x_drift = self.length * np.tan(driver_x_angle)
@@ -466,19 +481,32 @@ class StagePrtclTransWakeInstability(Stage):
             ys = beam.ys()
             beam.set_xs(xs + x_drift)
             beam.set_ys(ys + y_drift)
+            xs_driver = driver.xs()
+            ys_driver = driver.ys()
+            driver.set_xs(xs_driver + x_drift)
+            driver.set_ys(ys_driver + y_drift)
             
             #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
         
-            if drive_beam0.x_angle() != 0 and np.abs( (beam.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+            if driver_incoming.x_angle() != 0 and np.abs( (beam.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
                 
-            if drive_beam0.y_angle() != 0 and np.abs( -(beam.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+            if driver_incoming.y_angle() != 0 and np.abs( -(beam.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
                 
         
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
-        drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
+        #drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        #beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+
+        if self.downramp is not None:
+            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver) # TODO: check if track_downramp rotates the beams correctly
+        else:
+            beam_outgoing = copy.deepcopy(beam)
+            driver_outgoing = copy.deepcopy(driver)
+            if self.ramp_beta_mag is not None:
+                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
         
         # ==========  Make animations ==========
@@ -494,14 +522,18 @@ class StagePrtclTransWakeInstability(Stage):
         
 
         # ========== Bookkeeping ==========
-        self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/drive_beam_ramped.energy() * beam.abs_charge()/drive_beam_ramped.abs_charge()
+        self.driver_to_beam_efficiency = (beam_outgoing.energy()-beam_incoming.energy())/driver_outgoing.energy() * beam_outgoing.abs_charge()/driver_outgoing.abs_charge()
         
-        # Copy meta data from input beam (will be iterated by super)
-        beam.trackable_number = beam0.trackable_number
-        beam.stage_number = beam0.stage_number
-        beam.location = beam0.location
+        # Copy meta data from input beam_outgoing (will be iterated by super)
+        beam_outgoing.trackable_number = beam_incoming.trackable_number
+        beam_outgoing.stage_number = beam_incoming.stage_number
+        beam_outgoing.location = beam_incoming.location
         
-        return super().track(beam, savedepth, runnable, verbose)
+        # Return the beam (and optionally the driver)
+        if self._return_tracked_driver:
+            return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing
+        else:
+            return super().track(beam_outgoing, savedepth, runnable, verbose)
 
 
     # ==================================================

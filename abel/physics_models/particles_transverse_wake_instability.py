@@ -36,12 +36,12 @@ class PrtclTransWakeConfig():
         self.enable_ion_motion = enable_ion_motion
         self.show_prog_bar = show_prog_bar
 
+        self.make_animations = make_animations
         self.probe_evolution = probe_evolution
         if probe_evolution:
             if probe_every_nth_time_step <= 0 or isinstance(probe_every_nth_time_step, int) == False:
                 raise ValueError('probe_every_nth_time_step has to be an integer larger than 0')
             self.probe_every_nth_time_step = probe_every_nth_time_step
-            self.make_animations = make_animations
             self.tmpfolder = tmpfolder
             self.shot_path = shot_path
             self.stage_num = stage_num
