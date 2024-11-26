@@ -154,21 +154,22 @@ class Stage(Trackable, CostModeled):
     @property
     def length(self) -> float:
         "Total length of the trackable stage element [m], or None if not set/calculateable"
-        return self._length_calc
+        return self._length_calc #Always return the dynamic version
     @length.setter
     def length(self, length : float):
-        if self._length_calc is not None:
-            if length is None or self._length is not None:
-                pass
-            else:
-                raise VariablesOverspecifiedError("length already known/calculateable, cannot set.")
+        if self._length_calc is not None and self._length is None:
+            #If there is a known value, and we're not trying to modify a user-set value -> ERROR!
+            raise VariablesOverspecifiedError("length already known/calculateable, cannot set.")
+        #Set user value and recalculate
         self._length = length
-        self._recalcLengthGainGradient()
+        self._recalcLengthEnergyGradient()
     def get_length(self) -> float:
         "Alias of length"
         return self.length
-    _length      = None
-    _length_calc = None
+    #Variables are internal to the length/energy/gradient logic
+    # do not modify externally!
+    _length      = None #User-set value
+    _length_calc = None #Dynamic version, current best-known value
 
     @property
     def nom_energy_gain(self) -> float:
@@ -176,13 +177,10 @@ class Stage(Trackable, CostModeled):
         return self._nom_energy_gain_calc
     @nom_energy_gain.setter
     def nom_energy_gain(self, nom_energy_gain : float):
-        if self._nom_energy_gain_calc is not None:
-            if nom_energy_gain is None or self._nom_energy_gain is not None:
-                pass
-            else:
-                raise VariablesOverspecifiedError("nom_energy_gain already known/calculateable, cannot set.")
+        if self._nom_energy_gain_calc is not None and self._nom_energy_gain is None:
+            raise VariablesOverspecifiedError("nom_energy_gain already known/calculateable, cannot set.")
         self._nom_energy_gain = nom_energy_gain
-        self._recalcLengthGainGradient()
+        self._recalcLengthEnergyGradient()
     def get_nom_energy_gain(self):
         "Alias of nom_energy_gain"
         return self.nom_energy_gain
@@ -195,47 +193,63 @@ class Stage(Trackable, CostModeled):
         return self._nom_accel_gradient_calc
     @nom_accel_gradient.setter
     def nom_accel_gradient(self, nom_accel_gradient : float):
-        if self._nom_accel_gradient_calc is not None:
-            if nom_accel_gradient is None or self._nom_accel_gradient is not None:
-                pass
-            else:
-                raise VariablesOverspecifiedError("nom_accel_gradient already known/calculateable, cannot set")
+        if self._nom_accel_gradient_calc is not None and self._nom_accel_gradient is None:
+            raise VariablesOverspecifiedError("nom_accel_gradient already known/calculateable, cannot set")
         self._nom_accel_gradient = nom_accel_gradient
-        self._recalcLengthGainGradient()
+        self._recalcLengthEnergyGradient()
     _nom_accel_gradient      = None
     _nom_accel_gradient_calc = None
 
     @property
     def length_flattop(self) -> float:
         "Length of the plasma flattop [m], or None if not set/calculateable"
-        pass
+        return self._length_flattop_calc
     @length_flattop.setter
     def length_flattop(self, length_flattop : float):
-        pass
+        if self._length_flattop_calc is not None and self._length_flattop is None:
+            raise VariablesOverspecifiedError("length_flattop already known/calculateable, cannot set")
+        self._length_flattop = length_flattop
+        self._recalcLengthEnergyGradient()
+    _length_flattop      = None
+    _length_flattop_calc = None
 
     @property
     def nom_energy_gain_flattop(self) -> float:
         "Energy gain of the plasma flattop [eV], or None if not set/calculateable"
-        pass
+        return self._nom_energy_gain_flattop_calc
     @nom_energy_gain_flattop.setter
     def nom_energy_gain_flattop(self,nom_energy_gain_flattop : float):
-        pass
+        if self._nom_energy_gain_flattop_calc is not None and self._nom_energy_gain_flattop is None:
+            raise VariablesOverspecifiedError("nom_energy_gain_flattop is already known/calculateable, cannot set")
+        self._nom_energy_gain_flattop = nom_energy_gain_flattop
+        self._recalcLengthEnergyGradient()
+    _nom_energy_gain_flattop      = None
+    _nom_energy_gain_flattop_calc = None
 
     @property
     def nom_accel_gradient_flattop(self) -> float:
         "Accelerating gradient of the plasma flattop [eV/m], or None if not set/calculateable"
-        pass
+        return self._nom_accel_gradient_flattop_calc
     @nom_accel_gradient_flattop.setter
     def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
-        pass
+        if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is not None:
+            raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
+        self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
+        self._recalcLengthEnergyGradient()
+    _nom_accel_gradient_flattop      = None
+    _nom_accel_gradient_flattop_calc = None
 
-    def _recalcLengthGainGradient(self):
+    def _recalcLengthEnergyGradient(self):
         #Set what we can directly, set the rest back to None
         self._length_calc              = self._length
         self._nom_energy_gain_calc     = self._nom_energy_gain
         self._nom_accel_gradient_calc  = self._nom_accel_gradient
 
-        #Iteratively calculate everything
+        self._length_flattop_calc             = self._length_flattop
+        self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
+        self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
+
+        #Iteratively calculate everything until stability is reached
         itrCtr = 0
         while True:
             itrCtr += 1
@@ -245,21 +259,34 @@ class Stage(Trackable, CostModeled):
             updateCounter = 0
 
             #Indirect setting of overall
-            if self._length_calc is None:
-                if self._nom_energy_gain_calc is not None and self._nom_accel_gradient_calc is not None:
-                    self._length_calc = self._nom_energy_gain_calc / self._nom_accel_gradient_calc
+            if self.length is None:
+                if self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
+                    self._length_calc = self.nom_energy_gain / self.nom_accel_gradient
                     updateCounter += 1
-            if self._nom_energy_gain_calc is None:
-                if self._length_calc is not None and self._nom_accel_gradient_calc is not None:
-                    self._nom_energy_gain_calc = self._length_calc * self._nom_accel_gradient_calc
+            if self.nom_energy_gain is None:
+                if self.length is not None and self.nom_accel_gradient is not None:
+                    self._nom_energy_gain_calc = self.length * self.nom_accel_gradient
                     updateCounter += 1
-            if self._nom_accel_gradient_calc is None:
-                if self._length_calc is not None and self._nom_energy_gain_calc is not None:
-                    self._nom_accel_gradient_calc = self._nom_energy_gain_calc / self._length_calc
+            if self.nom_accel_gradient is None:
+                if self.length is not None and self.nom_energy_gain is not None:
+                    self._nom_accel_gradient_calc = self.nom_energy_gain / self.length
                     updateCounter += 1
 
             #Indirect setting of flattop
+            if self.length_flattop is None:
+                if self.nom_energy_gain_flattop is not None and self.nom_accel_gradient_flattop is not None:
+                    self._length_flattop_calc = self.nom_energy_gain_flattop / self.nom_accel_gradient_flattop
+                    updateCounter += 1
+            if self.nom_energy_gain_flattop is None:
+                if self.length_flattop is not None and self.nom_accel_gradient_flattop is not None:
+                    self._nom_energy_gain_flattop_calc = self.length_flattop * self.nom_accel_gradient_flattop
+                    updateCounter += 1
+            if self.nom_accel_gradient_flattop is None:
+                if self.length_flattop is not None and self.nom_energy_gain_flattop is not None:
+                    self._nom_accel_gradient_calc = self.nom_energy_gain_flattop / self.length_flattop
+                    updateCounter += 1
 
+            #Relationships including ramps
 
             #Are we done yet?
             if updateCounter == 0:
