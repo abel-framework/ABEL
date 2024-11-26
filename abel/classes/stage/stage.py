@@ -151,20 +151,22 @@ class Stage(Trackable, CostModeled):
     #length/length_flattop, nom_accel_gradient, and nom_energy_gain are interdependent
     # Allow explicitly setting 2 out of 3, and overwriting
     # Setting variable to None means it is not set.
-    def _lengthGradientEnergy_rdy(self):
-        hasData = 0
-        if self._length_rdy(fromOverall=False):
-            hasData += 1
-        if self._nom_energy_gain_rdy(fromOverall=False):
-            hasData += 1
-        if self._nom_accel_gradient_rdy(fromOverall=False):
-            hasData += 1
+    # def _lengthGradientEnergy_rdy(self):
+    #     hasData = 0
+    #     if self._length_rdy(fromOverall=False):
+    #         hasData += 1
+    #     if self._nom_energy_gain_rdy(fromOverall=False):
+    #         hasData += 1
+    #     if self._nom_accel_gradient_rdy(fromOverall=False):
+    #         hasData += 1
 
-        if hasData == 2:
-            return True
-        if hasData > 2:
-            raise VariablesOverspecifiedError("Internal error, length/gradient/energy overspecified")
-        return False
+    #     if hasData == 2:
+    #         return True
+    #     if hasData > 2:
+    #         raise VariablesOverspecifiedError("Internal error, length/gradient/energy overspecified")
+    #     return False
+
+    # Overall hidden variables and _rdy functions
 
     #Define all length/gradient/energy gain as undefined to begin with
     # Do not access these variables directly except in their own getter/setter.
@@ -175,15 +177,15 @@ class Stage(Trackable, CostModeled):
     _nom_energy_gain    = None
     _nom_accel_gradient = None
 
-    #Can we get the length of the total Stage? (flag to avoid recursive def.)
-    def _length_rdy(self,fromRamp=True,fromOverall=True) -> bool:
+    #Can we get the length of the total Stage? (flags to avoid recursive def.)
+    def _length_rdy(self,fromRamp=True,fromOverall=True,fromFlattop=True) -> bool:
         #Defined directly?
         if self._length is not None:
             return True
         #Via energy gain & gradient
         if fromOverall:
-            if self._nom_energy_gain_rdy(fromOverall=False) and \
-               self._nom_accel_gradient_rdy(fromOverall=False):
+            if self._nom_energy_gain_rdy   (fromOverall=False, fromFlattop=fromFlattop) and \
+               self._nom_accel_gradient_rdy(fromOverall=False, fromFlattop=fromFlattop):
                 return True
         #Via upramp & downramp & flattop lengths
         if fromRamp:
@@ -193,19 +195,19 @@ class Stage(Trackable, CostModeled):
             if self.has_downramp():
                 if self.downramp.length is None:
                     return False
-            if not self._length_flattop_rdy(fromOverall=False):
+            if not self._length_flattop_rdy(fromRamp=False,fromFlattop=fromFlattop):
                 return False
             return True
         return False
-    #Can we get the nominal energy gain of the total Stage? (flag to avoid infinite recursive def.)
-    def _nom_energy_gain_rdy(self, fromRamp=True, fromOverall=True) -> bool:
+    #Can we get the nominal energy gain of the total Stage? (flags to avoid infinite recursive def.)
+    def _nom_energy_gain_rdy(self, fromRamp=True, fromOverall=True, fromFlattop=True) -> bool:
         #Defined directly
         if self._nom_energy_gain is not None:
             return True
         #Via total length & gradient
         if fromOverall:
-            if self._length_rdy(fromOverall=False) and \
-               self._nom_accel_gradient_rdy(fromOverall=False):
+            if self._length_rdy            (fromOverall=False,fromFlattop=fromFlattop) and \
+               self._nom_accel_gradient_rdy(fromOverall=False,fromFlattop=fromFlattop):
                 return True
         #Via upramp gain & downramp gain & flattop gain
         if fromRamp:
@@ -215,82 +217,130 @@ class Stage(Trackable, CostModeled):
             if self.has_downramp():
                 if self.downramp.nom_energy_gain is None:
                     return False
-            if not self._nom_energy_gain_flattop_rdy(fromOverall=False):
+            if not self._nom_energy_gain_flattop_rdy(fromRamp=False,fromFlattop=fromFlattop):
                 return False
             return True
         #Didn't succeed
         return False
-    #Can we get the nominal acclerating gradient of the total Stage?
-    def _nom_accel_gradient_rdy(self, fromOverall=True) -> bool:
+    #Can we get the nominal accelerating gradient of the total Stage? (flags to avoid infinite recursive def.)
+    def _nom_accel_gradient_rdy(self, fromRamp=True, fromOverall=True, fromFlattop=True) -> bool:
         #Defined directly
         if self._nom_accel_gradient is not None:
             return True
-        #Via total length & energy gain
+        #Via total length & energy gain?
         if fromOverall:
-            if self._length_rdy(fromOverall=False) and \
-               self._nom_energy_gain_rdy(fromOverall=False):
+            if self._length_rdy         (fromOverall=False, fromFlattop=fromFlattop) and \
+               self._nom_energy_gain_rdy(fromOverall=False, fromFlattop=fromFlattop):
                 return True
-        return False
-
-    #Similar, between length/length_flattop
-    _length_flattop             = None
-    _nom_energy_gain_flattop    = None
-    #_nom_accel_gradient_flattop = None
-
-    #Can we get the length of the flattop? (flag to avoid infinite recursive def.)
-    def _length_flattop_rdy(self, fromOverall=True) -> bool:
-        #Defined directly?
-        if self._length_flattop is not None:
-            return True
-        #Via total length & upramp length & downramp length?
-        if fromOverall:
-            if self.has_upramp():
-                if self.upramp.length is None:
-                    return False
-            if self.has_downramp():
-                if self.downramp.length is None:
-                    return False
-            if not self._length_rdy(fromRamp=False):
-                return False
-            return True
-        #Via flattop gradient and energy?
-        # TODO?
-        #Didn't succeed
-        return False
-
-    #Can we get the energy gain fo the flattop? (flag to avoid infinite recursive def.)
-    def _nom_energy_gain_flattop_rdy(self, fromOverall=True) -> bool:
-        #Defined directly?
-        if self._nom_energy_gain_flattop is not None:
-            return True
-        #Via total energy gain + upramp gain + downramp gain?
-        if fromOverall:
+        #Via total length & ramp partial energy gains?
+        if fromRamp:
             if self.has_upramp():
                 if self.upramp.nom_energy_gain is None:
                     return False
             if self.has_downramp():
                 if self.downramp.nom_energy_gain is None:
                     return False
-            if not self._nom_energy_gain_rdy(fromRamp=False):
+            if not self._nom_energy_gain_flattop_rdy(fromRamp=False,fromFlattop=fromFlattop):
+                return False
+            if not self._length_rdy(fromOverall=False,fromFlattop=fromFlattop):
                 return False
             return True
-        #Via flattop length and gradient?
-        # TODO
         #Didn't succeed
         return False
 
+    #Flattop hidden variables and _rdy functions
+    
+    _length_flattop             = None
+    _nom_energy_gain_flattop    = None
+    _nom_accel_gradient_flattop = None
+
+    #Can we get the length of the flattop? (flags to avoid infinite recursive def.)
+    def _length_flattop_rdy(self, fromRamp=True, fromFlattop=True) -> bool:
+        #Defined directly?
+        if self._length_flattop is not None:
+            return True
+        #Via total length & upramp length & downramp length?
+        if fromRamp:
+            if self.has_upramp():
+                if self.upramp.length is None:
+                    return False
+            if self.has_downramp():
+                if self.downramp.length is None:
+                    return False
+            if not self._length_rdy(fromRamp=False,fromFlattop=False):
+                return False
+            return True
+        #Via flattop gradient and energy?
+        if fromFlattop:
+            if self._nom_accel_gradient_flattop_rdy(fromFlattop=False) and \
+               self._nom_energy_gain_flattop_rdy(fromFlattop=False):
+                return True
+        #Didn't succeed
+        return False
+
+    #Can we get the energy gain for the flattop? (flag to avoid infinite recursive def.)
+    def _nom_energy_gain_flattop_rdy(self, fromRamp=True, fromFlattop=True) -> bool:
+        #Defined directly?
+        if self._nom_energy_gain_flattop is not None:
+            return True
+        #Via total energy gain & upramp gain & downramp gain?
+        if fromRamp:
+            if self.has_upramp():
+                if self.upramp.nom_energy_gain is None:
+                    return False
+            if self.has_downramp():
+                if self.downramp.nom_energy_gain is None:
+                    return False
+            if not self._nom_energy_gain_rdy(fromRamp=False, fromFlattop=False):
+                return False
+            return True
+        #Via flattop length and gradient?
+        if fromFlattop:
+            if self._length_flattop_rdy(fromFlattop=False) and \
+               self._nom_accel_gradient_flattop_rdy(fromFlattop=False):
+                return True
+        #Didn't succeed
+        return False
+
+    #Can we get the gradient for the flattop? (flags to avoid infinite recursive def.)
+    def _nom_accel_gradient_flattop_rdy(self, fromRamp=True, fromFlattop=True) -> bool:
+        #Defined directly?
+        if self._nom_accel_gradient_flattop is not None:
+            return True
+        #Via total energy gain & upramp gain & downramp gain & flattop length?
+        if fromRamp:
+            if self.has_upramp():
+                if self.upramp.nom_energy_gain is None:
+                    return False
+            if self.has_downramp():
+                if self.downramp.nom_energy_gain is None:
+                    return False
+            if not self._nom_energy_gain_rdy(fromRamp=False, fromFlattop=False):
+                return False
+            if not self._length_flattop_rdy(fromRamp=False, fromFlattop=False):
+                return False
+            return True
+        #Via flattop length & energy?
+        if fromFlattop:
+            if self._length_flattop_rdy(fromFlattop=True) and \
+               self._nom_energy_gain_flattop_rdy(fromFlattop=True):
+                return True
+        #Didn't succeed
+        return False
+
+    #Flattop setter/getters
 
     @property
     def length_flattop(self) -> float:
         """Length of the plasma flattop [m],
         either directly set, or calculated from overall length minus ramp lengths,
-        (or from flattop gradient/energy - TODO), or None if not valid.
+        or from flattop gradient/energy, or None if not valid.
         """
         #Defined directly
         if self._length_flattop is not None:
             return self._length_flattop
         #Via total length & upramp length & downramp length?
-        if self._length_rdy(fromRamp=False):
+        if self._length_rdy(fromRamp=False, fromFlattop=False):
             L = self.length
             if self.has_upramp():
                 if self.upramp.length is None:
@@ -302,7 +352,9 @@ class Stage(Trackable, CostModeled):
                 L -= self.downramp.length
             return L
         #Via flattop energy gain & gradient?
-        # TODO?
+        if self._nom_accel_gradient_flattop_rdy(fromFlattop=False) and \
+           self._nom_energy_gain_flattop_rdy(fromFlattop=False):
+            return self.nom_energy_gain/self.nom_accel_gradient
         #Didn't succeed
         return None
     @length_flattop.setter
@@ -322,13 +374,13 @@ class Stage(Trackable, CostModeled):
     def nom_energy_gain_flattop(self) -> float:
         """Energy gain of the plasma flattop [eV],
         either directly set, or calculated from the overall energy gain minus ramp energy gains,
-        (or from flattop length/gradient - TODO), or None if not valid
+        or from flattop length/gradient, or None if not valid
         """
         #Defined directly:
         if self._nom_energy_gain_flattop is not None:
             return self._nom_energy_gain_flattop
         #By total & upramp & downramp energy gain
-        if self._nom_energy_gain_rdy(fromRamp=False):
+        if self._nom_energy_gain_rdy(fromRamp=False, fromFlattop=False):
             dE = self.nom_energy_gain
             if self.has_upramp():
                 if self.upramp.nom_energy_gain is None:
@@ -340,7 +392,9 @@ class Stage(Trackable, CostModeled):
                 dE -= self.downramp.nom_energy_gain
             return dE
         #Via flattop length & gradient?
-        # TODO?
+        if self._length_flattop_rdy(fromFlattop=False) and \
+           self._nom_accel_gradient_flattop_rdy(fromFlattop=False):
+            return self.length_flattop * self.nom_accel_gradient
         #Didn't succeed
         return None
     @nom_energy_gain_flattop.setter
@@ -357,13 +411,60 @@ class Stage(Trackable, CostModeled):
         self._nom_energy_gain_flattop = nom_energy_gain_flattop
 
     @property
+    def nom_accel_gradient_flattop(self) -> float:
+        """Accelerating gradient of the plasma flattop [eV/m],
+        directly set, or from flattop length/energy gain, or None if not valid.
+        """
+        #Defined directly:
+        if self._nom_accel_gradient_flattop is not None:
+            return self._nom_accel_gradient_flattop
+        #By total energy gain & upramp gain & downramp gain & flattop length?
+        if self._nom_energy_gain_flattop_rdy(fromRamp=False,fromFlattop=False):
+            dE = self.nom_energy_gain
+            if self.has_upramp():
+                if self.upramp.nom_energy_gain is None:
+                    return None
+                dE -= self.upramp.nom_energy_gain
+            if self.has_downramp():
+                if self.downramp.nom_energy_gain is None:
+                    return None
+                dE -= self.downramp.nom_energy_gain
+            if not self._length_flattop_rdy(fromRamp=False,fromFlattop=False):
+                return None
+            return dE/self.length_flattop
+        #By flattop length & nom energy gain?
+        if self._length_flattop_rdy(fromFlattop=True) and \
+           self._nom_energy_gain_flattop_rdy(fromFlattop=True):
+            return self.nom_energy_gain_flattop / self.length_flattop
+        #Didn't succeed
+        return None
+    @nom_accel_gradient_flattop.setter
+    def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
+        if self._nom_accel_gradient_flattop is not None:
+            #Overwrite previous excplit setting
+            self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
+            return
+        elif nom_accel_gradient_flattop is None:
+            #Allow setting None to None
+            return
+        if self._nom_accel_gradient_flattop_rdy():
+            raise VariablesOverspecifiedError("Cannot set nom_accel_gradient_flattop, it is already implicitly specified")
+        self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
+
+    ## Overall setter/getters
+
+    @property
     def length(self) -> float:
         "Total length of the trackable stage element [m], or None if not valid"
         #Defined directly
         if self._length is not None:
             return self._length
+        #By total gradient & energy
+        if self._nom_accel_gradient_rdy(fromOverall=False) and \
+           self._nom_energy_gain_rdy(fromOverall=False):
+            return self.nom_energy_gain/self.nom_accel_gradient
         #By flattop + upramp + downramp lengths
-        if self._length_flattop_rdy(fromOverall=False):
+        if self._length_flattop_rdy(fromRamp=False):
             L = self.length_flattop
             if self.has_upramp():
                 if self.upramp.length is None:
@@ -374,9 +475,6 @@ class Stage(Trackable, CostModeled):
                     return None
                 L += self.downramp.length
             return L
-        #By total gradient & energy
-        if self._lengthGradientEnergy_rdy():
-            return self.nom_energy_gain/self.nom_accel_gradient
         #Did't succeed
         return None
     @length.setter
@@ -400,8 +498,13 @@ class Stage(Trackable, CostModeled):
         #Defined directly
         if self._nom_energy_gain is not None:
             return self._nom_energy_gain
+        #By total length & gradient
+        #if self._lengthGradientEnergy_rdy():
+        if self._nom_accel_gradient_rdy(fromOverall=False) and \
+           self._length_rdy(fromOverall=False):
+            return self.nom_accel_gradient*self.length
         #By flattop & upramp & downramp energy gain
-        if self._nom_energy_gain_flattop_rdy(fromOverall=False):
+        if self._nom_energy_gain_flattop_rdy(fromRamp=False):
             dE = self.nom_energy_gain_flattop
             if self.has_upramp():
                 if self.upramp.nom_energy_gain is None:
@@ -412,9 +515,6 @@ class Stage(Trackable, CostModeled):
                     return None
                 dE += self.downramp.nom_energy_gain
             return dE
-        #By total length & gradient
-        if self._lengthGradientEnergy_rdy():
-            return self.nom_accel_gradient*self.length
         return None
     @nom_energy_gain.setter
     def nom_energy_gain(self, nom_energy_gain : float):
@@ -439,8 +539,24 @@ class Stage(Trackable, CostModeled):
         if self._nom_accel_gradient is not None:
             return self._nom_accel_gradient
         #By total length & energy gain
-        if self._lengthGradientEnergy_rdy():
+        #if self._lengthGradientEnergy_rdy():
+        if self._nom_energy_gain_rdy(fromOverall=False) and \
+           self._length_rdy(fromOverall=False):
             return self.nom_energy_gain/self.length
+        #By total energy gain & upramp gain & downramp gain & flattop length?
+        if self._nom_energy_gain_flattop_rdy(fromRamp=False):
+            dE = self.nom_energy_gain_flattop
+            if self.has_upramp():
+                if self.upramp.nom_energy_gain is None:
+                    return None
+                dE += self.upramp.nom_energy_gain
+            if self.has_downramp():
+                if self.downramp.nom_energy_gain is None:
+                    return None
+                dE += self.downramp.nom_energy_gain
+            if not self._length_rdy(fromRamp=False):
+                return None
+            return dE/self.length
         return None
     @nom_accel_gradient.setter
     def nom_accel_gradient(self, nom_accel_gradient : float):
@@ -458,7 +574,7 @@ class Stage(Trackable, CostModeled):
         "Alias of nom_accel_gradient"
         return self.nom_accel_gradient
 
-
+    #(Done with the length/nom_energy_gain/nom_accel_gradient stuff)
 
     def get_cost_breakdown(self):
         breakdown = []
