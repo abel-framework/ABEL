@@ -181,61 +181,36 @@ class StagePrtclTransWakeInstability(Stage):
             driver_incoming = self.driver_source.track() # Generate a drive beam with jitter. 
             self.drive_beam = driver_incoming                    ######################
         
-        drive_beam_ramped = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
-
-        #drive_beam_wakeT = copy.deepcopy(driver_incoming)  # Wake-T requires not-ramped beams for now... ############
-        #beam0_copy = copy.deepcopy(beam_incoming)  # Make a deep copy of beam_incoming for use in StageWakeT, which applies magnify_beta_function() separately. ############
-
+        drive_beam_rotated = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
         
-        # ========== Apply plasma density up ramp (demagnify beta function) ========== 
-        #drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-        #beam_incoming.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-
-        if self.upramp is not None:
-            beam0, drive_beam_ramped = self.track_upramp(beam_incoming, drive_beam_ramped) # TODO: check if track_upramp rotates the beams correctly
-        else:
-            beam0 = copy.deepcopy(beam_incoming)
-            #driver0 = copy.deepcopy(driver_incoming)
-            if self.ramp_beta_mag is not None:
-                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-        
-        # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
-        main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
-        self.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
-        self.main_num_profile = main_num_profile
-
         
         # ========== Rotate the coordinate system of the beams ==========
         if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
 
-            driver_x_angle = drive_beam_ramped.x_angle()
-            driver_y_angle = drive_beam_ramped.y_angle()
+            driver_x_angle = driver_incoming.x_angle()
+            driver_y_angle = driver_incoming.y_angle()
             
             beam0_x_angle = beam0.x_angle()
             beam0_y_angle = beam0.y_angle()
 
             # Calculate the angles that will be used to rotate the beams' frame
-            rotation_angle_x, rotation_angle_y = drive_beam_ramped.beam_alignment_angles()
+            rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
             rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
 
             # The model currently does not support beam tilt not aligned with beam propagation, so that active transformation is used to rotate the beam around x- and y-axis and align it to its own propagation direction. 
-            drive_beam_ramped.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+            drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
             #drive_beam_wakeT.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
 
             # Use passive transformation to rotate the frame of the beams
-            drive_beam_ramped.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
+            drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
             beam0.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
-            
-            #drive_beam_wakeT.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
-            #beam0_copy.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
 
-            if np.abs( drive_beam_ramped.x_angle() ) > 5e-10:
-                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'drive_beam_ramped x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_ramped x_angle after coordinate transformation: ' + str(drive_beam_ramped.x_angle())
+            if np.abs( drive_beam_rotated.x_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'drive_beam_rotated x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_ramped x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
                 warnings.warn(driver_error_string)
 
-            if np.abs( drive_beam_ramped.y_angle() ) > 5e-10:
-                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'drive_beam_ramped y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_ramped y_angle after coordinate transformation: ' + str(drive_beam_ramped.y_angle())
+            if np.abs( drive_beam_rotated.y_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'drive_beam_rotated y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_ramped y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
                 warnings.warn(driver_error_string)
 
     
@@ -244,6 +219,24 @@ class StagePrtclTransWakeInstability(Stage):
                 
             if np.abs( (beam0.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
+
+        
+        # ========== Apply plasma density up ramp (demagnify beta function) ==========
+        if self.upramp is not None:
+            beam0, drive_beam_ramped = self.track_upramp(beam_incoming, drive_beam_rotated) # TODO: check if track_upramp rotates the beams correctly
+        else:
+            beam0 = copy.deepcopy(beam_incoming)
+            drive_beam_ramped = copy.deepcopy(driver_incoming)
+            if self.ramp_beta_mag is not None:
+                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+
+
+        # ========== Record longitudinal number profile ==========
+        # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
+        main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
+        self.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
+        self.main_num_profile = main_num_profile
         
 
         # ========== Wake-T simulation and extraction ==========
@@ -282,41 +275,10 @@ class StagePrtclTransWakeInstability(Stage):
         zs_rho = info_rho.z
         rs_rho = info_rho.r
         
-
-        # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-        ## Define a Wake-T stage
-        #stage_wakeT = StageWakeT()
-        ##stage_wakeT.driver_source = self.driver_source
-        #stage_wakeT.drive_beam = drive_beam_wakeT
-        ##stage_wakeT.drive_beam = driver_incoming
-        #k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam_wakeT.gamma()/2))
-        #lambda_betatron = (2*np.pi/k_beta)
-        #stage_wakeT.length = lambda_betatron/10  # [m]
-        #stage_wakeT.plasma_density = plasma_density  # [m^-3]
-        #stage_wakeT.ramp_beta_mag = self.ramp_beta_mag
-        ##stage_wakeT.keep_data = False  # TODO: Does not work yet.
-        #
-        ## Run the Wake-T stage
-        #beam_wakeT = stage_wakeT.track(beam0_copy, verbose=self.show_prog_bar)
-        #
-        ## Read the Wake-T simulation data
-        #Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
-        #zs_Ez_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.zs
-        #rho = stage_wakeT.initial.plasma.density.rho*-e
-        #plasma_num_density = stage_wakeT.initial.plasma.density.rho/stage_wakeT.plasma_density
-        #info_rho = stage_wakeT.initial.plasma.density.metadata
-        #zs_rho = info_rho.z
-        #rs_rho = info_rho.r
-        # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-        
         # Cut out axial Ez over the ROI
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
-        #driver_x_offset = drive_beam_ramped.x_offset()
-        #driver_y_offset = drive_beam_ramped.y_offset()
-        #x_offset = beam0.x_offset()             # Important to NOT use beam0_copy.
-        #bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, threshold=0.8)
         bubble_radius_wakeT = self.get_bubble_radius_WakeT(plasma_num_density, rs_rho, threshold=0.8)
 
         # Cut out bubble radius over the ROI
@@ -462,43 +424,8 @@ class StagePrtclTransWakeInstability(Stage):
         driver = drive_beam_ramped  # TODO: output the evolved driver from the model
         #self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
 
-        
-        # ========== Rotate the coordinate system of the beams back to original ==========
-        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
 
-            # Angles of beam before rotating back to original coordinate system
-            beam_x_angle = beam.x_angle()
-            beam_y_angle = beam.y_angle()
-
-            driver.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True) # TODO: check if this roates back correctly.
-            beam.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
-            
-
-            # Add drifts to the beam
-            x_drift = self.length * np.tan(driver_x_angle)
-            y_drift = self.length * np.tan(driver_y_angle)
-            xs = beam.xs()
-            ys = beam.ys()
-            beam.set_xs(xs + x_drift)
-            beam.set_ys(ys + y_drift)
-            xs_driver = driver.xs()
-            ys_driver = driver.ys()
-            driver.set_xs(xs_driver + x_drift)
-            driver.set_ys(ys_driver + y_drift)
-            
-            #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
-        
-            if driver_incoming.x_angle() != 0 and np.abs( (beam.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
-                warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
-                
-            if driver_incoming.y_angle() != 0 and np.abs( -(beam.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
-                warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
-                
-        
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
-        #drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-        #beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-
         if self.downramp is not None:
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver) # TODO: check if track_downramp rotates the beams correctly
         else:
@@ -507,6 +434,38 @@ class StagePrtclTransWakeInstability(Stage):
             if self.ramp_beta_mag is not None:
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+
+        
+        # ========== Rotate the coordinate system of the beams back to original ==========
+        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+
+            # Angles of beam before rotating back to original coordinate system
+            beam_x_angle = beam_outgoing.x_angle()
+            beam_y_angle = beam_outgoing.y_angle()
+
+            driver_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True) # TODO: check if this roates back correctly.
+            beam_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+            
+
+            # Add drifts to the beam
+            x_drift = self.length * np.tan(driver_x_angle)
+            y_drift = self.length * np.tan(driver_y_angle)
+            xs = beam_outgoing.xs()
+            ys = beam_outgoing.ys()
+            beam_outgoing.set_xs(xs + x_drift)
+            beam_outgoing.set_ys(ys + y_drift)
+            xs_driver = driver_outgoing.xs()
+            ys_driver = driver_outgoing.ys()
+            driver_outgoing.set_xs(xs_driver + x_drift)
+            driver_outgoing.set_ys(ys_driver + y_drift)
+            
+            #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
+        
+            if driver_incoming.x_angle() != 0 and np.abs( (beam_outgoing.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
+                
+            if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
 
         
         # ==========  Make animations ==========
