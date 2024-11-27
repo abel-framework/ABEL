@@ -104,7 +104,7 @@ class Stage(Trackable, CostModeled):
         else:
             beam = beam0
             driver = driver0
-            
+        
         return beam, driver
 
     # downramp to be tracked after the main tracking
@@ -211,7 +211,47 @@ class Stage(Trackable, CostModeled):
     def length_downramp(self, length_downramp : float):
         assert self.downramp is not None, "No downramp to set length of"
         self.downramp.length = length_downramp
+
+
+    # ==================================================
+    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None):
+        """
+        Used for copying a predefined stage's settings and configurations to set up flat ramps.
     
+        Parameters
+        ----------
+        ramp_plasma_density: [m^-3] float, optional
+            Plasma density for the ramp.
+
+        ramp_length: [m] float, optional
+            Length of the ramp.
+    
+            
+        Returns
+        ----------
+        stage_copy: Stage object
+            A modified deep copy of the original stage.
+        """
+
+        stage_copy = copy.deepcopy(self)
+        stage_copy.ramp_beta_mag = 1.0
+
+        # Delete any upramps and downramps that might be present
+        stage_copy.upramp = None
+        stage_copy.downramp = None
+
+        # Can set some parameters to None to let track_upramp() and track_downramp() determine these
+        stage_copy.nom_accel_gradient = None
+        stage_copy.nom_energy_gain = None
+        stage_copy.plasma_density = ramp_plasma_density
+        stage_copy.length = ramp_length
+
+        # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
+        stage_copy.driver_source = None
+
+        return stage_copy
+
+        
     def get_length(self):
         return self.length
 
@@ -276,6 +316,7 @@ class Stage(Trackable, CostModeled):
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
 
+    
     def save_driver_to_file(self, driver, runnable):
         driver.save(runnable, beam_name='driver_stage' + str(driver.stage_number+1))
 
@@ -618,5 +659,5 @@ class Stage(Trackable, CostModeled):
         label = 'Plasma stage'
         color = 'red'
         return x_points, y_points, final_angle, label, color
-        
+
     
