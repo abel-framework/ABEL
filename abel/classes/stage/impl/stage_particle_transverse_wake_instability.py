@@ -39,7 +39,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, stage_number=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
+    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, stage_number=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
         """
         Parameters
         ----------
@@ -84,15 +84,13 @@ class StagePrtclTransWakeInstability(Stage):
         ...
         """
         
-        super().__init__(length, nom_energy_gain, plasma_density)
-
-        self.driver_source = driver_source
+        super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
+        
         self.main_source = main_source
         self.drive_beam = drive_beam
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
         self.interstage_dipole_field = None
-        self.ramp_beta_mag = ramp_beta_mag
 
         # Physics flags
         self.enable_tr_instability = enable_tr_instability 
@@ -197,9 +195,8 @@ class StagePrtclTransWakeInstability(Stage):
             rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
             rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
 
-            # The model currently does not support beam tilt not aligned with beam propagation, so that active transformation is used to rotate the beam around x- and y-axis and align it to its own propagation direction. 
+            # The model currently does not support drive beam tilt not aligned with beam propagation, so need to first ensure that the drive beam is aligned to its own propagation direction. This is done using active transformation to rotate the beam around x- and y-axis
             drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
-            #drive_beam_wakeT.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
 
             # Use passive transformation to rotate the frame of the beams
             drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
