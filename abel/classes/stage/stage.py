@@ -277,25 +277,27 @@ class Stage(Trackable, CostModeled):
     _nom_accel_gradient_flattop      = None
     _nom_accel_gradient_flattop_calc = None
 
-    def _recalcLengthEnergyGradient(self, calledFrom=None):
+    def _recalcLengthEnergyGradient(self, itrCtr_start=0):
         #Set what we can directly, and set the rest back to None
-        self._length_calc              = self._length
-        self._nom_energy_gain_calc     = self._nom_energy_gain
-        self._nom_accel_gradient_calc  = self._nom_accel_gradient
+        if itrCtr_start == 0:
+            self._length_calc              = self._length
+            self._nom_energy_gain_calc     = self._nom_energy_gain
+            self._nom_accel_gradient_calc  = self._nom_accel_gradient
 
-        self._length_flattop_calc             = self._length_flattop
-        self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
-        self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
+            self._length_flattop_calc             = self._length_flattop
+            self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
+            self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
 
-        self._printVerb("length                     (1)>", self.length)
-        self._printVerb("nom_energy_gain            (1)>", self.nom_energy_gain)
-        self._printVerb("nom_accel_gradient         (1)>", self.nom_accel_gradient)
-        self._printVerb("length_flattop             (1)>", self.length_flattop)
-        self._printVerb("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
-        self._printVerb("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
+            self._printVerb("length                     (1)>", self.length)
+            self._printVerb("nom_energy_gain            (1)>", self.nom_energy_gain)
+            self._printVerb("nom_accel_gradient         (1)>", self.nom_accel_gradient)
+            self._printVerb("length_flattop             (1)>", self.length_flattop)
+            self._printVerb("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
+            self._printVerb("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
 
         #Iteratively calculate everything until stability is reached
-        itrCtr = 0
+        itrCtr = itrCtr_start
+        updateCounter_total = 0
         while True:
             itrCtr += 1
             self._printVerb("itrCtr = ", itrCtr)
@@ -415,7 +417,7 @@ class Stage(Trackable, CostModeled):
                         self._printVerb("nom_energy_gain_flattop (3)>",dE)
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
-            
+
             #Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
             # via flattop energy and length, which then sets global energy and length.
             #Nom_accel_gradient_flattop works the same way
@@ -447,17 +449,42 @@ class Stage(Trackable, CostModeled):
                                 updateCounter += 1
 
             #Are we done yet?
+            updateCounter_total += updateCounter
             if updateCounter == 0:
                 self._printVerb()
                 break
 
-        #Mutual update parent<->ramps (but avoid recursion)
-        if self.parent is not None and calledFrom != self.parent:
-            self.parent._recalcLengthEnergyGradient(calledFrom=self)
-        if self.upramp is not None and calledFrom != self.upramp:
-            self.upramp._recalcLengthEnergyGradient(calledFrom=self)
-        if self.downramp is not None and calledFrom != self.downramp:
-            self.downramp._recalcLengthEnergyGradient(calledFrom=self)
+        #self._printLengthEnergyGradient_internal()
+
+        #Mutual update parent<->ramps (but avoid infinite recursion)
+        if updateCounter_total > 0:
+            while True:
+                updateCounter = 0
+
+                if self.parent is not None:
+                    itrCtr, uc = self.parent._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
+                    updateCounter += uc
+                    #TODO: Should somehow be able to make one extra pass of everything...
+                    # IDEA: Let breaking condition be that itrCtr has changed by X ammount without updateCounter_total changing?
+                    # if self.parent.upramp is not None:
+                    #     itrCtr, uc = self.parent.upramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
+                    #     updateCounter += uc
+                    # if self.parent.downramp is not None:
+                    #     itrCtr, uc = self.parent.downramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
+                    #     updateCounter += uc
+                if self.upramp is not None:
+                    itrCtr,uc = self.upramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
+                    updateCounter += uc
+                if self.downramp is not None:
+                    itrCtr,uc = self.downramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
+                    updateCounter += uc
+
+                updateCounter_total += updateCounter
+                if updateCounter == 0:
+                    self._printVerb()
+                    break
+
+        return itrCtr, updateCounter_total
 
     doVerbosePrint_debug = False
     def _printVerb(self, *args, **kwargs):
