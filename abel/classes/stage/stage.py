@@ -63,8 +63,7 @@ class Stage(Trackable, CostModeled):
 
         self.name = 'Plasma stage'
 
-    ## Define upramp/downramp attributes
-    # Should maybe demand that they or of same type as the current class, not just generic Stage?
+    ## Define upramp and downramp, if present
     @property
     def upramp(self) -> Self | None:
         "The upramp of this stage, which also is a Stage"
@@ -103,6 +102,7 @@ class Stage(Trackable, CostModeled):
     _parent = None
 
     def _getOtherRamp(self, aRamp : Self) -> Self:
+        "Lets the upramp get hold of the downramp in the same pair, and vise versa"
         if aRamp == self.upramp:
             return self.downramp
         elif aRamp == self.downramp:
@@ -111,7 +111,7 @@ class Stage(Trackable, CostModeled):
             raise StageError("Could not find calling ramp?")
 
     def _getOverallestStage(self) -> Self:
-        "Find the most overall stage in the hierachy"
+        "Find and return the most overall stage in the hierachy"
         bottom_Stage = self
         itrCtr_pSearch = 0
         while bottom_Stage.parent is not None:
@@ -200,6 +200,38 @@ class Stage(Trackable, CostModeled):
 
     ## Mutually consistent calculation for length, nom_accel_gradient,nom_energy gain,
     #  their flattop counterparts, and (if existing) their stage counterparts.
+    #
+    #  If you try to set something that has already been set or calculated,
+    #  we raise a VariablesOverspecifiedError exception with a meaningfull error message.
+    #  If you try to get something that is unknown, you will get a None.
+    #
+    # The algorithm when setting a new variable which is unknown is basically:
+    #  1. Nuke all calculated variables in the whole Stage hierarchy
+    #  2. "Calculate" all variables where the user has set a value by copying this value into the calculated value
+    #  3. Try to calculate whatever variables we can in the whole hierarchy from what is currently known
+    #  4. If we managed to calculate something, repeat 3. until nothing new comes out.
+    #
+    #  Step 1/2 is implemented in methods _resetLengthEnergyGradient() and _resetLengthEnergyGradient_helper()
+    #  Step 3/4 is implemented in methods _recalcLengthEnergyGradient() and _recalcLengthEnergyGradient_helper()
+    #
+    #  Functions _printLengthEnergyGradient_internal() and _printVerb() are for debugging.
+    #  The last one works like print() and is enabled/disabled by the variable doVerbosePrint_debug.
+    #
+    # User-specified data is stored in variables with a single underscore, e.g. _length,
+    # and calculated variables are stored in variables with also _calc, i.e. _length_calc.
+    # Please only access these through their getters and setters i.e. length(self), length(self,length).
+    # The only place the _calc variables are touched outside of the getters and setters
+    # is when resetting them in _resetLengthEnergyGradient_helper()
+    # and when calculating them in _recalcLengthEnergyGradient_helper().
+    #
+    # If the calculation takes too many iterations, something is probably gone wrong (bug),
+    # and we raise a StageError exception.
+    #
+    # Traversing and keeping track the hierarchy of Stages is done using the properties parent, upramp, and downramp
+    # These are ensured to be a Stage or None. The parent cannot be unset, but upramp and downramp can be removed (set to None).
+    # Helper methods _getOtherRamp() and _getOverallestStage() are used to traverse the hierarchy.
+
+    # Setting and getting the variables
 
     @property
     def length(self) -> float:
