@@ -102,13 +102,25 @@ class Stage(Trackable, CostModeled):
         self._parent = parent
     _parent = None
 
-    def getOtherRamp(self, aRamp : Self) -> Self:
+    def _getOtherRamp(self, aRamp : Self) -> Self:
         if aRamp == self.upramp:
             return self.downramp
         elif aRamp == self.downramp:
             return self.upramp
         else:
             raise StageError("Could not find calling ramp?")
+
+    def _getOverallestStage(self) -> Self:
+        "Find the most overall stage in the hierachy"
+        bottom_Stage = self
+        itrCtr_pSearch = 0
+        while bottom_Stage.parent is not None:
+            #Climb down to the bottom
+            itrCtr_pSearch += 1
+            if itrCtr_pSearch > 20: #Magic number
+                raise StageError("Too many levels of parents, giving up")
+            bottom_Stage = bottom_Stage.parent
+        return bottom_Stage
 
     ## Tracking methods
 
@@ -200,6 +212,7 @@ class Stage(Trackable, CostModeled):
             raise VariablesOverspecifiedError("length already known/calculateable, cannot set.")
         #Set user value and recalculate
         self._length = length
+        self._resetLengthEnergyGradient()
         self._recalcLengthEnergyGradient()
     def get_length(self) -> float:
         "Alias of length"
@@ -218,6 +231,7 @@ class Stage(Trackable, CostModeled):
         if self._nom_energy_gain_calc is not None and self._nom_energy_gain is None:
             raise VariablesOverspecifiedError("nom_energy_gain already known/calculateable, cannot set.")
         self._nom_energy_gain = nom_energy_gain
+        self._resetLengthEnergyGradient()
         self._recalcLengthEnergyGradient()
     def get_nom_energy_gain(self):
         "Alias of nom_energy_gain"
@@ -234,6 +248,7 @@ class Stage(Trackable, CostModeled):
         if self._nom_accel_gradient_calc is not None and self._nom_accel_gradient is None:
             raise VariablesOverspecifiedError("nom_accel_gradient already known/calculateable, cannot set")
         self._nom_accel_gradient = nom_accel_gradient
+        self._resetLengthEnergyGradient()
         self._recalcLengthEnergyGradient()
     _nom_accel_gradient      = None
     _nom_accel_gradient_calc = None
@@ -247,6 +262,7 @@ class Stage(Trackable, CostModeled):
         if self._length_flattop_calc is not None and self._length_flattop is None:
             raise VariablesOverspecifiedError("length_flattop already known/calculateable, cannot set")
         self._length_flattop = length_flattop
+        self._resetLengthEnergyGradient()
         self._recalcLengthEnergyGradient()
     _length_flattop      = None
     _length_flattop_calc = None
@@ -260,6 +276,7 @@ class Stage(Trackable, CostModeled):
         if self._nom_energy_gain_flattop_calc is not None and self._nom_energy_gain_flattop is None:
             raise VariablesOverspecifiedError("nom_energy_gain_flattop is already known/calculateable, cannot set")
         self._nom_energy_gain_flattop = nom_energy_gain_flattop
+        self._resetLengthEnergyGradient()
         self._recalcLengthEnergyGradient()
     _nom_energy_gain_flattop      = None
     _nom_energy_gain_flattop_calc = None
@@ -273,30 +290,50 @@ class Stage(Trackable, CostModeled):
         if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
             raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
         self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
+        self._resetLengthEnergyGradient()
         self._recalcLengthEnergyGradient()
     _nom_accel_gradient_flattop      = None
     _nom_accel_gradient_flattop_calc = None
 
-    def _recalcLengthEnergyGradient(self, itrCtr_start=0):
-        #Set what we can directly, and set the rest back to None
-        if itrCtr_start == 0:
-            self._length_calc              = self._length
-            self._nom_energy_gain_calc     = self._nom_energy_gain
-            self._nom_accel_gradient_calc  = self._nom_accel_gradient
+    #Recalculation methods
 
-            self._length_flattop_calc             = self._length_flattop
-            self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
-            self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
+    def _resetLengthEnergyGradient(self):
+        "Reset all the calculated values in the current Stage hierarchy"
+        self._getOverallestStage()._resetLengthEnergyGradient_helper()
 
-            self._printVerb("length                     (1)>", self.length)
-            self._printVerb("nom_energy_gain            (1)>", self.nom_energy_gain)
-            self._printVerb("nom_accel_gradient         (1)>", self.nom_accel_gradient)
-            self._printVerb("length_flattop             (1)>", self.length_flattop)
-            self._printVerb("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
-            self._printVerb("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
+    def _resetLengthEnergyGradient_helper(self):
+        #Climb back up from the bottom and set what we can
+        # directly / to None, from the stored user input
+        self._length_calc              = self._length
+        self._nom_energy_gain_calc     = self._nom_energy_gain
+        self._nom_accel_gradient_calc  = self._nom_accel_gradient
 
+        self._length_flattop_calc             = self._length_flattop
+        self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
+        self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
+
+        self._printVerb("length                     (1)>", self.length)
+        self._printVerb("nom_energy_gain            (1)>", self.nom_energy_gain)
+        self._printVerb("nom_accel_gradient         (1)>", self.nom_accel_gradient)
+        self._printVerb("length_flattop             (1)>", self.length_flattop)
+        self._printVerb("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
+        self._printVerb("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
+
+        if self.upramp is not None:
+            self._printVerb("Upramp:")
+            self.upramp._resetLengthEnergyGradient_helper()
+        if self.downramp is not None:
+            self._printVerb("Downramp:")
+            self.downramp._resetLengthEnergyGradient_helper()
+
+    def _recalcLengthEnergyGradient(self):
         #Iteratively calculate everything until stability is reached
-        itrCtr = itrCtr_start
+        #Note: Before starting calculation, call _resetLengthEnergyGradient() to reset the hierachy
+        self._getOverallestStage()._recalcLengthEnergyGradient_helper()
+        self._printVerb()
+
+    def _recalcLengthEnergyGradient_helper(self):
+        itrCtr = 0
         updateCounter_total = 0
         while True:
             itrCtr += 1
@@ -418,11 +455,12 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
 
-            #Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
-            # via flattop energy and length, which then sets global energy and length.
-            #Nom_accel_gradient_flattop works the same way
-            # Formula is G_toal = E_total/L_total = (E_up+E_flat+E_dn)/(L_up+L_flat+L_dn)
-            # Ditto: G_flat = E_flat/L_flat = (E_total-E_up-E_dn)/L_flat
+            #Note:
+            #   Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
+            #       via flattop energy and length, which then sets global energy and length.
+            #       G_total = E_total/L_total = (E_up+E_flat+E_dn)/(L_up+L_flat+L_dn)
+            #   Nom_accel_gradient_flattop works the same way
+            #       G_flat = E_flat/L_flat = (E_total-E_up-E_dn)/L_flat
 
             #Use data from parent to update itself (i.e. if self is a ramp)
             if self.parent is not None:
@@ -430,7 +468,7 @@ class Stage(Trackable, CostModeled):
                     if self.parent.length is not None and \
                        self.parent.length_flattop is not None:
 
-                        otherRamp = self.parent.getOtherRamp(self)
+                        otherRamp = self.parent._getOtherRamp(self)
                         if otherRamp is not None:
                             if otherRamp.length is not None:
                                 self._length_calc = self.parent.length - self.parent.length_flattop - otherRamp.length
@@ -441,50 +479,30 @@ class Stage(Trackable, CostModeled):
                     if self.parent.nom_energy_gain is not None and \
                        self.parent.nom_energy_gain_flattop is not None:
 
-                        otherRamp = self.parent.getOtherRamp(self)
+                        otherRamp = self.parent._getOtherRamp(self)
                         if otherRamp is not None:
                             if otherRamp.nom_energy_gain is not None:
                                 self._nom_energy_gain_calc = self.parent.nom_energy_gain - self.parent.nom_energy_gain_flattop - otherRamp.nom_energy_gain
                                 self._printVerb("nom_energy_gain (4)>", self.nom_energy_gain)
                                 updateCounter += 1
 
+            #Dig down and try to calculate more
+            if self.upramp is not None:
+                self._printVerb("-> upramp")
+                updateCounter += self.upramp._recalcLengthEnergyGradient_helper()
+                self._printVerb("<-")
+            if self.downramp is not None:
+                self._printVerb("-> downramp")
+                updateCounter += self.downramp._recalcLengthEnergyGradient_helper()
+                self._printVerb("<-")
+
             #Are we done yet?
             updateCounter_total += updateCounter
             if updateCounter == 0:
-                self._printVerb()
+                self._printVerb("[break]")
                 break
 
-        #self._printLengthEnergyGradient_internal()
-
-        #Mutual update parent<->ramps (but avoid infinite recursion)
-        if updateCounter_total > 0:
-            while True:
-                updateCounter = 0
-
-                if self.parent is not None:
-                    itrCtr, uc = self.parent._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
-                    updateCounter += uc
-                    #TODO: Should somehow be able to make one extra pass of everything...
-                    # IDEA: Let breaking condition be that itrCtr has changed by X ammount without updateCounter_total changing?
-                    # if self.parent.upramp is not None:
-                    #     itrCtr, uc = self.parent.upramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
-                    #     updateCounter += uc
-                    # if self.parent.downramp is not None:
-                    #     itrCtr, uc = self.parent.downramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
-                    #     updateCounter += uc
-                if self.upramp is not None:
-                    itrCtr,uc = self.upramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
-                    updateCounter += uc
-                if self.downramp is not None:
-                    itrCtr,uc = self.downramp._recalcLengthEnergyGradient(itrCtr_start=itrCtr)
-                    updateCounter += uc
-
-                updateCounter_total += updateCounter
-                if updateCounter == 0:
-                    self._printVerb()
-                    break
-
-        return itrCtr, updateCounter_total
+        return updateCounter_total
 
     doVerbosePrint_debug = False
     def _printVerb(self, *args, **kwargs):
