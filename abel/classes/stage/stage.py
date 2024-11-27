@@ -61,7 +61,7 @@ class Stage(Trackable, CostModeled):
 
         self.name = 'Plasma stage'
 
-    #Define upramp/downramp attributes
+    ## Define upramp/downramp attributes
     upramp = None
     downramp = None
     
@@ -73,6 +73,8 @@ class Stage(Trackable, CostModeled):
         if self.downramp is not None and isinstance(self.downramp, Stage):
             return True
         return False
+
+    ## Tracking methods
 
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -232,7 +234,7 @@ class Stage(Trackable, CostModeled):
         return self._nom_accel_gradient_flattop_calc
     @nom_accel_gradient_flattop.setter
     def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
-        if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is not None:
+        if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
             raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
         self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
         self._recalcLengthEnergyGradient()
@@ -249,10 +251,18 @@ class Stage(Trackable, CostModeled):
         self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
         self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
 
+        print("length                     (1)>", self.length)
+        print("nom_energy_gain            (1)>", self.nom_energy_gain)
+        print("nom_accel_gradient         (1)>", self.nom_accel_gradient)
+        print("length_flattop             (1)>", self.length_flattop)
+        print("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
+        print("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
+
         #Iteratively calculate everything until stability is reached
         itrCtr = 0
         while True:
             itrCtr += 1
+            print("itrCtr = ", itrCtr)
             if itrCtr > 20:
                 raise StageError("Not able make self-consistent calculation, infinite loop detected")
 
@@ -262,38 +272,123 @@ class Stage(Trackable, CostModeled):
             if self.length is None:
                 if self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
                     self._length_calc = self.nom_energy_gain / self.nom_accel_gradient
+                    print("length                     (2)>",self.length)
                     updateCounter += 1
             if self.nom_energy_gain is None:
                 if self.length is not None and self.nom_accel_gradient is not None:
                     self._nom_energy_gain_calc = self.length * self.nom_accel_gradient
+                    print("nom_energy_gain            (2)>",self.nom_energy_gain)
                     updateCounter += 1
             if self.nom_accel_gradient is None:
                 if self.length is not None and self.nom_energy_gain is not None:
                     self._nom_accel_gradient_calc = self.nom_energy_gain / self.length
+                    print("nom_accel_gradient         (2)>",self.nom_accel_gradient)
                     updateCounter += 1
 
             #Indirect setting of flattop
             if self.length_flattop is None:
                 if self.nom_energy_gain_flattop is not None and self.nom_accel_gradient_flattop is not None:
                     self._length_flattop_calc = self.nom_energy_gain_flattop / self.nom_accel_gradient_flattop
+                    print("length_flattop             (2)>",self.length_flattop)
                     updateCounter += 1
             if self.nom_energy_gain_flattop is None:
                 if self.length_flattop is not None and self.nom_accel_gradient_flattop is not None:
                     self._nom_energy_gain_flattop_calc = self.length_flattop * self.nom_accel_gradient_flattop
+                    print("nom_energy_gain_flattop    (2)>",self.nom_energy_gain_flattop)
                     updateCounter += 1
             if self.nom_accel_gradient_flattop is None:
                 if self.length_flattop is not None and self.nom_energy_gain_flattop is not None:
-                    self._nom_accel_gradient_calc = self.nom_energy_gain_flattop / self.length_flattop
+                    self._nom_accel_gradient_flattop_calc = self.nom_energy_gain_flattop / self.length_flattop
+                    print("nom_accel_gradient_flattop (2)>",self.nom_energy_gain_flattop)
                     updateCounter += 1
 
-            #Relationships including ramps
+            #Relationships total <-> flattop+ramp
+            if self.length is None:
+                if self.length_flattop is not None:
+                    L = self.length_flattop
+                    isDef = True
+                    if self.has_upramp():
+                        if self.upramp.length is None:
+                            isDef = False
+                        else:
+                            L += self.upramp.length
+                    if self.has_downramp():
+                        if self.downramp.length is None:
+                            isDef = False
+                        else:
+                            L += self.downramp.length
+                    if isDef:
+                        print("length                  (3)>",L)
+                        self._length_calc = L
+                        updateCounter += 1
+
+            if self.length_flattop is None:
+                if self.length is not None:
+                    L = self.length
+                    isDef = True
+                    if self.has_upramp():
+                        if self.upramp.length is None:
+                            isDef = False
+                        else:
+                            L -= self.upramp.length
+                    if self.has_downramp():
+                        if self.downramp.length is None:
+                            isDef = False
+                        else:
+                            L -= self.downramp.length
+                    if isDef:
+                        print("length_flattop          (3)>",L)
+                        self._length_flattop_calc = L
+                        updateCounter += 1
+            
+            if self.nom_energy_gain is None:
+                if self.nom_energy_gain_flattop is not None:
+                    dE = self.nom_energy_gain_flattop
+                    isDef = True
+                    if self.has_upramp():
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE += self.upramp.nom_energy_gain
+                    if self.has_downramp():
+                        if self.downramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE += self.downramp.nom_energy_gain
+                    if isDef:
+                        print("nom_energy_gain         (3)>",dE)
+                        self._nom_energy_gain_calc = dE
+                        updateCounter += 1
+
+            if self.nom_energy_gain_flattop is None:
+                if self.nom_energy_gain is not None:
+                    dE = self.nom_energy_gain
+                    isDef = True
+                    if self.has_upramp():
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE -= self.upramp.nom_energy_gain
+                    if self.has_downramp():
+                        if self.downramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE -= self.downramp.nom_energy_gain
+                    if isDef:
+                        print("nom_energy_gain_flattop (3)>",dE)
+                        self._nom_energy_gain_flattop_calc = dE
+                        updateCounter += 1
+            
+            #TODO: Consistency checks for ramp settings,
+            # i.e. if they are calculatable and not set -> problem
+            # If ramp is present, their parameters must always be set directly.
 
             #Are we done yet?
             if updateCounter == 0:
+                print()
                 break
 
-
-    #(Done with the length/nom_energy_gain/nom_accel_gradient stuff)
+    ## Various calculations / plots / etc
 
     def get_cost_breakdown(self):
         breakdown = []
