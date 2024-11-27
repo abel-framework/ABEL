@@ -12,6 +12,8 @@ from types import SimpleNamespace
 from matplotlib.colors import LogNorm
 from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
 
+from typing import Self
+
 class Stage(Trackable, CostModeled):
     
     @abstractmethod
@@ -62,17 +64,51 @@ class Stage(Trackable, CostModeled):
         self.name = 'Plasma stage'
 
     ## Define upramp/downramp attributes
-    upramp = None
-    downramp = None
-    
-    def has_upramp(self):
-        if self.upramp is not None and isinstance(self.upramp, Stage):
-            return True
-        return False
-    def has_downramp(self):
-        if self.downramp is not None and isinstance(self.downramp, Stage):
-            return True
-        return False
+    # Should maybe demand that they or of same type as the current class, not just generic Stage?
+    @property
+    def upramp(self) -> Self | None:
+        "The upramp of this stage, which also is a Stage"
+        return self._upramp
+    @upramp.setter
+    def upramp(self, upramp : Self | None):
+        if not isinstance(upramp, Stage) and upramp is not None:
+            raise StageError("The upramp must be an instance of Stage or None")
+        self._upramp = upramp
+        self._upramp.parent = self
+    _upramp = None
+
+    @property
+    def downramp(self) -> Self:
+        "The downramp of this stage, which also is a Stage"
+        return self._downramp
+    @downramp.setter
+    def downramp(self, downramp : Self | None):
+        if not isinstance(downramp, Stage) and downramp is not None:
+            raise StageError("The downramp must be an instance of Stage or None")
+        self._downramp = downramp
+        self._downramp.parent = self
+    _downramp = None
+
+    @property
+    def parent(self) -> Self | None:
+        "The parent of this stage (which is then an upramp or downramp), or None"
+        return self._parent
+    @parent.setter
+    def parent(self, parent : Self):
+        if parent is None:
+            raise StageError("Stage parent cannot be unset")
+        if not isinstance(parent, Stage):
+            raise StageError("Stage parent must be an instance of Stage")
+        self._parent = parent
+    _parent = None
+
+    def getOtherRamp(self, aRamp : Self) -> Self:
+        if aRamp == self.upramp:
+            return self.downramp
+        elif aRamp == self.downramp:
+            return self.upramp
+        else:
+            raise StageError("Could not find calling ramp?")
 
     ## Tracking methods
 
@@ -87,7 +123,7 @@ class Stage(Trackable, CostModeled):
 
     # upramp to be tracked before the main tracking
     def track_upramp(self, beam0, driver0=None):
-        if self.has_upramp():
+        if self.upramp is not None:
 
             # set driver
             self.upramp.driver_source = SourceCapsule(beam=driver0)
@@ -119,7 +155,7 @@ class Stage(Trackable, CostModeled):
 
     # downramp to be tracked after the main tracking
     def track_downramp(self, beam0, driver0):
-        if self.has_downramp():
+        if self.downramp is not None:
 
             # set driver
             self.downramp.driver_source = SourceCapsule(beam=driver0)
@@ -241,8 +277,8 @@ class Stage(Trackable, CostModeled):
     _nom_accel_gradient_flattop      = None
     _nom_accel_gradient_flattop_calc = None
 
-    def _recalcLengthEnergyGradient(self):
-        #Set what we can directly, set the rest back to None
+    def _recalcLengthEnergyGradient(self, calledFrom=None):
+        #Set what we can directly, and set the rest back to None
         self._length_calc              = self._length
         self._nom_energy_gain_calc     = self._nom_energy_gain
         self._nom_accel_gradient_calc  = self._nom_accel_gradient
@@ -264,6 +300,7 @@ class Stage(Trackable, CostModeled):
             itrCtr += 1
             print("itrCtr = ", itrCtr)
             if itrCtr > 20:
+                print(self._printLengthEnergyGradient_internal())
                 raise StageError("Not able make self-consistent calculation, infinite loop detected")
 
             updateCounter = 0
@@ -307,12 +344,12 @@ class Stage(Trackable, CostModeled):
                 if self.length_flattop is not None:
                     L = self.length_flattop
                     isDef = True
-                    if self.has_upramp():
+                    if self.upramp is not None:
                         if self.upramp.length is None:
                             isDef = False
                         else:
                             L += self.upramp.length
-                    if self.has_downramp():
+                    if self.downramp is not None:
                         if self.downramp.length is None:
                             isDef = False
                         else:
@@ -326,12 +363,12 @@ class Stage(Trackable, CostModeled):
                 if self.length is not None:
                     L = self.length
                     isDef = True
-                    if self.has_upramp():
+                    if self.upramp is not None:
                         if self.upramp.length is None:
                             isDef = False
                         else:
                             L -= self.upramp.length
-                    if self.has_downramp():
+                    if self.downramp is not None:
                         if self.downramp.length is None:
                             isDef = False
                         else:
@@ -340,17 +377,17 @@ class Stage(Trackable, CostModeled):
                         print("length_flattop          (3)>",L)
                         self._length_flattop_calc = L
                         updateCounter += 1
-            
+
             if self.nom_energy_gain is None:
                 if self.nom_energy_gain_flattop is not None:
                     dE = self.nom_energy_gain_flattop
                     isDef = True
-                    if self.has_upramp():
+                    if self.upramp is not None:
                         if self.upramp.nom_energy_gain is None:
                             isDef = False
                         else:
                             dE += self.upramp.nom_energy_gain
-                    if self.has_downramp():
+                    if self.downramp is not None:
                         if self.downramp.nom_energy_gain is None:
                             isDef = False
                         else:
@@ -364,12 +401,12 @@ class Stage(Trackable, CostModeled):
                 if self.nom_energy_gain is not None:
                     dE = self.nom_energy_gain
                     isDef = True
-                    if self.has_upramp():
+                    if self.upramp is not None:
                         if self.upramp.nom_energy_gain is None:
                             isDef = False
                         else:
                             dE -= self.upramp.nom_energy_gain
-                    if self.has_downramp():
+                    if self.downramp is not None:
                         if self.downramp.nom_energy_gain is None:
                             isDef = False
                         else:
@@ -379,14 +416,59 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
             
-            #TODO: Consistency checks for ramp settings,
-            # i.e. if they are calculatable and not set -> problem
-            # If ramp is present, their parameters must always be set directly.
+            #Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
+            # via flattop energy and length, which then sets global energy and length.
+            #Nom_accel_gradient_flattop works the same way
+            # Formula is G_toal = E_total/L_total = (E_up+E_flat+E_dn)/(L_up+L_flat+L_dn)
+            # Ditto: G_flat = E_flat/L_flat = (E_total-E_up-E_dn)/L_flat
+
+            #Use data from parent to update itself (i.e. if self is a ramp)
+            if self.parent is not None:
+                if self.length is None:
+                    if self.parent.length is not None and \
+                       self.parent.length_flattop is not None:
+
+                        otherRamp = self.parent.getOtherRamp(self)
+                        if otherRamp is not None:
+                            if otherRamp.length is not None:
+                                self._length_calc = self.parent.length - self.parent.length_flattop - otherRamp.length
+                                print("length          (4)>", self.length)
+                                updateCounter += 1
+
+                if self.nom_energy_gain is None:
+                    if self.parent.nom_energy_gain is not None and \
+                       self.parent.nom_energy_gain_flattop is not None:
+
+                        otherRamp = self.parent.getOtherRamp(self)
+                        if otherRamp is not None:
+                            if otherRamp.nom_energy_gain is not None:
+                                self._nom_energy_gain_calc = self.parent.nom_energy_gain - self.parent.nom_energy_gain_flattop - otherRamp.nom_energy_gain
+                                print("nom_energy_gain (4)>", self.nom_energy_gain)
+                                updateCounter += 1
 
             #Are we done yet?
             if updateCounter == 0:
                 print()
                 break
+
+        #Mutual update parent<->ramps (but avoid recursion)
+        if self.parent is not None and calledFrom != self.parent:
+            self.parent._recalcLengthEnergyGradient(calledFrom=self)
+        if self.upramp is not None and calledFrom != self.upramp:
+            self.upramp._recalcLengthEnergyGradient(calledFrom=self)
+        if self.downramp is not None and calledFrom != self.downramp:
+            self.downramp._recalcLengthEnergyGradient(calledFrom=self)
+
+    def _printLengthEnergyGradient_internal(stage):
+        "For debugging"
+        print("parent/upramp/downramp:    ", stage.parent, stage.upramp, stage.downramp)
+        print("length:                    ", stage._length, stage._length_calc)
+        print("length_flattop:            ", stage._length_flattop, stage._length_flattop_calc)
+        print("nom_energy_gain:           ", stage._nom_energy_gain, stage._nom_energy_gain_calc)
+        print("nom_energy_gain_flattop:   ", stage._nom_energy_gain_flattop, stage._nom_energy_gain_flattop_calc)
+        print("nom_accel_gradient:        ", stage._nom_accel_gradient, stage._nom_accel_gradient_calc)
+        print("nom_accel_gradient_flattop:", stage._nom_accel_gradient_flattop, stage._nom_accel_gradient_flattop_calc)
+        print()
 
     ## Various calculations / plots / etc
 
