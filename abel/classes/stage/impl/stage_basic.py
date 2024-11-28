@@ -25,8 +25,15 @@ class StageBasic(Stage):
         if self.plasma_density is None:
             self.optimize_plasma_density()
 
+        # set up ramp lengths if they exist (both upramp and downramp lengths have to be set up before track_upramp())
+        if self.upramp is not None and self.upramp.length is None:
+            self.calc_upramp_length(beam_incoming)
+        if self.downramp is not None and self.downramp.length is None:
+            self.calc_downramp_length(beam_incoming)
+
         # plasma-density ramps (de-magnify beta function)
         if self.upramp is not None:
+            self.upramp.nom_energy_gain = 0
             beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
         else:
             beam0 = copy.deepcopy(beam_incoming)
@@ -117,6 +124,7 @@ class StageBasic(Stage):
 
         # apply plasma-density down ramp (magnify beta function)
         if self.downramp is not None:
+            self.downramp.nom_energy_gain = 0
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
         else:
             beam_outgoing = copy.deepcopy(beam)

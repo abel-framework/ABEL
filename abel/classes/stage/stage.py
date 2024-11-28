@@ -88,6 +88,22 @@ class Stage(Trackable, CostModeled):
         self._downramp.parent = self
     _downramp = None
 
+    def calc_upramp_length(self, beam):
+        "Calculate the upramp (uniform step ramp) length based on stage nominal energy or beam energy."
+        if self.nom_energy is None:
+            self.nom_energy = beam.energy()
+        self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+        if self.upramp.length < 0.0:
+            raise ValueError(f"upramp.length = {self.upramp.length} [m] < 0.0")
+            
+    def calc_downramp_length(self, beam):
+        "Calculate the downramp (uniform step ramp) length based on stage nominal energy or beam energy."
+        if self.nom_energy is None:
+            self.nom_energy = beam.energy()
+        self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+        if self.downramp.length < 0.0:
+            raise ValueError(f"downramp.length = {self.downramp.length} [m] < 0.0")
+
     @property
     def parent(self) -> Self | None:
         "The parent of this stage (which is then an upramp or downramp), or None"
@@ -144,14 +160,14 @@ class Stage(Trackable, CostModeled):
             if self.upramp.plasma_density is None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-            # determine length if not already set
-            if self.upramp.length is None:
-                # set ramp length (uniform step ramp)
-                if self.nom_energy is None:
-                    self.nom_energy = beam0.energy()
-                self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-            if self.upramp.length < 0.0:
-                raise ValueError(f"upramp.length = {self.upramp.length} [m] < 0.0")
+            ## determine length if not already set
+            #if self.upramp.length is None:
+            #    # set ramp length (uniform step ramp)
+            #    if self.nom_energy is None:
+            #        self.nom_energy = beam0.energy()
+            #    self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+            #if self.upramp.length < 0.0:
+            #    raise ValueError(f"upramp.length = {self.upramp.length} [m] < 0.0")
 
              # perform tracking
             self.upramp._return_tracked_driver = True
@@ -177,14 +193,14 @@ class Stage(Trackable, CostModeled):
                 # set ramp density
                 self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
             
-            # determine length if not already set
-            if self.downramp.length is None:
-                # set ramp length (uniform step ramp)
-                if self.nom_energy is None:
-                    self.nom_energy = beam0.energy()
-                self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-            if self.downramp.length < 0.0:
-                raise ValueError(f"downramp.length = {self.downramp.length} [m] < 0.0")
+            ## determine length if not already set
+            #if self.downramp.length is None:
+            #    # set ramp length (uniform step ramp)
+            #    if self.nom_energy is None:
+            #        self.nom_energy = beam0.energy()
+            #    self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+            #if self.downramp.length < 0.0:
+            #    raise ValueError(f"downramp.length = {self.downramp.length} [m] < 0.0")
             
             # perform tracking
             self.downramp._return_tracked_driver = True
@@ -198,11 +214,11 @@ class Stage(Trackable, CostModeled):
             
         return beam, driver
 
-    ## Mutually consistent calculation for length, nom_accel_gradient,nom_energy gain,
+    ## Mutually consistent calculation for length, nom_accel_gradient, nom_energy gain,
     #  their flattop counterparts, and (if existing) their stage counterparts.
     #
     #  If you try to set something that has already been set or calculated,
-    #  we raise a VariablesOverspecifiedError exception with a meaningfull error message.
+    #  we raise a VariablesOverspecifiedError exception with a meaningful error message.
     #  If you try to get something that is unknown, you will get a None.
     #
     # The algorithm when setting a new variable which is unknown is basically:
@@ -227,7 +243,7 @@ class Stage(Trackable, CostModeled):
     # If the calculation takes too many iterations, something is probably gone wrong (bug),
     # and we raise a StageError exception.
     #
-    # Traversing and keeping track the hierarchy of Stages is done using the properties parent, upramp, and downramp
+    # Traversing and keeping track of the hierarchy of Stages is done using the properties parent, upramp, and downramp.
     # These are ensured to be a Stage or None. The parent cannot be unset, but upramp and downramp can be removed (set to None).
     # Helper methods _getOtherRamp() and _getOverallestStage() are used to traverse the hierarchy.
 
