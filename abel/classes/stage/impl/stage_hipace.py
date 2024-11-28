@@ -73,6 +73,12 @@ class StageHipace(Stage):
         # generate driver
         driver_incoming = self.driver_source.track()
 
+        # set up ramp lengths if they exist (both upramp and downramp lengths have to be set up before track_upramp())
+        if self.upramp is not None and self.upramp.length is None:
+            self.calc_upramp_length(beam_incoming)
+        if self.downramp is not None and self.downramp.length is None:
+            self.calc_downramp_length(beam_incoming)
+
         # plasma-density ramps (de-magnify beta function)
         location_flattop_start = 0
         if self.upramp is not None:
