@@ -160,15 +160,6 @@ class Stage(Trackable, CostModeled):
             if self.upramp.plasma_density is None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-            ## determine length if not already set
-            #if self.upramp.length is None:
-            #    # set ramp length (uniform step ramp)
-            #    if self.nom_energy is None:
-            #        self.nom_energy = beam0.energy()
-            #    self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-            #if self.upramp.length < 0.0:
-            #    raise ValueError(f"upramp.length = {self.upramp.length} [m] < 0.0")
-
              # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
@@ -191,16 +182,7 @@ class Stage(Trackable, CostModeled):
             # determine density if not already set
             if self.downramp.plasma_density is None:
                 # set ramp density
-                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
-            
-            ## determine length if not already set
-            #if self.downramp.length is None:
-            #    # set ramp length (uniform step ramp)
-            #    if self.nom_energy is None:
-            #        self.nom_energy = beam0.energy()
-            #    self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-            #if self.downramp.length < 0.0:
-            #    raise ValueError(f"downramp.length = {self.downramp.length} [m] < 0.0")
+                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag           
             
             # perform tracking
             self.downramp._return_tracked_driver = True

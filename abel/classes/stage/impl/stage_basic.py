@@ -33,7 +33,8 @@ class StageBasic(Stage):
 
         # plasma-density ramps (de-magnify beta function)
         if self.upramp is not None:
-            self.upramp.nom_energy_gain = 0
+            if self.upramp.nom_energy_gain is None:
+                self.upramp.nom_energy_gain = 0.0
             beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
         else:
             beam0 = copy.deepcopy(beam_incoming)
@@ -124,7 +125,8 @@ class StageBasic(Stage):
 
         # apply plasma-density down ramp (magnify beta function)
         if self.downramp is not None:
-            self.downramp.nom_energy_gain = 0
+            if self.downramp.nom_energy_gain is None:
+                self.downramp.nom_energy_gain = 0.0
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
         else:
             beam_outgoing = copy.deepcopy(beam)
