@@ -188,8 +188,8 @@ class StagePrtclTransWakeInstability(Stage):
             driver_x_angle = driver_incoming.x_angle()
             driver_y_angle = driver_incoming.y_angle()
             
-            beam0_x_angle = beam0.x_angle()
-            beam0_y_angle = beam0.y_angle()
+            beam0_x_angle = beam_incoming.x_angle()
+            beam0_y_angle = beam_incoming.y_angle()
 
             # Calculate the angles that will be used to rotate the beams' frame
             rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
@@ -200,7 +200,7 @@ class StagePrtclTransWakeInstability(Stage):
 
             # Use passive transformation to rotate the frame of the beams
             drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
-            beam0.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+            beam_incoming.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
 
             if np.abs( drive_beam_rotated.x_angle() ) > 5e-10:
                 driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'drive_beam_rotated x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_ramped x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
@@ -211,10 +211,10 @@ class StagePrtclTransWakeInstability(Stage):
                 warnings.warn(driver_error_string)
 
     
-            if np.abs( -(beam0.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
+            if np.abs( -(beam_incoming.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
                 
-            if np.abs( (beam0.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
+            if np.abs( (beam_incoming.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
 
         
@@ -256,7 +256,7 @@ class StagePrtclTransWakeInstability(Stage):
         driver0_wake_t = beam2wake_t_bunch(drive_beam_wakeT, name='driver')
         beam0_wake_t = beam2wake_t_bunch(beam0_copy, name='beam')
 
-        bunches = plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
+        bunches = plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
         
         wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
         
@@ -1485,7 +1485,7 @@ class StagePrtclTransWakeInstability(Stage):
         axs[2,2].legend()
         axs[2,2].set_xlim(xlim_min, xlim_max)
 
-        fig.suptitle('Stage ' + str(self.stage_number) + ', ' + beam)
+        fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + beam)
 
     
     # ==================================================
