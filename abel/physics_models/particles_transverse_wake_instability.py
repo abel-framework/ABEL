@@ -145,7 +145,7 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
             intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
             Wy_perts = ion_motion_config.Wy_perts
             intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
-    
+            
     else:  # No ion motion
         intpl_Wx_perts = np.zeros_like(beam.zs())
         intpl_Wy_perts = np.zeros_like(beam.zs())

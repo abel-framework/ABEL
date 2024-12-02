@@ -483,7 +483,7 @@ class Stage(Trackable, CostModeled):
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_xlim(long_limits)
 
-        fig.suptitle('Stage ' + str(self.stage_number) + ', ' + bunch)
+        fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
         
         plt.show()
 
