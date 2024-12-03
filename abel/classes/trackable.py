@@ -204,17 +204,9 @@ class Trackable(ABC):
     
     # length of the trackable element
     @abstractmethod
-    def get_length(self):
+    def get_length(self) -> float:
         "Length of the trackable element, added to the Beam location after tracking [m]"
         pass
-
-    
-    # abbreviation of the get_length() function
-    #TODO: Maybe not a good idea, since this is usually "number of elements" type length?
-    def __len__(self):
-        "Alias of the get_length() function [m]"
-        return self.get_length()
-        
     
     # object for survey plotting
     def survey_object(self):

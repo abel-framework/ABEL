@@ -35,6 +35,10 @@ class StageQuasistatic2d(Stage):
         # make driver (and convert to WakeT bunch)
         driver_incoming = self.driver_source.track()
 
+        # Set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done
+        self._prepare_ramps()
+
         # plasma-density ramps (de-magnify beta function)
         if self.upramp is not None:
             self.upramp.calculate_evolution = self.calculate_evolution

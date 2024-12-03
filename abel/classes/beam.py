@@ -1213,13 +1213,20 @@ class Beam():
         
     def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
         
-        # remove particles with subzero energy
-        del self[self.Es() < 0]
-        del self[np.isnan(self.Es())]
+        # remove particles with subzero and Nan energy
+        neg_indices = self.Es() < 0
+        del self[neg_indices]
+        if isinstance(deltaEs, np.ndarray) and len(deltaEs) > 1:
+            deltaEs = deltaEs[~neg_indices]
+
+        nan_indices = np.isnan(self.Es())
+        del self[nan_indices]
+        if isinstance(deltaEs, np.ndarray) and len(deltaEs) > 1:
+            deltaEs = deltaEs[~nan_indices]
         
         # determine initial and final Lorentz factor
         gamma0s = energy2gamma(self.Es())
-        Es_final = self.Es()+deltaEs
+        Es_final = self.Es() + deltaEs
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         

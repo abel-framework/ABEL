@@ -73,6 +73,10 @@ class StageHipace(Stage):
         # generate driver
         driver_incoming = self.driver_source.track()
 
+        # Set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done
+        self._prepare_ramps()
+
         # plasma-density ramps (de-magnify beta function)
         location_flattop_start = 0
         if self.upramp is not None:
