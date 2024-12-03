@@ -32,6 +32,7 @@ class Stage(Trackable, CostModeled):
         
         # nominal initial energy
         self.nom_energy = None 
+        self.nom_energy_flattop = None
 
         self._return_tracked_driver = False
         
@@ -88,22 +89,40 @@ class Stage(Trackable, CostModeled):
         self._downramp.parent = self
     _downramp = None
 
-    def calc_upramp_length(self, beam):
-        "Calculate the upramp (uniform step ramp) length based on stage nominal energy or beam energy."
+    def _prepare_ramps(self):
+        "Set ramp lengths and nominal energy gains if the ramps exist (both upramp and downramp lengths have to be set up before track_upramp())."
         if self.nom_energy is None:
-            self.nom_energy = beam.energy()
-        self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-        if self.upramp.length < 0.0:
-            raise ValueError(f"upramp.length = {self.upramp.length} [m] < 0.0")
-            
-    def calc_downramp_length(self, beam):
-        "Calculate the downramp (uniform step ramp) length based on stage nominal energy or beam energy."
-        if self.nom_energy is None:
-            self.nom_energy = beam.energy()
-        self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-        if self.downramp.length < 0.0:
-            raise ValueError(f"downramp.length = {self.downramp.length} [m] < 0.0")
+            #Should be set in linac.track()
+            raise StageError('Stage nominal energy is None.')
 
+        if self.upramp is not None:
+            if self.upramp.nom_energy_gain is None:
+                self.upramp.nom_energy_gain = 0.0
+            if self.upramp.nom_energy is None:
+                self.upramp.nom_energy = self.nom_energy
+                self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy
+            if self.upramp.length is None:
+                self.upramp.length = self._calc_ramp_length(self.upramp)
+        else:
+            self.nom_energy_flattop = self.nom_energy
+            
+        if self.downramp is not None:
+            if self.downramp.nom_energy_gain is None:
+                self.downramp.nom_energy_gain = 0.0
+            if self.downramp.nom_energy is None:
+                self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
+            if self.downramp.length is None:
+                self.downramp.length = self._calc_ramp_length(self.downramp)
+
+    def _calc_ramp_length(self, ramp : Self) -> float:
+        "Calculate and set the up/down ramp (uniform step ramp) length [m] based on stage nominal energy."
+        if ramp.nom_energy is None:
+            raise StageError('Ramp nominal energy is None.')
+        ramp_length = beta_matched(self.plasma_density, ramp.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+        if ramp_length < 0.0:
+            raise ValueError(f"ramp_length = {ramp_length} [m] < 0.0")
+        return ramp_length
+            
     @property
     def parent(self) -> Self | None:
         "The parent of this stage (which is then an upramp or downramp), or None"

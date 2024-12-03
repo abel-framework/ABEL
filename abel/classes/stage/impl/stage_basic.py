@@ -25,23 +25,19 @@ class StageBasic(Stage):
         if self.plasma_density is None:
             self.optimize_plasma_density()
 
-        # set up ramp lengths if they exist (both upramp and downramp lengths have to be set up before track_upramp())
-        if self.upramp is not None and self.upramp.length is None:
-            self.calc_upramp_length(beam_incoming)
-        if self.downramp is not None and self.downramp.length is None:
-            self.calc_downramp_length(beam_incoming)
+        # Set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done
+        self._prepare_ramps()
 
         # plasma-density ramps (de-magnify beta function)
         if self.upramp is not None:
-            if self.upramp.nom_energy_gain is None:
-                self.upramp.nom_energy_gain = 0.0
             beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
         else:
             beam0 = copy.deepcopy(beam_incoming)
             driver0 = copy.deepcopy(driver_incoming)
             if self.ramp_beta_mag is not None:
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)   
                 
         # apply plasma-density up ramp (demagnify beta function)
         beam = copy.deepcopy(beam0)
@@ -89,11 +85,11 @@ class StageBasic(Stage):
                 
 
         # ========== Betatron oscillations ==========
-        beam.apply_betatron_motion(self.length_flattop, self.plasma_density, self.nom_energy_gain, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+        beam.apply_betatron_motion(self.length_flattop, self.plasma_density, self.nom_energy_gain_flattop, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
 
 
         # ========== Accelerate beam with homogeneous energy gain ==========
-        beam.set_Es(beam.Es() + self.nom_energy_gain)
+        beam.set_Es(beam.Es() + self.nom_energy_gain_flattop)
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -125,8 +121,6 @@ class StageBasic(Stage):
 
         # apply plasma-density down ramp (magnify beta function)
         if self.downramp is not None:
-            if self.downramp.nom_energy_gain is None:
-                self.downramp.nom_energy_gain = 0.0
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
         else:
             beam_outgoing = copy.deepcopy(beam)
