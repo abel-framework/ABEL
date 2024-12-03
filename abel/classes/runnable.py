@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from abel import CONFIG, Beam
 import os, shutil, time, sys, csv
 from datetime import datetime
@@ -46,6 +46,10 @@ class Runnable(ABC):
 
             # save object to file
             self.save()
+
+    @abstractmethod
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        pass
 
     
     ## SCAN FUNCTIONALITY
@@ -138,6 +142,7 @@ class Runnable(ABC):
         #return beam
     
     
+
     
     # generate run folder
     def run_path(self):
