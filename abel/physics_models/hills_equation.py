@@ -44,7 +44,7 @@ def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp=None, g=Non
         if g is None:
             g = kp**2*SI.m_e*SI.c/(2*SI.e)
 
-        # convert to focusing strenth
+        # convert to focusing strength
         k = g*SI.c/gamma2energy(gamma0)
 
         # calculate evolution (pure sinusoids)
@@ -81,7 +81,7 @@ def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp=None, g=Non
         x = np.real(1j*(Di*scispec.kv(0,A*1j) + Dk*scispec.iv(0,A*1j))/E)
         xp = -np.real((dgamma_ds*C**2/(2*A*E))*(Dk*scispec.iv(1,A*1j) - Di*scispec.kv(1,A*1j)))
     
-    # convert angles back to proper velocoties
+    # convert angles back to proper velocities
     ux = xp * gamma2proper_velocity(gamma)
     
     return x, ux
