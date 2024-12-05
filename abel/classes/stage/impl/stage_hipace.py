@@ -58,6 +58,8 @@ class StageHipace(Stage):
         
 
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
+
+        self.stage_number = beam_incoming.stage_number
         
         ## PREPARE TEMPORARY FOLDER
         

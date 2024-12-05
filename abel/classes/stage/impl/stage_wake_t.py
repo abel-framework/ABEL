@@ -21,6 +21,8 @@ class StageWakeT(Stage):
 
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+
+        self.stage_number = beam0.stage_number
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):

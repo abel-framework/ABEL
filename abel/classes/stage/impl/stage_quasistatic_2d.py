@@ -28,6 +28,8 @@ class StageQuasistatic2d(Stage):
     # track the particles through
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
+        self.stage_number = beam_incoming.stage_number
+        
         # suppress numba warnings from Ocelot
         import warnings
         warnings.simplefilter('ignore', category=RuntimeWarning)
