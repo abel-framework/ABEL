@@ -1058,22 +1058,22 @@ class StageSlicesTransWakeInstability(Stage):
         weights = beam.weightings()
 
         # Labels for plots
-        zlab = '$z$ [$\mathrm{\mu}$m]'
+        zlab = r'$z$ [$\mathrm{\mu}$m]'
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         #slab = '$s$ [m]'
-        xlab = '$x$ [$\mathrm{\mu}$m]'
-        ylab = '$y$ [$\mathrm{\mu}$m]'
+        xlab = r'$x$ [$\mathrm{\mu}$m]'
+        ylab = r'$y$ [$\mathrm{\mu}$m]'
         #field_lab = '$E_z$ [GV/m]'
         #dN_dz_lab = '$\partial N/\partial z$ [$\mathrm{m}^{-1}$]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
-        energ_lab = '$\mathcal{E}$ [GeV]'
+        xps_lab = r"$x\'$ [mrad]"
+        yps_lab = r"$y\'$ [mrad]"
+        energ_lab = r'$\mathcal{E}$ [GeV]'
 
         cmap = cmaps.FLASHForward
         
         # Set up a figure with axes
         fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
-        fig.suptitle('$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
+        fig.suptitle(r'$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
 
         nbins = int(np.sqrt(len(weights)/2))
         hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
@@ -1100,7 +1100,7 @@ class StageSlicesTransWakeInstability(Stage):
         extent_xps[2] = extent_xps[2]*1e3  # [mrad]
         extent_xps[3] = extent_xps[3]*1e3  # [mrad]
 
-        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab=r"$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         if plot_centroids is True:
             axs[0][1].plot(self.zs_main_cut*1e6, self.xp_slices_main*1e3, 'r', alpha=0.5)
             axs[0][1].axis(extent_xps)
@@ -1115,7 +1115,7 @@ class StageSlicesTransWakeInstability(Stage):
         extent_xxp[2] = extent_xxp[2]*1e3  # [mrad]
         extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
 
-        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab=r"$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         #if plot_centroids is True:
         #    axs[0][2].plot(self.x_slices_main*1e6, self.xp_slices_main*1e3, 'rx', alpha=0.5, label='From tracking')
 
@@ -1141,7 +1141,7 @@ class StageSlicesTransWakeInstability(Stage):
         extent_yps[2] = extent_yps[2]*1e3  # [mrad]
         extent_yps[3] = extent_yps[3]*1e3  # [mrad]
         
-        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab=r"$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         if plot_centroids is True:
             axs[1][1].plot(self.zs_main_cut*1e6, self.yp_slices_main*1e3, 'r', alpha=0.5)
             axs[1][1].axis(extent_yps)
@@ -1155,7 +1155,7 @@ class StageSlicesTransWakeInstability(Stage):
         extent_yyp[1] = extent_yyp[1]*1e6  # [um]
         extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
         extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
-        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab=r"$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         #if plot_centroids is True:
         #    axs[1][2].plot(self.y_slices_main*1e6, self.yp_slices_main*1e3, 'rx', alpha=0.5, label='From tracking')
 
@@ -1177,7 +1177,7 @@ class StageSlicesTransWakeInstability(Stage):
         extent_xpyp[1] = extent_xpyp[1]*1e3  # [mrad]
         extent_xpyp[2] = extent_xpyp[2]*1e3  # [mrad]
         extent_xpyp[3] = extent_xpyp[3]*1e3  # [mrad]
-        self.distribution_plot_2D(arr1=xps, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xpyp, axes=axs[2][1], extent=extent_xpyp, vmin=None, vmax=None, colmap=cmap, xlab=xps_lab, ylab=yps_lab, clab='$\partial^2 N/\partial x\' \partial y\'$ [$\mathrm{rad}^{-2}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=xps, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xpyp, axes=axs[2][1], extent=extent_xpyp, vmin=None, vmax=None, colmap=cmap, xlab=xps_lab, ylab=yps_lab, clab=r"$\partial^2 N/\partial x\' \partial y\'$ [$\mathrm{rad}^{-2}$]", origin='lower', interpolation='nearest')
 
         # 2D z-energy distribution
         hist_range_energ = [[None, None], [None, None]]
@@ -1224,13 +1224,13 @@ class StageSlicesTransWakeInstability(Stage):
         weights = beam.weightings()
 
         # Labels for plots
-        zlab = '$z$ [$\mathrm{\mu}$m]'
+        zlab = r'$z$ [$\mathrm{\mu}$m]'
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
-        xlab = '$x$ [$\mathrm{\mu}$m]'
-        ylab = '$y$ [$\mathrm{\mu}$m]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
-        energ_lab = '$\mathcal{E}$ [GeV]'
+        xlab = r'$x$ [$\mathrm{\mu}$m]'
+        ylab = r'$y$ [$\mathrm{\mu}$m]'
+        xps_lab = r"$x\'$ [mrad]"
+        yps_lab = r"$y\'$ [mrad]"
+        energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
         fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(5*3, 4*3))
@@ -1331,12 +1331,12 @@ class StageSlicesTransWakeInstability(Stage):
         ax.set_ylabel(energ_lab)
         if plot_centroids is True:
             energy_slices_from_beam = self.particles2slices(beam=beam, beam_quant=beam.Es(), z_slices=self.zs_main_cut)
-            ax.plot(self.zs_main_cut*1e6, energy_slices_from_beam/1e9, 'kx', alpha=0.7, label='Slice mean $\mathcal{E}$ from particles')
-            ax.plot(self.zs_main_cut*1e6, self.energy_slices_main/1e9, 'r', alpha=0.5, label='Slice mean $\mathcal{E}$ from tracking')
+            ax.plot(self.zs_main_cut*1e6, energy_slices_from_beam/1e9, 'kx', alpha=0.7, label=r'Slice mean $\mathcal{E}$ from particles')
+            ax.plot(self.zs_main_cut*1e6, self.energy_slices_main/1e9, 'r', alpha=0.5, label=r'Slice mean $\mathcal{E}$ from tracking')
             ax.legend()
             
         # Set label and other properties for the colorbar
-        fig.suptitle('$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
+        fig.suptitle(r'$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
         cbar_ax = fig.add_axes([0.15, 0.91, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
         fig.colorbar(p, cax=cbar_ax, orientation='horizontal', label=energ_lab)
         
@@ -1349,7 +1349,7 @@ class StageSlicesTransWakeInstability(Stage):
 
     
     # ==================================================
-    def plot_Ez_rb_cut(self, z_slices=None, main_num_profile=None, zs_Ez=None, Ez=None, Ez_cut=None, zs_rho=None, bubble_radius=None, bubble_radius_cut=None, zlab='$z$ [$\mathrm{\mu}$m]'):
+    def plot_Ez_rb_cut(self, z_slices=None, main_num_profile=None, zs_Ez=None, Ez=None, Ez_cut=None, zs_rho=None, bubble_radius=None, bubble_radius_cut=None, zlab=r'$z$ [$\mathrm{\mu}$m]'):
 
         if z_slices is None:
             z_slices = self.zs_main_cut
@@ -1376,9 +1376,9 @@ class StageSlicesTransWakeInstability(Stage):
         axs_wakeT_cut[0].plot(z_slices*1e6, main_num_profile, 'g', label='Number profile')
         axs_wakeT_cut[0].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
         axs_wakeT_cut[0].set_xlabel(zlab)
-        axs_wakeT_cut[0].set_ylabel('Main beam number profile $N(z)$')
+        axs_wakeT_cut[0].set_ylabel(r'Main beam number profile $N(z)$')
         ax_Ez_cut_wakeT2 = axs_wakeT_cut[0].twinx()
-        ax_Ez_cut_wakeT2.plot(zs_Ez*1e6, Ez/1e9, label='Wake-T $E_z$')
+        ax_Ez_cut_wakeT2.plot(zs_Ez*1e6, Ez/1e9, label=r'Wake-T $E_z$')
         ax_Ez_cut_wakeT2.plot(z_slices*1e6, Ez_cut/1e9, 'r', label='Cut-out Wake-T $E_z$')
         ax_Ez_cut_wakeT2.set_ylabel('$E_z$ [GV/m]')
         ax_Ez_cut_wakeT2.legend(loc='lower right')
@@ -1387,11 +1387,11 @@ class StageSlicesTransWakeInstability(Stage):
         axs_wakeT_cut[1].plot(z_slices*1e6, main_num_profile, 'g', label='Number profile')
         axs_wakeT_cut[1].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
         axs_wakeT_cut[1].set_xlabel(zlab)
-        axs_wakeT_cut[1].set_ylabel('Main beam number profile $N(z)$')
+        axs_wakeT_cut[1].set_ylabel(r'Main beam number profile $N(z)$')
         ax_rb_cut_wakeT2 = axs_wakeT_cut[1].twinx()
-        ax_rb_cut_wakeT2.plot(zs_rho*1e6, bubble_radius*1e6, label='Wake-T $r_\mathrm{b}$')
-        ax_rb_cut_wakeT2.plot(z_slices*1e6, bubble_radius_cut*1e6, 'r', label='Cut-out Wake-T $r_\mathrm{b}$')
-        ax_rb_cut_wakeT2.set_ylabel('Bubble radius [$\mathrm{\mu}$m]')
+        ax_rb_cut_wakeT2.plot(zs_rho*1e6, bubble_radius*1e6, label=r'Wake-T $r_\mathrm{b}$')
+        ax_rb_cut_wakeT2.plot(z_slices*1e6, bubble_radius_cut*1e6, 'r', label=r'Cut-out Wake-T $r_\mathrm{b}$')
+        ax_rb_cut_wakeT2.set_ylabel(r'Bubble radius [$\mathrm{\mu}$m]')
         ax_rb_cut_wakeT2.legend(loc='upper right')
 
 
@@ -1432,51 +1432,51 @@ class StageSlicesTransWakeInstability(Stage):
 
         # Make figure with axes
         fig, axs = plt.subplots(nrows=1, ncols=4, layout="constrained", figsize=(3.5*4, 3))
-        slab = '$s$ [m]'
+        slab = r'$s$ [m]'
         
-        axs[0].plot(s_min2, X_min2, label='$x$')
+        axs[0].plot(s_min2, X_min2, label=r'$x$')
         axs[0].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
         axs[0].set_xlabel(slab)
-        axs[0].set_ylabel('$X$ [$\mathrm{\mu}$m]')
+        axs[0].set_ylabel(r'$X$ [$\mathrm{\mu}$m]')
         ax = plt.twinx(axs[0])
         ax.plot(s_min2, Y_min2, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
+        ax.set_ylabel(r'$Y$ [$\mathrm{\mu}$m]')
         lns = axs[0].get_lines() + ax.get_lines()
         labs = [l.get_label() for l in lns]
         axs[0].legend(lns, labs)
         axs[0].set_title(r'Transverse offset, slice at $\langle\xi\rangle$' f"{round(ref_slice_sigma_z_min2)}"r'$\sigma_z$')
         
-        axs[1].plot(s_min1, X_min1, label='$x$')
+        axs[1].plot(s_min1, X_min1, label=r'$x$')
         axs[1].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
         axs[1].set_xlabel(slab)
-        axs[1].set_ylabel('$X$ [$\mathrm{\mu}$m]')
+        axs[1].set_ylabel(r'$X$ [$\mathrm{\mu}$m]')
         ax = plt.twinx(axs[1])
-        ax.plot(s_min1, Y_min1, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
+        ax.plot(s_min1, Y_min1, 'orange', alpha=0.5, label=r'$y$')
+        ax.set_ylabel(r'$Y$ [$\mathrm{\mu}$m]')
         lns = axs[1].get_lines() + ax.get_lines()
         labs = [l.get_label() for l in lns]
         axs[1].legend(lns, labs)
         axs[1].set_title(r'Transverse offset, slice at $\langle\xi\rangle$' f"{round(ref_slice_sigma_z_min1)}"r'$\sigma_z$')
         
-        axs[2].plot(s_0, X_0, label='$x$')
+        axs[2].plot(s_0, X_0, label=r'$x$')
         axs[2].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
         axs[2].set_xlabel(slab)
-        axs[2].set_ylabel('$X$ [$\mathrm{\mu}$m]')
+        axs[2].set_ylabel(r'$X$ [$\mathrm{\mu}$m]')
         ax = plt.twinx(axs[2])
-        ax.plot(s_0, Y_0, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
+        ax.plot(s_0, Y_0, 'orange', alpha=0.5, label=r'$y$')
+        ax.set_ylabel(r'$Y$ [$\mathrm{\mu}$m]')
         lns = axs[2].get_lines() + ax.get_lines()
         labs = [l.get_label() for l in lns]
         axs[2].legend(lns, labs)
         axs[2].set_title(r'Transverse offset, slice at $\langle\xi\rangle$')
         
-        axs[3].plot(s_2, X_2, label='$x$')
+        axs[3].plot(s_2, X_2, label=r'$x$')
         axs[3].grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
         axs[3].set_xlabel(slab)
-        axs[3].set_ylabel('$X$ [$\mathrm{\mu}$m]')
+        axs[3].set_ylabel(r'$X$ [$\mathrm{\mu}$m]')
         ax = plt.twinx(axs[3])
-        ax.plot(s_2, Y_2, 'orange', alpha=0.5, label='$y$')
-        ax.set_ylabel('$Y$ [$\mathrm{\mu}$m]')
+        ax.plot(s_2, Y_2, 'orange', alpha=0.5, label=r'$y$')
+        ax.set_ylabel(r'$Y$ [$\mathrm{\mu}$m]')
         lns = axs[3].get_lines() + ax.get_lines()
         labs = [l.get_label() for l in lns]
         axs[3].legend(lns, labs)
@@ -1645,7 +1645,7 @@ class StageSlicesTransWakeInstability(Stage):
         slab = '$s$ [m]'
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
-        energylab = '$\mathcal{E}$ [GeV]'
+        energylab = r'$\mathcal{E}$ [GeV]'
         
         z_beam = self.zs_main_cut*1e6  # [um]
         #prop_dist = self.prop_dist*1e6  # [um]
@@ -1682,14 +1682,14 @@ class StageSlicesTransWakeInstability(Stage):
         ax3.set_box_aspect(1)
         ax3.plot(s_ref_slice, x_ref_slice*1e6)
         ax3.set_xlabel(slab)
-        ax3.set_ylabel('$X$ [$\mathrm{\mu}$m]')
+        ax3.set_ylabel(r'$X$ [$\mathrm{\mu}$m]')
         ax3.set_title(r'Transverse offset, slice at $\xi=$' f"{round(xi_ref_slice,1)} "r'$\mathrm{\mu}$m')
         
         ax4 = fig.add_axes([right,top-vertical_distance,.335,.335])
         ax4.set_box_aspect(1)
         ax4.plot(s_ref_slice, xp_ref_slice*1e3)
         ax4.set_xlabel(slab)
-        ax4.set_ylabel('$X\'$ [mrad]')
+        ax4.set_ylabel(r"$X\'$ [mrad]")
         ax4.set_title(r'Angular offset, slice at $\xi=$' f"{round(xi_ref_slice,1)} "r'$\mathrm{\mu}$m')
         
         ax5 = fig.add_axes([left,top-vertical_distance*2,.335,.335])
@@ -1703,7 +1703,7 @@ class StageSlicesTransWakeInstability(Stage):
         ax6.set_box_aspect(1)
         ax6.plot(s_ref_slice, energy_spread_s*100)
         ax6.set_xlabel(slab)
-        ax6.set_ylabel('$\sigma_\mathcal{E}/\mathcal{E}$ [%]')
+        ax6.set_ylabel(r'$\sigma_\mathcal{E}/\mathcal{E}$ [%]')
         ax6.set_title('Energy spread');
 
     
