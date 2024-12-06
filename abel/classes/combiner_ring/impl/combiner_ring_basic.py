@@ -23,10 +23,13 @@ class CombinerRingBasic(CombinerRing):
         beam.bunch_separation = self.bunch_separation
 
         # warn if field or energy loss is too high
-        if self.get_average_dipole_field() > self.max_dipole_field:
-            print(f"Dipole field too high: {self.get_average_dipole_field():.1f} T")
-        if self.get_rel_energy_loss() > self.max_rel_energy_loss:
-            print(f"Relative energy loss too high: {100*self.get_rel_energy_loss():.1f}%")
+        if not self.nom_energy is None:
+            if self.get_average_dipole_field() > self.max_dipole_field:
+                print(f"Dipole field too high: {self.get_average_dipole_field():.1f} T")
+            if self.get_rel_energy_loss() > self.max_rel_energy_loss:
+                print(f"Relative energy loss too high: {100*self.get_rel_energy_loss():.1f}%")
+        else:
+            print("CombinerRingBasic: Could not evaluate dipole field or energy loss limits because nom_energy not set")
         
         return super().track(beam, savedepth, runnable, verbose)
 

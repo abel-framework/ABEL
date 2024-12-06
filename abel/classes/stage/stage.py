@@ -81,9 +81,13 @@ class Stage(Trackable, CostModeled):
     @upramp.setter
     def upramp(self, upramp : Self | None):
         if not isinstance(upramp, Stage) and upramp is not None:
-            raise StageError("The upramp must be an instance of Stage or None")
+            raise StageError("The upramp must be an instance of Stage or None")    
         self._upramp = upramp
-        self._upramp.parent = self
+        if upramp is not None:
+            self._upramp.parent = self
+
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
     _upramp = None
 
 
@@ -97,7 +101,11 @@ class Stage(Trackable, CostModeled):
         if not isinstance(downramp, Stage) and downramp is not None:
             raise StageError("The downramp must be an instance of Stage or None")
         self._downramp = downramp
-        self._downramp.parent = self
+        if downramp is not None:
+            self._downramp.parent = self
+
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
     _downramp = None
 
 
@@ -125,15 +133,35 @@ class Stage(Trackable, CostModeled):
         stage_copy.ramp_beta_mag = 1.0
 
         # Delete any upramps and downramps that might be present
-        stage_copy.upramp = None
-        stage_copy.downramp = None
+        if stage_copy.upramp is not None:
+            stage_copy.upramp = None
+        if stage_copy.downramp is not None:
+            stage_copy.downramp = None
 
-        # Can set some parameters to None to let track_upramp() and track_downramp() determine these
-        stage_copy.nom_accel_gradient = None
-        stage_copy.nom_energy_gain = None
+        # Can set energy gain and gradient parameters to None to let track_upramp() and track_downramp() determine these.
+        # Do try/except to allow zeroing everything.
+        try:
+            stage_copy.nom_accel_gradient = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.nom_energy_gain = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.nom_accel_gradient_flattop = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.nom_energy_gain_flattop = None
+        except VariablesOverspecifiedError:
+            pass
+        #Everything else now unset, can set this safely.
+        # Will also trigger reset/recalc if needed
+        stage_copy.length = ramp_length 
+        
         stage_copy.plasma_density = ramp_plasma_density
-        stage_copy.length = ramp_length
-
+         
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
         stage_copy.driver_source = None
 
@@ -910,7 +938,9 @@ class Stage(Trackable, CostModeled):
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_xlim(long_limits)
 
-        fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
+
+        if self.stage_number is not None:
+            fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
         
         plt.show()
 
