@@ -217,6 +217,12 @@ class StagePrtclTransWakeInstability(Stage):
             if np.abs( (beam_incoming.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
 
+                
+        # ========== Prepare ramps ==========
+        # If ramps exist, set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done.
+        self._prepare_ramps()
+
         
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:
@@ -354,7 +360,7 @@ class StagePrtclTransWakeInstability(Stage):
             make_animations=self.make_animations, 
             tmpfolder=tmpfolder, 
             shot_path=shot_path, 
-            stage_num=beam0.stage_number, 
+            stage_num=beam_incoming.stage_number, 
             enable_tr_instability=self.enable_tr_instability, 
             enable_radiation_reaction=self.enable_radiation_reaction, 
             enable_ion_motion=self.enable_ion_motion, 

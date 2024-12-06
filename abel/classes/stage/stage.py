@@ -156,7 +156,8 @@ class Stage(Trackable, CostModeled):
             stage_copy.nom_energy_gain_flattop = None
         except VariablesOverspecifiedError:
             pass
-        #Everything else now unset, can set this safely.
+            
+        # Everything else now unset, can set this safely.
         # Will also trigger reset/recalc if needed
         stage_copy.length = ramp_length 
         
