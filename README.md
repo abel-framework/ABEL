@@ -4,8 +4,7 @@ The ABEL simulation framework is a particle-tracking framework for plasma-accele
 
 ## Installation with pip
 1. Clone the repository to a local folder
-2. Edit the file abel/config.py. In particular, you'll need to install HiPACE and tell it where it is located; ABEL needs the "tools" python module in their source folder.
-3. In your target python environment, run `pip install path-to-ABEL` where `path-to-ABEL` is where you have cloned ABEL to.
+2. In your target python environment, run `pip install path-to-ABEL` where `path-to-ABEL` is where you have cloned ABEL to.
    If you want to be able to modify ABEL without uninstalling and reinstalling, you can run `pip install -e path-to-abel`, and the `abel`
    folder in your local clone will effectively be put into your `$PYTHONPATH`.
 
@@ -13,7 +12,7 @@ To remove ABEL, run `pip uninstall abel`.
 
 ## Configuration of ABEL
 To use ABEL, you must configure it. This is done with the file `.abelconfig.toml`, which is automatically created in your home directory the first time you import ABEL.
-Edit this file with your text editor to tell ABEL where to find tools such as ELEGANT, HIPACE, and GUINEAPIG, as well as configure it for your computingcluster, if needed.
+Edit this file with your text editor to tell ABEL where to find tools such as ELEGANT, HIPACE, and GUINEAPIG, as well as configure it for your computing cluster, if needed.
 
 How to edit it is explained with comments in the file. It uses the file format "TOML", which is a simple text file similar to .ini, but better defined.
 
