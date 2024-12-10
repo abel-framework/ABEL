@@ -1213,13 +1213,20 @@ class Beam():
         
     def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
         
-        # remove particles with subzero energy
-        del self[self.Es() < 0]
-        del self[np.isnan(self.Es())]
+        # remove particles with subzero and Nan energy
+        neg_indices = self.Es() < 0
+        del self[neg_indices]
+        if isinstance(deltaEs, np.ndarray) and len(deltaEs) > 1:
+            deltaEs = deltaEs[~neg_indices]
+
+        nan_indices = np.isnan(self.Es())
+        del self[nan_indices]
+        if isinstance(deltaEs, np.ndarray) and len(deltaEs) > 1:
+            deltaEs = deltaEs[~nan_indices]
         
         # determine initial and final Lorentz factor
         gamma0s = energy2gamma(self.Es())
-        Es_final = self.Es()+deltaEs
+        Es_final = self.Es() + deltaEs
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
@@ -1547,8 +1554,8 @@ class Beam():
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
         ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = r'$x\'$ [mrad]'
-        yps_lab = r'$y\'$ [mrad]'
+        xps_lab = r"$x'$ [mrad]"
+        yps_lab = r"$y'$ [mrad]"
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
@@ -1578,7 +1585,7 @@ class Beam():
         extent_xps[2] = extent_xps[2]*1e3  # [mrad]
         extent_xps[3] = extent_xps[3]*1e3  # [mrad]
 
-        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab=r"$\partial^2 N/\partial z \partial x'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         
         
         # 2D x-x' distribution
@@ -1591,7 +1598,7 @@ class Beam():
         extent_xxp[2] = extent_xxp[2]*1e3  # [mrad]
         extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
 
-        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab=r"$\partial^2 N/\partial x\partial x'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         
 
         # 2D z-y distribution
@@ -1614,7 +1621,7 @@ class Beam():
         extent_yps[2] = extent_yps[2]*1e3  # [mrad]
         extent_yps[3] = extent_yps[3]*1e3  # [mrad]
         
-        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab=r"$\partial^2 N/\partial z \partial y'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         
 
         # 2D y-y' distribution
@@ -1627,7 +1634,7 @@ class Beam():
         extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
         extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
         
-        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab=r"$\partial^2 N/\partial y\partial y'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
        
 
         # 2D x-y distribution

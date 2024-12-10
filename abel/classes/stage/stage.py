@@ -12,8 +12,11 @@ from types import SimpleNamespace
 from matplotlib.colors import LogNorm
 from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
 
+from typing import Self
+
 class Stage(Trackable, CostModeled):
     
+    # ==================================================
     @abstractmethod
     def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None):
 
@@ -30,9 +33,8 @@ class Stage(Trackable, CostModeled):
         
         # nominal initial energy
         self.nom_energy = None 
+        self.nom_energy_flattop = None
 
-        self.upramp = None
-        self.downramp = None
         self._return_tracked_driver = False
         
         self.evolution = SimpleNamespace()
@@ -44,7 +46,10 @@ class Stage(Trackable, CostModeled):
         self.efficiency = SimpleNamespace()
         
         self.initial = SimpleNamespace()
+        self.initial.driver = SimpleNamespace()
+        self.initial.driver.instance = SimpleNamespace()
         self.initial.beam = SimpleNamespace()
+        self.initial.beam.instance = SimpleNamespace()
         self.initial.beam.current = SimpleNamespace()
         self.initial.beam.density = SimpleNamespace()
         self.initial.plasma = SimpleNamespace()
@@ -53,7 +58,10 @@ class Stage(Trackable, CostModeled):
         self.initial.plasma.wakefield.onaxis = SimpleNamespace()
         
         self.final = SimpleNamespace()
+        self.final.driver = SimpleNamespace()
+        self.final.driver.instance = SimpleNamespace()
         self.final.beam = SimpleNamespace()
+        self.final.beam.instance = SimpleNamespace()
         self.final.beam.current = SimpleNamespace()
         self.final.beam.density = SimpleNamespace()
         self.final.plasma = SimpleNamespace()
@@ -63,15 +71,199 @@ class Stage(Trackable, CostModeled):
 
         self.name = 'Plasma stage'
 
+
+    # ==================================================
+    ## Define upramp and downramp, if present
+    @property
+    def upramp(self) -> Self | None:
+        "The upramp of this stage, which also is a Stage"
+        return self._upramp
+    @upramp.setter
+    def upramp(self, upramp : Self | None):
+        if not isinstance(upramp, Stage) and upramp is not None:
+            raise StageError("The upramp must be an instance of Stage or None")    
+        self._upramp = upramp
+        if upramp is not None:
+            self._upramp.parent = self
+
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+    _upramp = None
+
+
+    # ==================================================
+    @property
+    def downramp(self) -> Self:
+        "The downramp of this stage, which also is a Stage"
+        return self._downramp
+    @downramp.setter
+    def downramp(self, downramp : Self | None):
+        if not isinstance(downramp, Stage) and downramp is not None:
+            raise StageError("The downramp must be an instance of Stage or None")
+        self._downramp = downramp
+        if downramp is not None:
+            self._downramp.parent = self
+
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+    _downramp = None
+
+
+    # ==================================================
+    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None):
+        """
+        Used for copying a predefined stage's settings and configurations to set up flat ramps.
     
-    @abstractmethod   
+        Parameters
+        ----------
+        ramp_plasma_density: [m^-3] float, optional
+            Plasma density for the ramp.
+
+        ramp_length: [m] float, optional
+            Length of the ramp.
+    
+            
+        Returns
+        ----------
+        stage_copy: Stage object
+            A modified deep copy of the original stage.
+        """
+
+        stage_copy = copy.deepcopy(self)
+        stage_copy.ramp_beta_mag = 1.0
+
+        # Delete any upramps and downramps that might be present
+        if stage_copy.upramp is not None:
+            stage_copy.upramp = None
+        if stage_copy.downramp is not None:
+            stage_copy.downramp = None
+
+        # Can set energy gain and gradient parameters to None to let track_upramp() and track_downramp() determine these.
+        # Do try/except to allow zeroing everything.
+        try:
+            stage_copy.nom_accel_gradient = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.nom_energy_gain = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.nom_accel_gradient_flattop = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.nom_energy_gain_flattop = None
+        except VariablesOverspecifiedError:
+            pass
+        #Everything else now unset, can set this safely.
+        # Will also trigger reset/recalc if needed
+        stage_copy.length = ramp_length 
+        
+        stage_copy.plasma_density = ramp_plasma_density
+         
+        # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
+        stage_copy.driver_source = None
+
+        return stage_copy
+    
+
+    # ==================================================
+    def _prepare_ramps(self):
+        "Set ramp lengths and nominal energy gains if the ramps exist (both upramp and downramp lengths have to be set up before track_upramp())."
+        if self.nom_energy is None:
+            #Should be set in linac.track()
+            raise StageError('Stage nominal energy is None.')
+
+        if self.upramp is not None:
+            if self.upramp.nom_energy_gain is None:
+                self.upramp.nom_energy_gain = 0.0
+            if self.upramp.nom_energy is None:
+                self.upramp.nom_energy = self.nom_energy
+                self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy_gain
+            if self.upramp.length is None:
+                self.upramp.length = self._calc_ramp_length(self.upramp)
+        else:
+            self.nom_energy_flattop = self.nom_energy
+            
+        if self.downramp is not None:
+            if self.downramp.nom_energy_gain is None:
+                self.downramp.nom_energy_gain = 0.0
+            if self.downramp.nom_energy is None:
+                self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
+            if self.downramp.length is None:
+                self.downramp.length = self._calc_ramp_length(self.downramp)
+
+
+    # ==================================================
+    def _calc_ramp_length(self, ramp : Self) -> float:
+        "Calculate and set the up/down ramp (uniform step ramp) length [m] based on stage nominal energy."
+        if ramp.nom_energy is None:
+            raise StageError('Ramp nominal energy is None.')
+        ramp_length = beta_matched(self.plasma_density, ramp.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+        if ramp_length < 0.0:
+            raise ValueError(f"ramp_length = {ramp_length} [m] < 0.0")
+        return ramp_length
+    
+
+    # ==================================================
+    @property
+    def parent(self) -> Self | None:
+        "The parent of this stage (which is then an upramp or downramp), or None"
+        return self._parent
+    @parent.setter
+    def parent(self, parent : Self):
+        if parent is None:
+            raise StageError("Stage parent cannot be unset")
+        if not isinstance(parent, Stage):
+            raise StageError("Stage parent must be an instance of Stage")
+        self._parent = parent
+    _parent = None
+
+
+    # ==================================================
+    def _getOtherRamp(self, aRamp : Self) -> Self:
+        "Lets the upramp get hold of the downramp in the same pair, and vise versa"
+        if aRamp == self.upramp:
+            return self.downramp
+        elif aRamp == self.downramp:
+            return self.upramp
+        else:
+            raise StageError("Could not find calling ramp?")
+
+
+    # ==================================================
+    def _getOverallestStage(self) -> Self:
+        "Find and return the most overall stage in the hierachy"
+        bottom_Stage = self
+        itrCtr_pSearch = 0
+        while bottom_Stage.parent is not None:
+            #Climb down to the bottom
+            itrCtr_pSearch += 1
+            if itrCtr_pSearch > 20: #Magic number
+                raise StageError("Too many levels of parents, giving up")
+            bottom_Stage = bottom_Stage.parent
+        return bottom_Stage
+
+    
+    
+    ## Tracking methods
+
+    # ==================================================
+    @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         beam.stage_number += 1
+        if self.length < 0.0:
+            raise ValueError(f"Length = {self.length} [m] < 0.0")
+        if self.length_flattop < 0.0:
+            raise ValueError(f"Flattop length = {self.length_flattop} [m] < 0.0")
         return super().track(beam, savedepth, runnable, verbose)
 
+
+    # ==================================================
     # upramp to be tracked before the main tracking
     def track_upramp(self, beam0, driver0=None):
-        if self.upramp is not None and isinstance(self.upramp, Stage):
+        if self.upramp is not None:
 
             # set driver
             self.upramp.driver_source = SourceCapsule(beam=driver0)
@@ -80,16 +272,7 @@ class Stage(Trackable, CostModeled):
             if self.upramp.plasma_density is None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-            # determine length if not already set
-            if self.upramp.length is None:
-            
-                # set ramp length (uniform step ramp)
-                if self.nom_energy is None:
-                    self.nom_energy = beam0.energy()
-                
-                self.upramp.length = beta_matched(self.plasma_density, self.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
-            
-            # perform tracking
+             # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
             beam.stage_number -= 1
@@ -98,30 +281,22 @@ class Stage(Trackable, CostModeled):
         else:
             beam = beam0
             driver = driver0
-            
+        
         return beam, driver
 
+
+    # ==================================================
     # downramp to be tracked after the main tracking
     def track_downramp(self, beam0, driver0):
-        if self.downramp is not None and isinstance(self.downramp, Stage):
+        if self.downramp is not None:
 
             # set driver
             self.downramp.driver_source = SourceCapsule(beam=driver0)
             
             # determine density if not already set
             if self.downramp.plasma_density is None:
-                
                 # set ramp density
-                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
-            
-            # determine length if not already set
-            if self.downramp.length is None:
-                
-                # set ramp length (uniform step ramp)
-                if self.nom_energy is None:
-                    self.nom_energy = beam0.energy()
-                
-                self.downramp.length = beta_matched(self.plasma_density, self.nom_energy+self.nom_energy_gain)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag           
             
             # perform tracking
             self.downramp._return_tracked_driver = True
@@ -134,109 +309,435 @@ class Stage(Trackable, CostModeled):
             driver = driver0
             
         return beam, driver
-    
 
-    @property
-    def length_flattop(self) -> float:
-        if hasattr(self, '_length_flattop'):
-            if self.nom_energy_gain is not None:
-                self.nom_accel_gradient = self.nom_energy_gain/self._length_flattop
-                del self._length_flattop
-            elif self.nom_accel_gradient is not None:
-                self.nom_energy_gain = self.nom_accel_gradient*self._length_flattop
-                del self._length_flattop
-            else:
-                return self._length_flattop
-        elif self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
-            return self.nom_energy_gain/self.nom_accel_gradient
-        else:
-            return None
-    @length_flattop.setter
-    def length_flattop(self, length_flattop : float):
-        if self.nom_energy_gain is not None:
-            self.nom_accel_gradient = self.nom_energy_gain/length_flattop
-        elif self.nom_accel_gradient is not None:
-            self.nom_energy_gain = self.nom_accel_gradient*length_flattop
-        else:
-            self._length_flattop = length_flattop
 
+    ## Mutually consistent calculation for length, nom_accel_gradient, nom_energy gain,
+    #  their flattop counterparts, and (if existing) their stage counterparts.
+    #
+    #  If you try to set something that has already been set or calculated,
+    #  we raise a VariablesOverspecifiedError exception with a meaningful error message.
+    #  If you try to get something that is unknown, you will get a None.
+    #
+    # The algorithm when setting a new variable which is unknown is basically:
+    #  1. Nuke all calculated variables in the whole Stage hierarchy
+    #  2. "Calculate" all variables where the user has set a value by copying this value into the calculated value
+    #  3. Try to calculate whatever variables we can in the whole hierarchy from what is currently known
+    #  4. If we managed to calculate something, repeat 3. until nothing new comes out.
+    #
+    #  Step 1/2 is implemented in methods _resetLengthEnergyGradient() and _resetLengthEnergyGradient_helper()
+    #  Step 3/4 is implemented in methods _recalcLengthEnergyGradient() and _recalcLengthEnergyGradient_helper()
+    #
+    #  Functions _printLengthEnergyGradient_internal() and _printVerb() are for debugging.
+    #  The last one works like print() and is enabled/disabled by the variable doVerbosePrint_debug.
+    #
+    # User-specified data is stored in variables with a single underscore, e.g. _length,
+    # and calculated variables are stored in variables with also _calc, i.e. _length_calc.
+    # Please only access these through their getters and setters i.e. length(self), length(self,length).
+    # The only place the _calc variables are touched outside of the getters and setters
+    # is when resetting them in _resetLengthEnergyGradient_helper()
+    # and when calculating them in _recalcLengthEnergyGradient_helper().
+    #
+    # If the calculation takes too many iterations, something is probably gone wrong (bug),
+    # and we raise a StageError exception.
+    #
+    # Traversing and keeping track of the hierarchy of Stages is done using the properties parent, upramp, and downramp.
+    # These are ensured to be a Stage or None. The parent cannot be unset, but upramp and downramp can be removed (set to None).
+    # Helper methods _getOtherRamp() and _getOverallestStage() are used to traverse the hierarchy.
+
+    # Setting and getting the variables
+
+
+    # ==================================================
     @property
     def length(self) -> float:
-        if self.length_flattop is None:
-            return None
-        else:
-            L = self.length_flattop
-            if self.length_upramp is not None:
-                L += self.length_upramp
-            if self.length_downramp is not None:
-                L += self.length_downramp
-            return L
+        "Total length of the trackable stage element [m], or None if not set/calculateable"
+        return self._length_calc # Always return the dynamic version
     @length.setter
     def length(self, length : float):
-        if self.length_upramp is not None or self.length_downramp is not None:
-            print('This stage has ramps, setting the flattop length only (ramp lengths are added)')
-        self.length_flattop = length
+        if self._length_calc is not None and self._length is None:
+            # If there is a known value, and we're not trying to modify a user-set value -> ERROR!
+            raise VariablesOverspecifiedError("length already known/calculateable, cannot set.")
+        #Set user value and recalculate
+        self._length = length
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
 
-    @property
-    def length_upramp(self) -> float:
-        if self.upramp is not None:
-            return self.upramp.length
-        else:
-            return None
-    @length_upramp.setter
-    def length_upramp(self, length_upramp : float):
-        assert self.upramp is not None, "No upramp to set length of"
-        self.upramp.length = length_upramp
-    
-    @property
-    def length_downramp(self) -> float:
-        if self.downramp is not None:
-            return self.downramp.length
-        else:
-            return None
-    @length_downramp.setter
-    def length_downramp(self, length_downramp : float):
-        assert self.downramp is not None, "No downramp to set length of"
-        self.downramp.length = length_downramp
-    
-    def get_length(self):
+
+    # ==================================================
+    def get_length(self) -> float:
+        "Alias of length"
         return self.length
+    # Variables are internal to the length/energy/gradient logic
+    # do not modify externally!
+    _length      = None #User-set value
+    _length_calc = None #Dynamic version, current best-known value
 
+
+    # ==================================================
+    @property
+    def nom_energy_gain(self) -> float:
+        "Total nominal energy gain of the stage [eV], or None if not set/calculateable"
+        return self._nom_energy_gain_calc
+    @nom_energy_gain.setter
+    def nom_energy_gain(self, nom_energy_gain : float):
+        if self._nom_energy_gain_calc is not None and self._nom_energy_gain is None:
+            raise VariablesOverspecifiedError("nom_energy_gain already known/calculateable, cannot set.")
+        self._nom_energy_gain = nom_energy_gain
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+
+
+    # ==================================================
+    def get_nom_energy_gain(self):
+        "Alias of nom_energy_gain"
+        return self.nom_energy_gain
+    _nom_energy_gain      = None
+    _nom_energy_gain_calc = None
+
+
+    # ==================================================
+    @property
+    def nom_accel_gradient(self) -> float:
+        "Total nominal accelerating gradient of the stage [eV/m], or None if not set/calculateable"
+        return self._nom_accel_gradient_calc
+    @nom_accel_gradient.setter
+    def nom_accel_gradient(self, nom_accel_gradient : float):
+        if self._nom_accel_gradient_calc is not None and self._nom_accel_gradient is None:
+            raise VariablesOverspecifiedError("nom_accel_gradient already known/calculateable, cannot set")
+        self._nom_accel_gradient = nom_accel_gradient
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+    _nom_accel_gradient      = None
+    _nom_accel_gradient_calc = None
+
+
+    # ==================================================
+    @property
+    def length_flattop(self) -> float:
+        "Length of the plasma flattop [m], or None if not set/calculateable"
+        return self._length_flattop_calc
+    @length_flattop.setter
+    def length_flattop(self, length_flattop : float):
+        if self._length_flattop_calc is not None and self._length_flattop is None:
+            raise VariablesOverspecifiedError("length_flattop already known/calculateable, cannot set")
+        self._length_flattop = length_flattop
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+    _length_flattop      = None
+    _length_flattop_calc = None
+
+
+    # ==================================================
+    @property
+    def nom_energy_gain_flattop(self) -> float:
+        "Energy gain of the plasma flattop [eV], or None if not set/calculateable"
+        return self._nom_energy_gain_flattop_calc
+    @nom_energy_gain_flattop.setter
+    def nom_energy_gain_flattop(self,nom_energy_gain_flattop : float):
+        if self._nom_energy_gain_flattop_calc is not None and self._nom_energy_gain_flattop is None:
+            raise VariablesOverspecifiedError("nom_energy_gain_flattop is already known/calculateable, cannot set")
+        self._nom_energy_gain_flattop = nom_energy_gain_flattop
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+    _nom_energy_gain_flattop      = None
+    _nom_energy_gain_flattop_calc = None
+
+
+    # ==================================================
+    @property
+    def nom_accel_gradient_flattop(self) -> float:
+        "Accelerating gradient of the plasma flattop [eV/m], or None if not set/calculateable"
+        return self._nom_accel_gradient_flattop_calc
+    @nom_accel_gradient_flattop.setter
+    def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
+        if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
+            raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
+        self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+    _nom_accel_gradient_flattop      = None
+    _nom_accel_gradient_flattop_calc = None
+
+
+
+    ## Recalculation methods
+
+    # ==================================================
+    def _resetLengthEnergyGradient(self):
+        "Reset all the calculated values in the current Stage hierarchy"
+        self._getOverallestStage()._resetLengthEnergyGradient_helper()
+
+
+    # ==================================================
+    def _resetLengthEnergyGradient_helper(self):
+        #Climb back up from the bottom and set what we can
+        # directly / to None, from the stored user input
+        self._length_calc              = self._length
+        self._nom_energy_gain_calc     = self._nom_energy_gain
+        self._nom_accel_gradient_calc  = self._nom_accel_gradient
+
+        self._length_flattop_calc             = self._length_flattop
+        self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
+        self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
+
+        self._printVerb("length                     (1)>", self.length)
+        self._printVerb("nom_energy_gain            (1)>", self.nom_energy_gain)
+        self._printVerb("nom_accel_gradient         (1)>", self.nom_accel_gradient)
+        self._printVerb("length_flattop             (1)>", self.length_flattop)
+        self._printVerb("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
+        self._printVerb("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
+
+        if self.upramp is not None:
+            self._printVerb("Upramp:")
+            self.upramp._resetLengthEnergyGradient_helper()
+        if self.downramp is not None:
+            self._printVerb("Downramp:")
+            self.downramp._resetLengthEnergyGradient_helper()
+
+
+    # ==================================================
+    def _recalcLengthEnergyGradient(self):
+        #Iteratively calculate everything until stability is reached
+        #Note: Before starting calculation, call _resetLengthEnergyGradient() to reset the hierachy
+        self._getOverallestStage()._recalcLengthEnergyGradient_helper()
+        self._printVerb()
+
+
+    # ==================================================
+    def _recalcLengthEnergyGradient_helper(self):
+        itrCtr = 0
+        updateCounter_total = 0
+        while True:
+            itrCtr += 1
+            self._printVerb("itrCtr = ", itrCtr)
+            if itrCtr > 20:
+                self._printLengthEnergyGradient_internal()
+                raise StageError("Not able make self-consistent calculation, infinite loop detected")
+
+            updateCounter = 0
+
+            #Indirect setting of overall
+            if self.length is None:
+                if self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
+                    self._length_calc = self.nom_energy_gain / self.nom_accel_gradient
+                    self._printVerb("length                     (2)>",self.length)
+                    updateCounter += 1
+            if self.nom_energy_gain is None:
+                if self.length is not None and self.nom_accel_gradient is not None:
+                    self._nom_energy_gain_calc = self.length * self.nom_accel_gradient
+                    self._printVerb("nom_energy_gain            (2)>",self.nom_energy_gain)
+                    updateCounter += 1
+            if self.nom_accel_gradient is None:
+                if self.length is not None and self.nom_energy_gain is not None:
+                    self._nom_accel_gradient_calc = self.nom_energy_gain / self.length
+                    self._printVerb("nom_accel_gradient         (2)>",self.nom_accel_gradient)
+                    updateCounter += 1
+
+            #Indirect setting of flattop
+            if self.length_flattop is None:
+                if self.nom_energy_gain_flattop is not None and self.nom_accel_gradient_flattop is not None:
+                    self._length_flattop_calc = self.nom_energy_gain_flattop / self.nom_accel_gradient_flattop
+                    self._printVerb("length_flattop             (2)>",self.length_flattop)
+                    updateCounter += 1
+            if self.nom_energy_gain_flattop is None:
+                if self.length_flattop is not None and self.nom_accel_gradient_flattop is not None:
+                    self._nom_energy_gain_flattop_calc = self.length_flattop * self.nom_accel_gradient_flattop
+                    self._printVerb("nom_energy_gain_flattop    (2)>",self.nom_energy_gain_flattop)
+                    updateCounter += 1
+            if self.nom_accel_gradient_flattop is None:
+                if self.length_flattop is not None and self.nom_energy_gain_flattop is not None:
+                    self._nom_accel_gradient_flattop_calc = self.nom_energy_gain_flattop / self.length_flattop
+                    self._printVerb("nom_accel_gradient_flattop (2)>",self.nom_energy_gain_flattop)
+                    updateCounter += 1
+
+            #Relationships total <-> flattop+ramp
+            if self.length is None:
+                if self.length_flattop is not None:
+                    L = self.length_flattop
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.length is None:
+                            isDef = False
+                        else:
+                            L += self.upramp.length
+                    if self.downramp is not None:
+                        if self.downramp.length is None:
+                            isDef = False
+                        else:
+                            L += self.downramp.length
+                    if isDef:
+                        self._printVerb("length                  (3)>",L)
+                        self._length_calc = L
+                        updateCounter += 1
+
+            if self.length_flattop is None:
+                if self.length is not None:
+                    L = self.length
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.length is None:
+                            isDef = False
+                        else:
+                            L -= self.upramp.length
+                    if self.downramp is not None:
+                        if self.downramp.length is None:
+                            isDef = False
+                        else:
+                            L -= self.downramp.length
+                    if isDef:
+                        self._printVerb("length_flattop          (3)>",L)
+                        self._length_flattop_calc = L
+                        updateCounter += 1
+
+            if self.nom_energy_gain is None:
+                if self.nom_energy_gain_flattop is not None:
+                    dE = self.nom_energy_gain_flattop
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE += self.upramp.nom_energy_gain
+                    if self.downramp is not None:
+                        if self.downramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE += self.downramp.nom_energy_gain
+                    if isDef:
+                        self._printVerb("nom_energy_gain         (3)>",dE)
+                        self._nom_energy_gain_calc = dE
+                        updateCounter += 1
+
+            if self.nom_energy_gain_flattop is None:
+                if self.nom_energy_gain is not None:
+                    dE = self.nom_energy_gain
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE -= self.upramp.nom_energy_gain
+                    if self.downramp is not None:
+                        if self.downramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE -= self.downramp.nom_energy_gain
+                    if isDef:
+                        self._printVerb("nom_energy_gain_flattop (3)>",dE)
+                        self._nom_energy_gain_flattop_calc = dE
+                        updateCounter += 1
+
+            #Note:
+            #   Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
+            #       via flattop energy and length, which then sets global energy and length.
+            #       G_total = E_total/L_total = (E_up+E_flat+E_dn)/(L_up+L_flat+L_dn)
+            #   Nom_accel_gradient_flattop works the same way
+            #       G_flat = E_flat/L_flat = (E_total-E_up-E_dn)/L_flat
+
+            #Use data from parent to update itself (i.e. if self is a ramp)
+            if self.parent is not None:
+                if self.length is None:
+                    if self.parent.length is not None and \
+                       self.parent.length_flattop is not None:
+
+                        otherRamp = self.parent._getOtherRamp(self)
+                        if otherRamp is not None:
+                            if otherRamp.length is not None:
+                                self._length_calc = self.parent.length - self.parent.length_flattop - otherRamp.length
+                                self._printVerb("length          (4)>", self.length)
+                                updateCounter += 1
+
+                if self.nom_energy_gain is None:
+                    if self.parent.nom_energy_gain is not None and \
+                       self.parent.nom_energy_gain_flattop is not None:
+
+                        otherRamp = self.parent._getOtherRamp(self)
+                        if otherRamp is not None:
+                            if otherRamp.nom_energy_gain is not None:
+                                self._nom_energy_gain_calc = self.parent.nom_energy_gain - self.parent.nom_energy_gain_flattop - otherRamp.nom_energy_gain
+                                self._printVerb("nom_energy_gain (4)>", self.nom_energy_gain)
+                                updateCounter += 1
+
+            #Dig down and try to calculate more
+            if self.upramp is not None:
+                self._printVerb("-> upramp")
+                updateCounter += self.upramp._recalcLengthEnergyGradient_helper()
+                self._printVerb("<-")
+            if self.downramp is not None:
+                self._printVerb("-> downramp")
+                updateCounter += self.downramp._recalcLengthEnergyGradient_helper()
+                self._printVerb("<-")
+
+            #Are we done yet?
+            updateCounter_total += updateCounter
+            if updateCounter == 0:
+                self._printVerb("[break]")
+                break
+
+        return updateCounter_total
+
+
+    # ==================================================
+    doVerbosePrint_debug = False
+    def _printVerb(self, *args, **kwargs):
+        if self.doVerbosePrint_debug:
+            print(*args, **kwargs)
+
+
+    # ==================================================
+    def _printLengthEnergyGradient_internal(stage):
+        "For debugging"
+        print("parent/upramp/downramp:    ", stage.parent, stage.upramp, stage.downramp)
+        print("length:                    ", stage._length, stage._length_calc)
+        print("length_flattop:            ", stage._length_flattop, stage._length_flattop_calc)
+        print("nom_energy_gain:           ", stage._nom_energy_gain, stage._nom_energy_gain_calc)
+        print("nom_energy_gain_flattop:   ", stage._nom_energy_gain_flattop, stage._nom_energy_gain_flattop_calc)
+        print("nom_accel_gradient:        ", stage._nom_accel_gradient, stage._nom_accel_gradient_calc)
+        print("nom_accel_gradient_flattop:", stage._nom_accel_gradient_flattop, stage._nom_accel_gradient_flattop_calc)
+        print()
+
+
+
+    ## Various calculations / plots / etc
+
+    # ==================================================
     def get_cost_breakdown(self):
         breakdown = []
         breakdown.append(('Plasma cell', self.get_length() * CostModeled.cost_per_length_plasma_stage))
         breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
         return (self.name, breakdown)
-    
-    def get_nom_energy_gain(self):
-        if self.nom_energy_gain is None:
-            self.nom_energy_gain = self.nom_accel_gradient*self.length
-            self.length = None
-        return self.nom_energy_gain
 
-    def get_nom_accel_gradient(self):
-        return self.nom_accel_gradient
 
+    # ==================================================
     def matched_beta_function(self, energy_incoming):
         if self.ramp_beta_mag is not None:
             return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
         else:
             return beta_matched(self.plasma_density, energy_incoming)
-            
+
+    
+    # ==================================================
     def matched_beta_function_flattop(self, energy):
         return beta_matched(self.plasma_density, energy)
     
+
+    # ==================================================
     def energy_usage(self):
         return self.driver_source.energy_usage()
     
+
+    # ==================================================
     def energy_efficiency(self):
         return self.efficiency
 
+
+    # ==================================================
     #@abstractmethod   # TODO: calculate the dumped power and use it for the dump cost model.
     def dumped_power(self):
         return None
 
-    
+
+    # ==================================================
     def calculate_efficiency(self, beam0, driver0, beam, driver):
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
@@ -246,6 +747,8 @@ class Stage(Trackable, CostModeled):
         self.efficiency.wake_to_beam = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
         self.efficiency.driver_to_beam = self.efficiency.driver_to_wake*self.efficiency.wake_to_beam
 
+
+    # ==================================================
     def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
         
         dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
@@ -263,10 +766,13 @@ class Stage(Trackable, CostModeled):
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
 
+    
+    # ==================================================
     def save_driver_to_file(self, driver, runnable):
         driver.save(runnable, beam_name='driver_stage' + str(driver.stage_number+1))
 
     
+    # ==================================================
     def save_evolution_to_file(self, bunch='beam'):
     
         # select bunch
@@ -297,9 +803,12 @@ class Stage(Trackable, CostModeled):
         np.savetxt(filename, matrix, delimiter=',')
         
     
+    # ==================================================
     def plot_driver_evolution(self):
         self.plot_evolution(bunch='driver')
     
+
+    # ==================================================
     def plot_evolution(self, bunch='beam'):
         
         # select bunch
@@ -428,10 +937,14 @@ class Stage(Trackable, CostModeled):
         axs[2,2].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_xlim(long_limits)
+
+        if self.stage_number is not None:
+            fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
         
         plt.show()
 
-        
+
+    # ==================================================  
     def plot_wakefield(self):
         
         # extract wakefield if not already existing
@@ -494,6 +1007,7 @@ class Stage(Trackable, CostModeled):
         axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
 
         
+    # ==================================================
     # plot wake
     def plot_wake(self, savefig=None):
         
@@ -595,6 +1109,7 @@ class Stage(Trackable, CostModeled):
         return 
 
     
+    # ==================================================
     def survey_object(self):
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
@@ -604,4 +1119,12 @@ class Stage(Trackable, CostModeled):
         color = 'red'
         return x_points, y_points, final_angle, label, color
         
-    
+
+class VariablesOverspecifiedError(Exception):
+    "Exception class to throw when trying to set too many overlapping variables"
+    pass
+class StageError(Exception):
+    "Exception class for Stege to throw in other cases"
+
+
+
