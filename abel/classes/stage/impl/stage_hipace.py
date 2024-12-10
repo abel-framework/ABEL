@@ -17,7 +17,7 @@ try:
     sys.path.append(os.path.join(CONFIG.hipace_path, 'tools'))
     import read_insitu_diagnostics
 except:
-    print('Could not import HiPACE++ tools')
+    print(f'Could not import HiPACE++ tools from {os.path.join(CONFIG.hipace_path, 'tools')}')
 
 class StageHipace(Stage):
     
