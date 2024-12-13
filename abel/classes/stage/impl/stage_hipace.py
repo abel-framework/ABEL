@@ -316,6 +316,14 @@ class StageHipace(Stage):
                 evol.energy_spread_fwhm[:] = np.nan
             
             evol.rel_energy_spread_fwhm = evol.energy_spread_fwhm/evol.energy
+
+            # peak current
+            slice_charges_tuple = (evol.slices.charge[:, :-1] + evol.slices.charge[:, 1:])/2
+            slice_thicknesses_tuple = np.diff(evol.slices.z)
+            slice_zs_tuple = (evol.slices.z[:, :-1] + evol.slices.z[:, 1:])/2
+            slice_currents_tuple = np.sign(slice_charges_tuple)*slice_charges_tuple*SI.c/slice_thicknesses_tuple
+            peak_currents = np.max(np.stack(slice_currents_tuple), axis=1)
+            evol.peak_current = peak_currents
             
             # assign it
             if bunch == 'beam':
