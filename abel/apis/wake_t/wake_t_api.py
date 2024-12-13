@@ -83,8 +83,8 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam, stage_le
     n_out = 1
 
     # Set box ranges
-    box_size_r = np.max([4/k_p(plasma_density), 3*blowout_radius(plasma_density, abel_drive_beam.peak_current())])
     R_blowout = blowout_radius(plasma_density, abel_drive_beam.peak_current())
+    box_size_r = np.max([4/k_p(plasma_density), 3*R_blowout])
     box_min_z = abel_drive_beam.z_offset() - 3.3 * R_blowout
     box_max_z = min(abel_drive_beam.z_offset() + 6 * abel_drive_beam.bunch_length(), np.max(abel_drive_beam.zs()) + 0.5*R_blowout)
     box_range_z = [box_min_z, box_max_z]
