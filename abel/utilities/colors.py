@@ -4,6 +4,15 @@ import pyqtgraph as pg
 import matplotlib.pylab as plt
 import matplotlib.cm as cmx
 
+def get_cmap_by_name(name):
+    "Get the provided color maps by string, for specification by e.g. config files"
+    if name == "FLASHForward":
+        return FLASHForward
+    elif name == "FLASHForward_nowhite":
+        return FLASHForward_nowhite
+    else:
+        raise ValueError("cmap name '"+name+"' unknown")
+
 ## Written by Pau Gonzalez & Carl A. Lindstrøm, 2020
 
 def discrete_colorMap(num_curves: int, base_color: str):

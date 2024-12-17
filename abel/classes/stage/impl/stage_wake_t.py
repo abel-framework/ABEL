@@ -10,13 +10,14 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 class StageWakeT(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1, num_cell_xy=256, keep_data=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, drive_beam=None, ramp_beta_mag=1, num_cell_xy=256, keep_data=False):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source)
         
         self.ramp_beta_mag = ramp_beta_mag
         self.num_cell_xy = num_cell_xy
         self.keep_data = keep_data
+        self.drive_beam = drive_beam
 
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
@@ -29,7 +30,11 @@ class StageWakeT(Stage):
             os.mkdir(tmpfolder)
 
         # make driver (and convert to WakeT bunch)
-        driver0 = self.driver_source.track()
+        if self.drive_beam is None:
+            driver0 = self.driver_source.track()
+            self.drive_beam = driver0 
+        else:
+            driver0 = self.drive_beam  # Allows the drive beam to be passed from outside.
         
         # apply plasma-density up ramp (demagnify beta function)
         driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
@@ -65,6 +70,7 @@ class StageWakeT(Stage):
                                     n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
         # do tracking
+        #bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
         bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
         
         # save evolution of the beam and driver

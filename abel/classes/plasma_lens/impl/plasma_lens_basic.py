@@ -1,0 +1,31 @@
+from abel import PlasmaLens
+from matplotlib import patches
+import numpy as np
+import scipy.constants as SI
+from abel.physics_models.hills_equation import evolve_hills_equation_analytic
+from abel.utilities.relativity import energy2gamma
+
+class PlasmaLensBasic(PlasmaLens):
+    
+    def __init__(self, length=None, radius=None, current=None):
+        super().__init__(length, radius, current)
+        
+    
+    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        
+        # calculate the evolution
+        xs, uxs = evolve_hills_equation_analytic(beam.xs()-self.offset_x, beam.uxs(), self.length, beam.gammas(), 0, g=self.get_focusing_gradient())
+        ys, uys = evolve_hills_equation_analytic(beam.ys()-self.offset_y, beam.uys(), self.length, beam.gammas(), 0, g=self.get_focusing_gradient())
+        
+        # set new beam positions and angles (shift back plasma-lens offsets)
+        beam.set_xs(xs+self.offset_x)
+        beam.set_uxs(uxs)
+        beam.set_ys(ys+self.offset_y)
+        beam.set_uys(uys)
+        
+        return super().track(beam, savedepth, runnable, verbose)   
+
+
+    def get_focusing_gradient(self):
+        return SI.mu_0 * self.current / (2*np.pi * self.radius**2)
+    

@@ -3,6 +3,9 @@ import scipy.constants as SI
 from abel import InteractionPoint, Event
 
 class InteractionPointBasic(InteractionPoint):
+
+    def __init__(self):
+        super().__init__()
     
     # perform a simple interaction (geometric lumosity)
     def interact(self, beam1, beam2):

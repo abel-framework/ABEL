@@ -2,7 +2,8 @@ import numpy as np
 import openpmd_api as io
 from datetime import datetime
 from pytz import timezone
-from abel import CONFIG
+from abel.CONFIG import CONFIG
+from types import SimpleNamespace
 import scipy.constants as SI
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
@@ -12,20 +13,25 @@ from abel.physics_models.betatron_motion import evolve_betatron_motion
 #from abel.physics_models.beta_multistep import evolve_betatron_motion
 
 import scipy.sparse as sp
+from scipy.spatial.transform import Rotation as Rot
 import copy
 
 from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
 
         # the phase space variable is private
         if phasespace is not None:
             self.__phasespace = phasespace
         else:
             self.__phasespace = self.reset_phase_space(num_particles)
-            
+
+        # bunch pattern information
+        self.num_bunches_in_train = num_bunches_in_train
+        self.bunch_separation = bunch_separation # [s]
+        
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
         self.location = 0        
@@ -116,7 +122,27 @@ class Beam():
         return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC, {self.energy()/1e9:.2f} GeV"
         
         
+    ## BUNCH PATTERN
+
+    def bunch_frequency(self) -> float:
+        if self.num_bunches_in_train == 1:
+            return None
+        elif self.bunch_separation == 0.0:
+            return None
+        else:
+            return 1/self.bunch_separation
+
+    def train_duration(self) -> float:
+        if self.num_bunches_in_train == 1:
+            return 0.0
+        elif self.bunch_separation == 0.0:
+            return None
+        else:
+            return self.bunch_separation * (self.num_bunches_in_train-1)
     
+    def average_current_train(self) -> float:
+        return self.charge()*self.bunch_frequency()
+
     
     ## BEAM ARRAYS
 
@@ -201,6 +227,7 @@ class Beam():
         if pz0 is None:
             pz0 = np.mean(self.pzs())
         return self.pzs()/pz0 -1
+        
     
     def ts(self):
         return self.zs()/SI.c
@@ -228,7 +255,301 @@ class Beam():
         vector[2,:] = self.ys()
         vector[3,:] = self.uys()/SI.c
         return vector
+
+
+    ## Rotate the coordinate system of the beam
+    # ==================================================
+    def rotate_coord_sys_3D(self, axis1, angle1, axis2=np.array([0, 1, 0]), angle2=0.0, axis3=np.array([1, 0, 0]), angle3=0.0, invert=False):
+        """
+        Rotates the coordinate system (passive transformation) of the beam first with angle1 around axis1, then with angle2 around axis2 and lastly with angle3 around axis3.
+        
+        Parameters
+        ----------
+        axis1, axis2, axis3: 1x3 float nd arrays
+            Unit vectors specifying the rotation axes.
+        
+        angle1, angle2, angle3: [rad] float
+            Angles used for rotation of the beam's coordinate system around the respective axes.
+
+        invert: bool
+            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+            
+        Returns
+        ----------
+        Modified beam xs, ys, zs, uxs, uys and uzs.
+        """
+
+        # Check the inputs
+        if np.linalg.norm(axis1) != 1.0 or np.linalg.norm(axis2) != 1.0 or np.linalg.norm(axis3) != 1.0:
+            raise ValueError('The rotation axes have to be unit vectors.')
+
+        if angle1 < -np.pi or angle1 > np.pi or angle2 < -np.pi or angle2 > np.pi or angle3 < -np.pi or angle3 > np.pi:
+            raise ValueError('The rotation angles have to be in the interval [-pi, pi].')
+        
+        # Combine into (N, 3) arrays
+        zs = self.zs()
+        xs = self.xs()
+        ys = self.ys()
+        uzs = self.uzs()
+        uxs = self.uxs()
+        uys = self.uys()
+        coords = np.column_stack((zs, xs, ys))
+        u_vecs = np.column_stack((uzs, uxs, uys))
+
+        # Create rotation objects
+        rotation1 = Rot.from_rotvec(angle1 * axis1)
+        rotation2 = Rot.from_rotvec(angle2 * axis2)
+        rotation3 = Rot.from_rotvec(angle3 * axis3)
+
+        # Combine the rotations by applying them in sequence
+        combined_rotation = rotation1 * rotation2 * rotation3  # Rotation order is right-to-left, but effectively opposite when inverse=True in combined_rotation.apply().
+
+        # Apply rotation to the arrays
+        rotated_coords = combined_rotation.apply(coords, inverse= not invert)  # Since combined_rotation.apply() performs active transformations by default, inverse must be set to True for passive transformation.
+        rotated_u_vecs = combined_rotation.apply(u_vecs, inverse= not invert)
+
+        # Extract the rotated arrays
+        rotated_zs, rotated_xs, rotated_ys = rotated_coords[:, 0], rotated_coords[:, 1], rotated_coords[:, 2]
+        rotated_uzs, rotated_uxs, rotated_uys = rotated_u_vecs[:, 0], rotated_u_vecs[:, 1], rotated_u_vecs[:, 2]
+
+        self.set_zs(rotated_zs)
+        self.set_xs(rotated_xs)
+        self.set_ys(rotated_ys)
+        self.set_uzs(rotated_uzs)
+        self.set_uxs(rotated_uxs)
+        self.set_uys(rotated_uys)
+        
+
+    # ==================================================
+    def beam_alignment_angles(self):
+        """
+        Calculates the angles for rotation around the y- and x-axis to align the z-axis to the beam proper velocity.
+        
+        Parameters
+        ----------
+        ...
+        
+            
+        Returns
+        ----------
+        x_angle: [rad] float
+            Used for rotating the beam's frame around the y-axis.
+        
+        y_angle: [rad] float
+            Used for rotating the beam's frame around the x-axis. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        """
+
+        # Get the mean proper velocity component offsets
+        uz_offset = energy2proper_velocity(self.energy())
+        ux_offset = self.ux_offset()
+        uy_offset = self.uy_offset()
+
+        point_vec = np.array([uz_offset, ux_offset, uy_offset])
+        point_vec = point_vec/np.linalg.norm(point_vec)
+
+        # Calculate the angles to be used for beam rotation
+        z_axis = np.array([1, 0, 0])  # Axis as an unit vector
+        
+        zx_projection = point_vec * np.array([1, 1, 0])  # The projection of the pointing vector onto the zx-plane.
+
+        # Separate treatments for small angles to avoid numerical instability
+        if np.abs(self.x_angle()) < 1e-4:
+            x_angle = ux_offset/uz_offset
+        else:
+            x_angle = np.sign(point_vec[1]) * np.arccos( np.dot(zx_projection, z_axis) / np.linalg.norm(zx_projection) )  # The angle between zx_projection and z_axis.
+
+        
+        if np.abs(self.y_angle()) < 1e-4:
+            y_angle = point_vec[2]/np.linalg.norm(zx_projection)
+        else:
+            rotated_zy_projection = np.array([ np.linalg.norm(zx_projection), 0, point_vec[2] ])  # The new pointing vector after its zx-projection has been aligned to the rotated z-axis.
     
+            y_angle = np.sign(point_vec[2]) * np.arccos( np.dot(rotated_zy_projection, z_axis) / np.linalg.norm(rotated_zy_projection) )  # Note that due to the right hand rule, a positive y_angle corresponds to rotation from z-axis towards negative y. I.e. opposite sign convention of yps.
+
+        return x_angle, y_angle
+
+    
+    # ==================================================
+    def xy_rotate_coord_sys(self, x_angle=None, y_angle=None, invert=False):
+        """
+        Rotates the coordinate system of the beam first with x_angle around the y-axis then with y_angle around the x-axis.
+        
+        Parameters
+        ----------
+        x_angle: [rad] float
+            Angle to rotate the coordinate system with in the zx-plane.
+        
+        y_angle: [rad] float
+            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+
+        invert: bool
+            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+        
+            
+        Returns
+        ----------
+        Modified beam xs, ys, zs, uxs, uys and uzs.
+        """
+        
+        x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
+        y_axis = np.array([0, 0, 1])
+
+        if x_angle is None:
+            x_angle, _ = self.beam_alignment_angles()
+        if y_angle is None:
+            _, y_angle = self.beam_alignment_angles()
+            y_angle = -y_angle
+        
+        self.rotate_coord_sys_3D(y_axis, x_angle, x_axis, y_angle, invert=invert)
+
+    
+    # ==================================================
+    def add_pointing_tilts(self, align_x_angle=None, align_y_angle=None):
+        """
+        Uses active transformation to tilt the beam in the zx- and zy-planes.
+        
+        Parameters
+        ----------
+         align_x_angle: [rad] float
+            Beam coordinates with in the zx-plane are rotated with this angle.
+        
+        align_y_angle: [rad] float
+            Beam coordinates with in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        
+            
+        Returns
+        ----------
+        Modified beam xs, ys and zs.
+        """
+
+        if align_x_angle is None:
+            align_x_angle, _ = self.beam_alignment_angles()
+        if align_y_angle is None:
+            _, align_y_angle = self.beam_alignment_angles()
+            align_y_angle = -align_y_angle
+
+        y_axis = np.array([0, 0, 1])
+        x_axis = np.array([0, 1, 0])
+        
+        zs = self.zs()
+        xs = self.xs()
+        ys = self.ys()
+
+        # Combine into (N, 3) arrays
+        coords = np.column_stack((zs, xs, ys))
+        
+        # Create the rotation object
+        rotation_y = Rot.from_rotvec(align_x_angle * y_axis)
+        rotation_x = Rot.from_rotvec(align_y_angle * x_axis)
+        combined_rotation = rotation_y * rotation_x
+
+        # Apply rotation to the coordinates only
+        rotated_coords = combined_rotation.apply(coords, inverse=False)  # Active transformation
+
+        # Extract the rotated coordinates
+        rotated_zs, rotated_xs, rotated_ys = rotated_coords[:, 0], rotated_coords[:, 1], rotated_coords[:, 2]
+
+        self.set_zs(rotated_zs)
+        self.set_xs(rotated_xs)
+        self.set_ys(rotated_ys)
+
+
+    # ==================================================
+    def slice_centroids(self, beam_quant, bin_number=None, cut_off=None, make_plot=False):
+        """
+        Returns the slice centroids of a beam quantity beam_quant.
+
+        Parameters
+        ----------
+        beam_quant: 1D float array
+            Beam quantity to be binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+
+        bin_number: float
+            Number of beam slices.
+
+        cut_off: float
+            Determines the longitudinal coordinates inside the region of interest
+
+        make_plot: bool
+            Flag for making plots.
+
+            
+        Returns
+        ----------
+        beam_quant_slices: 1D float array
+            beam_quant binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+
+        z_centroids: [m] 1D float array
+            z-coordinates of the beam slices.
+        """
+        
+        zs = self.zs()
+        mean_z = self.z_offset()
+        weights = self.weightings()
+
+        if cut_off is None:
+            cut_off = 1.5 * self.bunch_length()
+
+        # Sort the arrays
+        indices = np.argsort(zs)
+        zs_sorted = zs[indices]  # Particle quantity.
+        weights_sorted = weights[indices]  # Particle quantity.
+        beam_quant_sorted = beam_quant[indices]  # Particle quantity.
+
+        # Filter out elements outside the region of interest
+        bool_indices = (zs_sorted <= mean_z + cut_off) & (zs_sorted >= mean_z - cut_off)
+        zs_roi = zs_sorted[bool_indices]
+        weights_roi = weights_sorted[bool_indices]
+        beam_quant_roi = beam_quant_sorted[bool_indices]
+
+        if bin_number is None:
+            bin_number = int(np.sqrt(len(zs_roi)/2))
+
+        # Beam slice zs
+        _, edges = np.histogram(zs_roi, bins=bin_number)  # Get the edges of the histogram of z with bin_number bins.
+        z_centroids = (edges[0:-1] + edges[1:])/2  # Centres of the beam slices (z)
+        
+        # Compute the mean of beam_quant of all particles inside a z-bin
+        beam_quant_centroids = np.empty(len(z_centroids))
+        for i in range(0,len(edges)-1):
+            left = np.searchsorted(zs_roi, edges[i])  # zs_sorted[left:len(zs_sorted)] >= edges[i], left side of bin i.
+            right = np.searchsorted(zs_roi, edges[i+1], side='right')  # zs_sorted[0:right] <= edges[i+1], right (larger) side of bin i.
+            beam_quant_centroids[i] = weighted_mean(beam_quant_roi[left:right], weights_roi[left:right])
+
+        if make_plot is True:
+            plt.figure()
+            plt.scatter(zs*1e6, beam_quant)
+            plt.plot(z_centroids*1e6, beam_quant_centroids, 'rx-')
+            plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
+        
+        return beam_quant_centroids, z_centroids
+        
+    
+    # ==================================================
+    def x_tilt_angle(self, z_cutoff=None):
+        if z_cutoff is None:
+            z_cutoff = 1.5 * self.bunch_length()
+            
+        x_centroids, z_centroids = self.slice_centroids(self.xs(), cut_off=z_cutoff, make_plot=False)
+        
+        # Perform linear regression
+        slope, _ = np.polyfit(z_centroids, x_centroids, 1)
+        
+        return np.arctan(slope)
+
+    
+    # ==================================================
+    def y_tilt_angle(self, z_cutoff=None):
+        if z_cutoff is None:
+            z_cutoff = 1.5 * self.bunch_length()
+        y_centroids, z_centroids = self.slice_centroids(self.ys(), cut_off=z_cutoff, make_plot=False)
+        
+        # Perform linear regression
+        slope, _ = np.polyfit(z_centroids, y_centroids, 1)
+        
+        return np.arctan(slope)
+
+
     
     ## BEAM STATISTICS
 
@@ -242,7 +563,10 @@ class Beam():
         return abs(self.charge())
     
     def charge_sign(self):
-        return self.charge()/abs(self.charge())
+        if self.charge() == 0:
+            return 1.0
+        else:
+            return self.charge()/abs(self.charge())
     
     def energy(self, clean=False):
         return weighted_mean(self.Es(), self.weightings(), clean)
@@ -403,7 +727,6 @@ class Beam():
     
     def longitudinal_num_density(self, bins=None):
         dQdz, zs = self.projected_density(self.zs, bins=bins)
-        #dNdz = dQdz / SI.e
         dNdz = dQdz / SI.e / self.charge_sign()
         return dNdz, zs
     
@@ -800,6 +1123,16 @@ class Beam():
         ax.set_title('Transverse profile')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um^2)')
+
+    
+    def plot_bunch_pattern(self):
+        
+        fig, ax = plt.subplots()
+        fig.set_figwidth(6)
+        fig.set_figheight(4)        
+        ax.plot(ts*SI.c*1e6, -dQdt/1e3)
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('Beam current (kA)')
         
         
     
@@ -823,14 +1156,19 @@ class Beam():
         z_mean = self.z_offset()
         zs_scaled = z_mean + (self.zs()-z_mean)*bunch_length/self.bunch_length()
         self.set_zs(zs_scaled)
+
+    def scale_norm_emittance_x(self, norm_emit_nx):
+        scale_factor = norm_emit_nx/self.norm_emittance_x()
+        self.set_xs(self.xs() * np.sqrt(scale_factor))
+        self.set_uxs(self.uxs() * np.sqrt(scale_factor))
+
+    def scale_norm_emittance_y(self, norm_emit_ny):
+        scale_factor = norm_emit_ny/self.norm_emittance_y()
+        self.set_ys(self.ys() * np.sqrt(scale_factor))
+        self.set_uys(self.uys() * np.sqrt(scale_factor))
         
     # betatron damping (must be done before acceleration)
     def apply_betatron_damping(self, deltaE):
-        
-        # remove particles with subzero energy
-        del self[self.Es() < 0]
-        del self[np.isnan(self.Es())]
-        
         gammasBoosted = energy2gamma(abs(self.Es()+deltaE))
         betamag = np.sqrt(self.gammas()/gammasBoosted)
         self.magnify_beta_function(betamag)
@@ -857,8 +1195,14 @@ class Beam():
         self.set_ys((self.ys()-y_offset)*mag + y_offset)
         self.set_uxs((self.uxs()-ux_offset)/mag + ux_offset)
         self.set_uys((self.uys()-uy_offset)/mag + uy_offset)
-        
-        
+
+    
+    # transport in a drift
+    def transport(self, L):
+        self.set_xs(self.xs() + L*self.xps())
+        self.set_ys(self.ys() + L*self.yps())
+
+    
     def flip_transverse_phase_spaces(self, flip_momenta=True, flip_positions=False):
         if flip_momenta:
             self.set_uxs(-self.uxs())
@@ -868,18 +1212,68 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, save_evolution = False):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
         
-        # remove particles with subzero energy
-        del self[self.Es() < 0]
-        del self[np.isnan(self.Es())]
+        # remove particles with subzero and Nan energy
+        neg_indices = self.Es() < 0
+        del self[neg_indices]
+        if isinstance(deltaEs, np.ndarray) and len(deltaEs) > 1:
+            deltaEs = deltaEs[~neg_indices]
+
+        nan_indices = np.isnan(self.Es())
+        del self[nan_indices]
+        if isinstance(deltaEs, np.ndarray) and len(deltaEs) > 1:
+            deltaEs = deltaEs[~nan_indices]
         
         # determine initial and final Lorentz factor
         gamma0s = energy2gamma(self.Es())
-        Es_final = self.Es()+deltaEs
+        Es_final = self.Es() + deltaEs
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
+        if calc_evolution:
+                
+            # calculate evolution
+            num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
+            evol = SimpleNamespace()
+            evol.location = np.linspace(0, L, num_evol_steps)
+            evol.x, evol.ux, evol.ux, evol.y, evol.uy, evol.energy, evol.energy_spread, evol.rel_energy_spread, evol.beam_size_x, evol.beam_size_y, evol.emit_nx, evol.emit_ny, evol.beta_x, evol.beta_y = (np.empty(evol.location.shape) for _ in range(14))
+
+            # select a given subset of the particles (for faster calculation)
+            sample_fraction = round(2*np.sqrt(len(self))) #
+            inds_sample = np.arange(0, len(self), sample_fraction, dtype=int) # not random, to be consistent across ramps and stages
+            xs_sample, uxs_sample = self.xs()[inds_sample], self.uxs()[inds_sample]
+            ys_sample, uys_sample = self.ys()[inds_sample], self.uys()[inds_sample]
+            gamma0s_sample, dgamma_ds_sample = gamma0s[inds_sample], dgamma_ds[inds_sample]
+            Es_sample, deltaEs_sample = self.Es()[inds_sample], deltaEs[inds_sample]
+
+            # go through steps
+            for i in range(num_evol_steps):
+                
+                # evolve the beam (no radiation reaction)
+                xs_i, uxs_i = evolve_hills_equation_analytic(xs_sample-x0_driver, uxs_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
+                ys_i, uys_i = evolve_hills_equation_analytic(ys_sample-y0_driver, uys_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
+                Es_i = Es_sample+deltaEs_sample*i/(num_evol_steps-1)
+                uzs_i = energy2proper_velocity(Es_i)
+                
+                # save the parameters
+                evol.x[i], evol.ux[i] = np.mean(xs_i), np.mean(uxs_i)
+                evol.y[i], evol.uy[i] = np.mean(ys_i), np.mean(uys_i)
+                evol.energy[i], evol.energy_spread[i] = np.mean(Es_i), np.std(Es_i)
+                evol.beam_size_x[i], evol.beam_size_y[i] = np.std(xs_i), np.std(ys_i)
+                evol.emit_nx[i] = np.sqrt(np.linalg.det(np.cov(xs_i, uxs_i/SI.c))) # only works for equal weight particles
+                evol.emit_ny[i] = np.sqrt(np.linalg.det(np.cov(ys_i, uys_i/SI.c))) # only works for equal weight particles
+                covx, covy = np.cov(xs_i, uxs_i/uzs_i), np.cov(ys_i, uys_i/uzs_i)
+                evol.beta_x[i] = covx[0,0]/np.sqrt(np.linalg.det(covx))
+                evol.beta_y[i] = covy[0,0]/np.sqrt(np.linalg.det(covy))
+
+            evol.rel_energy_spread = evol.energy_spread/evol.energy
+            evol.charge = self.charge()*np.ones(evol.location.shape)
+            evol.z = self.z_offset()*np.ones(evol.location.shape)
+            evol.bunch_length = self.bunch_length()*np.ones(evol.location.shape)
+            evol.plasma_density = n0*np.ones(evol.location.shape)
+            
+            
         # calculate final positions and angles after betatron motion
         if radiation_reaction:
             xs, ys, uxs, uys, Es_final, evolution, location = evolve_betatron_motion(self.qs(), self.xs()-x0_driver, self.ys()-y0_driver, self.uxs(), self.uys(), L, gamma0s, dgamma_ds, k_p(n0), save_evolution)
@@ -904,6 +1298,10 @@ class Beam():
             if save_evolution:
                 print('Save_evolution has not yet been implemented without radiation reaction, set save_evolution to False')
 
+
+        if calc_evolution:
+            return Es_final, evol
+        else:
             return Es_final
         
   
@@ -962,6 +1360,9 @@ class Beam():
         dset_q = io.Dataset(np.dtype('float64'), extent=[1])
         dset_m = io.Dataset(np.dtype('float64'), extent=[1])
         
+        dset_n = io.Dataset(self.ids().dtype, extent=[1])
+        dset_f = io.Dataset(np.dtype('float64'), extent=[1])
+        
         # prepare for writing
         particles['position']['z'].reset_dataset(dset_z)
         particles['position']['x'].reset_dataset(dset_x)
@@ -989,9 +1390,9 @@ class Beam():
         particles['momentum']['y'].store_chunk(self.uys())
         particles['weighting'][io.Record_Component.SCALAR].store_chunk(self.weightings())
         particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
-        particles["charge"][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
-        particles["mass"][io.Record_Component.SCALAR].make_constant(SI.m_e)
-
+        particles['charge'][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
+        particles['mass'][io.Record_Component.SCALAR].make_constant(SI.m_e)
+        
         # set SI units (scaling factor)
         particles['momentum']['z'].unit_SI = SI.m_e
         particles['momentum']['x'].unit_SI = SI.m_e
@@ -1048,14 +1449,18 @@ class Beam():
         beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
         
         # add metadata to beam
-        try: 
+        try:
             beam.trackable_number = series.iterations[index].get_attribute("trackable_number")
             beam.stage_number = series.iterations[index].get_attribute("stage_number")
-            beam.location = series.iterations[index].get_attribute("location")  
+            beam.location = series.iterations[index].get_attribute("location")
+            beam.num_bunches_in_train = series.iterations[index].get_attribute("num_bunches_in_train")
+            beam.bunch_separation = series.iterations[index].get_attribute("bunch_separation")
         except:
             beam.trackable_number = None
             beam.stage_number = None
             beam.location = None
+            beam.num_bunches_in_train = None
+            beam.bunch_separation = None
         
         return beam
 
@@ -1162,8 +1567,8 @@ class Beam():
         xilab = r'$\xi$ [$\mathrm{\mu}$m]'
         xlab = r'$x$ [$\mathrm{\mu}$m]'
         ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
+        xps_lab = r"$x'$ [mrad]"
+        yps_lab = r"$y'$ [mrad]"
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
@@ -1193,7 +1598,7 @@ class Beam():
         extent_xps[2] = extent_xps[2]*1e3  # [mrad]
         extent_xps[3] = extent_xps[3]*1e3  # [mrad]
 
-        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab=r"$\partial^2 N/\partial z \partial x'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         
         
         # 2D x-x' distribution
@@ -1206,7 +1611,7 @@ class Beam():
         extent_xxp[2] = extent_xxp[2]*1e3  # [mrad]
         extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
 
-        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab=r"$\partial^2 N/\partial x\partial x'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         
 
         # 2D z-y distribution
@@ -1229,7 +1634,7 @@ class Beam():
         extent_yps[2] = extent_yps[2]*1e3  # [mrad]
         extent_yps[3] = extent_yps[3]*1e3  # [mrad]
         
-        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab=r"$\partial^2 N/\partial z \partial y'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
         
 
         # 2D y-y' distribution
@@ -1242,7 +1647,7 @@ class Beam():
         extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
         extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
         
-        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab=r"$\partial^2 N/\partial y\partial y'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]", origin='lower', interpolation='nearest')
        
 
         # 2D x-y distribution

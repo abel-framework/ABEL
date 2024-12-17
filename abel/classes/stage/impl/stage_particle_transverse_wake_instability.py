@@ -6,32 +6,28 @@ Ben Chen, 6 October 2023, University of Oslo
 
 import numpy as np
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-#from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import interp1d
-#from scipy.stats import linregress
 import scipy.signal as signal
 
-#from tqdm import tqdm
 import time
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors  # For logarithmic colour scales
 from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
 from matplotlib.colors import LogNorm
+from matplotlib.animation import FuncAnimation
+from matplotlib import ticker as mticker
+#from functools import partial
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
 
 from joblib import Parallel, delayed  # Parallel tracking
 from joblib_progress import joblib_progress  # TODO: remove
 from types import SimpleNamespace
-#from openpmd_viewer import OpenPMDTimeSeries
-import os, copy
+import os, copy, warnings, uuid, shutil
 
 from abel.physics_models.particles_transverse_wake_instability import *
 from abel.physics_models.twoD_particles_transverse_wake_instability import *  # TODO: remove
-#from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig
-from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
-#from abel.utilities.relativity import energy2gamma
-#from abel.utilities.statistics import prct_clean, prct_clean2d
-from abel.utilities.other import find_closest_value_in_arr
+from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field, blowout_radius
+from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
 from abel.classes.stage.impl.stage_wake_t import StageWakeT
 from abel import Stage, CONFIG
 from abel import Beam
@@ -41,7 +37,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells=None, num_xy_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=True, update_factor=1.0):
+    def __init__(self, driver_source=None, main_source=None, drive_beam=None, main_beam=None, length=None, nom_energy_gain=None, plasma_density=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, ramp_beta_mag=1.0, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, stage_number=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
         """
         Parameters
         ----------
@@ -91,16 +87,6 @@ class StagePrtclTransWakeInstability(Stage):
         self.driver_source = driver_source
         self.main_source = main_source
         self.drive_beam = drive_beam
-        #self.main_beam = main_beam
-        #
-        #if drive_beam is None:
-        #    self.drive_beam = driver_source.track()
-        #else:
-        #    self.drive_beam = drive_beam
-        #if main_beam is None:
-        #    self.main_beam = main_source.track()
-        #else:
-        #    self.main_beam = main_beam
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
         self.interstage_dipole_field = None
@@ -114,15 +100,14 @@ class StagePrtclTransWakeInstability(Stage):
         self.ion_charge_num = ion_charge_num
         self.ion_mass = ion_mass
         
-        self.num_z_cells = num_z_cells
-        self.num_xy_cells_rft = num_xy_cells_rft
+        self.num_z_cells_main = num_z_cells_main
+        self.num_x_cells_rft = num_x_cells_rft
+        self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
         self.uniform_z_grid = uniform_z_grid
-        self.update_factor = update_factor
-        
-        self.interstages_enabled = False
-        self.show_prog_bar = show_prog_bar
-        
+        self.update_factor = np.max([time_step_mod, update_factor])
+
+        # Longitudinal electric field and plasma ion bubble radius
         self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
         self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
         #self.Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
@@ -135,8 +120,17 @@ class StagePrtclTransWakeInstability(Stage):
         self.main_num_profile = None
         self.z_slices = None
         self.main_slices_edges = None
+
+        # Beam evolution diagnostics
+        self.probe_evolution = probe_evolution
+        self.probe_every_nth_time_step = probe_every_nth_time_step
+        self.evolution = None
+        self.make_animations = make_animations
+        self.run_path = None
         
-        self.diag_path = None
+        self.show_prog_bar = show_prog_bar
+        self.interstages_enabled = False
+        
         self.parallel_track_2D = False
         
         self.driver_to_wake_efficiency = None
@@ -156,132 +150,90 @@ class StagePrtclTransWakeInstability(Stage):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
         # Set the diagnostics directory
-        self.diag_path = runnable.run_path()
+        self.run_path = runnable.run_path()
 
-        # Set the flag for displaying progress bar
+        # Override enable/disable progress bar
         self.show_prog_bar = verbose
 
-        # Extract quantities from the stage
+        # Extract quantities
         plasma_density = self.plasma_density
         stage_length = self.length
         gamma0 = beam0.gamma()
         time_step_mod = self.time_step_mod
 
         particle_mass = beam0.particle_mass
+        self.stage_number = beam0.stage_number
 
-        # ==========  ==========
-        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0:
+        
+        # ========== Get the drive beam ==========
+        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    #############################
             drive_beam0 = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
             drive_beam0 = self.driver_source.track()
-            self.drive_beam = drive_beam0  # Generate a drive beam with jitter.
-
-        #x_offset = beam0.x_offset()                   ############################# to be del
-        #xs = beam0.xs()                               ############################# to be del
-        #beam0.set_xs(xs - x_offset)                   ############################# to be del
-        #xp_offset = beam0.x_angle()                   ############################# to be del
-        #xps = beam0.xps()                             ############################# to be del
-        #beam0.set_xps(xps - xp_offset)                ############################# to be del
-        #print(beam0.x_offset())
-        #print(beam0.x_angle())
+            self.drive_beam = drive_beam0  # Generate a drive beam with jitter.     ############################# 
         
+        drive_beam_ramped = copy.deepcopy(drive_beam0)  # Make a deep copy to not affect the original drive beam.
+
+        drive_beam_wakeT = copy.deepcopy(drive_beam0)  # Wake-T requires not-ramped beams for now...
         beam0_copy = copy.deepcopy(beam0)  # Make a deep copy of beam0 for use in StageWakeT, which applies magnify_beta_function() separately.
-        drive_beam = copy.deepcopy(drive_beam0)
-
-        eff_x_offset_sig_before_upramp = (beam0.x_offset() - drive_beam0.x_offset())/drive_beam0.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_before_upramp = (beam0.y_offset() - drive_beam0.y_offset())/drive_beam0.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
 
         
-        #print('\nBefore ramp demagnification')
-        #print('Driver x/y offsets:', drive_beam0.x_offset(), drive_beam0.y_offset())                               ############################# to be del
-        #print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - drive_beam0.x_offset(), beam0.x_offset())  ############################# to be del
-        #print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - drive_beam0.y_offset(), beam0.y_offset())  ############################# to be del
-        #print('Effective x-offset/drive beam size x:', eff_x_offset_sig_before_upramp)                             ############################# to be del
-        #print('Effective y-offset/drive beam size y:', eff_y_offset_sig_before_upramp)                             ############################# to be del
-
-        
-
-        #driver_x_offset = drive_beam0.x_offset()                 ##############################
-        #driver_y_offset = drive_beam0.y_offset()                 ##############################
-        #x_offset = beam0.x_offset()                              ##############################
-        #y_offset = beam0.y_offset()                              ##############################
-
-        #xs = beam0.xs()                                          ##############################
-        #beam0.set_xs(xs - driver_x_offset)                       ##############################
-        #ys = beam0.ys()                                          ##############################
-        #beam0.set_ys(ys - driver_y_offset)                       ##############################
-    
-        #drive_beam0_xs = drive_beam0.xs()                        ##############################
-        #drive_beam0.set_xs(drive_beam0_xs - driver_x_offset)     ##############################
-        #drive_beam0_ys = drive_beam0.ys()                        ##############################
-        #drive_beam0.set_ys(drive_beam0_ys - driver_y_offset)     ##############################
-    
-        # ========== Apply plasma density up ramp (demagnify beta function) before shifting the coordinates ========== 
-        drive_beam.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)           #####################################
+        # ========== Apply plasma density up ramp (demagnify beta function) ========== 
+        drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam0)
-
-        eff_x_offset_sig_after_upramp = (beam0.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_after_upramp = (beam0.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
-        
-        #print('\nAfter ramp demagnification')
-        #print('Driver x/y offsets:', drive_beam.x_offset() , drive_beam.y_offset() )                                 ############################### to be del
-        #print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - drive_beam.x_offset(), beam0.x_offset())     ############################### to be del
-        #print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - drive_beam.y_offset(), beam0.y_offset())     ############################### to be del
-        #print('Effective x-offset/drive beam size x:', eff_x_offset_sig_after_upramp)                                ############################# to be del
-        #print('Effective y-offset/drive beam size y:', eff_y_offset_sig_after_upramp)                                ############################# to be del
-
-        
-        if self.driver_source.jitter.x != 0 and abs(eff_x_offset_sig_before_upramp / eff_x_offset_sig_after_upramp - 1) > 1e-6:
-            raise ValueError('Error in up ramp demagnification.')
-
-        if self.driver_source.jitter.y != 0 and abs(eff_y_offset_sig_before_upramp / eff_y_offset_sig_after_upramp - 1) > 1e-6:
-            raise ValueError('Error in up ramp demagnification.')
-
-        # ========== Shift the main beam to coordinate system with axis defined by drive beam ==========
-        driver_x_offset = drive_beam.x_offset()   ###################################
-        driver_y_offset = drive_beam.y_offset()   ###################################
-        x_offset = beam0.x_offset()               ###################################
-        y_offset = beam0.y_offset()               ###################################
-
-        xs = beam0.xs()                          ####################################
-        beam0.set_xs(xs - driver_x_offset)       ####################################
-        ys = beam0.ys()                          ####################################
-        beam0.set_ys(ys - driver_y_offset)       ####################################
-        
-        #print('\nAfter shifting main beam using driver offset')
-        #print('Driver x/y offsets:', drive_beam.x_offset() , drive_beam.y_offset() )                               ########################################## to be del
-        #print('Effective x-offset, beam0.x_offset:', beam0.x_offset() - driver_x_offset, beam0.x_offset())   ########################################## to be del
-        #print('Effective y-offset, beam0.y_offset:', beam0.y_offset() - driver_y_offset, beam0.y_offset())   ########################################## to be del
-        #print(abs((x_offset - driver_x_offset) / beam0.x_offset()))
-        #print(abs((y_offset - driver_y_offset) / beam0.y_offset()))
-        
-        if self.driver_source.jitter.x != 0 and abs((x_offset - driver_x_offset) / beam0.x_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
-
-        if self.driver_source.jitter.y != 0 and abs((y_offset - driver_y_offset) / beam0.y_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
-
-        # Also shift a copy of the drive beam if ion motion is enabled
-        if self.enable_ion_motion:
-            shifted_drive_beam = copy.deepcopy(drive_beam)
-            xs_drive_beam = drive_beam.xs()
-            shifted_drive_beam.set_xs(xs_drive_beam - driver_x_offset)
-            ys_drive_beam = drive_beam.ys()
-            shifted_drive_beam.set_ys(ys_drive_beam - driver_y_offset)
-        else:
-            shifted_drive_beam = copy.deepcopy(drive_beam)
         
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
         main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
         self.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
         self.main_num_profile = main_num_profile
+
+        
+        # ========== Rotate the coordinate system of the beams ==========
+        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+
+            driver_x_angle = drive_beam_ramped.x_angle()
+            driver_y_angle = drive_beam_ramped.y_angle()
+            
+            beam0_x_angle = beam0.x_angle()
+            beam0_y_angle = beam0.y_angle()
+
+            # Calculate the angles that will be used to rotate the beams' frame
+            rotation_angle_x, rotation_angle_y = drive_beam_ramped.beam_alignment_angles()
+            rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+            # The model currently does not support beam tilt not aligned with beam propagation, so that active transformation is used to rotate the beam around x- and y-axis and align it to its own prapagation direction. 
+            drive_beam_ramped.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+            drive_beam_wakeT.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+
+            # Use passive transformation to rotate the frame of the beams
+            drive_beam_ramped.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
+            beam0.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+            
+            drive_beam_wakeT.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+            beam0_copy.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+
+            if np.abs( drive_beam_ramped.x_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'drive_beam_ramped x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_ramped x_angle after coordinate transformation: ' + str(drive_beam_ramped.x_angle())
+                warnings.warn(driver_error_string)
+
+            if np.abs( drive_beam_ramped.y_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'drive_beam_ramped y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_ramped y_angle after coordinate transformation: ' + str(drive_beam_ramped.y_angle())
+                warnings.warn(driver_error_string)
+
+    
+            if np.abs( -(beam0.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
+                
+            if np.abs( (beam0.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
         
 
         # ========== Wake-T simulation and extraction ==========
         # Define a Wake-T stage
         stage_wakeT = StageWakeT()
-        stage_wakeT.driver_source = self.driver_source
-        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam.gamma()/2))
+        #stage_wakeT.driver_source = self.driver_source
+        stage_wakeT.drive_beam = drive_beam_wakeT
+        k_beta = k_p(plasma_density)/np.sqrt(2*min(gamma0, drive_beam_wakeT.gamma()/2))
         lambda_betatron = (2*np.pi/k_beta)
         stage_wakeT.length = lambda_betatron/10  # [m]
         stage_wakeT.plasma_density = plasma_density  # [m^-3]
@@ -289,8 +241,7 @@ class StagePrtclTransWakeInstability(Stage):
         #stage_wakeT.keep_data = False  # TODO: Does not work yet.
         
         # Run the Wake-T stage
-        beam_wakeT = stage_wakeT.track(beam0_copy)
-        #beam_wakeT = stage_wakeT.track(beam0)
+        beam_wakeT = stage_wakeT.track(beam0_copy, verbose=self.show_prog_bar)
         
         # Read the Wake-T simulation data
         Ez_axis_wakeT = stage_wakeT.initial.plasma.wakefield.onaxis.Ezs
@@ -305,65 +256,89 @@ class StagePrtclTransWakeInstability(Stage):
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
-        bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, x_offset, threshold=0.8)
+        #driver_x_offset = drive_beam_ramped.x_offset()
+        #driver_y_offset = drive_beam_ramped.y_offset()
+        #x_offset = beam0.x_offset()             # Important to NOT use beam0_copy.
+        #bubble_radius_wakeT = self.get_bubble_radius(plasma_num_density, rs_rho, driver_x_offset, threshold=0.8)
+        bubble_radius_wakeT = self.get_bubble_radius_WakeT(plasma_num_density, rs_rho, threshold=0.8)
 
         # Cut out bubble radius over the ROI
-        bubble_radius, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead... 
+        bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead...
+
+        if bubble_radius_wakeT.max() < 0.5 * blowout_radius(self.plasma_density, drive_beam_ramped.peak_current()) or bubble_radius_roi.any()==0:
+            warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
+
+        idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
+        if idxs_bubble_peaks.size > 0:
+            warnings.warn("The bubble radius may not be smooth.", UserWarning)
 
         # Save quantities to the stage
         self.Ez_fit_obj = Ez_fit
         self.rb_fit_obj = rb_fit
-        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam, beam0=beam0)
+        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam0)
         
         self.Ez_roi = Ez
         #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
         #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
-        self.bubble_radius_roi = bubble_radius
+        self.bubble_radius_roi = bubble_radius_roi
         self.bubble_radius_axial = bubble_radius_wakeT
         self.zs_bubble_radius_axial = zs_rho
         
         # Make plots for control if necessary
-        #self.plot_Ez_rb_cut(z_slices, main_num_profile, zs_Ez_wakeT, Ez_axis_wakeT, Ez, zs_rho, bubble_radius_wakeT, bubble_radius, zlab=r'$z$ [$\mathrm{\mu}$m]')
-        
+        #self.plot_Ez_rb_cut(z_slices, main_num_profile, zs_Ez_wakeT, Ez_axis_wakeT, Ez, zs_rho, bubble_radius_wakeT, bubble_radius_roi, zlab=r'$z$ [$\mathrm{\mu}$m]')
 
+        
         # ========== Instability tracking ==========
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
-
-        if self.num_z_cells is None:
-            self.num_z_cells = round(np.sqrt( len(shifted_drive_beam)+len(beam_filtered) )/2)
         
+        if self.num_z_cells_main is None:
+            self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
+
+        if self.make_animations:
+            # Create the temporary folder
+            parent_dir = CONFIG.temp_path
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+            tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
+            os.mkdir(tmpfolder)
+        else:
+            tmpfolder = None
+            
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
             stage_length=self.length, 
-            drive_beam=shifted_drive_beam, 
+            drive_beam=drive_beam_ramped, 
             main_beam=beam_filtered, 
             time_step_mod=self.time_step_mod, 
             show_prog_bar=self.show_prog_bar, 
+            probe_evolution=self.probe_evolution, 
+            probe_every_nth_time_step=self.probe_every_nth_time_step, 
+            make_animations=self.make_animations, 
+            tmpfolder=tmpfolder, 
+            shot_path=runnable.shot_path(), 
+            stage_num=beam0.stage_number, 
             enable_tr_instability=self.enable_tr_instability, 
             enable_radiation_reaction=self.enable_radiation_reaction, 
             enable_ion_motion=self.enable_ion_motion, 
             ion_charge_num=self.ion_charge_num, 
             ion_mass=self.ion_mass, 
-            num_z_cells=self.num_z_cells, 
-            num_xy_cells_rft=self.num_xy_cells_rft, 
+            num_z_cells_main=self.num_z_cells_main, 
+            num_x_cells_rft=self.num_x_cells_rft, 
+            num_y_cells_rft=self.num_y_cells_rft, 
             num_xy_cells_probe=self.num_xy_cells_probe, 
             uniform_z_grid=self.uniform_z_grid, 
+            driver_x_jitter=self.driver_source.jitter.x, 
+            driver_y_jitter=self.driver_source.jitter.y, 
             update_factor=self.update_factor
         )
         
-        inputs = [beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
+        inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
             none_indices = [i for i, x in enumerate(inputs) if x is None]
             print(none_indices)
             raise ValueError('At least one input is set to None.')
-
-        
-        #print('\nJust before instability tracking')
-        #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                            ########################### to be del
-        #print('Effective x-offset, beam_filtered.x_offset:', beam_filtered.x_offset() - drive_beam.x_offset(), beam_filtered.x_offset()) ################# to be del
-        #print('Effective y-offset, beam_filtered.y_offset:', beam_filtered.y_offset() - drive_beam.y_offset(), beam_filtered.y_offset()) ################# to be del
         
         
         if self.parallel_track_2D is True:
@@ -394,83 +369,57 @@ class StagePrtclTransWakeInstability(Stage):
             
         else:
             
-            beam = transverse_wake_instability_particles(beam_filtered, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
+            beam, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
+
+            self.evolution = evolution
+
+        
+        # ========== Rotate the coordinate system of the beams back to original ==========
+        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+
+            # Angles of beam before rotating back to original coordinate system
+            beam_x_angle = beam.x_angle()
+            beam_y_angle = beam.y_angle()
             
+            beam.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+
+            # Add drifts to the beam
+            x_drift = self.length * np.tan(driver_x_angle)
+            y_drift = self.length * np.tan(driver_y_angle)
+            xs = beam.xs()
+            ys = beam.ys()
+            beam.set_xs(xs + x_drift)
+            beam.set_ys(ys + y_drift)
+            
+            #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
         
-        #print('After instability tracking')
-        #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                    ######################################## to be del
-        #print('Effective x-offset, beam.x_offset:', beam.x_offset() - drive_beam.x_offset(), beam.x_offset())         ######################################## to be del
-        #print('Effective y-offset, beam.y_offset:', beam.y_offset() - drive_beam.y_offset(), beam.y_offset(), '\n')   ######################################## to be del
-
-
-        # ========== Shift the main beam back to the original coordinate system ==========
-        x_offset = beam.x_offset()
-        y_offset = beam.y_offset()
-        xs = beam.xs()                                          ######################################## 
-        beam.set_xs(xs + driver_x_offset)                       ######################################## 
-        ys = beam.ys()                                          ######################################## 
-        beam.set_ys(ys + driver_y_offset)                       ########################################
-
-        eff_x_offset_sig_before_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_before_downramp = (beam.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
-
-        #print('After shifting back to original coordinate system, before ramp magnification')
-        #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                          ############################# to be del
-        #print('Effective x-offset, beam.x_offset:', beam.x_offset() - drive_beam.x_offset(), beam.x_offset())               ############################# to be del
-        #print('Effective y-offset, beam.y_offset:', beam.y_offset() - drive_beam.y_offset(), beam.y_offset())               ############################# to be del
-        #print('Effective x-offset/drive beam size x:', eff_x_offset_sig_before_downramp)                                    ############################# to be del
-        #print('Effective y-offset/drive beam size y:', eff_y_offset_sig_before_downramp)                                    ############################# to be del
+            if drive_beam0.x_angle() != 0 and np.abs( (beam.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
+                
+            if drive_beam0.y_angle() != 0 and np.abs( -(beam.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
         
-        if self.driver_source.jitter.x != 0 and abs((x_offset + driver_x_offset) / beam.x_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
-
-        if self.driver_source.jitter.y != 0 and abs((y_offset + driver_y_offset) / beam.y_offset() - 1) > 1e-6:
-            raise ValueError('Main beam not shifted accurately.')
         
-        # ==========  Apply plasma density down ramp (magnify beta function) after shifting the coordinates back to original reference ========== 
-        drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                                   ######################################
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)
-        #drive_beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam)                                   #########################################
+        # ==========  Apply plasma density down ramp (magnify beta function) ==========
+        drive_beam_ramped.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
+        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=drive_beam0)
 
         
-        eff_x_offset_sig_after_downramp = (beam.x_offset() - drive_beam.x_offset())/drive_beam.beam_size_x()  # Driver-main beam x-offset in units of driver beam size.
-        eff_y_offset_sig_after_downramp = (beam.y_offset() - drive_beam.y_offset())/drive_beam.beam_size_y()  # Driver-main beam y-offset in units of driver beam size.
+        # ==========  Make animations ==========
+        if self.probe_evolution and self.make_animations:
+        #if self.make_animations and self.stage_number == 9:
+            self.animate_sideview_x(tmpfolder)
+            self.animate_sideview_y(tmpfolder)
+            self.animate_phasespace_x(tmpfolder)
+            self.animate_phasespace_y(tmpfolder)
 
+        if tmpfolder is not None:
+            # Remove temporary files
+            shutil.rmtree(tmpfolder)
         
-        #print('\nAfter ramp magnification')
-        #print('Driver x/y offsets:', drive_beam.x_offset(), drive_beam.y_offset())                                          ############################# to be del
-        #print('Effective x-offset, beam.x_offset:', beam.x_offset() - drive_beam.x_offset(), beam.x_offset())               ############################# to be del
-        #print('Effective y-offset, beam.y_offset:', beam.y_offset() - drive_beam.y_offset(), beam.y_offset())               ############################# to be del
-        #print('Effective x-offset/drive beam size x:', eff_x_offset_sig_after_downramp)                                     ############################# to be del
-        #print('Effective y-offset/drive beam size y:', eff_y_offset_sig_after_downramp)                                     ############################# to be del
 
-        if self.driver_source.jitter.x != 0 and abs(eff_x_offset_sig_before_downramp / eff_x_offset_sig_after_downramp - 1) > 1e-6:
-            raise ValueError('Error in down ramp demagnification.')
-
-        if self.driver_source.jitter.y != 0 and abs(eff_y_offset_sig_before_downramp / eff_y_offset_sig_after_downramp - 1) > 1e-6:
-            raise ValueError('Error in down ramp demagnification.')
-
-        #xs = beam.xs()                                 ######################################## 
-        #beam.set_xs(xs + driver_x_offset)              ######################################## 
-        #ys = beam.ys()                                 ######################################## 
-        #beam.set_ys(ys + driver_y_offset)              ######################################## 
-
-        
-        #x_offset = beam0.x_offset()                    ############################# to be del
-        #xs = beam0.xs()                                ############################# to be del
-        #beam0.set_xs(xs - x_offset)                    ############################# to be del
-        #xp_offset = beam0.x_angle()                    ############################# to be del
-        #xps = beam0.xps()                              ############################# to be del
-        #beam0.set_xps(xps - xp_offset)                 ############################# to be del
-        #print(beam0.x_offset())
-        #print(beam0.x_angle())
-
-        # Clean nan particles and extreme outliers
-        #beam.remove_nans()
-        #beam.remove_halo_particles()
-        
-        self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/drive_beam.energy() * beam.abs_charge()/drive_beam.abs_charge()
-        
+        # ========== Bookkeeping ==========
+        self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/drive_beam_ramped.energy() * beam.abs_charge()/drive_beam_ramped.abs_charge()
         self.main_beam = copy.deepcopy(beam)  # Need to make a deepcopy, or changes to beam may affect the Beam object saved here.
         
         # Copy meta data from input beam (will be iterated by super)
@@ -491,6 +440,8 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ========== Save plasma electron number density ========== 
         self.initial.plasma.density.rho = rho0/-SI.e
+        self.initial.plasma.density.rs_rho = metadata_rho0.r
+        self.initial.plasma.density.zs_rho = metadata_rho0.z
         self.initial.plasma.density.extent = metadata_rho0.imshow_extent  # array([z_min, z_max, x_min, x_max])
 
         # ========== Calculate and save initial beam particle density ==========
@@ -523,6 +474,12 @@ class StagePrtclTransWakeInstability(Stage):
         
         # ========== Save initial beam currents ==========
         self.calculate_beam_current(beam0, driver0)
+
+    
+    # ==================================================
+    # May not be needed, as saving evolution to this stage is trivial.
+    #def __extract_evolution(self, evolution):
+    #    self.evolution = evolution
 
 
     # ==================================================
@@ -587,92 +544,6 @@ class StagePrtclTransWakeInstability(Stage):
 
     
     # ==================================================
-    # Returns the mean of a beam quantity beam_quant (1D float array) for all particles inside the beam slices.
-    #def particles2slices(self, beam, beam_quant, z_slices=None, bin_number=None, cut_off=None, make_plot=False):
-    #    """
-    #    Returns the mean of a beam quantity beam_quant for all particles inside the beam slices.
-#
-    #    Parameters
-    #    ----------
-    #    beam: Beam object.
-    #        
-    #    beam_quant: 1D float arrays
-    #        Beam quantity to be binned into bins/slices defined by z_slices. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
-    #        
-    #    z_slices: [m] 1D float array
-    #        z-coordinates of the beam slices.
-#
-    #    bin_number: float
-    #        Number of beam slices.
-#
-    #    cut_off: float
-    #        Determines the longitudinal coordinates inside the region of interest
-#
-    #    make_plot: boolean
-    #        Flag for making plots.
-#
-    #        
-    #    Returns
-    #    ----------
-    #    beam_quant_slices: 1D float array
-    #        beam_quant binned into bins/slices defined by z_slices. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
-    #    """
-    #    
-    #    if bin_number is None:
-    #        bin_number = self.num_beam_slice
-    #    if cut_off is None:
-    #        cut_off = self.main_beam_roi * beam.bunch_length()
-    #    
-    #    zs = beam.zs()
-    #    mean_z = np.mean(zs)
-#
-    #    # Get all elements inside the region of interest.
-    #    bool_indices = (zs <= mean_z + cut_off) & (zs >= mean_z - cut_off)
-    #    zs_roi = zs[bool_indices]
-#
-    #    if z_slices is None:
-    #        _, edges = np.histogram(zs_roi, bins=bin_number)  # Get the edges of the histogram of z with bin_number bins.
-    #        z_slices = (edges[0:-1] + edges[1:])/2  # Centres of the beam slices (z).
-#
-    #    # Make small bins for interpolation
-    #    Nbins = int(np.sqrt(len(zs)/2))
-    #    _, edges = np.histogram(zs, bins=Nbins)
-    #    zs_bins = (edges[0:-1] + edges[1:])/2  # Centres of the bins (z).
-    #    
-    #    # Sort the arrays
-    #    indices = np.argsort(zs)
-    #    zs_sorted = zs[indices]  # Particle quantity.
-    #    beam_quant_sorted = beam_quant[indices]  # Particle quantity.
-#
-    #    # Compute the mean of beam_quant of all particles inside a z-bin.
-    #    beam_quant_bins = np.empty(len(zs_bins))
-    #    for i in range(0,len(zs_bins)-1):
-    #        left = np.searchsorted(zs_sorted, zs_bins[i])  # zs_sorted[left:len(zs_sorted)] >= zs_bins[i], left side of bin i.
-    #        right = np.searchsorted(zs_sorted, zs_bins[i+1], side='right')  # zs_sorted[0:right] <= zs_bins[i+1], right (larger) side of bin i.
-    #        beam_quant_bins[i] = np.mean(beam_quant_sorted[left:right])
-#
-    #    if np.any(np.isnan(beam_quant_bins)):
-    #        beam_quant_bins = self.fill_nan_with_mean(beam_quant_bins)  # Replace the nan values with the mean.
-    #       
-    #    beam_quant_slices = np.interp(z_slices, zs_bins, beam_quant_bins)
-    #    beam_quant_slices = self.fill_nan_with_mean(beam_quant_slices)  # Replace the nan values with the mean.
-    #    if np.any(np.isnan(beam_quant_slices)):
-    #        plt.figure()
-    #        plt.scatter(zs*1e6, beam_quant)
-    #        plt.plot(z_slices*1e6, beam_quant_slices, 'r')
-    #        plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
-    #        raise ValueError('Interpolated array still contains Nan.')
-#
-    #    if make_plot is True:
-    #        plt.figure()
-    #        plt.scatter(zs*1e6, beam_quant)
-    #        plt.plot(z_slices*1e6, beam_quant_slices, 'rx-')
-    #        plt.xlabel(r'$\xi$ [$\mathrm{\mu}$m]')
-    #    
-    #    return beam_quant_slices
-
-    
-    # ==================================================
     def Ez_shift_fit(self, Ez, zs_Ez, beam, z_slices=None):
         """
         Cuts out the longitudinal axial E-field Ez over the beam region and makes a fit using the z-coordinates for the region.
@@ -721,13 +592,13 @@ class StagePrtclTransWakeInstability(Stage):
         sse_Ez = np.sum((Ez_cut - Ez_fit(zs_cut))**2)
         
         if sse_Ez/np.mean(Ez_cut) > 0.05:
-            print('Warning: the longitudinal E-field may not have been accurately fitted.\n')
+            warnings.warn('The longitudinal E-field may not have been accurately fitted.\n', UserWarning)
         
         return Ez_fit(z_slices), Ez_fit
 
-    
+
     # ==================================================
-    def get_bubble_radius(self, plasma_num_density, plasma_tr_coord, driver_offset=None, main_offset=None, threshold=0.8):
+    def get_bubble_radius(self, plasma_num_density, plasma_tr_coord, driver_offset, threshold=0.8):
         """
         - For extracting the plasma ion bubble radius by finding the coordinates in which the plasma number density goes from zero to a threshold value.
         - The symmetry axis is determined using the transverse offset of the drive beam.
@@ -739,13 +610,10 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma number density in units of initial number density n0. Need to be oriented with propagation direction pointing to the right and positive offset pointing upwards.
             
         plasma_tr_coord: [m] 1D float array 
-            Transverse coordinate of plasma_num_density.
+            Transverse coordinate of plasma_num_density. Needs to be strictly growing from start to end.
 
         driver_offset: [m] float
             Mean transverse offset of the drive beam.
-
-        main_offset: [m] float
-            Mean transverse offset of the main beam.
             
         threshold: float
             Defines a threshold for the plasma density to determine bubble_radius.
@@ -757,46 +625,72 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma bubble radius over the simulation box.
         """
 
-        # Find the offsets of the beams
-        if driver_offset is None:
-            drive_beam = self.drive_beam
-            driver_offset = drive_beam.x_offset()
-        if main_offset is None:
-            main_beam = self.main_beam
-            main_offset = main_beam.x_offset()
+        # Check if plasma_tr_coord is strictly growing from start to end
+        if not np.all(np.diff(plasma_tr_coord) > 0):
+            raise ValueError('plasma_tr_coord needs to be strictly increasing from start to end.')
         
         # Find the value in plasma_tr_coord closest to driver_offset and corresponding index
         idx_middle, _ = find_closest_value_in_arr(plasma_tr_coord, driver_offset)
-        
-        # Find the value in plasma_tr_coord closest to main_offset and corresponding index
-        idx_offset, _ = find_closest_value_in_arr(plasma_tr_coord, main_offset)
 
         rows, cols = np.shape(plasma_num_density)
         bubble_radius = np.zeros(cols)
+        slopes = np.diff(plasma_num_density)
 
         for i in range(0,cols):  # Loop through all transverse slices.
             
             # Extract a transverse slice
             slice = plasma_num_density[:,i]
-
-            peaks, _ = signal.find_peaks(slice)  # Find all peaks in the slice.
-            idxs_peaks_above = peaks[peaks > idx_middle]  # Get the slice peaks above middle.
-            idxs_peaks_below = peaks[peaks < idx_middle]  # Get the slice peaks below middle.
+            
+            idxs_peaks, _ = signal.find_peaks(slice, height=1.2, width=1.5, prominence=None)  # Find all relevant peaks in the slice.
+            
+            if idxs_peaks.size == 0:
+                idxs_peaks, _ = signal.find_peaks(slice, height=1.0, width=1, prominence=None)  # Slightly reduce requirement if no peaks found.
+                
+            idxs_peaks_above = idxs_peaks[idxs_peaks > idx_middle]  # Get the slice peak indices located above middle.
+            idxs_peaks_below = idxs_peaks[idxs_peaks < idx_middle]  # Get the slice peak indices located below middle.
 
             # Check if there are peaks on both sides
-            if len(idxs_peaks_above) > 0 and len(idxs_peaks_below) > 0:
-                idx_above = idxs_peaks_above[-1]  # Get the slice peak above closest to middle.
-                idx_below = idxs_peaks_below[0]  # Get the slice peak below closest to middle.
-                valley = slice[idx_below+1:idx_above]  # Get the elements between the peaks.
+            if idxs_peaks_above.size > 0 and idxs_peaks_below.size > 0:
+                
+                # Get the indices for the maximum negative and positive slopes of plasma_num_density
+                slopes = np.diff(slice)
+                slopes = np.insert(arr=slopes, obj=0, values=0.0)
+                idx_max_pos_slope = np.argmax(slopes)
+                idx_max_neg_slope = np.argmin(slopes)
 
-                # Check that the "valley" of the slice is not too shallow. If so, bubble radius should be > 0.
-                if len(valley) and valley.min() < threshold:
-                    idxs_slice_above_thres = np.where(slice > threshold)[0]  # Find the indices of all the elements in the slice > threshold.
-   
-                    # Find the value in idxs_slice_above_thres closest to idx_offset (equivalent to the value in plasma_num_density above threshold that is closest to the main beam offset axis, i.e. the innermost plasma electron layer).
-                    _, idx = find_closest_value_in_arr(idxs_slice_above_thres, idx_offset)
+                _, idx_above = find_closest_value_in_arr(idxs_peaks_above, idx_max_pos_slope)  # Get the slice peak above middle closest to max_pos_slope.
+                _, idx_below = find_closest_value_in_arr(idxs_peaks_below, idx_max_neg_slope)  # Get the slice peak below middle closest to max_neg_slope.
+                
+                # Get the plasma_num_density slice elements between the peaks. Set the rest to nan.
+                valley = copy.deepcopy(slice)
+                valley[:idx_below] = np.nan
+                valley[idx_above+1:] = np.nan
+                
+                # Check that the "valley" of the slice is not too shallow. If too shallow, bubble_radius[i] = 0.
+                if len(valley) > 0 and np.nanmin(valley) < threshold and np.nanmax(valley) >= threshold:
+                    
+                    # Find the indices of all the elements in valley >= threshold.
+                    idxs_slice_above_thres = np.where(valley >= threshold)[0]
+                    
+                    # Get the valley indices above threshold located above middle
+                    idxs_valley_above_middle = idxs_slice_above_thres[idxs_slice_above_thres > idx_middle]
+
+                    # Find element in valley closest to threshold
+                    idx_valley_above_middle_closest2thres, _ = find_closest_value_in_arr(valley[idxs_valley_above_middle], threshold)
+                    idx = idxs_valley_above_middle[idx_valley_above_middle_closest2thres]
+                    
                     bubble_radius[i] = np.abs(plasma_tr_coord[idx] - driver_offset)
         
+        return bubble_radius
+
+
+    # ==================================================
+    def get_bubble_radius_WakeT(self, plasma_num_density, plasma_tr_coord, threshold=0.8):
+        """
+        The plasma wake calculated by Wake-T is always centered around r = 0.0, so that driver_offset=0.0 are used as inputs in get_bubble_radius().
+        """
+        bubble_radius = self.get_bubble_radius(plasma_num_density=plasma_num_density, plasma_tr_coord=plasma_tr_coord, driver_offset=0.0, threshold=0.8)
+
         return bubble_radius
 
     
@@ -835,6 +729,7 @@ class StagePrtclTransWakeInstability(Stage):
         
         # Start index (head of the beam) of extraction interval.
         head_idx, _ = find_closest_value_in_arr(arr=zs_rb, val=zs.max())
+        
         # End index (tail of the beam) of extraction interval.
         tail_idx, _ = find_closest_value_in_arr(arr=zs_rb, val=zs.min())
         
@@ -848,7 +743,7 @@ class StagePrtclTransWakeInstability(Stage):
         sse_rb = np.sum((rb_cut - rb_fit(zs_cut))**2)
         
         if sse_rb/np.mean(rb_cut) > 0.05:
-            print('Warning: the plasma bubble radius may not have been accurately fitted.\n')
+            warnings.warn('The plasma bubble radius may not have been accurately fitted.\n', UserWarning)
         
         return rb_fit(z_slices), rb_fit    
         
@@ -1145,171 +1040,6 @@ class StagePrtclTransWakeInstability(Stage):
 
     
     # ==================================================
-    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', reduce_cax_pad=False):
-
-        if weights is None:
-            weights = self.main_beam.weightings()
-        if hist_bins is None:
-            nbins = int(np.sqrt(len(arr1)/2))
-            hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
-        if hist_range is None:
-            hist_range = [[None, None], [None, None]]
-            hist_range[0] = [ arr1.min(), arr1.max() ]  # List contains 2 lists of 2 floats. Extent of the histogram along each direction
-            hist_range[1] = [ arr2.min(), arr2.max() ]
-        if extent is None:
-            extent = hist_range[0] + hist_range[1]
-        
-        binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
-        beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
-        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, 
-                  xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
-
-    
-    # ==================================================
-    def density_map_diags(self, beam=None, plot_centroids=False, save_plots=True):
-        
-        #colors = ['white', 'aquamarine', 'lightgreen', 'green']
-        #colors = ['white', 'forestgreen', 'limegreen', 'lawngreen', 'aquamarine', 'deepskyblue']
-        #bounds = [0, 0.2, 0.4, 0.8, 1]
-        #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
-        
-        cmap = CONFIG.default_cmap
-
-        if beam is None:
-            beam = self.main_beam
-
-        # Macroparticles data
-        zs = beam.zs()
-        xs = beam.xs()
-        xps = beam.xps()
-        ys = beam.ys()
-        yps = beam.yps()
-        Es = beam.Es()
-        weights = beam.weightings()
-
-        # Labels for plots
-        zlab = r'$z$ [$\mathrm{\mu}$m]'
-        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
-        xlab = r'$x$ [$\mathrm{\mu}$m]'
-        ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
-        energ_lab = r'$\mathcal{E}$ [GeV]'
-        
-        # Set up a figure with axes
-        fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
-        fig.suptitle(r'$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
-
-        nbins = int(np.sqrt(len(weights)/2))
-        hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
-
-        # 2D z-x distribution
-        hist_range = [[None, None], [None, None]]
-        hist_range[0] = [ zs.min(), zs.max() ]  # [m], list contains 2 lists of 2 floats. Extent of the histogram along each direction
-        hist_range[1] = [ xs.min(), xs.max() ]
-        extent_zx = hist_range[0] + hist_range[1]
-        extent_zx = [i*1e6 for i in extent_zx]  # [um]
-
-        self.distribution_plot_2D(arr1=zs, arr2=xs, weights=weights, hist_bins=hist_bins, hist_range=hist_range, axes=axs[0][0], extent=extent_zx, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xlab, clab=r'$\partial^2 N/\partial\xi \partial x$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D z-x' distribution
-        hist_range_xps = [[None, None], [None, None]]
-        hist_range_xps[0] = hist_range[0]
-        hist_range_xps[1] = [ xps.min(), xps.max() ]  # [rad]
-        extent_xps = hist_range_xps[0] + hist_range_xps[1]
-        extent_xps[0] = extent_xps[0]*1e6  # [um]
-        extent_xps[1] = extent_xps[1]*1e6  # [um]
-        extent_xps[2] = extent_xps[2]*1e3  # [mrad]
-        extent_xps[3] = extent_xps[3]*1e3  # [mrad]
-
-        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        
-        
-        # 2D x-x' distribution
-        hist_range_xxp = [[None, None], [None, None]]
-        hist_range_xxp[0] = hist_range[1]
-        hist_range_xxp[1] = [ xps.min(), xps.max() ]  # [rad]
-        extent_xxp = hist_range_xxp[0] + hist_range_xxp[1]
-        extent_xxp[0] = extent_xxp[0]*1e6  # [um]
-        extent_xxp[1] = extent_xxp[1]*1e6  # [um]
-        extent_xxp[2] = extent_xxp[2]*1e3  # [mrad]
-        extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
-
-        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D z-y distribution
-        hist_range_zy = [[None, None], [None, None]]
-        hist_range_zy[0] = hist_range[0]
-        hist_range_zy[1] = [ ys.min(), ys.max() ]
-        extent_zy = hist_range_zy[0] + hist_range_zy[1]
-        extent_zy = [i*1e6 for i in extent_zy]  # [um]
-
-        self.distribution_plot_2D(arr1=zs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_zy, axes=axs[1][0], extent=extent_zy, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=ylab, clab=r'$\partial^2 N/\partial\xi \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D z-y' distribution
-        hist_range_yps = [[None, None], [None, None]]
-        hist_range_yps[0] = hist_range[0]
-        hist_range_yps[1] = [ yps.min(), yps.max() ]  # [rad]
-        extent_yps = hist_range_yps[0] + hist_range_yps[1]
-        extent_yps[0] = extent_yps[0]*1e6  # [um]
-        extent_yps[1] = extent_yps[1]*1e6  # [um]
-        extent_yps[2] = extent_yps[2]*1e3  # [mrad]
-        extent_yps[3] = extent_yps[3]*1e3  # [mrad]
-        
-        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D y-y' distribution
-        hist_range_yyp = [[None, None], [None, None]]
-        hist_range_yyp[0] = hist_range_zy[1]
-        hist_range_yyp[1] = [ yps.min(), yps.max() ]  # [rad]
-        extent_yyp = hist_range_yyp[0] + hist_range_yyp[1]
-        extent_yyp[0] = extent_yyp[0]*1e6  # [um]
-        extent_yyp[1] = extent_yyp[1]*1e6  # [um]
-        extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
-        extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
-        
-        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-       
-
-        # 2D x-y distribution
-        hist_range_xy = [[None, None], [None, None]]
-        hist_range_xy[0] = hist_range[1]
-        hist_range_xy[1] = hist_range_zy[1]
-        extent_xy = hist_range_xy[0] + hist_range_xy[1]
-        extent_xy = [i*1e6 for i in extent_xy]  # [um]
-
-        self.distribution_plot_2D(arr1=xs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xy, axes=axs[2][0], extent=extent_xy, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=ylab, clab=r'$\partial^2 N/\partial x \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        
-
-        # Energy distribution
-        ax = axs[2][1]
-        dN_dE, rel_energ = beam.rel_energy_spectrum()
-        dN_dE = dN_dE/-e
-        ax.fill_between(rel_energ*100, y1=dN_dE, y2=0, color='b', alpha=0.3)
-        ax.plot(rel_energ*100, dN_dE, color='b', alpha=0.3, label='Relative energy density')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(r'$\mathcal{E}/\langle\mathcal{E}\rangle-1$ [%]')
-        ax.set_ylabel('Relative energy density')
-        # Add text to the plot
-        ax.text(0.05, 0.95, r'$\sigma_\mathcal{E}/\langle\mathcal{E}\rangle=$' f'{format(beam.rel_energy_spread()*100, ".2f")}' '%', fontsize=12, color='black', ha='left', va='top', transform=ax.transAxes)
-
-        # 2D z-energy distribution
-        hist_range_energ = [[None, None], [None, None]]
-        hist_range_energ[0] = hist_range[0]
-        hist_range_energ[1] = [ Es.min(), Es.max() ]  # [eV]
-        extent_energ = hist_range_energ[0] + hist_range_energ[1]
-        extent_energ[0] = extent_energ[0]*1e6  # [um]
-        extent_energ[1] = extent_energ[1]*1e6  # [um]
-        extent_energ[2] = extent_energ[2]/1e9  # [GeV]
-        extent_energ[3] = extent_energ[3]/1e9  # [GeV]
-        self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
-
-    
-    # ==================================================
     def scatter_diags(self, beam=None, n_th_particle=1):
         '''
         n_th_particle:  Use this to reduce the amount of plotted particles by only plotting every n_th_particle particle.
@@ -1416,12 +1146,8 @@ class StagePrtclTransWakeInstability(Stage):
         fig.suptitle(r'$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
         cbar_ax = fig.add_axes([0.15, 0.91, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
         fig.colorbar(p, cax=cbar_ax, orientation='horizontal', label=energ_lab)
-        
 
-    # ==================================================
-    # Add plots for diagnosing the beam evolution inside a stage.
 
-    
     # ==================================================
     def plot_Ez_rb_cut(self, z_slices=None, main_num_profile=None, zs_Ez=None, Ez=None, Ez_cut=None, zs_rho=None, bubble_radius=None, zlab=r'$z$ [$\mathrm{\mu}$m]'):
 
@@ -1482,6 +1208,841 @@ class StagePrtclTransWakeInstability(Stage):
         ax_rb_cut_wakeT2.plot(zs_sorted*1e6, bubble_radius_cut*1e6, 'r', label=r'Cut-out $r_\mathrm{b}$')
         ax_rb_cut_wakeT2.set_ylabel(r'Bubble radius [$\mathrm{\mu}$m]')
         ax_rb_cut_wakeT2.legend(loc='upper right')
+        
+
+    # ==================================================
+    def plot_evolution(self):
+        """
+        Plot the evolution of various beam parameters as a function of s.
+        """
+
+        evolution = self.evolution
+        if len(evolution.prop_length) == 0:
+            print('No beam parameter evolution data found.')
+            return
+
+        energies = evolution.energy
+        nom_energy = self.nom_energy_gain + energies[0]
+        prop_length = evolution.prop_length
+        #num_particles = evolution.num_particles
+        charges = evolution.charge
+        
+        x_offsets = evolution.x_offset
+        y_offsets = evolution.y_offset
+        #z_offsets = evolution.z_offset
+        beam_size_xs = evolution.beam_size_x
+        beam_size_ys = evolution.beam_size_y
+        #bunch_lengths = self.evolution.bunch_length
+        rel_energy_spreads = evolution.rel_energy_spread
+        divergence_xs = evolution.divergence_x
+        divergence_ys = evolution.divergence_y
+        rel_energy_offsets = energies/nom_energy-1
+        beta_xs = evolution.beta_x
+        beta_ys = evolution.beta_y
+        norm_emittance_xs = evolution.norm_emittance_x
+        norm_emittance_ys = evolution.norm_emittance_y
+        
+        #long_label = '$s_\mathrm{stage}$ [m]'
+        long_label = r'$\Delta s$ [m]'
+        xlim_max = prop_length.max()
+        xlim_min = prop_length.min()
+
+        # line format
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        #af = 0.2
+        
+        fig, axs = plt.subplots(3,3)
+        fig.set_figwidth(20)
+        fig.set_figheight(12)
+        plt.subplots_adjust(hspace=0.05)  # Reduce the space between subplots
+
+        axs[0,0].plot(np.array([0.0, self.length]), np.array([energies[0], nom_energy])/1e9, ':', color=col0, label='Nominal value')
+        axs[0,0].plot(prop_length, energies/1e9, color=col1)
+        #axs[0,0].plot(prop_length, np.ones_like(prop_length)*nom_energy/1e9, ':', color=col0)
+        #axs[0,0].set_xlabel(long_label)
+        axs[0,0].set(xticklabels=[])
+        axs[0,0].set_ylabel(r'Energy [GeV]')
+        axs[0,0].set_xlim(xlim_min, xlim_max)
+
+        axs[1,0].plot(prop_length, rel_energy_spreads*100, color=col1)
+        #axs[1,0].set_xlabel(long_label)
+        axs[1,0].set(xticklabels=[])
+        axs[1,0].set_ylabel('Energy spread [%]')
+        axs[1,0].set_yscale('log')
+        axs[1,0].set_xlim(xlim_min, xlim_max)
+        
+        axs[2,0].plot(prop_length, np.zeros_like(rel_energy_offsets), ':', color=col0)
+        axs[2,0].plot(prop_length, rel_energy_offsets*100, color=col1)
+        axs[2,0].set_xlabel(long_label)
+        axs[2,0].set_ylabel('Energy offset [%]')
+        axs[2,0].set_xlim(xlim_min, xlim_max)
+
+        axs[0,1].plot(prop_length, charges[0]*np.ones_like(charges)*1e9, ':', color=col0)
+        axs[0,1].plot(prop_length, charges*1e9, color=col1)
+        #axs[0,1].set_xlabel(long_label)
+        axs[0,1].set(xticklabels=[])
+        axs[0,1].set_ylabel('Charge [nC]')
+        axs[0,1].set_xlim(xlim_min, xlim_max)
+
+        #axs[1,1].plot(prop_length, bunch_lengths*1e6, color=col1)
+        #axs[1,1].set_xlabel(long_label)
+        #axs[1,1].set_ylabel(r'Bunch length [$\mathrm{\mu}$m]')
+
+        axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label=r"$\sigma_{x'} $")
+        axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label=r"$\sigma_{y'} $")
+        #axs[1,1].set_xlabel(long_label)
+        axs[1,1].set(xticklabels=[])
+        axs[1,1].set_ylabel(r'Divergence [$\mathrm{\mu}$rad]')
+        axs[1,1].legend()
+        axs[1,1].set_xlim(xlim_min, xlim_max)
+        
+        #axs[2,1].plot(s_centroids, np.zeros(x_angle.shape), ':', color=col0)
+        #axs[2,1].plot(s_centroids, x_angle*1e6, color=col1, marker='x', label=r'$\langle x\' \rangle$')
+        #axs[2,1].plot(s_centroids, y_angle*1e6, color=col2, marker='x', label=r'$\langle y\' \rangle$')
+        ##axs[2,1].plot(s, xp_offset_beam*1e6, color='red')
+        ##axs[2,1].plot(s, yp_offset_beam*1e6, color='black')
+        #axs[2,1].set_xlabel(long_label)
+        #axs[2,1].set_ylabel(r'Angular offset [$\mathrm{\mu}$rad]')
+        #axs[2,1].legend()
+        
+        axs[2,1].plot(prop_length, np.sqrt(energies/energies[0])*beta_xs[0]*1e3, ':', color=col0, label='Nominal value')
+        axs[2,1].plot(prop_length, beta_xs*1e3, color=col1, label=r'$\beta_x$')
+        axs[2,1].plot(prop_length, beta_ys*1e3, color=col2, label=r'$\beta_y$')
+        axs[2,1].set_xlabel(long_label)
+        axs[2,1].set_ylabel(r'Beta function [mm]')
+        axs[2,1].legend()
+        axs[2,1].set_xlim(xlim_min, xlim_max)
+
+        axs[0,2].plot(prop_length, np.ones_like(norm_emittance_xs)*norm_emittance_xs[0]*1e6, ':', color=col0, label='Nominal value')
+        axs[0,2].plot(prop_length, np.ones_like(norm_emittance_ys)*norm_emittance_ys[0]*1e6, ':', color=col0)
+        axs[0,2].plot(prop_length, norm_emittance_xs*1e6, color=col1, label=r'$\varepsilon_{\mathrm{n}x}$')
+        axs[0,2].plot(prop_length, norm_emittance_ys*1e6, color=col2, label=r'$\varepsilon_{\mathrm{n}y}$')
+        #axs[0,2].set_xlabel(long_label)
+        axs[0,2].set(xticklabels=[])
+        axs[0,2].set_ylabel('Emittance, rms [mm mrad]')
+        axs[0,2].set_yscale('log')
+        axs[0,2].legend()
+        axs[0,2].set_xlim(xlim_min, xlim_max)
+
+        axs[1,2].plot(prop_length, (energies[0]/energies)**(1/4)*beam_size_xs[0]*1e6, ':', color=col0, label='Nominal value')
+        axs[1,2].plot(prop_length, (energies[0]/energies)**(1/4)*beam_size_ys[0]*1e6, ':', color=col0)
+        #axs[1,2].plot(prop_length, np.ones_like(beam_size_xs)*beam_size_xs[0]*1e6, ':', color=col0, label='Nominal value')
+        #axs[1,2].plot(prop_length, np.ones(beam_size_ys.shape)*beam_size_ys[0]*1e6, ':', color=col0)
+        axs[1,2].plot(prop_length, beam_size_xs*1e6, color=col1, label=r'$\sigma_x$')
+        axs[1,2].plot(prop_length, beam_size_ys*1e6, color=col2, label=r'$\sigma_y$')
+        #axs[1,2].set_xlabel(long_label)
+        axs[1,2].set(xticklabels=[])
+        axs[1,2].set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
+        axs[1,2].set_yscale('log')
+        axs[1,2].legend()
+        axs[1,2].set_xlim(xlim_min, xlim_max)
+
+        axs[2,2].plot(prop_length, np.zeros_like(x_offsets), ':', color=col0)
+        axs[2,2].plot(prop_length, x_offsets*1e6, color=col1, label=r'$\langle x \rangle$')
+        axs[2,2].plot(prop_length, y_offsets*1e6, color=col2, label=r'$\langle y \rangle$')
+        axs[2,2].set_xlabel(long_label)
+        axs[2,2].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
+        #axs[2,2].set_yscale('log')
+        axs[2,2].legend()
+        axs[2,2].set_xlim(xlim_min, xlim_max)
+
+    
+    # ==================================================
+    # Animate the horizontal sideview (top view)
+    def animate_sideview_x(self, evolution_folder):
+
+        files = sorted(os.listdir(evolution_folder))
+        
+        if len(files) != len(self.evolution.prop_length):
+            raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
+
+        # Set default font size
+        plt.rc('axes', titlesize=13)    # fontsize of the axes title
+        plt.rc('axes', labelsize=10)    # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=9)    # fontsize of the x tick labels
+        plt.rc('ytick', labelsize=9)    # fontsize of the y tick labels
+        plt.rc('legend', fontsize=9)    # legend fontsize
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        
+        # get initial beam
+        beam_init = Beam()
+        beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
+        
+        max_sig_index = np.argmax(self.evolution.beam_size_x)
+        max_sig_beam = Beam()
+        max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
+        dQdzdx0, zs0, xs0 = max_sig_beam.phase_space_density(max_sig_beam.zs, max_sig_beam.xs)
+        dQdx0, _ = max_sig_beam.projected_density(max_sig_beam.xs, bins=xs0)
+        Is0, _ = max_sig_beam.current_profile(bins=zs0/SI.c)
+        
+        # get final beam
+        beam_final = Beam()
+        beam_final = beam_final.load(evolution_folder + os.fsdecode(files[-1]))
+        #dQdzdx_final, zs_final, xs_final = beam_final.phase_space_density(beam_final.zs, beam_final.xs)
+        dQdx_final, _ = beam_final.projected_density(beam_final.xs, bins=xs0)
+        Is_final, _ = beam_final.current_profile(bins=zs0/SI.c)
+        
+        # prepare centroid arrays
+        x0s = []
+        z0s = []
+        Emeans = []
+        sigzs = []
+        sigxs = []
+        ss = []
+        emitns = []
+        # set the colors and transparency
+        col0 = "#cedeeb"
+        col1 = "tab:blue"
+        
+        # frame function
+        def frameFcn(i):
+            
+            # get beam for this frame
+            beam = Beam()
+            beam = beam.load(evolution_folder + os.fsdecode(files[i]))
+            
+            # plot mean energy evolution
+            ss.append(self.evolution.prop_length[i])
+            Emeans.append(beam.energy())
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
+            axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
+            axs[0,0].set_xlabel('Propagation length [m]')
+            axs[0,0].set_ylabel('Mean energy [GeV]')
+            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            axs[0,0].set_ylim(beam_init.energy()*0.9e-9, beam_final.energy()*1.1e-9)
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot emittance and bunch length evolution
+            emitns.append(beam.norm_emittance_x())
+            sigzs.append(beam.bunch_length())
+            ylim_min = np.min([np.min(emitns)*1e6, beam_init.norm_emittance_x()*0.97e6, beam_final.norm_emittance_x()*0.97e6])
+            ylim_max = np.max([np.max(emitns)*1e6, beam_init.norm_emittance_x()*1.05e6, beam_final.norm_emittance_x()*1.05e6])
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigzs)*1e6, np.array(emitns)*1e6, '-', color=col0)
+            axs[0,1].plot(sigzs[-1]*1e6, emitns[-1]*1e6, 'o', color=col1)
+            axs[0,1].set_ylim(ylim_min, ylim_max)
+            #axs[0,1].set_ylim(np.min([np.min(emitns)*0.95e6, beam_final.norm_emittance_x()*0.8e6]), np.max([np.max(emitns)*1.05e6, emitns[0]*1.2e6]))
+            #axs[0,1].set_ylim(np.min(self.evolution.norm_emittance_x)*0.8e6, np.max(self.evolution.norm_emittance_x)*1.2e6)
+            axs[0,1].set_xlim(np.min([np.min(sigzs)*0.95e6, beam_final.bunch_length()*0.8e6]), np.max([np.max(sigzs)*1.05e6, sigzs[0]*1.2e6]))
+            #axs[0,1].set_xlim(np.min(self.evolution.bunch_length)*0.95e6, np.max(self.evolution.bunch_length)*1.05e6)
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel(r'Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Norm. emittance\n[mm mrad]')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdzdx, zs, xs = beam.phase_space_density(beam.zs, beam.xs, hbins=zs0, vbins=xs0)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(zs*1e6, xs*1e6, -dQdzdx, cmap=CONFIG.default_cmap, shading='auto')
+            axs[1,0].set_ylabel(r"Transverse offset, $x$ [$\mathrm{\mu}$m]")
+            axs[1,0].set_title('Horizontal sideview (top view)')
+            
+            # plot current profile
+            af = 0.15
+            Is, ts = beam.current_profile(bins=zs0/SI.c)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
+            axs[2,0].plot(ts*SI.c*1e6, -Is/1e3)
+            axs[2,0].set_xlim([np.min(zs0)*1e6, np.max(zs0)*1e6])
+            axs[2,0].set_ylim([0, np.max([np.max(-Is0), np.max(-Is_final)])*1.3e-3])
+            axs[2,0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$I$ [kA]')
+            
+            # plot position projection
+            dQdx, xs2 = beam.projected_density(beam.xs, bins=xs0)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdx, np.zeros(dQdx.size)))*1e3, np.concatenate((xs2, np.flip(xs2)))*1e6, alpha=af, color=col1)
+            axs[1,1].plot(-dQdx*1e3, xs2*1e6, color=col1)
+            axs[1,1].set_ylim([np.min(xs0)*1e6, np.max(xs0)*1e6])
+            axs[1,1].set_xlim([0, np.max([np.max(-dQdx), np.max(-dQdx_final)])*1.1e3])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel(r"$dQ/dx$ [nC/$\mathrm{\mu}$m]")
+            axs[1,1].set_ylabel(r"$x$ [$\mathrm{\mu}$m]")
+        
+            # plot centroid evolution
+            z0s.append(beam.z_offset())
+            #sigxs.append(beam.beam_size_x())
+            x0s.append(beam.x_offset())
+            ylim_min = pad_downwards(np.min([np.min(x0s), np.min(self.evolution.x_offset)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(x0s), np.max(self.evolution.x_offset)]), padding=0.1)*1e6
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(z0s)*1e6, np.array(x0s)*1e6, '-', color=col0)
+            axs[2,1].plot(z0s[-1]*1e6, x0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel(r'$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel(r'$x$ offset [$\mathrm{\mu}$m]')
+            #axs[2,1].set_xlim(np.min([np.min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, np.max([np.max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
+            axs[2,1].set_xlim((z0s[0]-sigzs[0]/10)*1e6, (np.max(self.evolution.z_offset)+sigzs[0]/10)*1e6)
+            #axs[2,1].set_xlim(np.min(self.evolution.z_offset)*0.95e6, np.max(self.evolution.z_offset)*1.05e6)
+            #axs[2,1].set_ylim(np.min(-np.max(x0s)*1.1, -0.1*sigxs[0])*1e6, np.max(np.max(x0s)*1.1, 0.1*sigxs[0])*1e6)
+            #axs[2,1].set_ylim(np.min(self.evolution.x_offset)*1.1e6, np.max(self.evolution.x_offset)*1.1e6)
+            axs[2,1].set_ylim(ylim_min, ylim_max)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+        
+            return cax
+        
+        animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
+        
+        # save the animation as a GIF
+        plot_path = self.run_path + 'plots' + os.sep
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path +'sideview_x_stage_' + str(self.stage_number)+ '.gif'
+        animation.save(filename, writer="pillow", fps=20)
+
+        # hide the figure
+        plt.close()
+
+        # Reset to default matplotlib settings
+        plt.rcdefaults()
+
+        return filename
+
+
+    # ==================================================
+    # Animate the vertical sideview
+    def animate_sideview_y(self, evolution_folder):
+
+        files = sorted(os.listdir(evolution_folder))
+
+        if len(files) != len(self.evolution.prop_length):
+            raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
+        
+        # Set default font size
+        plt.rc('axes', titlesize=13)    # fontsize of the axes title
+        plt.rc('axes', labelsize=10)    # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=9)    # fontsize of the x tick labels
+        plt.rc('ytick', labelsize=9)    # fontsize of the y tick labels
+        plt.rc('legend', fontsize=9)    # legend fontsize
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        
+        # get initial beam
+        beam_init = Beam()
+        beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
+
+        # Get max beam size beam
+        max_sig_index = np.argmax(self.evolution.beam_size_y)
+        max_sig_beam = Beam()
+        max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
+        dQdzdy0, zs0, ys0 = max_sig_beam.phase_space_density(max_sig_beam.zs, max_sig_beam.ys)
+        dQdy0, _ = max_sig_beam.projected_density(max_sig_beam.ys, bins=ys0)
+        Is0, _ = max_sig_beam.current_profile(bins=zs0/SI.c)
+        
+        # get final beam
+        beam_final = Beam()
+        beam_final = beam_final.load(evolution_folder + os.fsdecode(files[-1]))
+        #dQdzdy_final, zs_final, ys_final = beam_final.phase_space_density(beam_final.zs, beam_final.ys)
+        dQdy_final, _ = beam_final.projected_density(beam_final.ys, bins=ys0)
+        Is_final, _ = beam_final.current_profile(bins=zs0/SI.c)
+        
+        # prepare centroid arrays
+        y0s = []
+        z0s = []
+        Emeans = []
+        sigzs = []
+        sigys = []
+        ss = []
+        emitns = []
+        # set the colors and transparency
+        col0 = "#f5d9c1"
+        col1 = "tab:orange"
+        
+        # frame function
+        def frameFcn(i):
+            
+            # get beam for this frame
+            beam = Beam()
+            beam = beam.load(evolution_folder + os.fsdecode(files[i]))
+            
+            # plot mean energy evolution
+            ss.append(self.evolution.prop_length[i])
+            Emeans.append(beam.energy())
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
+            axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
+            axs[0,0].set_xlabel('Propagation length [m]')
+            axs[0,0].set_ylabel('Mean energy [GeV]')
+            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            axs[0,0].set_ylim(beam_init.energy()*0.9e-9, beam_final.energy()*1.1e-9)
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot emittance and bunch length evolution
+            emitns.append(beam.norm_emittance_y())
+            sigzs.append(beam.bunch_length())
+            ylim_min = np.min([np.min(emitns)*1e6, beam_init.norm_emittance_y()*0.97e6, beam_final.norm_emittance_y()*0.97e6])
+            ylim_max = np.max([np.max(emitns)*1e6, beam_init.norm_emittance_y()*1.05e6, beam_final.norm_emittance_y()*1.05e6])
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigzs)*1e6, np.array(emitns)*1e6, '-', color=col0)
+            axs[0,1].plot(sigzs[-1]*1e6, emitns[-1]*1e6, 'o', color=col1)
+            axs[0,1].set_ylim(ylim_min, ylim_max)
+            axs[0,1].set_xlim(np.min([np.min(sigzs)*0.95e6, beam_final.bunch_length()*0.8e6]), np.max([np.max(sigzs)*1.05e6, sigzs[0]*1.2e6]))
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel(r'Bunch length [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Norm. emittance\n[mm mrad]')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdzdy, zs, ys = beam.phase_space_density(beam.zs, beam.ys, hbins=zs0, vbins=ys0)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(zs*1e6, ys*1e6, -dQdzdy, cmap=CONFIG.default_cmap, shading='auto')
+            axs[1,0].set_ylabel(r"Transverse offset, $y$ [$\mathrm{\mu}$m]")
+            axs[1,0].set_title('Vertical sideview')
+            
+            # plot current profile
+            af = 0.15
+            Is, ts = beam.current_profile(bins=zs0/SI.c)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((ts, np.flip(ts)))*SI.c*1e6, -np.concatenate((Is, np.zeros(Is.size)))/1e3, alpha=af, color=col1)
+            axs[2,0].plot(ts*SI.c*1e6, -Is/1e3, color=col1)
+            axs[2,0].set_xlim([np.min(zs0)*1e6, np.max(zs0)*1e6])
+            axs[2,0].set_ylim([0, np.max([np.max(-Is0), np.max(-Is_final)])*1.3e-3])
+            axs[2,0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel('$I$ [kA]')
+            
+            # plot position projection
+            dQdy, ys2 = beam.projected_density(beam.ys, bins=ys0)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdy, np.zeros(dQdy.size)))*1e3, np.concatenate((ys2, np.flip(ys2)))*1e6, alpha=af, color=col1)
+            axs[1,1].plot(-dQdy*1e3, ys2*1e6, color=col1)
+            axs[1,1].set_ylim([np.min(ys0)*1e6, np.max(ys0)*1e6])
+            axs[1,1].set_xlim([0, np.max([np.max(-dQdy), np.max(-dQdy_final)])*1.1e3])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel(r"$dQ/dy$ [nC/$\mathrm{\mu}$m]")
+            axs[1,1].set_ylabel(r"$y$ [$\mathrm{\mu}$m]")
+        
+            # plot centroid evolution
+            z0s.append(beam.z_offset())
+            #sigys.append(beam.beam_size_y())
+            y0s.append(beam.y_offset())
+            ylim_min = pad_downwards(np.min([np.min(y0s), np.min(self.evolution.y_offset)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(y0s), np.max(self.evolution.y_offset)]), padding=0.1)*1e6
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(z0s)*1e6, np.array(y0s)*1e6, '-', color=col0)
+            axs[2,1].plot(z0s[-1]*1e6, y0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel(r'$z$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel(r'$y$ offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_xlim(np.min([np.min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, np.max([np.max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
+            axs[2,1].set_ylim(ylim_min, ylim_max)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+        
+            return cax
+        
+        animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
+        
+        # save the animation as a GIF
+        plot_path = self.run_path + 'plots' + os.sep
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path +'sideview_y_stage_' + str(self.stage_number)+ '.gif'
+        animation.save(filename, writer="pillow", fps=20)
+
+        # hide the figure
+        plt.close()
+
+        # Reset to default matplotlib settings
+        plt.rcdefaults()
+
+        return filename
+
+
+    # ==================================================
+    # Animate the horizontal phase space
+    def animate_phasespace_x(self, evolution_folder):
+
+        files = sorted(os.listdir(evolution_folder))
+
+        if len(files) != len(self.evolution.prop_length):
+            raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
+
+        # Set default font size
+        plt.rc('axes', titlesize=13)    # fontsize of the axes title
+        plt.rc('axes', labelsize=10)    # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=9)    # fontsize of the x tick labels
+        plt.rc('ytick', labelsize=9)    # fontsize of the y tick labels
+        plt.rc('legend', fontsize=9)    # legend fontsize
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        # get initial beam
+        beam_init = Beam()
+        beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
+
+        # get max beam size beam
+        max_sig_index = np.argmax(self.evolution.beam_size_x)
+        max_sig_beam = Beam()
+        max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
+        dQdxdpx0, xs0, _ = max_sig_beam.phase_space_density(max_sig_beam.xs, max_sig_beam.pxs)
+
+        # get max divergence beam
+        max_sig_xp_index = np.argmax(self.evolution.divergence_y)
+        max_sig_xp_beam = Beam()
+        max_sig_xp_beam = max_sig_xp_beam.load(evolution_folder + os.fsdecode(files[max_sig_xp_index]))
+        _, _, pxs0 = max_sig_xp_beam.phase_space_density(max_sig_xp_beam.xs, max_sig_xp_beam.pxs)
+        
+        # get final beam
+        beam_final = Beam()
+        beam_final = beam_final.load(evolution_folder + os.fsdecode(files[-1]))
+        _, _, pxs_final = beam_final.phase_space_density(beam_final.xs, beam_final.pxs)
+
+        # calculate limits
+        #pxlim = np.max(np.abs(pxs0))
+        pxlim = np.max([np.max(np.abs(pxs0)), np.max(np.abs(pxs_final))])
+        if np.max(np.abs(pxs_final)) > np.max(np.abs(pxs0)):
+            pxs0 = pxs_final
+        
+        # calculate projections
+        #dQdx0, _ = max_sig_beam.projected_density(max_sig_beam.xs, bins=xs0)
+        #dQdpx0, _ = max_sig_xp_beam.projected_density(max_sig_xp_beam.pxs, bins=pxs0)
+        dQdx0, _ = max_sig_xp_beam.projected_density(max_sig_xp_beam.xs, bins=xs0)
+        dQdpx0, _ = max_sig_beam.projected_density(max_sig_beam.pxs, bins=pxs0)
+        dQdx_final, _ = beam_final.projected_density(beam_final.xs, bins=xs0)
+        dQdpx_final, _ = beam_final.projected_density(beam_final.pxs, bins=pxs0)
+        
+        # prepare centroid arrays
+        x0s = []
+        xp0s = []
+        sigxs = []
+        sigxps = []
+        ss = []
+        emitns = []
+        
+        # set the colors and transparency
+        col0 = "#cedeeb"
+        col1 = "tab:blue"
+        
+        # frame function
+        def frameFcn(i):
+            
+            # get beam for this frame
+            beam = Beam()
+            beam = beam.load(evolution_folder + os.fsdecode(files[i]))
+            
+            # plot emittance evolution
+            ss.append(self.evolution.prop_length[i])
+            emitns.append(beam.norm_emittance_x(clean=False))
+            ylim_min = np.min([np.min(emitns)*1e6, beam_init.norm_emittance_x()*0.97e6, beam_final.norm_emittance_x()*0.97e6])
+            ylim_max = np.max([np.max(emitns)*1e6, beam_init.norm_emittance_x()*1.05e6, beam_final.norm_emittance_x()*1.05e6])
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(emitns)*1e6, '-', color=col0)
+            axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
+            axs[0,0].set_xlabel('Propagation distance [m]')
+            axs[0,0].set_ylabel('Norm. emittance\n[mm mrad]')
+            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            #axs[0,0].set_ylim(beam_init.norm_emittance_x()*0.9e6, np.max(self.evolution.norm_emittance_x)*1.2e6)
+            axs[0,0].set_ylim(ylim_min, ylim_max)
+            #axs[0,0].set_yscale('log')
+            #axs[0,0].yaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot beam size and divergence evolution
+            sigxs.append(beam.beam_size_x())
+            sigxps.append(beam.divergence_x())
+            xlim_min = np.min([np.min(sigxs)*0.9e6,  beam_final.beam_size_x()*0.9e6])
+            xlim_max = np.max([np.max(sigxs)*1.1e6, max_sig_beam.beam_size_x()*1.1e6])
+            ylim_min = np.min([np.min(sigxps)*0.9e3, np.min(self.evolution.divergence_x)*0.9e3])
+            ylim_max = np.max([np.max(sigxps)*1.1e3, max_sig_xp_beam.divergence_x()*1.1e3])
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigxs)*1e6, np.array(sigxps)*1e3, '-', color=col0)
+            axs[0,1].plot(sigxs[-1]*1e6, sigxps[-1]*1e3, 'o', color=col1)
+            axs[0,1].set_xlim(xlim_min, xlim_max)
+            #axs[0,1].set_xlim(beam_init.beam_size_x()*0.8e6, max_sig_beam.beam_size_x()*1.2e6)
+            #axs[0,1].set_ylim(np.min([np.min(sigxps)*0.9e3, beam_final.divergence_x()*0.8e3]), np.max([np.max(sigxps)*1.1e3, sigxs[0]*1.2e3]))
+            #axs[0,1].set_ylim(np.min(self.evolution.divergence_x)*0.9e3, max_sig_xp_beam.divergence_x()*1.1e3)
+            axs[0,1].set_ylim(ylim_min, ylim_max)
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel(r'Beam size [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Divergence [mrad]')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdxdpx, xs, pxs = beam.phase_space_density(beam.xs, beam.pxs, hbins=xs0, vbins=pxs0)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(xs*1e6, pxs*1e-6*SI.c/SI.e, -dQdxdpx, cmap=CONFIG.default_cmap, shading='auto')
+            axs[1,0].set_ylabel("Momentum, $p_x$ [MeV/c]")
+            axs[1,0].set_title('Horizontal phase space')
+            axs[1,0].set_ylim([-pxlim*1e-6*SI.c/SI.e, pxlim*1e-6*SI.c/SI.e])
+            
+            # plot position projection
+            af = 0.15
+            dQdx, xs2 = beam.projected_density(beam.xs, bins=xs0)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((xs2, np.flip(xs2)))*1e6, -np.concatenate((dQdx, np.zeros(dQdx.size)))*1e3, alpha=af, color=col1)
+            axs[2,0].plot(xs2*1e6, -dQdx*1e3, color=col1)
+            axs[2,0].set_xlim([np.min(xs0)*1e6, np.max(xs0)*1e6])
+            axs[2,0].set_ylim([0, np.max([np.max(-dQdx0), np.max(-dQdx_final)])*1.2e3])
+            axs[2,0].set_xlabel(r'Transverse position, $x$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel(r'$dQ/dx$ [nC/$\mathrm{\mu}$m]')
+            
+            # plot angular projection
+            dQdpx, pxs2 = beam.projected_density(beam.pxs, bins=pxs0)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdpx, np.zeros(dQdpx.size)))*1e9/(1e-6*SI.c/SI.e), np.concatenate((pxs2, np.flip(pxs2)))*1e-6*SI.c/SI.e, alpha=af, color=col1)
+            axs[1,1].plot(-dQdpx*1e9/(1e-6*SI.c/SI.e), pxs2*1e-6*SI.c/SI.e, color=col1)
+            axs[1,1].set_xlim([0, np.max([np.max(-dQdpx0), np.max(-dQdpx_final)])*1e9/(1e-6*SI.c/SI.e)*1.2])
+            axs[1,1].set_ylim([-pxlim*1e-6*SI.c/SI.e, pxlim*1e-6*SI.c/SI.e])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel(r"$dQ/dp_x$ [nC c/MeV]")
+            axs[1,1].set_ylabel("Momentum, $p_x$ [MeV/c]")
+            
+            # plot centroid evolution
+            x0s.append(beam.x_offset())
+            xp0s.append(beam.x_angle())
+            xlim_min = pad_downwards(np.min([np.min(x0s), np.min(self.evolution.x_offset)]), padding=0.1)*1e6
+            xlim_max = pad_upwards(np.max([np.max(x0s), np.max(self.evolution.x_offset)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(xp0s), np.min(self.evolution.x_angle)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(xp0s), np.max(self.evolution.x_angle)]), padding=0.1)*1e6
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(x0s)*1e6, np.array(xp0s)*1e6, '-', color=col0)
+            axs[2,1].plot(x0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel(r'Centroid offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel(r'Centroid angle [$\mathrm{\mu}$rad]')
+            axs[2,1].set_xlim(xlim_min, xlim_max)
+            axs[2,1].set_ylim(ylim_min, ylim_max)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+            
+            return cax
+        
+        # make all frames
+        animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
+        
+        # save the animation as a GIF
+        plot_path = self.run_path + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'phasespace_x_stage_' + str(self.stage_number) + '.gif'
+        animation.save(filename, writer="pillow", fps=20)
+
+        # hide the figure
+        plt.close()
+
+        return filename
+
+
+    # ==================================================
+    # Animate the vertical phase space
+    def animate_phasespace_y(self, evolution_folder):
+
+        files = sorted(os.listdir(evolution_folder))
+
+        if len(files) != len(self.evolution.prop_length):
+            raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
+
+        # Set default font size
+        plt.rc('axes', titlesize=13)    # fontsize of the axes title
+        plt.rc('axes', labelsize=10)    # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=9)    # fontsize of the x tick labels
+        plt.rc('ytick', labelsize=9)    # fontsize of the y tick labels
+        plt.rc('legend', fontsize=9)    # legend fontsize
+        
+        # set up figure
+        fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
+        fig.set_figwidth(CONFIG.plot_width_default*0.8)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+        
+        # get initial beam
+        beam_init = Beam()
+        beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
+
+        # get max beam size beam
+        max_sig_index = np.argmax(self.evolution.beam_size_y)
+        max_sig_beam = Beam()
+        max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
+        dQdydpy0, ys0, _ = max_sig_beam.phase_space_density(max_sig_beam.ys, max_sig_beam.pys)
+
+        # get max divergence beam
+        max_sig_yp_index = np.argmax(self.evolution.divergence_y)
+        max_sig_yp_beam = Beam()
+        max_sig_yp_beam = max_sig_yp_beam.load(evolution_folder + os.fsdecode(files[max_sig_yp_index]))
+        _, _, pys0 = max_sig_yp_beam.phase_space_density(max_sig_yp_beam.ys, max_sig_yp_beam.pys)
+        
+        # get final beam
+        beam_final = Beam()
+        beam_final = beam_final.load(evolution_folder + os.fsdecode(files[-1]))
+        _, _, pys_final = beam_final.phase_space_density(beam_final.ys, beam_final.pys)
+
+        # calculate limits
+        #pylim = np.max(np.abs(pys0))
+        pylim = np.max([np.max(np.abs(pys0)), np.max(np.abs(pys_final))])
+        if np.max(np.abs(pys_final)) > np.max(np.abs(pys0)):
+            pys0 = pys_final
+        
+        # calculate projections
+        #dQdy0, _ = max_sig_beam.projected_density(max_sig_beam.ys, bins=ys0)
+        #dQdpy0, _ = max_sig_yp_beam.projected_density(max_sig_yp_beam.pys, bins=pys0)
+        dQdy0, _ = max_sig_yp_beam.projected_density(max_sig_yp_beam.ys, bins=ys0)
+        dQdpy0, _ = max_sig_beam.projected_density(max_sig_beam.pys, bins=pys0)
+        dQdy_final, _ = beam_final.projected_density(beam_final.ys, bins=ys0)
+        dQdpy_final, _ = beam_final.projected_density(beam_final.pys, bins=pys0)
+        
+        # prepare centroid arrays
+        y0s = []
+        yp0s = []
+        sigys = []
+        sigyps = []
+        ss = []
+        emitns = []
+        
+        # set the colors and transparency
+        col0 = "#f5d9c1"
+        col1 = "tab:orange"
+        
+        # frame function
+        def frameFcn(i):
+            
+            # get beam for this frame
+            beam = Beam()
+            beam = beam.load(evolution_folder + os.fsdecode(files[i]))
+            
+            # plot emittance evolution
+            ss.append(self.evolution.prop_length[i])
+            emitns.append(beam.norm_emittance_y(clean=False))
+            ylim_min = np.min([np.min(emitns)*1e6, beam_init.norm_emittance_y()*0.97e6, beam_final.norm_emittance_y()*0.97e6])
+            ylim_max = np.max([np.max(emitns)*1e6, beam_init.norm_emittance_y()*1.05e6, beam_final.norm_emittance_y()*1.05e6])
+            axs[0,0].cla()
+            axs[0,0].plot(np.array(ss), np.array(emitns)*1e6, '-', color=col0)
+            axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
+            axs[0,0].set_xlabel('Propagation distance [m]')
+            axs[0,0].set_ylabel('Norm. emittance\n[mm mrad]')
+            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            axs[0,0].set_ylim(ylim_min, ylim_max)
+            #axs[0,0].set_yscale('log')
+            #axs[0,0].yaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,0].xaxis.tick_top()
+            axs[0,0].xaxis.set_label_position('top')
+            
+            # plot beam size and divergence evolution
+            sigys.append(beam.beam_size_y())
+            sigyps.append(beam.divergence_y())
+            xlim_min = np.min([np.min(sigys)*0.9e6,  beam_final.beam_size_y()*0.9e6])
+            #xlim_max = np.max([np.max(sigys)*1.1e6, max_sig_beam.beam_size_y()*1.1e6])
+            xlim_max = np.max([np.max(sigys)*1.1e6, sigys[0]*1.1e6])
+            ylim_min = np.min([np.min(sigyps)*0.9e3, np.min(self.evolution.divergence_y)*0.9e3])
+            #ylim_max = np.max([np.max(sigyps)*1.1e3, max_sig_yp_beam.divergence_y()*1.1e3])
+            ylim_max = np.max([np.max(sigyps)*1.1e3, sigyps[0]*1.1e3])
+            axs[0,1].cla()
+            axs[0,1].plot(np.array(sigys)*1e6, np.array(sigyps)*1e3, '-', color=col0)
+            axs[0,1].plot(sigys[-1]*1e6, sigyps[-1]*1e3, 'o', color=col1)
+            axs[0,1].set_xlim(xlim_min, xlim_max)
+            axs[0,1].set_ylim(ylim_min, ylim_max)
+            axs[0,1].set_xscale('log')
+            axs[0,1].set_yscale('log')
+            axs[0,1].set_xlabel(r'Beam size [$\mathrm{\mu}$m]')
+            axs[0,1].set_ylabel('Divergence [mrad]')
+            axs[0,1].yaxis.tick_right()
+            axs[0,1].yaxis.set_label_position('right')
+            axs[0,1].xaxis.tick_top()
+            axs[0,1].xaxis.set_label_position('top')
+            axs[0,1].xaxis.set_minor_formatter(mticker.NullFormatter())
+            axs[0,1].yaxis.set_minor_formatter(mticker.NullFormatter())
+            
+            # plot phase space
+            dQdydpy, ys, pys = beam.phase_space_density(beam.ys, beam.pys, hbins=ys0, vbins=pys0)
+            axs[1,0].cla()
+            cax = axs[1,0].pcolor(ys*1e6, pys*1e-6*SI.c/SI.e, -dQdydpy, cmap=CONFIG.default_cmap, shading='auto')
+            axs[1,0].set_ylabel("Momentum, $p_y$ [MeV/c]")
+            axs[1,0].set_title('Vertical phase space')
+            axs[1,0].set_ylim([-pylim*1e-6*SI.c/SI.e, pylim*1e-6*SI.c/SI.e])
+            
+            # plot position projection
+            af = 0.15
+            dQdy, ys2 = beam.projected_density(beam.ys, bins=ys0)
+            axs[2,0].cla()
+            axs[2,0].fill(np.concatenate((ys2, np.flip(ys2)))*1e6, -np.concatenate((dQdy, np.zeros(dQdy.size)))*1e3, alpha=af, color=col1)
+            axs[2,0].plot(ys2*1e6, -dQdy*1e3, color=col1)
+            axs[2,0].set_xlim([np.min(ys0)*1e6, np.max(ys0)*1e6])
+            axs[2,0].set_ylim([0, np.max([np.max(-dQdy0), np.max(-dQdy_final)])*1.2e3])
+            axs[2,0].set_xlabel(r'Transverse position, $y$ [$\mathrm{\mu}$m]')
+            axs[2,0].set_ylabel(r'$dQ/dy$ [nC/$\mathrm{\mu}$m]')
+            
+            # plot angular projection
+            dQdpy, pys2 = beam.projected_density(beam.pys, bins=pys0)
+            axs[1,1].cla()
+            axs[1,1].fill(-np.concatenate((dQdpy, np.zeros(dQdpy.size)))*1e9/(1e-6*SI.c/SI.e), np.concatenate((pys2, np.flip(pys2)))*1e-6*SI.c/SI.e, alpha=af, color=col1)
+            axs[1,1].plot(-dQdpy*1e9/(1e-6*SI.c/SI.e), pys2*1e-6*SI.c/SI.e, color=col1)
+            axs[1,1].set_xlim([0, np.max([np.max(-dQdpy0), np.max(-dQdpy_final)])*1e9/(1e-6*SI.c/SI.e)*1.2])
+            axs[1,1].set_ylim([-pylim*1e-6*SI.c/SI.e, pylim*1e-6*SI.c/SI.e])
+            axs[1,1].yaxis.tick_right()
+            axs[1,1].yaxis.set_label_position('right')
+            axs[1,1].xaxis.set_label_position('top')
+            axs[1,1].set_xlabel(r"$dQ/dp_y$ [nC c/MeV]")
+            axs[1,1].set_ylabel("Momentum, $p_y$ [MeV/c]")
+            
+            # plot centroid evolution
+            y0s.append(beam.y_offset())
+            yp0s.append(beam.y_angle())
+            xlim_min = pad_downwards(np.min([np.min(y0s), np.min(self.evolution.y_offset)]), padding=0.1)*1e6
+            xlim_max = pad_upwards(np.max([np.max(y0s), np.max(self.evolution.y_offset)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(yp0s), np.min(self.evolution.y_angle)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(yp0s), np.max(self.evolution.y_angle)]), padding=0.1)*1e6
+            axs[2,1].cla()
+            axs[2,1].plot(np.array(y0s)*1e6, np.array(yp0s)*1e6, '-', color=col0)
+            axs[2,1].plot(y0s[-1]*1e6, yp0s[-1]*1e6, 'o', color=col1)
+            axs[2,1].set_xlabel(r'Centroid offset [$\mathrm{\mu}$m]')
+            axs[2,1].set_ylabel(r'Centroid angle [$\mathrm{\mu}$rad]')
+            axs[2,1].set_xlim(xlim_min, xlim_max)
+            axs[2,1].set_ylim(ylim_min, ylim_max)
+            axs[2,1].yaxis.tick_right()
+            axs[2,1].yaxis.set_label_position('right')
+            
+            return cax
+        
+        # make all frames
+        animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
+        
+        # save the animation as a GIF
+        plot_path = self.run_path + 'plots/'
+        if not os.path.exists(plot_path):
+            os.makedirs(plot_path)
+        filename = plot_path + 'phasespace_y_stage_' + str(self.stage_number) + '.gif'
+        animation.save(filename, writer="pillow", fps=20)
+
+        # hide the figure
+        plt.close()
+
+        return filename
 
     
     # ==================================================
@@ -1565,7 +2126,7 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def print_current_summary(self, drive_beam, initial_main_beam, beam_out, clean=False):
 
-        with open(self.diag_path + 'output.txt', 'w') as f:
+        with open(self.run_path + 'output.txt', 'w') as f:
             print('============================================================================', file=f)
             print(f"Time step [betatron wavelength/c]:\t\t {self.time_step_mod :.3f}", file=f)
             print(f"Interstages enabled:\t\t\t\t {str(self.interstages_enabled) :s}", file=f)
@@ -1596,14 +2157,14 @@ class StagePrtclTransWakeInstability(Stage):
                 print(f"Symmetrised drive beam:\t\t\t\t Not symmetrised.\n", file=f)
 
             print(f"Ramp beta magnification:\t\t\t {self.ramp_beta_mag :.3f}", file=f)
-            print(f"Radiation reaction enabled:\t\t\t {str(self.enable_radiation_reaction) :s}", file=f)
             print(f"Transverse wake instability enabled:\t\t {str(self.enable_tr_instability) :s}", file=f)
             print(f"Radiation reaction enabled:\t\t\t {str(self.enable_radiation_reaction) :s}", file=f)
             print(f"Ion motion enabled:\t\t\t\t {str(self.enable_ion_motion) :s}", file=f)
             print(f"\tIon charge number:\t\t\t {self.ion_charge_num :.3f}", file=f)
             print(f"\tIon mass [u]:\t\t\t\t {self.ion_mass/SI.physical_constants['atomic mass constant'][0] :.3f}", file=f)
-            print(f"\tnum_z_cells:\t\t\t\t {self.num_z_cells :d}", file=f)
-            print(f"\tnum_xy_cells_rft:\t\t\t {self.num_xy_cells_rft :d}", file=f)
+            print(f"\tnum_z_cells:\t\t\t\t {self.num_z_cells_main :d}", file=f)
+            print(f"\tnum_x_cells_rft:\t\t\t {self.num_x_cells_rft :d}", file=f)
+            print(f"\tnum_y_cells_rft:\t\t\t {self.num_y_cells_rft :d}", file=f)
             print(f"\tnum_xy_cells_probe:\t\t\t {self.num_xy_cells_probe :d}", file=f)
             print(f"\tupdate_factor:\t\t\t\t {self.update_factor :.3f}\n", file=f)
             
@@ -1650,11 +2211,16 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Current beam x angular offset [urad]:\t\t  \t\t\t {beam_out.x_angle(clean=clean)*1e6 :.3f}", file=f)
             print(f"Initial beam y angular offset [urad]:\t\t {drive_beam.y_angle(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.y_angle(clean=clean)*1e6 :.3f}", file=f)
             print(f"Current beam y angular offset [urad]:\t\t  \t\t\t {beam_out.y_angle(clean=clean)*1e6 :.3f}\n", file=f)
-    
-            print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x(clean=clean)*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=clean)*1e6 :.3f}", file=f)
-            print(f"Current normalised x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x(clean=clean)*1e6 :.3f}", file=f)
-            print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y(clean=clean)*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y(clean=clean)*1e6 :.3f}", file=f)
-            print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y(clean=clean)*1e6 :.3f}\n", file=f)
+
+            print(f"Initial normalised x emittance [mm mrad]:\t {drive_beam.norm_emittance_x(clean=False)*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=False)*1e6 :.3f}", file=f)
+            print(f"Current normalised x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x(clean=False)*1e6 :.3f}", file=f)
+            print(f"Initial normalised y emittance [mm mrad]:\t {drive_beam.norm_emittance_y(clean=False)*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y(clean=False)*1e6 :.3f}", file=f)
+            print(f"Current normalised y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y(clean=False)*1e6 :.3f}\n", file=f)
+            
+            print(f"Initial cleaned norm. x emittance [mm mrad]:\t {drive_beam.norm_emittance_x(clean=True)*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=True)*1e6 :.3f}", file=f)
+            print(f"Current cleaned norm. x emittance [mm mrad]:\t  \t\t\t {beam_out.norm_emittance_x(clean=True)*1e6 :.3f}", file=f)
+            print(f"Initial cleaned norm. y emittance [mm mrad]:\t {drive_beam.norm_emittance_y(clean=True)*1e6 :.3f} \t\t {initial_main_beam.norm_emittance_y(clean=True)*1e6 :.3f}", file=f)
+            print(f"Current cleaned norm. y emittance [mm mrad]:\t \t \t\t {beam_out.norm_emittance_y(clean=True)*1e6 :.3f}\n", file=f)
             
             print(f"Initial angular momentum [mm mrad]:\t\t {drive_beam.angular_momentum()*1e6 :.3f} \t\t\t {initial_main_beam.angular_momentum()*1e6 :.3f}", file=f)
             print(f"Current angular momentum [mm mrad]:\t\t  \t\t\t {beam_out.angular_momentum()*1e6 :.3f}\n", file=f)
@@ -1678,6 +2244,202 @@ class StagePrtclTransWakeInstability(Stage):
             print('-------------------------------------------------------------------------------------', file=f)
         f.close() # Close the file
 
-        with open(self.diag_path + 'output.txt', 'r') as f:
+        with open(self.run_path + 'output.txt', 'r') as f:
             print(f.read())
         f.close()
+
+#vvvvvvvvvvvvvvvvvvvvvv Not currently in use vvvvvvvvvvvvvvvvvvvvvv
+
+#    
+#
+#    
+#    # ==================================================
+#    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', reduce_cax_pad=False):
+#
+#        if weights is None:
+#            weights = self.main_beam.weightings()
+#        if hist_bins is None:
+#            nbins = int(np.sqrt(len(arr1)/2))
+#            hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
+#        if hist_range is None:
+#            hist_range = [[None, None], [None, None]]
+#            hist_range[0] = [ arr1.min(), arr1.max() ]  # List contains 2 lists of 2 floats. Extent of the histogram along each direction
+#            hist_range[1] = [ arr2.min(), arr2.max() ]
+#        if extent is None:
+#            extent = hist_range[0] + hist_range[1]
+#        
+#        binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
+#        beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
+#        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, 
+#                  xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
+#
+#    
+#    # ==================================================
+#    def density_map_diags(self, beam=None, plot_centroids=False, save_plots=True):
+#        
+#        #colors = ['white', 'aquamarine', 'lightgreen', 'green']
+#        #colors = ['white', 'forestgreen', 'limegreen', 'lawngreen', 'aquamarine', 'deepskyblue']
+#        #bounds = [0, 0.2, 0.4, 0.8, 1]
+#        #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
+#        
+#        cmap = CONFIG.default_cmap
+#
+#        if beam is None:
+#            beam = self.main_beam
+#
+#        # Macroparticles data
+#        zs = beam.zs()
+#        xs = beam.xs()
+#        xps = beam.xps()
+#        ys = beam.ys()
+#        yps = beam.yps()
+#        Es = beam.Es()
+#        weights = beam.weightings()
+#
+#        # Labels for plots
+#        zlab = r'$z$ [$\mathrm{\mu}$m]'
+#        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
+#        xlab = r'$x$ [$\mathrm{\mu}$m]'
+#        ylab = r'$y$ [$\mathrm{\mu}$m]'
+#        xps_lab = '$x\'$ [mrad]'
+#        yps_lab = '$y\'$ [mrad]'
+#        energ_lab = r'$\mathcal{E}$ [GeV]'
+#        
+#        # Set up a figure with axes
+#        fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
+#        fig.suptitle(r'$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
+#
+#        nbins = int(np.sqrt(len(weights)/2))
+#        hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
+#
+#        # 2D z-x distribution
+#        hist_range = [[None, None], [None, None]]
+#        hist_range[0] = [ zs.min(), zs.max() ]  # [m], list contains 2 lists of 2 floats. Extent of the histogram along each direction
+#        hist_range[1] = [ xs.min(), xs.max() ]
+#        extent_zx = hist_range[0] + hist_range[1]
+#        extent_zx = [i*1e6 for i in extent_zx]  # [um]
+#
+#        self.distribution_plot_2D(arr1=zs, arr2=xs, weights=weights, hist_bins=hist_bins, hist_range=hist_range, axes=axs[0][0], extent=extent_zx, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xlab, clab=r'$\partial^2 N/\partial\xi \partial x$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D z-x' distribution
+#        hist_range_xps = [[None, None], [None, None]]
+#        hist_range_xps[0] = hist_range[0]
+#        hist_range_xps[1] = [ xps.min(), xps.max() ]  # [rad]
+#        extent_xps = hist_range_xps[0] + hist_range_xps[1]
+#        extent_xps[0] = extent_xps[0]*1e6  # [um]
+#        extent_xps[1] = extent_xps[1]*1e6  # [um]
+#        extent_xps[2] = extent_xps[2]*1e3  # [mrad]
+#        extent_xps[3] = extent_xps[3]*1e3  # [mrad]
+#
+#        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#        
+#        
+#        # 2D x-x' distribution
+#        hist_range_xxp = [[None, None], [None, None]]
+#        hist_range_xxp[0] = hist_range[1]
+#        hist_range_xxp[1] = [ xps.min(), xps.max() ]  # [rad]
+#        extent_xxp = hist_range_xxp[0] + hist_range_xxp[1]
+#        extent_xxp[0] = extent_xxp[0]*1e6  # [um]
+#        extent_xxp[1] = extent_xxp[1]*1e6  # [um]
+#        extent_xxp[2] = extent_xxp[2]*1e3  # [mrad]
+#        extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
+#
+#        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D z-y distribution
+#        hist_range_zy = [[None, None], [None, None]]
+#        hist_range_zy[0] = hist_range[0]
+#        hist_range_zy[1] = [ ys.min(), ys.max() ]
+#        extent_zy = hist_range_zy[0] + hist_range_zy[1]
+#        extent_zy = [i*1e6 for i in extent_zy]  # [um]
+#
+#        self.distribution_plot_2D(arr1=zs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_zy, axes=axs[1][0], extent=extent_zy, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=ylab, clab=r'$\partial^2 N/\partial\xi \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D z-y' distribution
+#        hist_range_yps = [[None, None], [None, None]]
+#        hist_range_yps[0] = hist_range[0]
+#        hist_range_yps[1] = [ yps.min(), yps.max() ]  # [rad]
+#        extent_yps = hist_range_yps[0] + hist_range_yps[1]
+#        extent_yps[0] = extent_yps[0]*1e6  # [um]
+#        extent_yps[1] = extent_yps[1]*1e6  # [um]
+#        extent_yps[2] = extent_yps[2]*1e3  # [mrad]
+#        extent_yps[3] = extent_yps[3]*1e3  # [mrad]
+#        
+#        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D y-y' distribution
+#        hist_range_yyp = [[None, None], [None, None]]
+#        hist_range_yyp[0] = hist_range_zy[1]
+#        hist_range_yyp[1] = [ yps.min(), yps.max() ]  # [rad]
+#        extent_yyp = hist_range_yyp[0] + hist_range_yyp[1]
+#        extent_yyp[0] = extent_yyp[0]*1e6  # [um]
+#        extent_yyp[1] = extent_yyp[1]*1e6  # [um]
+#        extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
+#        extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
+#        
+#        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#       
+#
+#        # 2D x-y distribution
+#        hist_range_xy = [[None, None], [None, None]]
+#        hist_range_xy[0] = hist_range[1]
+#        hist_range_xy[1] = hist_range_zy[1]
+#        extent_xy = hist_range_xy[0] + hist_range_xy[1]
+#        extent_xy = [i*1e6 for i in extent_xy]  # [um]
+#
+#        self.distribution_plot_2D(arr1=xs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xy, axes=axs[2][0], extent=extent_xy, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=ylab, clab=r'$\partial^2 N/\partial x \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # Energy distribution
+#        ax = axs[2][1]
+#        dN_dE, rel_energ = beam.rel_energy_spectrum()
+#        dN_dE = dN_dE/-e
+#        ax.fill_between(rel_energ*100, y1=dN_dE, y2=0, color='b', alpha=0.3)
+#        ax.plot(rel_energ*100, dN_dE, color='b', alpha=0.3, label='Relative energy density')
+#        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+#        ax.set_xlabel(r'$\mathcal{E}/\langle\mathcal{E}\rangle-1$ [%]')
+#        ax.set_ylabel('Relative energy density')
+#        # Add text to the plot
+#        ax.text(0.05, 0.95, r'$\sigma_\mathcal{E}/\langle\mathcal{E}\rangle=$' f'{format(beam.rel_energy_spread()*100, ".2f")}' '%', fontsize=12, color='black', ha='left', va='top', transform=ax.transAxes)
+#
+#        # 2D z-energy distribution
+#        hist_range_energ = [[None, None], [None, None]]
+#        hist_range_energ[0] = hist_range[0]
+#        hist_range_energ[1] = [ Es.min(), Es.max() ]  # [eV]
+#        extent_energ = hist_range_energ[0] + hist_range_energ[1]
+#        extent_energ[0] = extent_energ[0]*1e6  # [um]
+#        extent_energ[1] = extent_energ[1]*1e6  # [um]
+#        extent_energ[2] = extent_energ[2]/1e9  # [GeV]
+#        extent_energ[3] = extent_energ[3]/1e9  # [GeV]
+#        self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
+
+
+'''    
+###################################################
+def growing_end_seq(arr, idxs):
+    
+    # Find the strictly growing sequence and their continuous indices
+    growing_sequence = np.array([])
+    growing_indices = np.array([], dtype=int)
+    sequence_head_idx = 1
+    for i in range(len(arr)-1, 1, -1):
+        if arr[i-1] < arr[i] and idxs[i]==idxs[i-1]+1:
+            growing_sequence = np.append(growing_sequence, arr[i-1])
+            growing_indices = np.append(growing_indices, int(idxs[i-1]))
+            sequence_head_idx = i
+        else:
+            break
+
+    growing_sequence = np.append(growing_sequence, arr[sequence_head_idx-2])
+    growing_indices = np.append(growing_indices, int(idxs[sequence_head_idx-2]))
+    
+    growing_sequence = np.flip(growing_sequence)
+    growing_indices = np.flip(growing_indices)
+    growing_sequence = np.append(growing_sequence, arr[-1])
+    growing_indices = np.append(growing_indices, int(idxs[-1]))
+    return growing_sequence, growing_indices
+'''

@@ -1,7 +1,5 @@
 import scipy.constants as SI
 import numpy as np
-import RF_Track as RFT
-from RF_Track import SpaceCharge_Field, Bunch6dT
 from abel import Beam
 import warnings
 #from abel.utilities.relativity import momentum2energy
@@ -13,6 +11,8 @@ def abel_beam2rft_beam(beam):
     Converts an ABEL beam object to a RF-Track beam object.
     """
 
+    from RF_Track import Bunch6dT
+
     xs_abel = beam.xs()    # [m]
     pxs_abel = beam.pxs()  # [kg m/s]
     ys_abel = beam.ys()
@@ -21,6 +21,11 @@ def abel_beam2rft_beam(beam):
     pzs_abel = beam.pzs()
     qs_abel = beam.qs()
     weightings_abel = beam.weightings()
+
+    # Hack for setting the weight for macroparticles with 0 charge. This hack is used in ion_motion_wakefield_perturbation.py to add "ghost particles" in order to enlarge the box for calculating the beam fields using RF-Track.
+    zero_mask = qs_abel == 0
+    if sum(zero_mask) != 0:
+        weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
 
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
     ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
@@ -76,6 +81,8 @@ def rft_beam2abel_beam(beam_rft):
 # ==================================================
 def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1):
 
+    from RF_Track import SpaceCharge_Field
+    
     if num_z_cells is None:
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
 
