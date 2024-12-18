@@ -62,7 +62,8 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
         """
 
         # make database
-        cellbase = '/pfs/lustrep2/projappl/project_465000445/software/clicopti/cellBase/TD_12GHz_v1.dat' # TODO: fix this
+        #cellbase = '/pfs/lustrep2/projappl/project_465000445/software/clicopti/cellBase/TD_12GHz_v1.dat' # WHY V1?
+        cellbase = CLICopti.CellBase.celldatabase_TD_12GHz_v2
         self.database = CLICopti.CellBase.CellBase_linearInterpolation_freqScaling(cellbase, ("a_n","d_n"), rf_frequency/1e9)
 
         # make structure
