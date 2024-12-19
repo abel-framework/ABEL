@@ -121,7 +121,7 @@ class CONFIG:
         cls.hipace_binary  = parsePath(cfdata['external_codes']['hipace']['hipace_binary'])
 
         # External codes - GuineaPig
-        cls.guineapig_path = parsePath(cfdata['external_codes']['hipace']['hipace_binary'])
+        cls.guineapig_path = parsePath(cfdata['external_codes']['guineapig']['guineapig_path'])
 
     @classmethod
     def printCONFIG(cls):
