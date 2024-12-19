@@ -1,7 +1,7 @@
 # Config file for ABEL installation, in TOML format
-# Don't modify this file directly as it is tracked with GIT,
-# to modify the defaults please copy it to ~/.abelconfig.toml
-# and then modify, this copy will then take precedence (as specified in CONFIG.py::CONFIG.config_searchpath)
+# Don't modify this file directly, as it is tracked with GIT.
+# To customise the defaults, please modify the personal ~/.abelconfig.toml, 
+# as this copy will then take precedence (as specified in CONFIG.py::CONFIG.config_searchpath).
 #
 # TOML file format: https://toml.io/en/
 # Python library used to read this file: https://docs.python.org/3/library/tomllib.html#module-tomllib
