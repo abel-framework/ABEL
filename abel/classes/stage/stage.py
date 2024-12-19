@@ -156,7 +156,8 @@ class Stage(Trackable, CostModeled):
             stage_copy.nom_energy_gain_flattop = None
         except VariablesOverspecifiedError:
             pass
-        #Everything else now unset, can set this safely.
+            
+        # Everything else now unset, can set this safely.
         # Will also trigger reset/recalc if needed
         stage_copy.length = ramp_length 
         
@@ -938,6 +939,7 @@ class Stage(Trackable, CostModeled):
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_xlim(long_limits)
 
+
         if self.stage_number is not None:
             fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
         
@@ -1009,7 +1011,7 @@ class Stage(Trackable, CostModeled):
         
     # ==================================================
     # plot wake
-    def plot_wake(self, savefig=None):
+    def plot_wake(self, aspect='auto', savefig=None):
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
@@ -1074,21 +1076,21 @@ class Stage(Trackable, CostModeled):
             clims = np.array([1e-2, 1e3])*self.plasma_density
             
             # plot plasma ions
-            p_ions = ax1.imshow(-rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Greens', alpha=np.array(-rho0_plasma>clims.min(), dtype=float))
+            p_ions = ax1.imshow(-rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Greens', alpha=np.array(-rho0_plasma>clims.min(), dtype=float), aspect=aspect)
             p_ions.set_clim(clims/1e6)
             cb_ions = plt.colorbar(p_ions, cax=cax3)
             cb_ions.set_label(label=r'Beam/plasma-electron/ion density [$\mathrm{cm^{-3}}$]', size=10)
             cb_ions.ax.tick_params(axis='y',which='both', direction='in')
             
             # plot plasma electrons
-            p_electrons = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float))
+            p_electrons = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float), aspect=aspect)
             p_electrons.set_clim(clims/1e6)
             cb_electrons = plt.colorbar(p_electrons, cax=cax2)
             cb_electrons.ax.tick_params(axis='y',which='both', direction='in')
             cb_electrons.set_ticklabels([])
             
             # plot beam electrons
-            p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
+            p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
             p_beam.set_clim(clims/1e6)
             cb_beam = plt.colorbar(p_beam, cax=cax1)
             cb_beam.set_ticklabels([])
@@ -1126,5 +1128,4 @@ class VariablesOverspecifiedError(Exception):
 class StageError(Exception):
     "Exception class for Stege to throw in other cases"
 
-
-
+    
