@@ -48,7 +48,7 @@ class PrtclTransWakeConfig():
 
         if enable_ion_motion:
             if update_factor is None:
-                update_factor=time_step_mod
+                update_factor=time_step_mod  # The default is to update the ion wakefield perturbation at every time step.
                 
             self.ion_motion_config = IonMotionConfig(
                 drive_beam=drive_beam, 
@@ -114,7 +114,8 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
         ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam, set_driver_sc_coords=False)
         
         #ion_motion_config.update_ion_wakefield = True #######<- Override
-    
+
+        # Check if ion wakefield perturbation should be updated for the current time step
         if ion_motion_config.update_ion_wakefield:
 
             # Extract drive beam RF-Track SpaceCharge_Field object
