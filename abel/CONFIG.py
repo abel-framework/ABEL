@@ -3,7 +3,7 @@ import abel.utilities.colors as cmaps
 
 class CONFIG:
 
-    #List of paths to look for ABEL's configuration file, in order of preference.
+    # List of paths to look for ABEL's configuration file, in order of preference.
     # If nothing was found, copy the one in templatepath into the first name in searchpath, and retry.
     _config_searchpath   = [os.path.join(os.path.expanduser('~'), ".abelconfig.toml"),]
     _config_templatepath = os.path.join(os.path.dirname(os.path.realpath(__file__)),"abelconfig.toml")
