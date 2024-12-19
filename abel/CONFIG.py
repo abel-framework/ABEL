@@ -47,16 +47,22 @@ class CONFIG:
                     if type(p) != str:
                         print()
                         raise TypeError(f'Expected each element of pathData to be a string, got {type(pathData)} for {pathData}')
-                    if p[0] == '$':
-                        if p[1:] == 'run_data_path':
-                            p = cls.run_data_path
-                        elif p[1:] == 'software_path':
-                            p = cls.software_path
-                        elif p[1:] == 'hipace_path':
-                            p = cls.hipace_path
-                        else:
-                            raise ValueError("Unknown path keyword '"+p+"'")
-                        pathData[i] = p
+                    if len(p) > 1:
+                        if p[0] == '$':
+                            if p[1] == '$':
+                                k = p[2:]
+                                if not k in os.environ:
+                                    raise KeyError(f"Invalid environment variable '{k}'")
+                                p = os.environ[k]
+                            elif p[1:] == 'run_data_path':
+                                p = cls.run_data_path
+                            elif p[1:] == 'software_path':
+                                p = cls.software_path
+                            elif p[1:] == 'hipace_path':
+                                p = cls.hipace_path
+                            else:
+                                raise ValueError("Unknown path keyword '"+p+"'")
+                            pathData[i] = p
                 return os.path.join(*pathData) #Use the 'splat' operator *
 
         # Parse
@@ -121,7 +127,7 @@ class CONFIG:
         cls.hipace_binary  = parsePath(cfdata['external_codes']['hipace']['hipace_binary'])
 
         # External codes - GuineaPig
-        cls.guineapig_path = parsePath(cfdata['external_codes']['hipace']['hipace_binary'])
+        cls.guineapig_path = parsePath(cfdata['external_codes']['guineapig']['guineapig_path'])
 
     @classmethod
     def printCONFIG(cls):
