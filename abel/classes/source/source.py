@@ -31,8 +31,6 @@ class Source(Trackable, CostModeled):
         
         self.waist_shift_x = waist_shift_x
         self.waist_shift_y = waist_shift_y
-
-        self.seed = seed
         
         self.jitter = SimpleNamespace()
         self.jitter.x = 0

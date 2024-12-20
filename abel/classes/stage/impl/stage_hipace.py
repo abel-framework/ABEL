@@ -17,7 +17,7 @@ try:
     sys.path.append(os.path.join(CONFIG.hipace_path, 'tools'))
     import read_insitu_diagnostics
 except:
-    print(f'Could not import HiPACE++ tools from {os.path.join(CONFIG.hipace_path, 'tools')}')
+    print(f"Could not import HiPACE++ tools from {os.path.join(CONFIG.hipace_path, 'tools')}")
 
 class StageHipace(Stage):
     
@@ -108,7 +108,6 @@ class StageHipace(Stage):
         path_driver = tmpfolder + filename_driver
         driver0.save(filename = path_driver, beam_name = 'driver')
 
-<<<<<<< HEAD
         if self.test_particle_source is not None:
             test_particle0 = self.test_particle_source.track()
             filename_test_particle = 'test_particle.h5'
@@ -116,7 +115,7 @@ class StageHipace(Stage):
             test_particle0.save(filename = path_test_particle, beam_name = 'test_particle')
         else: 
             filename_test_particle = 'empty.h5'
-=======
+            
         # make directory
         if self.plasma_density_from_file is not None:
             density_table_file = os.path.basename(self.plasma_density_from_file)
@@ -127,7 +126,6 @@ class StageHipace(Stage):
         else:
             density_table_file = None
         
->>>>>>> main
         
         # MAKE INPUT FILE
         
@@ -522,10 +520,6 @@ class StageHipace(Stage):
                 beta_matched = np.sqrt(2*gamma)/k_p(self.plasma_density)
                 amplitudes[int(i/self.output)] = np.sqrt(np.mean(puz*((x**2)/beta_matched + (pux**2)*beta_matched)))
         self.__amplitude_evol = phase_advances, amplitudes
-<<<<<<< HEAD
-        
-        
-=======
 
     
     def get_plasma_density(self, locations=None):
@@ -550,7 +544,6 @@ class StageHipace(Stage):
             ss = density_table[:,0]
             self.length = ss.max()-ss.min()
         return super().get_length()
->>>>>>> main
     
     def get_amplitudes(self):
         if self.__amplitude_evol is None:

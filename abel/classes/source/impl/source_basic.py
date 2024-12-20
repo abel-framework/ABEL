@@ -31,7 +31,7 @@ class SourceBasic(Source):
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
-        rng = np.random.default_rng(seed = self.seed)
+        rng = np.random.default_rng()
         # make empty beam
         beam = Beam()
         

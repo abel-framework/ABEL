@@ -16,7 +16,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     # locate template file
     filename_input_template = os.path.join(os.path.dirname(__file__), 'input_template')
 
-if no_plasma:
+    if no_plasma:
         plasma_components = 'no_plasma'
     else:
         # prepare plasma components (based on ion motion)
