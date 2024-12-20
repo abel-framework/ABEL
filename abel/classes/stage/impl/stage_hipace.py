@@ -182,7 +182,10 @@ class StageHipace(Stage):
         hipace_write_jobscript(filename_job_script, filename_input, num_nodes=self.num_nodes)
         
         # run HiPACE++
-        beam, driver, test_particle = hipace_run(filename_job_script, self.num_steps)
+        if self.test_particle_source:
+            beam, driver, test_particle = hipace_run(filename_job_script, self.num_steps)
+        else:
+            beam, driver = hipace_run(filename_job_script, self.num_steps)
         if self.driver_only:
             beam = beam0
         

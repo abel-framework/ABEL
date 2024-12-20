@@ -267,7 +267,7 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
         time.sleep(wait_time)
     
     # when finished, load the beam and driver
-    filename = runfolder + "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps))
+    filename = runfolder + "/diags/hdf5/openpmd_{:06}.h5".format(int(num_steps))
     try:
         beam = Beam.load(filename, beam_name='beam')
     except:
