@@ -59,11 +59,11 @@ from .classes.plasma_lens.impl.plasma_lens_basic import *
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import *
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
 from .classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorBasic
-from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW import RFAccelerator_TW
-from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLICG import RFAccelerator_TW_CLICG
-from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLIC502 import RFAccelerator_TW_CLIC502
-from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_DB2 import RFAccelerator_TW_DB2
-#from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
+from .classes.rf_accelerator.impl.rf_accelerator_tw import RFAccelerator_TW
+from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW_CLICG import RFAccelerator_TW_CLICG
+from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW_CLIC502 import RFAccelerator_TW_CLIC502
+from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW_DB2 import RFAccelerator_TW_DB2
+from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
 from .classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
 from .classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
 from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic

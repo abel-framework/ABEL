@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 import warnings
 import numpy as np
 
+# For type checking
+from abel.classes.beam     import Beam
+from abel.classes.runnable import Runnable
+
 class Trackable(ABC):
     
     # constructor
@@ -148,7 +152,7 @@ class Trackable(ABC):
     # Tracking function                       #
     #=========================================#
     
-    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam : Beam, savedepth : int = 0 , runnable : Runnable | None = None, verbose : bool = False) -> Beam:
         
         # remove nan particles
         beam.remove_nans()

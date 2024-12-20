@@ -40,10 +40,18 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
      length, num_structures, nom_energy_gain :
         See `RFAccelerator` class.
     """
-
-    #Database object is static
-    default_frequency = 11.9942e9 #[Hz]
     
+    #Database object is static, and initialized on-demand
+    # using the class default_frequency (i.e. not the object self.default_frequency)
+    # by method _make_database()
+    default_frequency = 11.9942e9 #[Hz]
+    database          = None
+    @classmethod
+    def _make_database(cls):
+        #cellbase = '/pfs/lustrep2/projappl/project_465000445/software/clicopti/cellBase/TD_12GHz_v1.dat' # WHY V1?
+        cellbase = CLICopti.CellBase.celldatabase_TD_12GHz_v2
+        cls.database = CLICopti.CellBase.CellBase_linearInterpolation_freqScaling(cellbase, ("a_n","d_n"), cls.default_frequency/1e9)
+
     def __init__(self, num_rf_cells=24,
                  rf_frequency=default_frequency,
                  a_n=0.110022947942206, a_n_delta=0.016003337882503*2,
@@ -61,15 +69,21 @@ class RFAccelerator_TW_DB2(abel.RFAccelerator_TW):
         If constructorCalling is False, then finalize the initialization in RFAccelerator_TW (use True when calling from child class constructor).
         """
 
-        # make database
-        #cellbase = '/pfs/lustrep2/projappl/project_465000445/software/clicopti/cellBase/TD_12GHz_v1.dat' # WHY V1?
-        cellbase = CLICopti.CellBase.celldatabase_TD_12GHz_v2
-        self.database = CLICopti.CellBase.CellBase_linearInterpolation_freqScaling(cellbase, ("a_n","d_n"), rf_frequency/1e9)
+        num_rf_cells = self._checkType_or_getOld(num_rf_cells, "num_rf_cells", typeWanted=int, nameInCLICopti="N",                 firstCall=constructorCalling)
+        a_n          = self._checkType_or_getOld(a_n,          "a_n",                                                              firstCall=constructorCalling)
+        a_n_delta    = self._checkType_or_getOld(a_n_delta,    "a_n_delta",                                                        firstCall=constructorCalling)
+        d_n          = self._checkType_or_getOld(d_n,          "d_n",                                                              firstCall=constructorCalling)
+        d_n_delta    = self._checkType_or_getOld(d_n_delta,    "d_n_delta",                                                        firstCall=constructorCalling)
+        rf_frequency = self._checkType_or_getOld(rf_frequency, "rf_frequency", nameInCLICopti="f0_scaleto", scaleFromCLICopti=1e9, firstCall=constructorCalling)
+
+        if self.__class__.database is None:
+            self._make_database()
 
         # make structure
-        structure = CLICopti.RFStructure.AccelStructure_paramSet2_noPsi(self.database, num_rf_cells, a_n, a_n_delta, d_n, d_n_delta)
+        structure = CLICopti.RFStructure.AccelStructure_paramSet2_noPsi(self.__class__.database, num_rf_cells, a_n, a_n_delta, d_n, d_n_delta, rf_frequency/1e9)
 
         #DB v2 constructed ignoring P/C limit
+        # TODO: Do this automatically on the CLICopti side
         structure.uselimit_PC = False
 
         if not constructorCalling:

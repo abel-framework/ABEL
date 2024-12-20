@@ -9,13 +9,13 @@ class RFAcceleratorBasic(RFAccelerator):
 
     default_rf_frequency = RFAccelerator.default_rf_frequency
     default_fill_factor = RFAccelerator.default_fill_factor
-    default_num_rf_cells = RFAccelerator.default_num_rf_cells
+    default_num_rf_cells = 24 # [integer]
     default_operating_temperature = RFAccelerator.default_operating_temperature
     
     def __init__(self, length=None, nom_energy_gain=None, fill_factor=default_fill_factor, rf_frequency=default_rf_frequency, num_rf_cells=default_num_rf_cells, operating_temperature=default_operating_temperature):
 
         # run base class constructor
-        super().__init__(length=length, nom_energy_gain=nom_energy_gain, num_rf_cells=num_rf_cells, fill_factor=fill_factor, rf_frequency=rf_frequency, operating_temperature=operating_temperature)
+        super().__init__(length=length, nom_energy_gain=nom_energy_gain,  fill_factor=fill_factor, rf_frequency=rf_frequency, operating_temperature=operating_temperature)
 
         self.structure = SimpleNamespace()
         self.structure.length = None
@@ -82,14 +82,14 @@ class RFAcceleratorBasic(RFAccelerator):
         return super().track(beam, savedepth, runnable, verbose)
 
 
-    @RFAccelerator.structure_length.getter
-    def structure_length(self) -> float:
-        "Gets the length of each individual RF structure [m]"
-        return self.structure.length
-        
-    def get_structure_power(self) -> float:
-        "Get the peak power [W] required for a single RF structure in the given configuration."
-        return self.structure.power
+    #@RFAccelerator.structure_length.getter
+    #def structure_length(self) -> float:
+    #    "Gets the length of each individual RF structure [m]"
+    #    return self.structure.length
+    #    
+    #def get_structure_power(self) -> float:
+    #    "Get the peak power [W] required for a single RF structure in the given configuration."
+    #    return self.structure.power
 
 
     def calculate_structure(self):

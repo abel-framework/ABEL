@@ -4,6 +4,9 @@ from abc import abstractmethod
 from matplotlib import patches
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
+import copy
+
+from abel import Beam, Runnable # For type checking
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -14,14 +17,17 @@ class RFAccelerator(Trackable, CostModeled):
     It's an abstract class, meant to be superseeded by a specific RFlinac implementation, relating to a structure type and how it is modelled.
     """
 
-    default_num_rf_cells = 20 # [m]
     default_fill_factor = 0.71
     default_rf_frequency = 2e9 # [Hz]
     
     default_operating_temperature = 300
     
+    # Acceptable missmatch of rf_frequency/bunch frequency. 
+    # If set to None, anything goes (this is not physical)
+    harmdiff_tolerance = 0.01
+
     @abstractmethod
-    def __init__(self, length=None, nom_energy_gain=None, num_rf_cells=default_num_rf_cells, fill_factor=default_fill_factor, rf_frequency=default_rf_frequency, operating_temperature=default_operating_temperature):
+    def __init__(self, length=None, structure_lenght=None, num_structures=None, nom_energy_gain=None, fill_factor=default_fill_factor, rf_frequency=default_rf_frequency, operating_temperature=default_operating_temperature):
         """
         Initialize the rf_accelerator base class.
         This can interface an underlying RF structure model including power requirements, and costs.
@@ -62,7 +68,8 @@ class RFAccelerator(Trackable, CostModeled):
 
         self.length = length
         self.nom_energy_gain = nom_energy_gain
-        self.num_rf_cells = num_rf_cells
+        self.structure_length = structure_lenght
+        self.num_structures = num_structures
         self.fill_factor = fill_factor
         self.rf_frequency = rf_frequency
         self.operating_temperature = operating_temperature
@@ -176,7 +183,7 @@ class RFAccelerator(Trackable, CostModeled):
         """
         return self.bunch_charge*self.bunch_frequency
     @average_current_train.setter
-    def average_current_train(self, average_current_train : float) -> None:
+    def average_current_train(self, average_current_train : float):
         raise NotImplementedError("Cannot directly set average_current_train")
 
     @property
@@ -265,7 +272,23 @@ class RFAccelerator(Trackable, CostModeled):
     #===========================================#
 
     @abstractmethod
-    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam0 : Beam, savedepth : int = 0, runnable : Runnable | None = None, verbose : bool = False) -> Beam:
+        #Check that beam is bunch frequency is subharmonic of RF frequency
+        if self.harmdiff_tolerance is not None:
+            if beam0.num_bunches_in_train > 1:
+                harm = self.rf_frequency/beam0.bunch_frequency()
+                if harm < 1.0:
+                    raise ValueError(f"RF frequency cannot be a subharmonic of the bunch frequency; got rf_frequency={self.rf_frequency/1e9:.2f}[GHz], bunch_frequency={beam0.bunch_frequency()/1e9:.2f}[GHz], harm={harm:.3f}")
+                harmdiff = harm % 1.0
+                if harmdiff > 0.5:
+                    harmdiff = 1.0-harmdiff
+                if harmdiff > self.harmdiff_tolerance:
+                    raise ValueError(f"Harmonic mismatch too large: rf_frequency={self.rf_frequency/1e9:.2f}[GHz], bunch_frequency={beam0.bunch_frequency()/1e9:.2f}[GHz], harm={harm:.3f}")
+
+        # Perform energy increase
+        beam = copy.deepcopy(beam0)
+        beam.set_Es(beam0.Es() + self.nom_energy_gain)
+
         return super().track(beam, savedepth, runnable, verbose)
     
     def get_length(self):

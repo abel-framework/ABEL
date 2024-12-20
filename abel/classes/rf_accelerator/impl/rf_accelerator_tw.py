@@ -2,6 +2,8 @@
 
 from abc import abstractmethod
 
+import CLICopti.RFStructure
+
 import abel
 
 import os
@@ -12,6 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as SI
 
+import copy
+
 class RFAccelerator_TW(abel.RFAccelerator):
     """
     Abstract rf_accelerator implementation for calculating parameters
@@ -20,7 +24,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
     for generating different structure geometries.
     """
     @abstractmethod
-    def __init__(self, RF_structure, length=None, num_structures=None, nom_energy_gain=None):
+    def __init__(self, RF_structure : CLICopti.RFStructure.AccelStructure, length=None, num_structures=None, nom_energy_gain=None):
         """
         Initializes a rf_accelerator_TW object.
         Accepts same arguments rf_accelerator + an RF_structure CLICopti object.
@@ -56,6 +60,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
     def _checkType_or_getOld(self, r, name, typeWanted=float, nameInCLICopti=None, scaleFromCLICopti=None, firstCall=False):
         """
         Helper for _make_structure() in the child classes.
+        The main arguments are the value r and the variable name in ABEL (used for error messages)
         If r is None return the old value from self._RFstructure,
         otherwise check data type and if possible/needed convert and scale.
         """
@@ -86,19 +91,14 @@ class RFAccelerator_TW(abel.RFAccelerator):
 
     @abstractmethod
     def _make_structure(self, num_rf_cells=None, rf_frequency=None):
+        """
+        Method used by subclasses to (re)generate the _RF_structure object.
+        Several arguments are generally provided, at least num_rf_cells [int] and rf_frequency [Hz].
+        """
         pass
 
     # Tracking
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-    #Check that beam is bunch frequency is subharmonic of RF frequency
-        #if beam.num_bunches_in_train > 1:
-        #    harm = self.rf_frequency/beam.bunch_frequency()
-        #    harmdiff = harm % 1.0
-        #    if harmdiff > 0.5:
-        #        harmdiff = 1.0-harmdiff
-        #    if harmdiff > 0.01:
-        #        raise ValueError(f"Harmonic mismatch too large: rf_frequency={self.rf_frequency/1e9:.2f}[GHz], bunch_frequency={beam.bunch_frequency()/1e9:.2f}[GHz], harm={harm:.3f}")
-
         #Store data used power-flow/power use/etc modelling
         self.bunch_charge           = beam.abs_charge()         # [C]
         self.bunch_separation       = beam.bunch_separation     # [s]
@@ -124,7 +124,7 @@ class RFAccelerator_TW(abel.RFAccelerator):
     @structure_length.setter
     def structure_length(self, structure_length : float):
         #Indirectly possible through num_rf_cells.setter
-        raise NotImplementedError("Not possible to set directly with RFAccelerator_TW")
+        raise NotImplementedError("Not possible to set directly with RFAccelerator_TW; please set number of cells instead.")
 
     @property
     def rf_frequency(self) -> float:
@@ -233,6 +233,8 @@ class RFAccelerator_TW(abel.RFAccelerator):
         #Get the maximum possible voltage
         Vmax = self.get_structure_voltage_max()
         #TODO: Handle Vmax = 0.0
+        if not Vmax > 0.0:
+            raise ValueError()
         Vtotal = self.nom_energy_gain
         Ntotal = Vtotal/Vmax
         

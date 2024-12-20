@@ -2,13 +2,12 @@ from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.cost_modeled import CostModeled
 import scipy.constants as SI
 import numpy as np
-import copy
 import matplotlib.pyplot as plt
 from types import SimpleNamespace
 
 class RFAcceleratorCLICopti(RFAccelerator):
 
-    default_num_rf_cells = 24 # [m]
+    default_num_rf_cells = 24 # [integer]
     default_fill_factor = 0.71
     default_rf_frequency = 2e9 # [Hz]
 
@@ -158,11 +157,7 @@ class RFAcceleratorCLICopti(RFAccelerator):
         # check the voltage
         if self.voltage_structure is not None and self.voltage_structure > self.get_structure_voltage_max():
             print(f'The structure gradient ({(self.voltage_structure/self.structure.length)/1e6:.1f} MV/m) is too high (max {(self.structure.voltage_max/self.structure.length)/1e6:.1f} MV/m)')
-        
-        # perform energy increase
-        beam = copy.deepcopy(beam0)
-        beam.set_Es(beam0.Es() + self.nom_energy_gain)
-        
+
         return super().track(beam, savedepth, runnable, verbose)
 
     
