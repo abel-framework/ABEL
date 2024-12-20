@@ -47,10 +47,6 @@ class Runnable(ABC):
             # save object to file
             self.save()
 
-    @abstractmethod
-    def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        pass
-    
     ## SCAN FUNCTIONALITY
     
     def is_scan(self):
