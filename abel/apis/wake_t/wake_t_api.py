@@ -42,7 +42,7 @@ def beam2wake_t_bunch(beam, name='beam'):
 
 
 # ==================================================
-def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam, stage_length=None, lambda_betatron_frac=0.1):
+def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam, stage_length=None, lambda_betatron_frac=0.1, num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None):
     """
     Calculates step size, box sizes etc. to set up a Wake-T plasma acceleration stage (https://wake-t.readthedocs.io/en/latest/api/beamline_elements/_autosummary/wake_t.beamline_elements.PlasmaStage.html#plasmastage).
     
@@ -61,7 +61,22 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam, stage_le
         Length of the plasma acceleration stage. If not given, is set to the same as one step size.
 
     lambda_betatron_frac: float, optional
-        The fraction of betatron wavelength used to set the step size.
+        The fraction of betatron wavelength used to set the step size as lambda_betatron*lambda_betatron_frac.
+
+    num_cell_xy: float, optional
+        Number of grid elements along r to calculate the wakefields.
+
+    n_out: int, optional
+        Number of times along the stage in which the particle distribution should be returned.
+        
+    box_size_r: [m], float, optional
+        Determines the transverse size of the simulation domain [-box_size_r, box_size_r] where the plasma wakefield will be calculated.
+
+    box_min_z: [m], float, optional
+        Minimum longitudinal (speed of light frame) position for the simulaltion domain in which the plasma wakefield will be calculated.
+
+    box_max_z: [m], float, optional
+        Maximum longitudinal (speed of light frame) position for the simulaltion domain in which the plasma wakefield will be calculated.
     
         
     Returns
@@ -78,19 +93,18 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam, stage_le
 
     # Determines how often the plasma wakefields should be updated. For example, if dz_fields=10e-6, the plasma wakefields are only updated every time the simulation window advances by 10 micron
     dz_fields = lambda_betatron*lambda_betatron_frac
-    
-    # Number of times along the stage in which the particle distribution should be returned
-    n_out = 1
 
     # Set box ranges
     R_blowout = blowout_radius(plasma_density, abel_drive_beam.peak_current())
-    box_size_r = np.max([4/k_p(plasma_density), 3*R_blowout])
-    box_min_z = abel_drive_beam.z_offset() - 3.3 * R_blowout
-    box_max_z = min(abel_drive_beam.z_offset() + 6 * abel_drive_beam.bunch_length(), np.max(abel_drive_beam.zs()) + 0.5*R_blowout)
+    if box_size_r is None:
+        box_size_r = np.max([4/k_p(plasma_density), 3*R_blowout])
+    if box_min_z is None:
+        box_min_z = abel_drive_beam.z_offset() - 4 * R_blowout
+    if box_max_z is None:
+        box_max_z = min(abel_drive_beam.z_offset() + 6 * abel_drive_beam.bunch_length(), np.max(abel_drive_beam.zs()) + 0.5*R_blowout)
     box_range_z = [box_min_z, box_max_z]
     
     # Calculate number of cells
-    num_cell_xy = 256
     dr = box_size_r/num_cell_xy
     num_cell_z = round((box_max_z-box_min_z)/dr)
 
