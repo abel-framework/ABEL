@@ -50,10 +50,15 @@ class StageWakeT(Stage):
         num_sigmas = 6
         #box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
         R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
-        box_min_z = driver0.z_offset() - 3.3 * R_blowout
+        box_min_z = driver0.z_offset() - 4.0 * R_blowout
+        #box_min_z = driver0.z_offset() - 3.3 * R_blowout
         #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
         box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
-        box_range_z = [box_min_z, box_max_z]
+
+        if box_min_z > beam0.zs().min() or box_max_z < driver0.zs().max():
+            raise SimulationDomainSizeError('The simulation domain is too small along z.')
+        #box_range_z = [box_min_z, box_max_z]
+        
         
         # making transverse box size
         box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, driver0.peak_current())])
@@ -63,8 +68,8 @@ class StageWakeT(Stage):
         num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # find stepsize
-        beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
-        dz = beta_matched/10
+        matched_beta = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
+        dz = matched_beta/10
         
         n_out = round(self.length/dz/8)
         plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
