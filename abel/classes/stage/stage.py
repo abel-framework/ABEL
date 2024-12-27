@@ -159,8 +159,7 @@ class Stage(Trackable, CostModeled):
             
         # Everything else now unset, can set this safely.
         # Will also trigger reset/recalc if needed
-        stage_copy.length = ramp_length 
-        
+        stage_copy.length = ramp_length
         stage_copy.plasma_density = ramp_plasma_density
          
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
@@ -452,7 +451,7 @@ class Stage(Trackable, CostModeled):
     @nom_accel_gradient_flattop.setter
     def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
         if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
-            raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
+            raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set.")
         self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
         self._resetLengthEnergyGradient()
         self._recalcLengthEnergyGradient()
@@ -1008,6 +1007,69 @@ class Stage(Trackable, CostModeled):
         axs[1].set_xlim(zlims)
         axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
 
+
+    # ==================================================  
+    def plot_final_wakefield(self):
+        
+        # extract wakefield if not already existing
+        if not hasattr(self.final.plasma.wakefield.onaxis, 'Ezs'):
+            print('No wakefield calculated')
+            return
+        if not hasattr(self.final.beam.current, 'Is'):
+            print('No beam current calculated')
+            return
+
+        # preprate plot
+        fig, axs = plt.subplots(2, 1)
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*1)
+        col0 = "xkcd:light gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        af = 0.1
+        
+        # extract wakefields and beam currents
+        zs0 = self.final.plasma.wakefield.onaxis.zs
+        Ezs0 = self.final.plasma.wakefield.onaxis.Ezs
+        has_final = hasattr(self.final.plasma.wakefield.onaxis, 'Ezs')
+        if has_final:
+            zs = self.final.plasma.wakefield.onaxis.zs
+            Ezs = self.final.plasma.wakefield.onaxis.Ezs
+        zs_I = self.final.beam.current.zs
+        Is = self.final.beam.current.Is
+
+        # find field at the driver and beam
+        z_mid = zs_I.min() + (zs_I.max()-zs_I.min())*0.3
+        mask = zs_I < z_mid
+        zs_masked = zs_I[mask]
+        z_beam = zs_masked[np.abs(Is[mask]).argmax()]
+        Ez_driver = Ezs0[zs0 > z_mid].max()
+        Ez_beam = np.interp(z_beam, zs0, Ezs0)
+        
+        # get wakefield
+        axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
+        if self.nom_energy_gain is not None:
+            axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
+        if self.driver_source.energy is not None:
+            Ez_driver_max = self.driver_source.energy/self.get_length()
+            axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
+        if has_final:
+            axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
+        axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
+        axs[0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
+        axs[0].set_ylabel('Longitudinal electric field [GV/m]')
+        zlims = [min(zs0)*1e6, max(zs0)*1e6]
+        axs[0].set_xlim(zlims)
+        axs[0].set_ylim(bottom=-1.7*np.max([np.abs(Ez_beam), Ez_driver])/1e9, top=1.3*Ez_driver/1e9)
+        
+        # plot beam current
+        axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
+        axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
+        axs[1].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
+        axs[1].set_ylabel('Beam current [kA]')
+        axs[1].set_xlim(zlims)
+        axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
+
         
     # ==================================================
     # plot wake
@@ -1076,21 +1138,21 @@ class Stage(Trackable, CostModeled):
             clims = np.array([1e-2, 1e3])*self.plasma_density
             
             # plot plasma ions
-            p_ions = ax1.imshow(-rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Greens', alpha=np.array(-rho0_plasma>clims.min(), dtype=float))
+            p_ions = ax1.imshow(-rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Greens', alpha=np.array(-rho0_plasma>clims.min(), dtype=float), aspect='auto')
             p_ions.set_clim(clims/1e6)
             cb_ions = plt.colorbar(p_ions, cax=cax3)
             cb_ions.set_label(label=r'Beam/plasma-electron/ion density [$\mathrm{cm^{-3}}$]', size=10)
             cb_ions.ax.tick_params(axis='y',which='both', direction='in')
             
             # plot plasma electrons
-            p_electrons = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float))
+            p_electrons = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float), aspect='auto')
             p_electrons.set_clim(clims/1e6)
             cb_electrons = plt.colorbar(p_electrons, cax=cax2)
             cb_electrons.ax.tick_params(axis='y',which='both', direction='in')
             cb_electrons.set_ticklabels([])
             
             # plot beam electrons
-            p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
+            p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect='auto')
             p_beam.set_clim(clims/1e6)
             cb_beam = plt.colorbar(p_beam, cax=cax1)
             cb_beam.set_ticklabels([])
@@ -1108,7 +1170,7 @@ class Stage(Trackable, CostModeled):
         if savefig is not None:
             fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
         
-        return 
+        return
 
     
     # ==================================================
@@ -1123,10 +1185,12 @@ class Stage(Trackable, CostModeled):
         
 
 class VariablesOverspecifiedError(Exception):
-    "Exception class to throw when trying to set too many overlapping variables"
+    "Exception class to throw when trying to set too many overlapping variables."
     pass
 class StageError(Exception):
-    "Exception class for Stege to throw in other cases"
+    "Exception class for Stage to throw in other cases."
 
-
+class SimulationDomainSizeError(Exception):
+    "Exception class to throw when the simulation domain size is too small."
+    pass
 
