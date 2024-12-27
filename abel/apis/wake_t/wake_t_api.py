@@ -22,6 +22,8 @@ def wake_t_bunch2beam(bunch):
                          pys=phasespace[3]*SI.c*SI.m_e,
                          pzs=phasespace[5]*SI.c*SI.m_e)
     
+    beam.location = bunch.prop_distance
+    
     return beam
       
     
