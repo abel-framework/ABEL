@@ -69,7 +69,7 @@ class StagePrtclTransWakeInstability(Stage):
         Ez_roi: [V/m] 1D array
             Longitudinal E-field in the region of interest fitted to a selection of zs along the main beam (main beam head to tail).
 
-        rb_fit_obj: [m] interpolation object?
+        rb_fit_obj: [m] interpolation object
             1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
         
         bubble_radius_roi: [m] 1D array
