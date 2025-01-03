@@ -1416,7 +1416,10 @@ class Beam():
         mass = particles["mass"][io.Record_Component.SCALAR].get_attribute("value")
         
         # extract phase space
-        ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
+        if "id" in particles:
+            ids = particles["id"][Record_Component.SCALAR].load_chunk()
+        else:
+            ids = None
         weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
         xs = particles['position']['x'].load_chunk()
         ys = particles['position']['y'].load_chunk()
@@ -1434,6 +1437,7 @@ class Beam():
         # make beam
         beam = Beam()
         beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
+        beam.particle_mass = mass
         
         # add metadata to beam
         try:
