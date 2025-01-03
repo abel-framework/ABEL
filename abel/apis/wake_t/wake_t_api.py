@@ -44,7 +44,7 @@ def beam2wake_t_bunch(beam, name='beam'):
 
 
 # ==================================================
-def wake_t_hdf5_load(file_path, beam_name='beam'):
+def wake_t_hdf5_load(file_path, species='beam'):
     """
     Load an ABEL beam from a Wake-T HDF5 file (OpenPMD format).
     """
@@ -58,7 +58,7 @@ def wake_t_hdf5_load(file_path, beam_name='beam'):
     *_, index = series.iterations
     
     # get particle data
-    particles = series.iterations[index].particles[beam_name]
+    particles = series.iterations[index].particles[species]
     
     # get attributes
     charge = particles["charge"][io.Record_Component.SCALAR].get_attribute("value")

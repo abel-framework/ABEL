@@ -254,19 +254,19 @@ class StageWakeT(Stage):
     
     # ==================================================
     # Apply waterfall function to all beam dump files
-    def __waterfall_fcn(self, fcns, edges, evolution_folder, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
         """
-        Applies waterfall function to all beam dump files in evolution_folder.
+        Applies waterfall function to all beam dump files in data_dir.
         """
 
         from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
         
         # find number of beam outputs to plot
-        files = sorted(os.listdir(evolution_folder))
+        files = sorted(os.listdir(data_dir))
         num_outputs = len(files)
         
         # prepare to read simulation data
-        file_path = evolution_folder + files[0]
+        file_path = data_dir + files[0]
         
         # declare data structure
         bins = [None] * len(fcns)
@@ -279,8 +279,8 @@ class StageWakeT(Stage):
         # go through files
         for index in range(num_outputs):
             # load phase space
-            file_path = evolution_folder + files[index]
-            beam = wake_t_hdf5_load(file_path=file_path, beam_name=species)
+            file_path = data_dir + files[index]
+            beam = wake_t_hdf5_load(file_path=file_path, species=species)
 
             if clean:
                 beam.remove_halo_particles(nsigma=remove_halo_nsigma)
@@ -299,16 +299,16 @@ class StageWakeT(Stage):
 
 
     # ==================================================
-    def extract_waterfalls(self, evolution_folder, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+    def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
         '''
         Extracts data for waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
         '''
 
         from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
         
-        files = sorted(os.listdir(evolution_folder))
-        file_path = evolution_folder + files[0]
-        beam0 = wake_t_hdf5_load(file_path=file_path, beam_name=species)
+        files = sorted(os.listdir(data_dir))
+        file_path = data_dir + files[0]
+        beam0 = wake_t_hdf5_load(file_path=file_path, species=species)
         num_bins = int(np.sqrt(len(beam0)*2))
         nsig = 5
         
@@ -320,7 +320,7 @@ class StageWakeT(Stage):
         xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
         
-        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], evolution_folder, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
+        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
 
         return waterfalls, locations, bins
 
