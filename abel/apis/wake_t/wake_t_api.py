@@ -44,6 +44,80 @@ def beam2wake_t_bunch(beam, name='beam'):
 
 
 # ==================================================
+def wake_t_hdf5_load(file_path, beam_name='beam'):
+    """
+    Load an ABEL beam from a Wake-T HDF5 file (OpenPMD format).
+    """
+
+    import openpmd_api as io
+    
+    # load file
+    series = io.Series(file_path, io.Access.read_only)
+    
+    # find index (use last one) by default
+    *_, index = series.iterations
+    
+    # get particle data
+    particles = series.iterations[index].particles[beam_name]
+    
+    # get attributes
+    charge = particles["charge"][io.Record_Component.SCALAR].get_attribute("value")
+    mass = particles["mass"][io.Record_Component.SCALAR].get_attribute("value")
+    
+    # extract phase space
+    if "id" in particles:
+        ids = particles["id"][Record_Component.SCALAR].load_chunk()
+    else:
+        ids = None
+    weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
+    xs = particles['position']['x'].load_chunk()
+    ys = particles['position']['y'].load_chunk()
+    zs = particles['position']['z'].load_chunk()
+    pxs_unscaled = particles['momentum']['x'].load_chunk()
+    pys_unscaled = particles['momentum']['y'].load_chunk()
+    pzs_unscaled = particles['momentum']['z'].load_chunk()
+    series.flush()  # Synchronization mechanism to confirm that all requested data is loaded into memory and available for further processing.
+    
+    # apply SI scaling
+    pxs = pxs_unscaled * particles['momentum']['x'].unit_SI
+    pys = pys_unscaled * particles['momentum']['y'].unit_SI
+    pzs = pzs_unscaled * particles['momentum']['z'].unit_SI
+    
+    # make beam
+    beam = Beam()
+    beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
+    beam.particle_mass = mass
+    
+    # add metadata to beam
+    try:
+        beam.location = particles['positionOffset']['z'].load_chunk()
+    except:
+        beam.location = None
+
+    try:
+        beam.trackable_number = series.iterations[index].get_attribute("trackable_number")
+    except:
+        beam.trackable_number = None
+    
+    try:
+        beam.stage_number = series.iterations[index].get_attribute("stage_number")
+    except:
+        beam.stage_number = None
+    
+    try:
+        beam.num_bunches_in_train = series.iterations[index].get_attribute("num_bunches_in_train")
+    except:
+        beam.num_bunches_in_train = None
+    
+    try:
+        beam.bunch_separation = series.iterations[index].get_attribute("bunch_separation")
+    except:
+        beam.bunch_separation = None
+        
+    return beam
+
+
+# ==================================================
 def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam, stage_length=None, lambda_betatron_frac=0.1, num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None):
     """
     Calculates step size, box sizes etc. to set up a Wake-T plasma acceleration stage (https://wake-t.readthedocs.io/en/latest/api/beamline_elements/_autosummary/wake_t.beamline_elements.PlasmaStage.html#plasmastage).
