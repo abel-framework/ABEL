@@ -265,3 +265,26 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
         wait_time = 3 # [s]
         time.sleep(wait_time)
 
+
+def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
+    """
+    Load an ABEL beam from a HiPACE++ HDF5 file (OpenPMD format).
+    """
+
+    from openpmd_viewer import OpenPMDTimeSeries
+
+    opmd_time_series = OpenPMDTimeSeries(data_dir)
+    hipace_iteration = opmd_time_series.iterations[hipace_iteration_idx]
+    
+    xs_hipace, uxs_hipace, ys_hipace, uys_hipace, zs_hipace, uzs_hipace, weights_hipace, masses_hipace, charges_hipace = opmd_time_series.get_particle( ['x', 'ux', 'y', 'uy', 'z', 'uz', 'w', 'mass', 'charge'], species=species, iteration=hipace_iteration, plot=False )
+    beam = Beam()
+    beam.set_phase_space(xs=xs_hipace, ys=ys_hipace, zs=zs_hipace, 
+                            uxs=uxs_hipace*SI.c, uys=uys_hipace*SI.c, 
+                            uzs=uzs_hipace*SI.c, 
+                            Q=np.sum(charges_hipace*weights_hipace), weightings=weights_hipace)
+    
+    beam.location = opmd_time_series.t[hipace_iteration_idx]*SI.c
+    beam.particle_mass = masses_hipace[0]
+
+    return beam
+
