@@ -1355,7 +1355,7 @@ class InterstageElegant(Interstage):
         return filename
 
     
-    # apply waterfall function to all beam files
+    # Apply waterfall function to all beam files
     def __waterfall_fcn(self, fcns, edges, evolution_folder, args=None, shot=0):
         
         # find number of beam outputs to plot
@@ -1393,7 +1393,7 @@ class InterstageElegant(Interstage):
         return waterfalls, locations, bins
 
     
-    # density plots
+    # Waterfall plots
     def plot_waterfalls(self, evolution_folder, shot=None, save_fig=False):
         
         if self.save_evolution is False:
