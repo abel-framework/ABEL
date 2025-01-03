@@ -10,7 +10,7 @@ from openpmd_viewer import OpenPMDTimeSeries
 
 class StageWakeT(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, drive_beam=None, ramp_beta_mag=1, num_cell_xy=256, keep_data=False):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, drive_beam=None, ramp_beta_mag=1, num_cell_xy=256, keep_data=False, run_path=None):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source)
         
@@ -18,8 +18,10 @@ class StageWakeT(Stage):
         self.num_cell_xy = num_cell_xy
         self.keep_data = keep_data
         self.drive_beam = drive_beam
+        self.run_path = run_path
 
-        
+
+    # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
         self.stage_number = beam0.stage_number
@@ -114,7 +116,8 @@ class StageWakeT(Stage):
         
         return super().track(beam, savedepth, runnable, verbose)
 
-    
+
+    # ==================================================
     def __extract_evolution(self, bunches):
     #def __extract_evolution(self, tmpfolder, bunches, runnable):
 
@@ -140,7 +143,8 @@ class StageWakeT(Stage):
         self.evolution.beta_x = beam_evol['beta_x']
         self.evolution.beta_y = beam_evol['beta_y']
 
-    
+
+    # ==================================================
     def __extract_initial_and_final_step(self, tmpfolder):
         
         # prepare to read simulation data
@@ -237,10 +241,139 @@ class StageWakeT(Stage):
         self.final.beam.density.extent = metadata_plasma.imshow_extent
         self.final.beam.density.rho = (jz_beam+jz_driver)/(dr*dr*dz)
         
-        
+
+    # ==================================================
     def energy_usage(self):
         return None # TODO
-    
+
+
+    # ==================================================
     def matched_beta_function(self, energy):
         return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
+
+    
+    # ==================================================
+    # Apply waterfall function to all beam dump files
+    def __waterfall_fcn(self, fcns, edges, evolution_folder, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+        """
+        Applies waterfall function to all beam dump files in evolution_folder.
+        """
+
+        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
         
+        # find number of beam outputs to plot
+        files = sorted(os.listdir(evolution_folder))
+        num_outputs = len(files)
+        
+        # prepare to read simulation data
+        file_path = evolution_folder + files[0]
+        
+        # declare data structure
+        bins = [None] * len(fcns)
+        waterfalls = [None] * len(fcns)
+        for j in range(len(fcns)):
+            waterfalls[j] = np.empty((len(edges[j])-1, num_outputs))
+        
+        locations = np.empty(num_outputs)
+        
+        # go through files
+        for index in range(num_outputs):
+            # load phase space
+            file_path = evolution_folder + files[index]
+            beam = wake_t_hdf5_load(file_path=file_path, beam_name=species)
+
+            if clean:
+                beam.remove_halo_particles(nsigma=remove_halo_nsigma)
+            
+            # find beam location
+            locations[index] = beam.location
+            
+            # get all waterfalls (apply argument if it exists)
+            for j in range(len(fcns)):
+                if args[j] is None:
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, bins=edges[j])
+                else:
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, args[j][index], bins=edges[j])
+                
+        return waterfalls, locations, bins
+
+
+    # ==================================================
+    def extract_waterfalls(self, evolution_folder, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+        '''
+        Extracts data for waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+        '''
+
+        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
+        
+        files = sorted(os.listdir(evolution_folder))
+        file_path = evolution_folder + files[0]
+        beam0 = wake_t_hdf5_load(file_path=file_path, beam_name=species)
+        num_bins = int(np.sqrt(len(beam0)*2))
+        nsig = 5
+        
+        if species == 'driver':
+            deltaedges = np.linspace(-0.5, 0.5, num_bins)
+        else:
+            deltaedges = np.linspace(-0.05, 0.05, num_bins)
+        tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
+        xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
+        yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
+        
+        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], evolution_folder, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
+
+        return waterfalls, locations, bins
+
+
+    # ==================================================
+    def plot_waterfalls(self, waterfalls, locations, bins, save_fig=False):
+        '''
+        Makes waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+        '''
+
+        # prepare figure
+        fig, axs = plt.subplots(4,1)
+        fig.set_figwidth(8)
+        fig.set_figheight(2.8*4)
+        
+        # current profile
+        Is = waterfalls[0]
+        ts = bins[0]
+        c0 = axs[0].pcolor(locations, ts*SI.c*1e6, -Is/1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar0 = fig.colorbar(c0, ax=axs[0])
+        axs[0].set_ylabel(r'Longitudinal position [$\mathrm{\mu}$m]')
+        cbar0.ax.set_ylabel('Beam current [kA]')
+        #axs[0].set_title('Shot ' + str(shot+1))
+        
+        # energy profile
+        dQddeltas = waterfalls[1]
+        deltas = bins[1]
+        c1 = axs[1].pcolor(locations, deltas*1e2, -dQddeltas*1e7, cmap=CONFIG.default_cmap, shading='auto')
+        cbar1 = fig.colorbar(c1, ax=axs[1])
+        axs[1].set_ylabel('Relative energy spread [%]')
+        cbar1.ax.set_ylabel('Spectral density [nC/%]')
+        
+        densityX = waterfalls[2]
+        xs = bins[2]
+        c2 = axs[2].pcolor(locations, xs*1e6, -densityX*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar2 = fig.colorbar(c2, ax=axs[2])
+        axs[2].set_ylabel(r'Horizontal position [$\mathrm{\mu}$m]')
+        cbar2.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
+        
+        densityY = waterfalls[3]
+        ys = bins[3]
+        c3 = axs[3].pcolor(locations, ys*1e6, -densityY*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar3 = fig.colorbar(c3, ax=axs[3])
+        axs[3].set_ylabel(r'Vertical position [$\mathrm{\mu}$m]')
+        cbar3.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
+        axs[3].set_xlabel('Location along the stage [m]')
+        
+        plt.show()
+        if save_fig:
+            plot_path = self.run_path + 'plots' + os.sep
+            if not os.path.exists(plot_path):
+                os.makedirs(plot_path)
+            filename = plot_path + 'waterfalls' + '.png'
+            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+
+            
