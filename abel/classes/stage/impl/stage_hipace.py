@@ -602,6 +602,41 @@ class StageHipace(Stage):
     def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
         """
         Applies waterfall function to all beam dump files in data_dir.
+
+         Parameters
+        ----------
+        fcns: A list of Beam class methods
+            Beam class profile methods such as Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y.
+
+        edges: float list
+            Specifies the bins to be used to create the histogram(s) in the waterfall plot(s).
+
+        data_dir: string
+            Path to the directory containing all HiPACE++ HDF5 output files.
+
+        species: string, optional
+            Specifies the name of the beam to be extracted.
+
+        clean: bool, optional
+            Determines whether the extracted beams from the HiPACE++ HDF5 output files should be cleaned before further processing.
+
+        remove_halo_nsigma: float, optional
+            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+
+        args: float list, optional
+            Allows passing additional arguments to the functions in fcns.
+            
+            
+        Returns
+        ----------
+        waterfalls: list of 2D float NumPy arrays
+            Each element in waterfalls corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+        
+        locations: [m] 1D float NumPy array
+            Stores the location for each slice of the waterfalls.
+        
+        bins: list of 1D float NumPy arrays
+            Each element contains the bins used for the slices/histograms in waterfalls.
         """
 
         from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
@@ -609,9 +644,6 @@ class StageHipace(Stage):
         # find number of beam outputs to plot
         files = sorted(os.listdir(data_dir))
         num_outputs = len(files)
-        
-        # prepare to read simulation data
-        file_path = data_dir + files[0]
         
         # declare data structure
         bins = [None] * len(fcns)
@@ -624,7 +656,6 @@ class StageHipace(Stage):
         # go through files
         for index in range(num_outputs):
             # load phase space
-            file_path = data_dir + files[index]
             beam = hipaceHdf5_2_abelBeam(data_dir, index, species=species)
 
             if clean:
@@ -647,6 +678,23 @@ class StageHipace(Stage):
     def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_fig=False):
         '''
         Makes waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+
+        Parameters
+        ----------
+        data_dir: string
+            Path to the directory containing all HiPACE++ HDF5 output files.
+
+        species: string, optional
+            Specifies the name of the beam to be extracted.
+
+        clean: bool, optional
+            Determines whether the extracted beams from the HiPACE++ HDF5 output files should be cleaned before further processing.
+
+        remove_halo_nsigma: float, optional
+            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+
+        save_fig: bool, optional
+            Flag for saving the output figure.
         '''
 
         from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam

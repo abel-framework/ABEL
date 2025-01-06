@@ -268,7 +268,23 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
 
 def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
     """
-    Load an ABEL beam from a HiPACE++ HDF5 file (OpenPMD format).
+    Load an ABEL beam from a HiPACE++ HDF5 output file (OpenPMD format).
+
+    Parameters
+    ----------
+    data_dir: string
+        Path to the directory containing all HiPACE++ HDF5 output files.
+
+    hipace_iteration_idx: int
+        Specifies the simulation iteration number to be extracted out of all available output files in data_dir.
+
+    species: string, optional
+        Specifies the name of the beam to be extracted.
+
+
+    Returns
+    ----------
+    beam: Beam object
     """
 
     from openpmd_viewer import OpenPMDTimeSeries

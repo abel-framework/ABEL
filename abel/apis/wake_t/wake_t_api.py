@@ -47,6 +47,19 @@ def beam2wake_t_bunch(beam, name='beam'):
 def wake_t_hdf5_load(file_path, species='beam'):
     """
     Load an ABEL beam from a Wake-T HDF5 file (OpenPMD format).
+
+    Parameters
+    ----------
+    file_path: string
+        Path to the Wake-T HDF5 output file.
+
+    species: string, optional
+        Specifies the name of the beam to be extracted.
+
+
+    Returns
+    ----------
+    beam: Beam object
     """
 
     import openpmd_api as io
