@@ -1417,7 +1417,7 @@ class Beam():
         
         # extract phase space
         if "id" in particles:
-            ids = particles["id"][Record_Component.SCALAR].load_chunk()
+            ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
         else:
             ids = None
         weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
