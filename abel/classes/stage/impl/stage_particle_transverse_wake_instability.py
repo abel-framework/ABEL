@@ -209,7 +209,6 @@ class StagePrtclTransWakeInstability(Stage):
             if np.abs( drive_beam_rotated.y_angle() ) > 5e-10:
                 driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'drive_beam_rotated y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_ramped y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
                 warnings.warn(driver_error_string)
-
     
             if np.abs( -(beam_incoming.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
@@ -243,13 +242,25 @@ class StagePrtclTransWakeInstability(Stage):
         
 
         # ========== Wake-T simulation and extraction ==========
-        # Set up a Wake-T plasma acceleration stage
         drive_beam_wakeT = copy.deepcopy(drive_beam_ramped)
         beam0_copy = copy.deepcopy(beam0)
 
-        # TODO: Need to subtract driver offsets from both beams?
+        # The drive beam must be centred around r=0 before being used in Wake-T
+        driver_x_offset = drive_beam_ramped.x_offset()
+        driver_y_offset = drive_beam_ramped.y_offset()
+        drive_beam_wakeT_xs = drive_beam_wakeT.xs()
+        drive_beam_wakeT.set_xs(drive_beam_wakeT_xs - driver_x_offset)
+        drive_beam_wakeT_ys = drive_beam_wakeT.ys()
+        drive_beam_wakeT.set_ys(drive_beam_wakeT_ys - driver_y_offset)
+
+        # Also subtract the drive beam offset from the main beam used in Wake-T
+        beam0_copy_xs = beam0_copy.xs()
+        beam0_copy.set_xs(beam0_copy_xs - driver_x_offset)
+        beam0_copy_ys = beam0_copy.ys()
+        beam0_copy.set_xs(beam0_copy_ys - driver_y_offset)
         
-        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_copy)
+        # Construct a Wake-T plasma acceleration stage
+        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_copy, stage_length=None, dz_fields=None)
 
         # Make temp folder
         if not os.path.exists(CONFIG.temp_path):
@@ -276,7 +287,12 @@ class StagePrtclTransWakeInstability(Stage):
         plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
         info_rho = wake_t_evolution.initial.plasma.density.metadata
         zs_rho = info_rho.z
-        rs_rho = info_rho.r
+
+        # Make corrections to the Wake-T data
+        rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
+        info_rho.r = rs_rho
+        info_rho.imshow_extent[2] = rs_rho.min()
+        info_rho.imshow_extent[3] = rs_rho.max()
         
         # Cut out axial Ez over the ROI
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
@@ -755,7 +771,7 @@ class StagePrtclTransWakeInstability(Stage):
         Returns
         ----------
         bubble_radius: [m] 1D float array 
-            Plasma bubble radius over the simulation box.
+            Plasma bubble radius over the simulation box, measured from the drive beam axis.
         """
 
         # Check if plasma_tr_coord is strictly growing from start to end
@@ -848,7 +864,7 @@ class StagePrtclTransWakeInstability(Stage):
             
         Returns
         ----------
-        rb_fit(z_slices): [m] 1D float array
+        rb_roi: [m] 1D float array
             Plasma ion bubble radius for the region of interest shifted to the location of the beam.
 
         rb_fit: [V/m] 1D interpolation object 
@@ -876,9 +892,29 @@ class StagePrtclTransWakeInstability(Stage):
         sse_rb = np.sum((rb_cut - rb_fit(zs_cut))**2)
         
         if sse_rb/np.mean(rb_cut) > 0.05:
-            warnings.warn('The plasma bubble radius may not have been accurately fitted.\n', UserWarning)
+            warnings.warn('The plasma ion bubble radius may not have been accurately fitted.\n', UserWarning)
+
+        rb_roi = rb_fit(z_slices)
+
+        # Check the smoothness of the bubble radius in the region of interest
+        drb_dz = np.gradient(rb_roi, z_slices)  # Compute first order derivative
+        smoothness_threshold = 2.0  # Define a threshold for smoothness
+        if np.all(np.abs(np.diff(drb_dz)) > smoothness_threshold):
+            
+            # Do a deeper smoothness test using the sorted beam macro particle zs
+            zs = beam.zs()
+            indices = np.argsort(zs)
+            zs_sorted = zs[indices]
+            rb_prtcl = rb_fit(zs_sorted)
+            drb_dz = np.gradient(rb_prtcl, zs_sorted)  # Compute first order derivative
+            d2rb_dz2 = np.gradient(rb_prtcl, zs_sorted)  # Compute second order derivative
+
+            smoothness_metric = np.max(np.abs(d2rb_dz2))
+            
+            if smoothness_metric > smoothness_threshold:
+                warnings.warn('The plasma ion bubble radius may not have been extracted correctly.\n', UserWarning)
         
-        return rb_fit(z_slices), rb_fit    
+        return rb_roi, rb_fit    
         
 
     # ==================================================
