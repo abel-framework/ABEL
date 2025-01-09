@@ -317,8 +317,8 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
 
     # Progress bar
     if show_prog_bar is True:
-        pbar = tqdm(total=100)
-        pbar.set_description('0%')
+        pbar = tqdm(total=100, bar_format='{desc} {percentage:3.1f}%|{bar}| [{elapsed}, {rate_fmt}{postfix}]')
+        
 
     # ============= Save evolution =============
     if trans_wake_config.probe_evolution:
@@ -464,8 +464,8 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
         # Progress bar
         if show_prog_bar is True:
-            pbar.update(prop_length/stage_length*100 - pbar.n)        
-            pbar.set_description(f"Instability tracking {round(prop_length/stage_length*100,2)}%")
+            pbar.update(prop_length/stage_length*100 - pbar.n)
+            pbar.set_description(f"\tInstability stage tracking")
 
         #print(time_step_count)
         #break #####################< override
