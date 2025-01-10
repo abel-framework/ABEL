@@ -152,7 +152,7 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
         Length of the plasma acceleration stage. If not given, is set to the same as one step size.
 
     dz_fields: [m], float, optional
-        Determines how often the plasma wakefields should be updated. For example, if dz_fields=10e-6, the plasma wakefields are only updated every time the simulation window advances by 10 micro meter. The default is set to be slightly longer than stage_length such that the plasma wakefields are only calculated once.
+        Determines how often the plasma wakefields should be updated. For example, if ``dz_fields=10e-6``, the plasma wakefields are only updated every time the simulation window advances by 10 micro meter. The default is set to be slightly longer than ``stage_length`` such that the plasma wakefields are only calculated once.
 
     num_cell_xy: float, optional
         Number of grid elements along r to calculate the wakefields.
@@ -161,13 +161,13 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
         Number of times along the stage in which the particle distribution should be returned.
         
     box_size_r: [m], float, optional
-        Determines the transverse size of the simulation domain [-box_size_r, box_size_r] where the plasma wakefield will be calculated.
+        Determines the transverse size of the simulation domain [``-box_size_r``, ``box_size_r``] where the plasma wakefield will be calculated.
 
     box_min_z: [m], float, optional
-        Minimum longitudinal (speed of light frame) position for the simulaltion domain in which the plasma wakefield will be calculated.
+        Minimum longitudinal (speed of light frame) position for the simulation domain in which the plasma wakefield will be calculated.
 
     box_max_z: [m], float, optional
-        Maximum longitudinal (speed of light frame) position for the simulaltion domain in which the plasma wakefield will be calculated.
+        Maximum longitudinal (speed of light frame) position for the simulation domain in which the plasma wakefield will be calculated.
     
         
     Returns

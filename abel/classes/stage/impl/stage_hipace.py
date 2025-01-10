@@ -601,7 +601,7 @@ class StageHipace(Stage):
     # Apply waterfall function to all beam dump files
     def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
         """
-        Applies waterfall function to all beam dump files in data_dir.
+        Applies waterfall function to all beam dump files in ``data_dir``.
 
          Parameters
         ----------
@@ -630,13 +630,13 @@ class StageHipace(Stage):
         Returns
         ----------
         waterfalls: list of 2D float NumPy arrays
-            Each element in waterfalls corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
         
         locations: [m] 1D float NumPy array
-            Stores the location for each slice of the waterfalls.
+            Stores the location for each slice of ``waterfalls``.
         
         bins: list of 1D float NumPy arrays
-            Each element contains the bins used for the slices/histograms in waterfalls.
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
         """
 
         from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam

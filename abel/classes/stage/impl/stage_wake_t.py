@@ -256,7 +256,7 @@ class StageWakeT(Stage):
     # Apply waterfall function to all beam dump files
     def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
         """
-        Applies waterfall function to all Wake-T HDF5 output files in data_dir.
+        Applies waterfall function to all Wake-T HDF5 output files in ``data_dir``.
 
          Parameters
         ----------
@@ -279,19 +279,19 @@ class StageWakeT(Stage):
             Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
 
         args: float list, optional
-            Allows passing additional arguments to the functions in fcns.
+            Allows passing additional arguments to the functions in ``fcns``.
             
             
         Returns
         ----------
         waterfalls: list of 2D float NumPy arrays
-            Each element in waterfalls corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one function in ``fcns`` applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
         
         locations: [m] 1D float NumPy array
-            Stores the location for each slice of the waterfalls.
+            Stores the location for each slice of ``waterfalls``.
         
         bins: list of 1D float NumPy arrays
-            Each element contains the bins used for the slices/histograms in waterfalls.
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
         """
 
         from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
@@ -359,13 +359,13 @@ class StageWakeT(Stage):
         Returns
         ----------
         waterfalls: list of 2D float NumPy arrays
-            Each element in waterfalls corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
         
         locations: [m] 1D float NumPy array
-            Stores the location for each slice of the waterfalls.
+            Stores the location for each slice of the ``waterfalls``.
         
         bins: list of 1D float NumPy arrays
-            Each element contains the bins used for the slices/histograms in waterfalls.
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
         '''
 
         from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
@@ -397,13 +397,13 @@ class StageWakeT(Stage):
         Parameters
         ----------
         waterfalls: list of 2D float NumPy arrays
-            Each element in waterfalls corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
         
         locations: [m] 1D float NumPy array
-            Stores the location for each slice of the waterfalls.
+            Stores the location for each slice of the ``waterfalls``.
         
         bins: list of 1D float NumPy arrays
-            Each element contains the bins used for the slices/histograms in waterfalls.
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
 
         save_fig: bool, optional
             Flag for saving the output figure.

@@ -61,17 +61,17 @@ class IonMotionConfig():
         update_ion_wakefield: bool
             ...
 
-        xs_probe: [m] 1D float array
-            x-coordinates used to probe beam electric fields calculated by RF-Track.
-
-        ys_probe: [m] 1D float array
-            y-coordinates used to probe beam electric fields calculated by RF-Track.
-
-        zs_probe: [m] 1D float array
-            z-coordinates used to probe beam electric fields calculated by RF-Track.
-
-        grid_size_z: [m] float or 1D float array
-            The size of grid cells along z. If uniform_z_grid is False, this becomes a 1D float array containing the distance between elements in zs_probe.
+        #xs_probe: [m] 1D float array
+        #    x-coordinates used to probe beam electric fields calculated by RF-Track.
+#
+        #ys_probe: [m] 1D float array
+        #    y-coordinates used to probe beam electric fields calculated by RF-Track.
+#
+        #zs_probe: [m] 1D float array
+        #    z-coordinates used to probe beam electric fields calculated by RF-Track.
+#
+        #grid_size_z: [m] float or 1D float array
+        #    The size of grid cells along z. If ``uniform_z_grid`` is ``False``, this becomes a 1D float array containing the distance between elements in zs_probe.
         """
 
         #self.drive_beam = drive_beam
@@ -395,7 +395,7 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
     xs_grid_flat = X.flatten()*1e3  # [mm]
     ys_grid_flat = Y.flatten()*1e3  # [mm]
     zs_grid_flat = Z.flatten()*1e3  # [mm]
-        
+    
     # Probe beam E-field
     E_fields_beam, _ = main_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
     Exs = E_fields_beam[:,0]
@@ -404,7 +404,6 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
     # Reshape the field component into a 3D array       
     Exs_3d = Exs.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
     Eys_3d = Eys.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
-    #Eys_3d = Exs.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
     
     return Exs_3d, Eys_3d
 

@@ -276,7 +276,7 @@ def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
         Path to the directory containing all HiPACE++ HDF5 output files.
 
     hipace_iteration_idx: int
-        Specifies the simulation iteration number to be extracted out of all available output files in data_dir.
+        Specifies the simulation iteration number to be extracted out of all available output files in ``data_dir``.
 
     species: string, optional
         Specifies the name of the beam to be extracted.

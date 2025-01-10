@@ -703,7 +703,7 @@ class StagePrtclTransWakeInstability(Stage):
             Axial longitudinal E-field.
             
         zs_Ez: [m] 1D float array
-            zs_Ez-coordinates for Ez. Monotonically increasing from first to last element.
+            z-coordinates for ``Ez``. Monotonically increasing from first to last element.
 
         beam: ABEL Beam object
             
@@ -759,13 +759,13 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma number density in units of initial number density n0. Need to be oriented with propagation direction pointing to the right and positive offset pointing upwards.
             
         plasma_tr_coord: [m] 1D float array 
-            Transverse coordinate of plasma_num_density. Needs to be strictly growing from start to end.
+            Transverse coordinate of ``plasma_num_density``. Needs to be strictly growing from start to end.
 
         driver_offset: [m] float
             Mean transverse offset of the drive beam.
             
         threshold: float
-            Defines a threshold for the plasma density to determine bubble_radius.
+            Defines a threshold for the plasma density to determine ``bubble_radius``.
 
             
         Returns
@@ -854,7 +854,7 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma ion bubble radius.
             
         zs_rb: [m] 1D float array
-            z-coordinates for rb. Monotonically increasing from first to last element.
+            z-coordinates for ``rb``. Monotonically increasing from first to last element.
 
         beam: ABEL Beam object
             
