@@ -1673,3 +1673,37 @@ class Beam():
         extent_energ[2] = extent_energ[2]/1e9  # [GeV]
         extent_energ[3] = extent_energ[3]/1e9  # [GeV]
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
+
+        
+    # ==================================================
+    def print_summary(self):
+
+        print('---------------------------------------------------')
+        print('Quantity \t\t\t\t Value')
+        print('---------------------------------------------------')
+        print(f"Number of macroparticles:\t\t {len(self) :d}")
+        print(f"Mean gamma:\t\t\t\t {self.gamma() :.3f}")
+        print(f"Mean energy [GeV]:\t\t\t {self.energy()/1e9 :.3f}")
+        print(f"rms energy spread [%]:\t\t\t {self.rel_energy_spread()*1e2 :.3f}\n")
+
+        print(f"Location [m]:\t\t\t\t {self.location :.3f}")
+        print(f"x offset [um]:\t\t\t\t {self.x_offset()*1e6 :.3f}")
+        print(f"y offset [um]:\t\t\t\t {self.y_offset()*1e6 :.3f}")
+        print(f"z offset [um]:\t\t\t\t {self.z_offset()*1e6 :.3f}\n")
+
+        print(f"x angular offset [urad]:\t\t {self.x_angle()*1e6 :.3f}")
+        print(f"y angular offset [urad]:\t\t {self.y_angle()*1e6 :.3f}\n")
+
+        print(f"Normalised x emittance [mm mrad]:\t {self.norm_emittance_x()*1e6 :.3f}")
+        print(f"Normalised y emittance [mm mrad]:\t {self.norm_emittance_y()*1e6 :.3f}")
+        print(f"Angular momentum [mm mrad]:\t\t {self.angular_momentum()*1e6 :.3f}\n")
+        print(f"x beta function [mm]:\t\t\t {self.beta_x()*1e3 :.3f} \t\t")
+        print(f"y beta function [mm]:\t\t\t {self.beta_y()*1e3 :.3f} \t\t\n")
+
+        print(f"x beam size [um]:\t\t\t {self.beam_size_x()*1e6 :.3f} \t\t\t")
+        print(f"y beam size [um]:\t\t\t {self.beam_size_y()*1e6 :.3f} \t\t\t")
+        print(f"rms beam length [um]:\t\t\t {self.bunch_length()*1e6 :.3f} \t\t")
+        print(f"Peak current [kA]:\t\t\t {self.peak_current()/1e3 :.3f} \t\t")
+        print('---------------------------------------------------')
+
+
