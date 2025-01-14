@@ -116,16 +116,16 @@ class Stage(Trackable, CostModeled):
     
         Parameters
         ----------
-        ramp_plasma_density: [m^-3] float, optional
+        ramp_plasma_density : [m^-3] float, optional
             Plasma density for the ramp.
 
-        ramp_length: [m] float, optional
+        ramp_length : [m] float, optional
             Length of the ramp.
     
             
         Returns
         ----------
-        stage_copy: Stage object
+        stage_copy : ``Stage`` object
             A modified deep copy of the original stage.
         """
 

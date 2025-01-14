@@ -272,19 +272,19 @@ def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
 
     Parameters
     ----------
-    data_dir: string
+    data_dir : str
         Path to the directory containing all HiPACE++ HDF5 output files.
 
-    hipace_iteration_idx: int
+    hipace_iteration_idx : int
         Specifies the simulation iteration number to be extracted out of all available output files in ``data_dir``.
 
-    species: string, optional
+    species : str, optional
         Specifies the name of the beam to be extracted.
 
 
     Returns
     ----------
-    beam: Beam object
+    beam : ``Beam`` object
     """
 
     from openpmd_viewer import OpenPMDTimeSeries

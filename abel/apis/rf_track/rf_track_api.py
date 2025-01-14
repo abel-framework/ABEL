@@ -8,7 +8,7 @@ import warnings
 # ==================================================
 def abel_beam2rft_beam(beam):
     """
-    Converts an ABEL beam object to a RF-Track beam object.
+    Converts an ABEL ``Beam`` object to a RF-Track ``Bunch6dT`` object.
     """
 
     from RF_Track import Bunch6dT
@@ -46,7 +46,7 @@ def abel_beam2rft_beam(beam):
 # ==================================================
 def rft_beam2abel_beam(beam_rft):
     """
-    Converts a RF-Track beam object to an ABEL beam object.
+    Converts a RF-Track ``Bunch6dT`` object to an ABEL ``Beam`` object.
     """
 
     phase_space_rft = beam_rft.get_phase_space('%X %Px %Y %Py %Z %Pz %Q %N %m', 'good')
@@ -77,7 +77,7 @@ def rft_beam2abel_beam(beam_rft):
                          particle_mass=particle_mass)
     return beam
 
-
+    
 # ==================================================
 def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1):
 
@@ -87,11 +87,11 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
 
     # Convert ABEL beam to RF-Track beam
-    beam_rft = abel_beam2rft_beam(abel_beam)
-    
+    beam_rft = abel_beam2rft_beam(abel_beam)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
+
     # Set the solver resolution and calculate fields
     sc_fields_obj = SpaceCharge_Field(beam_rft, num_x_cells, num_y_cells, num_z_cells, num_t_bins)  # num_x_cells, num_y_cells, num_z_cells, number of velocity slices
-
+    
     return sc_fields_obj
 
     
@@ -130,3 +130,20 @@ def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t
 
     return E_fields_beam, B_fields_beam, xs_sorted, ys_sorted, zs_sorted
 
+
+# ==================================================
+def wake_t_bunch2rft_beam(beam):
+    """
+    Converts a Wake-T ``ParticleBunch`` to a RF-Track ``Beam`` object.
+    """
+
+    return
+
+
+# ==================================================
+def rft_beam2abel_beam(beam_rft):
+    """
+    Converts a RF-Track ``Beam`` object to a Wake-T ``ParticleBunch``.
+    """
+
+    return

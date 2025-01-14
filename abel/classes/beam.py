@@ -264,13 +264,13 @@ class Beam():
         
         Parameters
         ----------
-        axis1, axis2, axis3: 1x3 float NumPy arrays
+        axis1, axis2, axis3 : 1x3 float ndarrays
             Unit vectors specifying the rotation axes.
         
-        angle1, angle2, angle3: [rad] float
+        angle1, angle2, angle3 : [rad] float
             Angles used for rotation of the beam's coordinate system around the respective axes.
 
-        invert: bool
+        invert : bool
             Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
             
         Returns
@@ -326,15 +326,15 @@ class Beam():
         
         Parameters
         ----------
-        ...
+        N/A
         
             
         Returns
         ----------
-        x_angle: [rad] float
+        x_angle : [rad] float
             Used for rotating the beam's frame around the y-axis.
         
-        y_angle: [rad] float
+        y_angle : [rad] float
             Used for rotating the beam's frame around the x-axis. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
         """
 
@@ -375,13 +375,13 @@ class Beam():
         
         Parameters
         ----------
-        x_angle: [rad] float
+        x_angle : [rad] float
             Angle to rotate the coordinate system with in the zx-plane.
         
-        y_angle: [rad] float
+        y_angle : [rad] float
             Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
 
-        invert: bool
+        invert : bool
             Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
         
             
@@ -409,10 +409,10 @@ class Beam():
         
         Parameters
         ----------
-         align_x_angle: [rad] float
+         align_x_angle : [rad] float
             Beam coordinates with in the zx-plane are rotated with this angle.
         
-        align_y_angle: [rad] float
+        align_y_angle : [rad] float
             Beam coordinates with in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
         
             
@@ -460,25 +460,25 @@ class Beam():
 
         Parameters
         ----------
-        beam_quant: 1D float array
+        beam_quant : 1D float array
             Beam quantity to be binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
 
-        bin_number: float
+        bin_number : float
             Number of beam slices.
 
-        cut_off: float
+        cut_off : float
             Determines the longitudinal coordinates inside the region of interest
 
-        make_plot: bool
+        make_plot : bool
             Flag for making plots.
 
             
         Returns
         ----------
-        beam_quant_slices: 1D float array
+        beam_quant_slices : 1D float array
             beam_quant binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
 
-        z_centroids: [m] 1D float array
+        z_centroids : [m] 1D float array
             z-coordinates of the beam slices.
         """
         
@@ -784,15 +784,15 @@ class Beam():
         
         Parameters
         ----------
-        zbins, xbins, ybins: [m] float or 1D float NumPy array
+        zbins, xbins, ybins : [m] float or 1D float ndarray
             The bins along z(x,y).
             
         Returns
         ----------
-        dQ_dxdydz: [C/m^3] 3D float NumPy array 
+        dQ_dxdydz : [C/m^3] 3D float ndarray 
             Charge density of the beam.
         
-        zctrs, xctrs, yctrs: [m] 1D float NumPy array 
+        zctrs, xctrs, yctrs : [m] 1D float ndarray 
             The centre positions of the bins of ``dQ_dxdydz``.
         """
         
@@ -842,40 +842,40 @@ class Beam():
         
         Parameters
         ----------
-        main_diag: [m^-2] 1D float NumPy array
+        main_diag : [m^-2] 1D float ndarray
             The main diagonal of the system matrix to be modified according to the boundary conditions.
 
-        upper_inner_off_diag: [m^-2] 1D float NumPy array
+        upper_inner_off_diag : [m^-2] 1D float ndarray
             The upper inne off-diagonal of the system matrix to be modified according to the boundary conditions.
 
-        lower_inner_off_diag: [m^-2] 1D float NumPy array
+        lower_inner_off_diag : [m^-2] 1D float ndarray
             The lower inne off-diagonal of the system matrix to be modified according to the boundary conditions.
 
-        outer_inner_off_diag: [m^-2] 1D float NumPy array
+        outer_inner_off_diag : [m^-2] 1D float ndarray
             The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
 
-        outer_inner_off_diag: [m^-2] 1D float NumPy array
+        outer_inner_off_diag : [m^-2] 1D float ndarray
             The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
             
-        num_x_cells: float
+        num_x_cells : float
             The number of cells in the x-direction. Determines the number of columns of the system matrix ``A``.
 
-        num_unknowns: float
+        num_unknowns : float
             The number of unknowns in the system, which is determined by The number of cells in the x and y-direction.
 
-        rhs: [V/m^3] 1D float NumPy array
+        rhs : [V/m^3] 1D float ndarray
             The right hand side of the Poisson equation to be modified according to the boundary conditions.
 
-        boundary_val: [V/m] float
+        boundary_val : [V/m] float
             The value of the electric fields Ex and Ey at the simulation box boundary.
 
             
         Returns
         ----------
-        A: [m^-2] 2D float sparse matrix
+        A : [m^-2] 2D float sparse matrix
             System matrix.
 
-        rhs: [V/m^3] 1D float NumPy array
+        rhs : [V/m^3] 1D float ndarray
             The modified right hand side of the Poisson equation.
         """
         
@@ -928,13 +928,13 @@ class Beam():
         
         Parameters
         ----------
-        num_x_cells, num_y_cells: float
+        num_x_cells, num_y_cells : float
             The number of cells in the x and y-direction.
 
-        charge_density_xy_slice: [C/m^3] 2D NumPy array
+        charge_density_xy_slice: [C/m^3] 2D ndarray
             A xy-slice of the beam charge density.
 
-        dx, dy: [m] float
+        dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
 
         boundary_val: [V/m] 
@@ -942,10 +942,10 @@ class Beam():
             
         Returns
         ----------
-        Ex: [V/m] 2D float array 
+        Ex : [V/m] 2D float array 
             x-conponent of electric field generated by the chosen beam slice.
 
-        Ey: [V/m] 2D float array 
+        Ey : [V/m] 2D float array 
             y-conponent of electric field generated by the chosen beam slice.
         """
         
@@ -990,31 +990,31 @@ class Beam():
 
         Parameters
         ----------
-        x_box_min, y_box_min: [m] float
+        x_box_min, y_box_min : [m] float
             The lower x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
 
-        x_box_max, y_box_max: [m] float
+        x_box_max, y_box_max : [m] float
             The upper x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
         
-        dx, dy: [m] float
+        dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
 
-        num_z_cells: float
+        num_z_cells : float
             The number of cells in the z-direction.
 
-        boundary_val: [V/m]
+        boundary_val : [V/m]
             The values of the electric fields Ex and Ey at the simulation domain boundary.
 
             
         Returns
         ----------
-        Ex: [V/m] 2D float array 
+        Ex : [V/m] 2D float array 
             x-conponent of electric field generated by the chosen beam slice.
 
-        Ey: [V/m] 2D float array 
+        Ey : [V/m] 2D float array 
             y-conponent of electric field generated by the chosen beam slice.
 
-        zctrs, xctrs, yctrs: [m] 1D float NumPy array
+        zctrs, xctrs, yctrs : [m] 1D float ndarray
             Coordinates in z, x and y for the centres of the bins of ``Ex`` and ``Ey``.
         """
 

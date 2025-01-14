@@ -1,6 +1,7 @@
 from abel import Beam
 import scipy.constants as SI
 import numpy as np
+import warnings
 import wake_t
 from abel.utilities.plasma_physics import k_p, blowout_radius
 from abel.classes.stage.stage import SimulationDomainSizeError
@@ -52,16 +53,16 @@ def wake_t_hdf5_load(file_path, species='beam'):
 
     Parameters
     ----------
-    file_path: string
+    file_path : str
         Path to the Wake-T HDF5 output file.
 
-    species: string, optional
+    species : str, optional
         Specifies the name of the beam to be extracted.
 
 
     Returns
     ----------
-    beam: Beam object
+    beam : ``Beam`` object
     """
 
     import openpmd_api as io
@@ -139,40 +140,40 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     
     Parameters
     ----------
-    plasma_density: [m^-3] float
+    plasma_density : [m^-3] float
         Plasma density.
         
-    abel_drive_beam: ABEL Beam object
+    abel_drive_beam : ABEL ``Beam`` object
         Drive beam.
 
-    abel_main_beam: ABEL Beam object, optional
+    abel_main_beam : ABEL ``Beam`` object, optional
         Main beam, can be used to determine the betatreon wavelength.
 
     stage_length: [m] float, optional
         Length of the plasma acceleration stage. If not given, is set to the same as one step size.
 
-    dz_fields: [m], float, optional
+    dz_fields : [m], float, optional
         Determines how often the plasma wakefields should be updated. For example, if ``dz_fields=10e-6``, the plasma wakefields are only updated every time the simulation window advances by 10 micro meter. The default is set to be slightly longer than ``stage_length`` such that the plasma wakefields are only calculated once.
 
-    num_cell_xy: float, optional
+    num_cell_xy : float, optional
         Number of grid elements along r to calculate the wakefields.
 
-    n_out: int, optional
+    n_out : int, optional
         Number of times along the stage in which the particle distribution should be returned.
         
-    box_size_r: [m], float, optional
+    box_size_r : [m], float, optional
         Determines the transverse size of the simulation domain [``-box_size_r``, ``box_size_r``] where the plasma wakefield will be calculated.
 
-    box_min_z: [m], float, optional
+    box_min_z : [m], float, optional
         Minimum longitudinal (speed of light frame) position for the simulation domain in which the plasma wakefield will be calculated.
 
-    box_max_z: [m], float, optional
+    box_max_z : [m], float, optional
         Maximum longitudinal (speed of light frame) position for the simulation domain in which the plasma wakefield will be calculated.
     
         
     Returns
     ----------
-    plasma_stage: Wake-T plasma acceleration stage
+    plasma_stage : Wake-T ``PlasmaStage`` object
     """
 
     if abel_main_beam is None:
@@ -208,13 +209,14 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
         if box_min_z > abel_drive_beam.zs().min() or box_max_z < abel_drive_beam.zs().max():
             raise SimulationDomainSizeError('The simulation box is too short.')
         if box_size_r < abel_drive_beam.rs().max():
-            raise SimulationDomainSizeError('The simulation box is too narrow.')
+            #raise SimulationDomainSizeError('The simulation box is too narrow.')
+            warnings.warn('The simulation box is too narrow.')
     else:
         if box_min_z > abel_main_beam.zs().min() or box_max_z < abel_drive_beam.zs().max():
             raise SimulationDomainSizeError('The simulation box is too short.')
         max_r = np.max( [abel_drive_beam.rs().max(), abel_main_beam.rs().max()] )
         if box_size_r < max_r:
-            raise SimulationDomainSizeError('The simulation box is too narrow.')
+            warnings.warn('The simulation box is too narrow.')
         
         
     # Calculate number of cells

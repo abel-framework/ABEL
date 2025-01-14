@@ -202,30 +202,15 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     """
     Parameters
     ----------
-    beam: Beam object
-    
-    #plasma_density: [m^-3] float
-        Plasma density.
+    beam: ``Beam`` object
         
-    Ez_fit_obj: [V/m] interpolation object
+    Ez_fit_obj : [V/m] interpolation object
         1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
         
-    rb_fit_obj: [m] interpolation object
+    rb_fit_obj : [m] interpolation object
         1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
-        
-    #stage_length: [m] float
-        Length of the plasma stage.
-    
-    #time_step_mod: float
-        Determines the time step of the instability tracking in units of beta_wave_length/c.
-    
-    #enable_radiation_reaction: bool
-        Flag for enabling radiation reactions.
-    
-    #show_prog_bar: bool
-        Flag for displaying the progress bar.
 
-    trans_wake_config: ...
+    trans_wake_config : ...
         ...
     
     ...
@@ -233,10 +218,10 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
     Returns
     ----------
-    beam_out: Beam object
+    beam_out : ``Beam`` object
         ...
     
-    evolution: ...
+    evolution : ...
         ...
     """
     
@@ -640,7 +625,7 @@ def save_beam(main_beam, file_path, stage_num, time_step, num_time_steps):
 ###################################################
 def save_time_step(arrays, file_path):
     """
-    arrays: List of arrays in the order
+    arrays : List of arrays in the order
         ``xs_sorted``, ``ys_sorted``, ``zs_sorted``, ``pxs_sorted``, ``pys_sorted``, ``pzs_sorted``, ``weights_sorted``, ``Ez``, ``bubble_radius``, ``intpl_Wx_perts``, ``intpl_Wy_perts``
     """
     

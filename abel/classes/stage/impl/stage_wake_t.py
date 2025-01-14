@@ -260,37 +260,37 @@ class StageWakeT(Stage):
 
          Parameters
         ----------
-        fcns: A list of Beam class methods
-            Beam class profile methods such as Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y.
+        fcns : A list of Beam class methods
+            Beam class profile methods such as ``Beam.current_profile``, ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, ``Beam.transverse_profile_y``.
 
-        edges: float list
+        edges : float list
             Specifies the bins to be used to create the histogram(s) in the waterfall plot(s).
 
-        data_dir: string
+        data_dir : str
             Path to the directory containing all Wake-T HDF5 output files.
 
-        species: string, optional
+        species : str, optional
             Specifies the name of the beam to be extracted.
 
-        clean: bool, optional
+        clean : bool, optional
             Determines whether the extracted beams from the Wake-T HDF5 output files should be cleaned before further processing.
 
-        remove_halo_nsigma: float, optional
+        remove_halo_nsigma : float, optional
             Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
 
-        args: float list, optional
+        args : float list, optional
             Allows passing additional arguments to the functions in ``fcns``.
             
             
         Returns
         ----------
-        waterfalls: list of 2D float NumPy arrays
+        waterfalls : list of 2D float ndarrays
             Each element in ``waterfalls`` corresponds to the output of one function in ``fcns`` applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
         
-        locations: [m] 1D float NumPy array
+        locations : [m] 1D float ndarray
             Stores the location for each slice of ``waterfalls``.
         
-        bins: list of 1D float NumPy arrays
+        bins : list of 1D float ndarrays
             Each element contains the bins used for the slices/histograms in ``waterfalls``.
         """
 
@@ -340,31 +340,31 @@ class StageWakeT(Stage):
 
         Parameters
         ----------
-        data_dir: string
+        data_dir : str
             Path to the directory containing all Wake-T HDF5 output files.
 
-        species: string, optional
+        species : str, optional
             Specifies the name of the beam to be extracted.
 
-        clean: bool, optional
+        clean : bool, optional
             Determines whether the extracted beams from the Wake-T HDF5 output files should be cleaned before further processing.
 
-        remove_halo_nsigma: float, optional
+        remove_halo_nsigma : float, optional
             Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
 
-        args: float list, optional
+        args : float list, optional
             Allows passing additional arguments to the functions in fcns.
 
             
         Returns
         ----------
-        waterfalls: list of 2D float NumPy arrays
+        waterfalls : list of 2D float ndarrays
             Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
         
-        locations: [m] 1D float NumPy array
+        locations : [m] 1D float ndarray
             Stores the location for each slice of the ``waterfalls``.
         
-        bins: list of 1D float NumPy arrays
+        bins : list of 1D float ndarrays
             Each element contains the bins used for the slices/histograms in ``waterfalls``.
         '''
 
@@ -396,17 +396,22 @@ class StageWakeT(Stage):
 
         Parameters
         ----------
-        waterfalls: list of 2D float NumPy arrays
+        waterfalls : list of 2D float ndarrays
             Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
         
-        locations: [m] 1D float NumPy array
+        locations : [m] 1D float ndarray
             Stores the location for each slice of the ``waterfalls``.
         
-        bins: list of 1D float NumPy arrays
+        bins : list of 1D float ndarrays
             Each element contains the bins used for the slices/histograms in ``waterfalls``.
 
-        save_fig: bool, optional
+        save_fig : bool, optional
             Flag for saving the output figure.
+
+
+        Returns
+        ----------
+        N/A
         '''
 
         # prepare figure

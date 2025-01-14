@@ -33,32 +33,32 @@ class IonMotionConfig():
         
         Parameters
         ----------
-        drive_beam: Beam object of drive beam.
+        drive_beam : ``Beam`` object of drive beam.
 
-        main_beam: Beam object of main beam.
+        main_beam : ``Beam`` object of main beam.
         
-        plasma_ion_density: [m^-3] float
+        plasma_ion_density : [m^-3] float
             Plasma ion density.
         
-        ion_charge_num: [e] float
+        ion_charge_num : [e] float
             Plasma io charge in units of the elementary charge.
         
         num_z_cells_main: float
             Number of grid cells along z.
 
-        num_x(y)_cells_rft: float
+        num_x(y)_cells_rft : float
             Number of grid cells along x and y used in RF-Track for calculating beam electric fields.
             
-        num_xy_cells_probe: float
+        num_xy_cells_probe : float
             Number of grid cells along x and y used to probe beam electric fields calculated by RF-Track.
         
-        uniform_z_grid: bool
+        uniform_z_grid : bool
             Determines whether the grid along z is uniform (True) or finely resolved along the drive beam and main beam regions, while the region between the beams are coarsely resolved (False).
 
-        update_factor: float
+        update_factor : float
             Update ion wakefield perturbation when beam sizes have changed by this factor.
 
-        update_ion_wakefield: bool
+        update_ion_wakefield : bool
             ...
 
         #xs_probe: [m] 1D float array
@@ -215,7 +215,7 @@ class IonMotionConfig():
     # ==================================================
     def assemble_driver_sc_fields_obj(self, drive_beam):
         """
-        Creates a RF-Track SpaceCharge_Field object for the drive beam. Only needs to be called at the start of a stage for non-evolving drive beam.
+        Creates a RF-Track ``SpaceCharge_Field`` object for the drive beam. Only needs to be called at the start of a stage for non-evolving drive beam.
         """
         
         x_min, x_max = self.xlims_driver_sc
@@ -277,19 +277,19 @@ def ion_motion_quantifier2(beam_size_x, beam_size_y, bunch_length, beam_peak_cur
 ###################################################
 def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj):
     """
-    Probes the drive beam SpaceCharge_Field object and returns the drive beam E-fields stored in 3D numpy arrays where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step.
+    Probes the drive beam ``SpaceCharge_Field`` object and returns the drive beam E-fields stored in 3D numpy arrays where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step.
 
     Parameters
     ----------
-    ion_motion_config: IonMotionConfig object
+    ion_motion_config : ``IonMotionConfig`` object
         Contains the configurations for calculating the ion wakefield perturbation.
     
-    driver_sc_fields_obj: RF-Track SpaceCharge_Field object.
+    driver_sc_fields_obj : RF-Track ``SpaceCharge_Field`` object.
         Contains the beam electric and magnetic fields for the drive beam calculated by RF-Track.
         
     Returns
     ----------
-    driver_Exs_3d, driver_Eys_3d: [V/m] 3D float array
+    driver_Exs_3d, driver_Eys_3d : [V/m] 3D float array
         Contain the beam E-field components where the first, second and third dimensions correspond to positions along x, y and z.
     """
     
@@ -337,7 +337,7 @@ def construct_empty_field(ion_motion_config):
 ###################################################
 def assemble_main_sc_fields_obj(ion_motion_config, main_beam):
     """
-    Creates a SpaceCharge_Field object for the main beam. Needs to be called at every ion wakefield calculation step.
+    Creates a ``SpaceCharge_Field`` object for the main beam. Needs to be called at every ion wakefield calculation step.
     """
     
     # Slightly enlarge the transverse region by constructing empty_beam to avoid extrapolation when evaluating the beam fields.
@@ -371,19 +371,19 @@ def assemble_main_sc_fields_obj(ion_motion_config, main_beam):
 ###################################################
 def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
     """
-    Probes the main beam SpaceCharge_Field object and returns the main beam E-field component stored in a 3D numpy array. Needs to be called at every ion wakefield calculation step.
+    Probes the main beam ``SpaceCharge_Field`` object and returns the main beam E-field component stored in a 3D numpy array. Needs to be called at every ion wakefield calculation step.
 
     Parameters
     ----------
-    ion_motion_config: IonMotionConfig object
+    ion_motion_config : ``IonMotionConfig`` object
         Contains the configurations for calculating the ion wakefield perturbation.
     
-    main_sc_fields_obj: RF-Track SpaceCharge_Field object.
+    main_sc_fields_obj : RF-Track ``SpaceCharge_Field`` object
         Contains the beam electric and magnetic fields for the main beam calculated by RF-Track.
         
     Returns
     ----------
-    Exs_3d, Eys_3d: [V/m] 3D float array
+    Exs_3d, Eys_3d : [V/m] 3D float array
         Contain the beam E-field components where the first, second and third dimensions correspond to positions along x, y and z.
     """
     
@@ -395,11 +395,29 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
     xs_grid_flat = X.flatten()*1e3  # [mm]
     ys_grid_flat = Y.flatten()*1e3  # [mm]
     zs_grid_flat = Z.flatten()*1e3  # [mm]
+
+    ##########################
+    # Start time
+    import time
+    start_time = time.time()
+    cpu_start_time = time.process_time()
+    ##########################
     
     # Probe beam E-field
     E_fields_beam, _ = main_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
     Exs = E_fields_beam[:,0]
     Eys = E_fields_beam[:,1]
+
+    ##########################
+    # End time
+    end_time = time.time()
+    cpu_end_time = time.process_time()
+
+    # Time usage
+    #print('Data points in get_field():', f'{len(xs_probe)}x{len(ys_probe)}x{len(zs_probe)}')
+    #print('Time taken, get_field():', end_time - start_time, 'seconds')
+    #print('CPU seconds, get_field():', cpu_end_time - cpu_start_time)
+    ##########################
     
     # Reshape the field component into a 3D array       
     Exs_3d = Exs.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
@@ -416,18 +434,18 @@ def ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driv
 
     Parameters
     ----------
-    ion_motion_config: IonMotionConfig object
+    ion_motion_config : ``IonMotionConfig`` object
         Contains the configurations for calculating the ion wakefield perturbation.
 
-    main_Exs_3d, main_Eys_3d: [V/m] 3D float array
+    main_Exs_3d, main_Eys_3d : [V/m] 3D float array
         Contains the main beam E-field component where the first, second and third dimensions correspond to positions along x, y and z.
     
-    driver_Exs_3d, driver_Eys_3d: [V/m] 3D float array
+    driver_Exs_3d, driver_Eys_3d : [V/m] 3D float array
         Contains the drive beam E-field component where the first, second and third dimensions correspond to positions along x, y and z.
         
     Returns
     ----------
-    wakefield_perturbations: [V/m] 3D float array
+    wakefield_perturbations : [V/m] 3D float array
         Contains the ion wakefield perturbation where the first, second and third dimensions correspond to positions along x, y and z. 
     """
 
@@ -570,7 +588,7 @@ def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_pert
     # ==================================================
     def wide_probe_driver_field(self, sc_fields_obj):
         """
-        Probes the beam SpaceCharge_Field object over a wider region around the beam and returns the drive beam E-field components stored in a 3D numpy array where the first, second and third dimensions correspond to positions along x, y and z.
+        Probes the beam ``SpaceCharge_Field`` object over a wider region around the beam and returns the drive beam E-field components stored in a 3D numpy array where the first, second and third dimensions correspond to positions along x, y and z.
         """
 
         x_min, x_max = self.xlims_driver_sc
@@ -867,7 +885,7 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj, field_comp):
     main_sc_fields_obj: RF-Track SpaceCharge_Field object.
         Contains the beam electric and magnetic fields for the main beam calculated by RF-Track.
 
-    field_comp: string
+    field_comp: str
         Specifies the transverse component ('x' or 'y') of the wakefield.
         
     Returns
@@ -985,7 +1003,7 @@ def ion_wakefield_perturbation(ion_motion_config, main_E_fields_comp_3d, driver_
 #    sc_fields_obj: RF-Track SpaceCharge_Field object.
 #        Contains the beam electric and magnetic fields calculated by RF-Track.
 #
-#    tr_direction: string
+#    tr_direction: str
 #        Specifies the transverse direction ('x' or 'y') of the wakefield.
 #        
 #    Returns
