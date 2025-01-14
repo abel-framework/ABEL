@@ -1011,7 +1011,7 @@ class Stage(Trackable, CostModeled):
         
     # ==================================================
     # plot wake
-    def plot_wake(self, aspect='auto', savefig=None):
+    def plot_wake(self, aspect='equal', savefig=None):
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
