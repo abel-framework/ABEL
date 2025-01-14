@@ -1012,6 +1012,23 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     # plot wake
     def plot_wake(self, aspect='equal', savefig=None):
+        """
+        Plot the wake structure (2D plot) as a new pyplot.figure.
+
+        Other parameters
+        ----------------
+        aspect : str
+            The aspect ratio of the plots.
+            Defaults to 'equal' which is also the matplotlib default; can also use 'auto'.
+            Set to 'auto' to plot the entire simulation box.
+        savefig : str or None
+            If not None, the path to save the figure.
+            Defaults to None
+
+        Returns:
+        --------
+          None
+        """
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
