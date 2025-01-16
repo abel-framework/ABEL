@@ -289,7 +289,7 @@ def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj):
         
     Returns
     ----------
-    driver_Exs_3d, driver_Eys_3d : [V/m] 3D float array
+    driver_Exs_3d, driver_Eys_3d : [V/m] 3D float ndarray
         Contain the beam E-field components where the first, second and third dimensions correspond to positions along x, y and z.
     """
     
@@ -383,7 +383,7 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
         
     Returns
     ----------
-    Exs_3d, Eys_3d : [V/m] 3D float array
+    Exs_3d, Eys_3d : [V/m] 3D float ndarray
         Contain the beam E-field components where the first, second and third dimensions correspond to positions along x, y and z.
     """
     
@@ -437,15 +437,15 @@ def ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driv
     ion_motion_config : ``IonMotionConfig`` object
         Contains the configurations for calculating the ion wakefield perturbation.
 
-    main_Exs_3d, main_Eys_3d : [V/m] 3D float array
+    main_Exs_3d, main_Eys_3d : [V/m] 3D float ndarray
         Contains the main beam E-field component where the first, second and third dimensions correspond to positions along x, y and z.
     
-    driver_Exs_3d, driver_Eys_3d : [V/m] 3D float array
+    driver_Exs_3d, driver_Eys_3d : [V/m] 3D float ndarray
         Contains the drive beam E-field component where the first, second and third dimensions correspond to positions along x, y and z.
         
     Returns
     ----------
-    wakefield_perturbations : [V/m] 3D float array
+    wakefield_perturbations : [V/m] 3D float ndarray
         Contains the ion wakefield perturbation where the first, second and third dimensions correspond to positions along x, y and z. 
     """
 

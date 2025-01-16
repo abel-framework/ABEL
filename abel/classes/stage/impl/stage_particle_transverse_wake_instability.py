@@ -66,13 +66,13 @@ class StagePrtclTransWakeInstability(Stage):
         Ez_fit_obj : [V/m] interpolation object
             1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
 
-        Ez_roi : [V/m] 1D array
+        Ez_roi : [V/m] 1D ndarray
             Longitudinal E-field in the region of interest fitted to a selection of zs along the main beam (main beam head to tail).
 
         rb_fit_obj : [m] interpolation object
             1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
         
-        bubble_radius_roi : [m] 1D array
+        bubble_radius_roi : [m] 1D ndarray
             The bubble radius in the region of interest fitted to a selection of zs along the main beam.
 
         ramp_beta_mag : float
@@ -699,21 +699,21 @@ class StagePrtclTransWakeInstability(Stage):
 
         Parameters
         ----------
-        Ez : [V/m] 1D array
+        Ez : [V/m] 1D float ndarray
             Axial longitudinal E-field.
             
-        zs_Ez : [m] 1D float array
+        zs_Ez : [m] 1D float ndarray
             z-coordinates for ``Ez``. Monotonically increasing from first to last element.
 
         beam : ABEL ``Beam`` object
             
-        z_slices : [m] 1D float array
+        z_slices : [m] 1D float ndarray
             Co-moving coordinates of the beam slices.
 
             
         Returns
         ----------
-        Ez_fit(z_slices) : [V/m] 1D array
+        Ez_fit(z_slices) : [V/m] 1D float ndarray
             Axial Ez for the region of interest shifted to the location of the beam.
 
         Ez_fit : [V/m] 1D interpolation object 
@@ -755,10 +755,10 @@ class StagePrtclTransWakeInstability(Stage):
         
         Parameters
         ----------
-        plasma_num_density : [n0] 2D float array
+        plasma_num_density : [n0] 2D float ndarray
             Plasma number density in units of initial number density n0. Need to be oriented with propagation direction pointing to the right and positive offset pointing upwards.
             
-        plasma_tr_coord : [m] 1D float array 
+        plasma_tr_coord : [m] 1D float ndarray 
             Transverse coordinate of ``plasma_num_density``. Needs to be strictly growing from start to end.
 
         driver_offset : [m] float
@@ -770,7 +770,7 @@ class StagePrtclTransWakeInstability(Stage):
             
         Returns
         ----------
-        bubble_radius : [m] 1D float array 
+        bubble_radius : [m] 1D float ndarray 
             Plasma bubble radius over the simulation box, measured from the drive beam axis.
         """
 
@@ -850,21 +850,21 @@ class StagePrtclTransWakeInstability(Stage):
 
         Parameters
         ----------
-        rb : [m] 1D array
+        rb : [m] 1D float ndarray
             Plasma ion bubble radius.
             
-        zs_rb : [m] 1D float array
+        zs_rb : [m] 1D float ndarray
             z-coordinates for ``rb``. Monotonically increasing from first to last element.
 
         beam : ABEL ``Beam`` object
             
-        z_slices : [m] 1D float array
+        z_slices : [m] 1D float ndarray
             Co-moving coordinates of the beam slices.
 
             
         Returns
         ----------
-        rb_roi : [m] 1D float array
+        rb_roi : [m] 1D float ndarray
             Plasma ion bubble radius for the region of interest shifted to the location of the beam.
 
         rb_fit : [V/m] 1D interpolation object 
