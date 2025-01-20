@@ -27,7 +27,7 @@ from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 class IonMotionConfig():
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, update_factor=1.0, update_ion_wakefield=False):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1):
         """
         Contains calculation configuration for calculating the ion wakefield perturbation.
         
@@ -40,39 +40,33 @@ class IonMotionConfig():
         plasma_ion_density : [m^-3] float
             Plasma ion density.
         
-        ion_charge_num : [e] float
-            Plasma io charge in units of the elementary charge.
+        ion_charge_num : [e] float, optional
+            Plasma io charge in units of the elementary charge. Default set to 1.0.
         
-        num_z_cells_main: float
+        num_z_cells_main: float, optional
             Number of grid cells along z.
 
-        num_x(y)_cells_rft : float
+        num_x(y)_cells_rft : float, optional
             Number of grid cells along x and y used in RF-Track for calculating beam electric fields.
             
-        num_xy_cells_probe : float
+        num_xy_cells_probe : float, optional
             Number of grid cells along x and y used to probe beam electric fields calculated by RF-Track.
         
-        uniform_z_grid : bool
+        uniform_z_grid : bool, optional
             Determines whether the grid along z is uniform (True) or finely resolved along the drive beam and main beam regions, while the region between the beams are coarsely resolved (False).
 
-        update_factor : float
-            Update ion wakefield perturbation when beam sizes have changed by this factor.
-
-        update_ion_wakefield : bool
-            ...
-
-        #xs_probe: [m] 1D float array
-        #    x-coordinates used to probe beam electric fields calculated by RF-Track.
-#
-        #ys_probe: [m] 1D float array
-        #    y-coordinates used to probe beam electric fields calculated by RF-Track.
-#
-        #zs_probe: [m] 1D float array
-        #    z-coordinates used to probe beam electric fields calculated by RF-Track.
-#
-        #grid_size_z: [m] float or 1D float array
-        #    The size of grid cells along z. If ``uniform_z_grid`` is ``False``, this becomes a 1D float array containing the distance between elements in zs_probe.
+        ion_wkfld_update_period : int, optional
+            Sets the update period for calculating the ion wakefield perturbation in units of time step. E.g. ``ion_wkfld_update_period=1`` updates the ion wakefield perturbation every time step.
         """
+
+        # Control the inputs
+        if not isinstance(ion_wkfld_update_period, int):
+            raise TypeError("ion_wkfld_update_period must be an integer.")
+        if ion_wkfld_update_period < 1:
+            raise ValueError("ion_wkfld_update_period must be a positive integer.")
+        
+            # Add more input tests...
+
 
         #self.drive_beam = drive_beam
         self.plasma_ion_density = plasma_ion_density  # [m^-3]
@@ -92,23 +86,35 @@ class IonMotionConfig():
         self.num_xy_cells_probe = num_xy_cells_probe
         self.uniform_z_grid = uniform_z_grid
 
+        # Coordinates used to probe drive beam and main beam electric fields calculated by RF-Track. 
+        # Span the both the beams and the region in between them in every direction.
+        # Updated at every every ion wakefield calculation step.
+        # [m] 1D float ndarray
         self.xs_probe = None
         self.ys_probe = None
         self.zs_probe = None
-        self.zs_probe_main = None
-        self.zs_probe_separation = None
-        self.zs_probe_driver = None
+
+        # Separate z-coordinates spanning three regions
+        self.zs_probe_main = None  # [m] 1D float ndarray, spans main_beam.zs().
+        self.zs_probe_separation = None  # [m] 1D float ndarray, z-coordinates that span the region between the beams.
+        self.zs_probe_driver = None  # [m] 1D float ndarray, spans drive_beam.zs().
+
+        # The transverse extent of the drive beam [m]
         self.xlims_driver_sc = None
         self.ylims_driver_sc = None
+
+        # The size of grid cells along z [m]. Can be non-uniform
         self.grid_size_z = None
 
         # Store the std of driver jitters for transverse mesh refinement
         self.driver_x_jitter = driver_x_jitter
         self.driver_y_jitter = driver_y_jitter
 
-        self.update_factor = update_factor
-        self.update_ion_wakefield = update_ion_wakefield
+        # Ion wakefield perturbation update configuraiton quantities
+        self.ion_wkfld_update_period = ion_wkfld_update_period
+        self.update_ion_wakefield = True  # Internal variable that is True when it is time to update the ion wakefield perturbation.
         
+        # Store ion wakefield perturbation for time steps that skip calculating the wakefield
         self.Wx_perts = None
         self.Wy_perts = None
         

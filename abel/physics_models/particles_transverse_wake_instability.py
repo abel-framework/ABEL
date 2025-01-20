@@ -30,7 +30,7 @@ class PrtclTransWakeConfig():
     """
 
     # =============================================
-    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, tmpfolder=None, shot_path=None, stage_num=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, update_factor=None, update_ion_wakefield=False):
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, tmpfolder=None, shot_path=None, stage_num=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1):
         
         self.plasma_density = plasma_density  # [m^-3]
         self.stage_length = stage_length
@@ -51,8 +51,6 @@ class PrtclTransWakeConfig():
             self.stage_num = stage_num
 
         if enable_ion_motion:
-            if update_factor is None:
-                update_factor=time_step_mod  # The default is to update the ion wakefield perturbation at every time step.
                 
             self.ion_motion_config = IonMotionConfig(
                 drive_beam=drive_beam, 
@@ -67,8 +65,7 @@ class PrtclTransWakeConfig():
                 uniform_z_grid=uniform_z_grid, 
                 driver_x_jitter=driver_x_jitter, 
                 driver_y_jitter=driver_y_jitter, 
-                update_factor=update_factor, 
-                update_ion_wakefield=update_ion_wakefield
+                ion_wkfld_update_period=ion_wkfld_update_period
             )
 
 
@@ -286,8 +283,9 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
             intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
     
             # Save Wx_perts and Wy_perts for time steps that skip calculating the wakefield
-            trans_wake_config.ion_motion_config.Wx_perts = Wx_perts
-            trans_wake_config.ion_motion_config.Wy_perts = Wy_perts
+            if trans_wake_config.ion_motion_config.ion_wkfld_update_period > 1:
+                trans_wake_config.ion_motion_config.Wx_perts = Wx_perts
+                trans_wake_config.ion_motion_config.Wy_perts = Wy_perts
         
         else:
             Wx_perts = ion_motion_config.Wx_perts
@@ -462,11 +460,10 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
 
     if enable_ion_motion:
         ion_motion_config = trans_wake_config.ion_motion_config
-        update_factor = np.max([time_step_mod, ion_motion_config.update_factor])
         ion_motion_config.update_ion_wakefield = True  # Need to be initially true for the first ion wakefield calculation.
-        update_freq = int(update_factor/time_step_mod)
         #driver_sc_fields_obj = ion_motion_config.assemble_driver_sc_fields_obj()
         #ion_motion_config.driver_sc_fields_obj = driver_sc_fields_obj
+        ion_wkfld_update_period = trans_wake_config.ion_motion_config.ion_wkfld_update_period
         
     
     ############# Beam propagation through the plasma cell #############
@@ -601,7 +598,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         time_step_count = time_step_count + 1
 
         if enable_ion_motion:
-            if time_step_count % update_freq == 0:
+            if time_step_count % ion_wkfld_update_period == 0:
                 ion_motion_config.update_ion_wakefield = True
             else:
                 ion_motion_config.update_ion_wakefield = False

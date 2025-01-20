@@ -264,13 +264,19 @@ class Beam():
         
         Parameters
         ----------
-        axis1, axis2, axis3 : 1x3 float ndarrays
-            Unit vectors specifying the rotation axes.
+        axis1 : 1x3 float ndarrays
+            Unit vector specifying the rotation axes.
         
-        angle1, angle2, angle3 : [rad] float
-            Angles used for rotation of the beam's coordinate system around the respective axes.
+        angle1 : [rad] float
+            Angle used for rotation of the beam's coordinate system around the respective axes.
 
-        invert : bool
+        axis2, axis3 : 1x3 float ndarrays, optional
+            Additional unit vectors specifying the rotation axes.
+
+        angle2, angle3 : [rad] float, optional
+            Additional angles used for rotation of the beam's coordinate system around the respective axes.
+
+        invert : bool, optional
             Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
             
         Returns
@@ -375,13 +381,13 @@ class Beam():
         
         Parameters
         ----------
-        x_angle : [rad] float
-            Angle to rotate the coordinate system with in the zx-plane.
+        x_angle : [rad] float, optional
+            Angle to rotate the coordinate system with in the zx-plane. Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
         
-        y_angle : [rad] float
-            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        y_angle : [rad] float, optional
+            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps(). Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
 
-        invert : bool
+        invert : bool, optional
             Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
         
             
@@ -409,11 +415,11 @@ class Beam():
         
         Parameters
         ----------
-         align_x_angle : [rad] float
-            Beam coordinates with in the zx-plane are rotated with this angle.
+         align_x_angle : [rad] float, optional
+            Beam coordinates with in the zx-plane are rotated with this angle. Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
         
-        align_y_angle : [rad] float
-            Beam coordinates with in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        align_y_angle : [rad] float, optional
+            Beam coordinates with in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps(). Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
         
             
         Returns
@@ -463,13 +469,13 @@ class Beam():
         beam_quant : 1D float array
             Beam quantity to be binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
 
-        bin_number : float
+        bin_number : float, optional
             Number of beam slices.
 
-        cut_off : float
+        cut_off : float, optional
             Determines the longitudinal coordinates inside the region of interest
 
-        make_plot : bool
+        make_plot : bool, optional
             Flag for making plots.
 
             
@@ -784,8 +790,10 @@ class Beam():
         
         Parameters
         ----------
-        zbins, xbins, ybins : [m] float or 1D float ndarray
+        zbins, xbins, ybins : [m] float or 1D float ndarray, optional
             The bins along z(x,y).
+
+        ...
             
         Returns
         ----------
@@ -937,7 +945,8 @@ class Beam():
         dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
 
-        boundary_val: [V/m] 
+        boundary_val: [V/m] float, optional
+            ...
 
             
         Returns
@@ -999,10 +1008,10 @@ class Beam():
         dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
 
-        num_z_cells : float
+        num_z_cells : float, optional
             The number of cells in the z-direction.
 
-        boundary_val : [V/m]
+        boundary_val : [V/m] float, optional
             The values of the electric fields Ex and Ey at the simulation domain boundary.
 
             

@@ -39,10 +39,12 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, update_factor=1.0):
+    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1):
         """
         Parameters
         ----------
+        ...
+
         driver_source : ``Source`` object of drive beam.
         
         main_source : ``Source`` object of main beam.
@@ -106,7 +108,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
         self.uniform_z_grid = uniform_z_grid
-        self.update_factor = np.max([time_step_mod, update_factor])
+        self.ion_wkfld_update_period=ion_wkfld_update_period
 
         # Longitudinal electric field and plasma ion bubble radius
         self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
@@ -389,7 +391,7 @@ class StagePrtclTransWakeInstability(Stage):
             uniform_z_grid=self.uniform_z_grid, 
             driver_x_jitter=self.driver_source.jitter.x, 
             driver_y_jitter=self.driver_source.jitter.y, 
-            update_factor=self.update_factor
+            ion_wkfld_update_period=self.ion_wkfld_update_period
         )
         
         inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
@@ -707,7 +709,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         beam : ABEL ``Beam`` object
             
-        z_slices : [m] 1D float ndarray
+        z_slices : [m] 1D float ndarray, optional
             Co-moving coordinates of the beam slices.
 
             
@@ -764,7 +766,7 @@ class StagePrtclTransWakeInstability(Stage):
         driver_offset : [m] float
             Mean transverse offset of the drive beam.
             
-        threshold : float
+        threshold : float, optional
             Defines a threshold for the plasma density to determine ``bubble_radius``.
 
             
@@ -858,7 +860,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         beam : ABEL ``Beam`` object
             
-        z_slices : [m] 1D float ndarray
+        z_slices : [m] 1D float ndarray, optional
             Co-moving coordinates of the beam slices.
 
             
@@ -2347,7 +2349,7 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"\tnum_x_cells_rft:\t\t\t {self.num_x_cells_rft :d}", file=f)
             print(f"\tnum_y_cells_rft:\t\t\t {self.num_y_cells_rft :d}", file=f)
             print(f"\tnum_xy_cells_probe:\t\t\t {self.num_xy_cells_probe :d}", file=f)
-            print(f"\tupdate_factor:\t\t\t\t {self.update_factor :.3f}\n", file=f)
+            print(f"\tion_wkfld_update_period\t\t\t {self.ion_wkfld_update_period :d}\n", file=f)
             
             print(f"Stage length [m]:\t\t\t\t {self.length :.3f}", file=f)
             print(f"Propagation length [m]:\t\t\t\t {beam_out.location :.3f}", file=f)

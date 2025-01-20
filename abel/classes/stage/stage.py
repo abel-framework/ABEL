@@ -449,7 +449,7 @@ class Stage(Trackable, CostModeled):
         "Accelerating gradient of the plasma flattop [eV/m], or None if not set/calculateable"
         return self._nom_accel_gradient_flattop_calc
     @nom_accel_gradient_flattop.setter
-    def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
+    def nom_accel_gradient_flattop(self, nom_accel_gradient_flattop : float):
         if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
             raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set.")
         self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
