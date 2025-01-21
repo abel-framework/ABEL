@@ -30,7 +30,7 @@ class PrtclTransWakeConfig():
     """
 
     # =============================================
-    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, tmpfolder=None, shot_path=None, stage_num=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1):
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, probe_evol_period=0, make_animations=False, tmpfolder=None, shot_path=None, stage_num=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1):
         
         self.plasma_density = plasma_density  # [m^-3]
         self.stage_length = stage_length
@@ -41,14 +41,13 @@ class PrtclTransWakeConfig():
         self.show_prog_bar = show_prog_bar
 
         self.make_animations = make_animations
-        self.probe_evolution = probe_evolution
-        if probe_evolution:
-            if probe_every_nth_time_step <= 0 or isinstance(probe_every_nth_time_step, int) == False:
-                raise ValueError('probe_every_nth_time_step has to be an integer larger than 0')
-            self.probe_every_nth_time_step = probe_every_nth_time_step
-            self.tmpfolder = tmpfolder
-            self.shot_path = shot_path
-            self.stage_num = stage_num
+        
+        if isinstance(probe_evol_period, int) == False:
+            raise ValueError('probe_evol_period has to be an integer.')
+        self.probe_evol_period = probe_evol_period
+        self.tmpfolder = tmpfolder
+        self.shot_path = shot_path
+        self.stage_num = stage_num
 
         if enable_ion_motion:
                 
@@ -240,10 +239,10 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
     Returns
     ----------
     intpl_Wx_perts : [V/m] 1D float ndarray
-        The x-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle. Only contains zeros if ion motion is not enabled, i.e. if ``trans_wake_config.enable_ion_motion=False``.
+        The x-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle.
 
     intpl_Wy_perts : [V/m] 1D float ndarray
-        The y-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle. Only contains zeros if ion motion is not enabled, i.e. if ``trans_wake_config.enable_ion_motion=False``.
+        The y-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle.
 
         
     References
@@ -252,50 +251,45 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
 
     """
     
-    if trans_wake_config.enable_ion_motion:
-        ion_motion_config = trans_wake_config.ion_motion_config
-        
-        # Set the coordinates used to probe beam electric fields from RF-Track
-        ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam, set_driver_sc_coords=False)
-        
-        #ion_motion_config.update_ion_wakefield = True #######<- Override
+    ion_motion_config = trans_wake_config.ion_motion_config
+    
+    # Set the coordinates used to probe beam electric fields from RF-Track
+    ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam, set_driver_sc_coords=False)
+    
+    #ion_motion_config.update_ion_wakefield = True #######<- Override
 
-        # Check if ion wakefield perturbation should be updated for the current time step
-        if ion_motion_config.update_ion_wakefield:
+    # Check if ion wakefield perturbation should be updated for the current time step
+    if ion_motion_config.update_ion_wakefield:
 
-            # Extract drive beam RF-Track SpaceCharge_Field object
-            driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
-    
-            # Probe drive beam E-field component in 3D
-            driver_Exs_3d, driver_Eys_3d = probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj)
-            
-            # Update the RF-Track SpaceCharge_Field object for the main beam
-            sc_fields_obj = assemble_main_sc_fields_obj(ion_motion_config, main_beam=beam)
-            
-            # Probe main beam field component in 3D
-            main_Exs_3d, main_Eys_3d = probe_main_beam_field(ion_motion_config, sc_fields_obj)
-            
-            # Calculate the ion wakefield perturbation
-            Wx_perts, Wy_perts = ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driver_Exs_3d, driver_Eys_3d)  # [V/m], 3D array
-    
-            # Interpolate the ion wakefield perturbation to macroparticle positions
-            intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
-            intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
-    
-            # Save Wx_perts and Wy_perts for time steps that skip calculating the wakefield
-            if trans_wake_config.ion_motion_config.ion_wkfld_update_period > 1:
-                trans_wake_config.ion_motion_config.Wx_perts = Wx_perts
-                trans_wake_config.ion_motion_config.Wy_perts = Wy_perts
+        # Extract drive beam RF-Track SpaceCharge_Field object
+        driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
+
+        # Probe drive beam E-field component in 3D
+        driver_Exs_3d, driver_Eys_3d = probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj)
         
-        else:
-            Wx_perts = ion_motion_config.Wx_perts
-            intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
-            Wy_perts = ion_motion_config.Wy_perts
-            intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
-            
-    else:  # No ion motion
-        intpl_Wx_perts = np.zeros_like(beam.zs())
-        intpl_Wy_perts = np.zeros_like(beam.zs())
+        # Update the RF-Track SpaceCharge_Field object for the main beam
+        sc_fields_obj = assemble_main_sc_fields_obj(ion_motion_config, main_beam=beam)
+        
+        # Probe main beam field component in 3D
+        main_Exs_3d, main_Eys_3d = probe_main_beam_field(ion_motion_config, sc_fields_obj)
+        
+        # Calculate the ion wakefield perturbation
+        Wx_perts, Wy_perts = ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driver_Exs_3d, driver_Eys_3d)  # [V/m], 3D array
+
+        # Interpolate the ion wakefield perturbation to macroparticle positions
+        intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+        intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+
+        # Save Wx_perts and Wy_perts for time steps that skip calculating the wakefield
+        if trans_wake_config.ion_motion_config.ion_wkfld_update_period > 1:
+            trans_wake_config.ion_motion_config.Wx_perts = Wx_perts
+            trans_wake_config.ion_motion_config.Wy_perts = Wy_perts
+    
+    else:
+        Wx_perts = ion_motion_config.Wx_perts
+        intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+        Wy_perts = ion_motion_config.Wy_perts
+        intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
             
     return intpl_Wx_perts, intpl_Wy_perts
     
@@ -478,14 +472,20 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
 
     # ============= Save evolution =============
-    if trans_wake_config.probe_evolution:
-        if trans_wake_config.probe_every_nth_time_step > num_time_steps:
-            probe_data_freq = num_time_steps
+    
+    if trans_wake_config.probe_evol_period > 0:
+        probe_evolution = True
+    else:
+        probe_evolution = False
+        
+    if probe_evolution:
+        if trans_wake_config.probe_evol_period > num_time_steps:
+            probe_evol_period = num_time_steps
         else:
-            probe_data_freq = trans_wake_config.probe_every_nth_time_step
+            probe_evol_period = trans_wake_config.probe_evol_period
         
         current_beam = Beam()
-        evolution = PrtclTransWakeEvolution( data_length=1+int(np.ceil( (num_time_steps - 1)/probe_data_freq ) ) )
+        evolution = PrtclTransWakeEvolution( data_length=1+int(np.ceil( (num_time_steps - 1)/probe_evol_period ) ) )
             
     else:
         evolution = PrtclTransWakeEvolution( data_length=0 )
@@ -495,7 +495,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
 
         
          # ============= Save evolution =============
-        if trans_wake_config.probe_evolution and time_step_count % probe_data_freq == 0:
+        if probe_evolution and time_step_count % probe_evol_period == 0:
             current_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
                                          xs=xs_sorted,
                                          ys=ys_sorted,
@@ -531,7 +531,6 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
         # ============= Drift of beam =============
         # Leapfrog
-        #time_step_count = time_step_count + 1/2
         prop_length = prop_length + 1/2*c*time_step
         xs_sorted = xs_sorted + pxs_sorted/pzs_sorted*1/2*c*time_step
         ys_sorted = ys_sorted + pys_sorted/pzs_sorted*1/2*c*time_step
@@ -539,7 +538,6 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
         # ============= Beam kick =============
         # Set the phase space of the filtered ABEL beam
-        #filtered_beam = Beam()
         filtered_beam.set_phase_space(Q=np.sum(weights_sorted)*beam.charge_sign()*e,
                                       xs=xs_sorted,
                                       ys=ys_sorted,
@@ -557,7 +555,12 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         #ion_start_time = time.time()
 
         # Calculate the ion wakefield perturbations
-        intpl_Wx_perts, intpl_Wy_perts = calc_ion_wakefield_perturbation(filtered_beam, drive_beam, trans_wake_config)
+        if trans_wake_config.enable_ion_motion:
+            intpl_Wx_perts, intpl_Wy_perts = calc_ion_wakefield_perturbation(filtered_beam, drive_beam, trans_wake_config)
+        else:  # No ion motion
+            intpl_Wx_perts = np.zeros_like(filtered_beam.zs())
+            intpl_Wy_perts = np.zeros_like(filtered_beam.zs())
+
         
         #ion_end_time = time.time()
         #print('Ion wake calc time taken:', ion_end_time - ion_start_time, 'seconds')
@@ -580,8 +583,9 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         else:
             pzs_sorted = pzs_sorted - e*Ez*time_step
             
-        # Save data
-        #if time_step_count == 0 and trans_wake_config.probe_evolution:
+
+        # ============= Debugging intpl_Wx_perts and intpl_Wx_perts  =============
+        #if time_step_count == 0 and probe_evolution:
             #file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
             #save_time_step([xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts], file_path)
 
@@ -603,13 +607,12 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
             else:
                 ion_motion_config.update_ion_wakefield = False
 
-        ## ============= Save evolution =============
-        #if trans_wake_config.probe_evolution and time_step_count % probe_data_freq == 0:
+
+        # ============= Debugging intpl_Wx_perts and intpl_Wx_perts  =============
+        #if probe_evolution and time_step_count % probe_evol_period == 0:
             #file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
             #save_time_step([xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts], file_path)
 
-        
-        
         
                 
         # RK4
@@ -653,16 +656,16 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
     
     
     # ============= Save evolution =============
-    if trans_wake_config.probe_evolution:
+    if probe_evolution:
         evolution.beam.plasma_density = plasma_density*np.ones_like(evolution.beam.location)
         evolution.driver.plasma_density = plasma_density*np.ones_like(evolution.driver.location)
 
         if evolution.index < len(evolution.beam.location):
-        # Last step in the evolution arrays already written to if num_time_steps % probe_data_freq != 0.
+        # Last step in the evolution arrays already written to if num_time_steps % probe_evol_period != 0.
             evolution.save_evolution(prop_length, beam_out, drive_beam, clean=False)
         
-    if trans_wake_config.make_animations:
-        save_beam(beam_out, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
+            if trans_wake_config.make_animations:
+                save_beam(beam_out, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
             
     return beam_out, evolution
 
@@ -687,6 +690,19 @@ def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorte
 
 ###################################################
 def save_beam(main_beam, file_path, stage_num, time_step, num_time_steps):
+    """
+    Saves ``main_beam`` as a .h5 file to ``file_path``. Only used in ``transverse_wake_instability_particles()`` when ``PrtclTransWakeEvolution.save_evolution()`` is called and ``PrtclTransWakeConfig.trans_wake_config.make_animations=True``, as one needs to save as many beam files as the length of ``PrtclTransWakeEvolution.beam.location``.
+
+     Parameters
+    ----------
+    ...
+
+        
+    Returns
+    ----------
+    N/A
+    """
+    
     main_beam.save(filename=file_path + 'main_beam_' + str(stage_num).zfill(3) + '_' + str(time_step).zfill(len(str(int(num_time_steps)))) + '.h5')
 
 

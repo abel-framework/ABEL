@@ -16,7 +16,6 @@ from matplotlib.colors import LinearSegmentedColormap  # For customising colour 
 from matplotlib.colors import LogNorm
 from matplotlib.animation import FuncAnimation
 from matplotlib import ticker as mticker
-#from functools import partial
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
 
 from joblib import Parallel, delayed  # Parallel tracking
@@ -28,7 +27,6 @@ from abel.physics_models.particles_transverse_wake_instability import *
 from abel.physics_models.twoD_particles_transverse_wake_instability import *  # TODO: remove
 from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field, blowout_radius
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
-from abel.classes.stage.impl.stage_wake_t import StageWakeT
 from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam, plasma_stage_setup, extract_initial_and_final_Ez_rho
 from abel import Stage, CONFIG
 from abel import Beam
@@ -39,7 +37,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evolution=False, probe_every_nth_time_step=1, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1):
+    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1):
         """
         Parameters
         ----------
@@ -83,6 +81,9 @@ class StagePrtclTransWakeInstability(Stage):
         enable_radiation_reaction : bool
             Flag for enabling radiation reactions.
 
+        probe_evol_period : int
+            Set to larger than 0 to determine the probing period for beam evolution diagnostics.
+
         ...
         """
         
@@ -125,8 +126,9 @@ class StagePrtclTransWakeInstability(Stage):
         self.main_slices_edges = None
 
         # Beam evolution diagnostics
-        self.probe_evolution = probe_evolution
-        self.probe_every_nth_time_step = probe_every_nth_time_step
+        if isinstance(probe_evol_period, int) == False:
+            raise ValueError('probe_evol_period has to be an integer.')
+        self.probe_evol_period = probe_evol_period
         self.evolution = None
         self.make_animations = make_animations
         self.run_path = None
@@ -372,9 +374,8 @@ class StagePrtclTransWakeInstability(Stage):
             drive_beam=drive_beam_ramped, 
             main_beam=beam_filtered, 
             time_step_mod=self.time_step_mod, 
-            show_prog_bar=self.show_prog_bar, 
-            probe_evolution=self.probe_evolution, 
-            probe_every_nth_time_step=self.probe_every_nth_time_step, 
+            show_prog_bar=self.show_prog_bar,
+            probe_evol_period=self.probe_evol_period, 
             make_animations=self.make_animations, 
             tmpfolder=tmpfolder, 
             shot_path=shot_path, 
@@ -490,13 +491,12 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ==========  Make animations ==========
-        if self.probe_evolution and self.make_animations:
+        if self.probe_evol_period > 0 and self.make_animations:
             self.animate_sideview_x(tmpfolder)
             self.animate_sideview_y(tmpfolder)
             self.animate_phasespace_x(tmpfolder)
             self.animate_phasespace_y(tmpfolder)
 
-        if tmpfolder is not None:
             # Remove temporary files
             shutil.rmtree(tmpfolder)
         
@@ -632,6 +632,35 @@ class StagePrtclTransWakeInstability(Stage):
     #    self.evolution = evolution
 
 
+    # ==================================================
+    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, probe_evol_period=0, make_animations=False):
+        """
+        Used for copying a predefined stage's settings and configurations to set up flat ramps. Overloads the parent class' method.
+    
+        Parameters
+        ----------
+        ramp_plasma_density : [m^-3] float, optional
+            Plasma density for the ramp.
+
+        ramp_length : [m] float, optional
+            Length of the ramp.
+
+        ...
+    
+            
+        Returns
+        ----------
+        stage_copy : ``Stage`` object
+            A modified deep copy of the original stage.
+        """
+
+        stage_copy = super().stage2ramp(ramp_plasma_density, ramp_length)
+
+        # Additional configurations 
+        #stage_copy.probe_evol_period = probe_evol_period
+        stage_copy.make_animations = make_animations
+
+        return stage_copy
     
     # ==================================================
     # Filter out particles that collide into bubble
@@ -1538,7 +1567,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         files = sorted(os.listdir(evolution_folder))
         
-        if len(files) != len(self.evolution.prop_length):
+        if len(files) != len(self.evolution.beam.location):
             raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
 
         # Set default font size
@@ -1557,7 +1586,7 @@ class StagePrtclTransWakeInstability(Stage):
         beam_init = Beam()
         beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
         
-        max_sig_index = np.argmax(self.evolution.beam_size_x)
+        max_sig_index = np.argmax(self.evolution.beam.beam_size_x)
         max_sig_beam = Beam()
         max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
         dQdzdx0, zs0, xs0 = max_sig_beam.phase_space_density(max_sig_beam.zs, max_sig_beam.xs)
@@ -1591,14 +1620,14 @@ class StagePrtclTransWakeInstability(Stage):
             beam = beam.load(evolution_folder + os.fsdecode(files[i]))
             
             # plot mean energy evolution
-            ss.append(self.evolution.prop_length[i])
+            ss.append(self.evolution.beam.location[i])
             Emeans.append(beam.energy())
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
             axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
             axs[0,0].set_xlabel('Propagation length [m]')
             axs[0,0].set_ylabel('Mean energy [GeV]')
-            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            axs[0,0].set_xlim(np.min(self.evolution.beam.location), np.max(self.evolution.beam.location))
             axs[0,0].set_ylim(beam_init.energy()*0.9e-9, beam_final.energy()*1.1e-9)
             axs[0,0].xaxis.tick_top()
             axs[0,0].xaxis.set_label_position('top')
@@ -1613,9 +1642,9 @@ class StagePrtclTransWakeInstability(Stage):
             axs[0,1].plot(sigzs[-1]*1e6, emitns[-1]*1e6, 'o', color=col1)
             axs[0,1].set_ylim(ylim_min, ylim_max)
             #axs[0,1].set_ylim(np.min([np.min(emitns)*0.95e6, beam_final.norm_emittance_x()*0.8e6]), np.max([np.max(emitns)*1.05e6, emitns[0]*1.2e6]))
-            #axs[0,1].set_ylim(np.min(self.evolution.norm_emittance_x)*0.8e6, np.max(self.evolution.norm_emittance_x)*1.2e6)
+            #axs[0,1].set_ylim(np.min(self.evolution.beam.norm_emittance_x)*0.8e6, np.max(self.evolution.beam.norm_emittance_x)*1.2e6)
             axs[0,1].set_xlim(np.min([np.min(sigzs)*0.95e6, beam_final.bunch_length()*0.8e6]), np.max([np.max(sigzs)*1.05e6, sigzs[0]*1.2e6]))
-            #axs[0,1].set_xlim(np.min(self.evolution.bunch_length)*0.95e6, np.max(self.evolution.bunch_length)*1.05e6)
+            #axs[0,1].set_xlim(np.min(self.evolution.beam.bunch_length)*0.95e6, np.max(self.evolution.beam.bunch_length)*1.05e6)
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
             axs[0,1].set_xlabel(r'Bunch length [$\mathrm{\mu}$m]')
@@ -1662,18 +1691,18 @@ class StagePrtclTransWakeInstability(Stage):
             z0s.append(beam.z_offset())
             #sigxs.append(beam.beam_size_x())
             x0s.append(beam.x_offset())
-            ylim_min = pad_downwards(np.min([np.min(x0s), np.min(self.evolution.x_offset)]), padding=0.1)*1e6
-            ylim_max = pad_upwards(np.max([np.max(x0s), np.max(self.evolution.x_offset)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(x0s), np.min(self.evolution.beam.x)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(x0s), np.max(self.evolution.beam.x)]), padding=0.1)*1e6
             axs[2,1].cla()
             axs[2,1].plot(np.array(z0s)*1e6, np.array(x0s)*1e6, '-', color=col0)
             axs[2,1].plot(z0s[-1]*1e6, x0s[-1]*1e6, 'o', color=col1)
             axs[2,1].set_xlabel(r'$z$ offset [$\mathrm{\mu}$m]')
             axs[2,1].set_ylabel(r'$x$ offset [$\mathrm{\mu}$m]')
             #axs[2,1].set_xlim(np.min([np.min(z0s)-sigzs[0]/6, z0s[0]-sigzs[0]/2])*1e6, np.max([np.max(z0s)+sigzs[0]/6, (z0s[0]+sigzs[0]/2)])*1e6)
-            axs[2,1].set_xlim((z0s[0]-sigzs[0]/10)*1e6, (np.max(self.evolution.z_offset)+sigzs[0]/10)*1e6)
-            #axs[2,1].set_xlim(np.min(self.evolution.z_offset)*0.95e6, np.max(self.evolution.z_offset)*1.05e6)
+            axs[2,1].set_xlim((z0s[0]-sigzs[0]/10)*1e6, (np.max(self.evolution.beam.z)+sigzs[0]/10)*1e6)
+            #axs[2,1].set_xlim(np.min(self.evolution.beam.z)*0.95e6, np.max(self.evolution.beam.z)*1.05e6)
             #axs[2,1].set_ylim(np.min(-np.max(x0s)*1.1, -0.1*sigxs[0])*1e6, np.max(np.max(x0s)*1.1, 0.1*sigxs[0])*1e6)
-            #axs[2,1].set_ylim(np.min(self.evolution.x_offset)*1.1e6, np.max(self.evolution.x_offset)*1.1e6)
+            #axs[2,1].set_ylim(np.min(self.evolution.beam.x)*1.1e6, np.max(self.evolution.beam.x)*1.1e6)
             axs[2,1].set_ylim(ylim_min, ylim_max)
             axs[2,1].yaxis.tick_right()
             axs[2,1].yaxis.set_label_position('right')
@@ -1704,7 +1733,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         files = sorted(os.listdir(evolution_folder))
 
-        if len(files) != len(self.evolution.prop_length):
+        if len(files) != len(self.evolution.beam.location):
             raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
         
         # Set default font size
@@ -1724,7 +1753,7 @@ class StagePrtclTransWakeInstability(Stage):
         beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
 
         # Get max beam size beam
-        max_sig_index = np.argmax(self.evolution.beam_size_y)
+        max_sig_index = np.argmax(self.evolution.beam.beam_size_y)
         max_sig_beam = Beam()
         max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
         dQdzdy0, zs0, ys0 = max_sig_beam.phase_space_density(max_sig_beam.zs, max_sig_beam.ys)
@@ -1758,14 +1787,14 @@ class StagePrtclTransWakeInstability(Stage):
             beam = beam.load(evolution_folder + os.fsdecode(files[i]))
             
             # plot mean energy evolution
-            ss.append(self.evolution.prop_length[i])
+            ss.append(self.evolution.beam.location[i])
             Emeans.append(beam.energy())
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
             axs[0,0].plot(ss[-1], Emeans[-1]/1e9, 'o', color=col1)
             axs[0,0].set_xlabel('Propagation length [m]')
             axs[0,0].set_ylabel('Mean energy [GeV]')
-            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            axs[0,0].set_xlim(np.min(self.evolution.beam.location), np.max(self.evolution.beam.location))
             axs[0,0].set_ylim(beam_init.energy()*0.9e-9, beam_final.energy()*1.1e-9)
             axs[0,0].xaxis.tick_top()
             axs[0,0].xaxis.set_label_position('top')
@@ -1826,8 +1855,8 @@ class StagePrtclTransWakeInstability(Stage):
             z0s.append(beam.z_offset())
             #sigys.append(beam.beam_size_y())
             y0s.append(beam.y_offset())
-            ylim_min = pad_downwards(np.min([np.min(y0s), np.min(self.evolution.y_offset)]), padding=0.1)*1e6
-            ylim_max = pad_upwards(np.max([np.max(y0s), np.max(self.evolution.y_offset)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(y0s), np.min(self.evolution.beam.y)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(y0s), np.max(self.evolution.beam.y)]), padding=0.1)*1e6
             axs[2,1].cla()
             axs[2,1].plot(np.array(z0s)*1e6, np.array(y0s)*1e6, '-', color=col0)
             axs[2,1].plot(z0s[-1]*1e6, y0s[-1]*1e6, 'o', color=col1)
@@ -1864,7 +1893,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         files = sorted(os.listdir(evolution_folder))
 
-        if len(files) != len(self.evolution.prop_length):
+        if len(files) != len(self.evolution.beam.location):
             raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
 
         # Set default font size
@@ -1884,13 +1913,13 @@ class StagePrtclTransWakeInstability(Stage):
         beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
 
         # get max beam size beam
-        max_sig_index = np.argmax(self.evolution.beam_size_x)
+        max_sig_index = np.argmax(self.evolution.beam.beam_size_x )
         max_sig_beam = Beam()
         max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
         dQdxdpx0, xs0, _ = max_sig_beam.phase_space_density(max_sig_beam.xs, max_sig_beam.pxs)
 
         # get max divergence beam
-        max_sig_xp_index = np.argmax(self.evolution.divergence_y)
+        max_sig_xp_index = np.argmax(self.evolution.beam.divergence_x)
         max_sig_xp_beam = Beam()
         max_sig_xp_beam = max_sig_xp_beam.load(evolution_folder + os.fsdecode(files[max_sig_xp_index]))
         _, _, pxs0 = max_sig_xp_beam.phase_space_density(max_sig_xp_beam.xs, max_sig_xp_beam.pxs)
@@ -1934,7 +1963,7 @@ class StagePrtclTransWakeInstability(Stage):
             beam = beam.load(evolution_folder + os.fsdecode(files[i]))
             
             # plot emittance evolution
-            ss.append(self.evolution.prop_length[i])
+            ss.append(self.evolution.beam.location[i])
             emitns.append(beam.norm_emittance_x(clean=False))
             ylim_min = np.min([np.min(emitns)*1e6, beam_init.norm_emittance_x()*0.97e6, beam_final.norm_emittance_x()*0.97e6])
             ylim_max = np.max([np.max(emitns)*1e6, beam_init.norm_emittance_x()*1.05e6, beam_final.norm_emittance_x()*1.05e6])
@@ -1943,7 +1972,7 @@ class StagePrtclTransWakeInstability(Stage):
             axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
             axs[0,0].set_xlabel('Propagation distance [m]')
             axs[0,0].set_ylabel('Norm. emittance\n[mm mrad]')
-            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            axs[0,0].set_xlim(np.min(self.evolution.beam.location), np.max(self.evolution.beam.location))
             #axs[0,0].set_ylim(beam_init.norm_emittance_x()*0.9e6, np.max(self.evolution.norm_emittance_x)*1.2e6)
             axs[0,0].set_ylim(ylim_min, ylim_max)
             #axs[0,0].set_yscale('log')
@@ -1956,7 +1985,7 @@ class StagePrtclTransWakeInstability(Stage):
             sigxps.append(beam.divergence_x())
             xlim_min = np.min([np.min(sigxs)*0.9e6,  beam_final.beam_size_x()*0.9e6])
             xlim_max = np.max([np.max(sigxs)*1.1e6, max_sig_beam.beam_size_x()*1.1e6])
-            ylim_min = np.min([np.min(sigxps)*0.9e3, np.min(self.evolution.divergence_x)*0.9e3])
+            ylim_min = np.min([np.min(sigxps)*0.9e3, np.min(self.evolution.beam.divergence_x)*0.9e3])
             ylim_max = np.max([np.max(sigxps)*1.1e3, max_sig_xp_beam.divergence_x()*1.1e3])
             axs[0,1].cla()
             axs[0,1].plot(np.array(sigxs)*1e6, np.array(sigxps)*1e3, '-', color=col0)
@@ -1964,7 +1993,7 @@ class StagePrtclTransWakeInstability(Stage):
             axs[0,1].set_xlim(xlim_min, xlim_max)
             #axs[0,1].set_xlim(beam_init.beam_size_x()*0.8e6, max_sig_beam.beam_size_x()*1.2e6)
             #axs[0,1].set_ylim(np.min([np.min(sigxps)*0.9e3, beam_final.divergence_x()*0.8e3]), np.max([np.max(sigxps)*1.1e3, sigxs[0]*1.2e3]))
-            #axs[0,1].set_ylim(np.min(self.evolution.divergence_x)*0.9e3, max_sig_xp_beam.divergence_x()*1.1e3)
+            #axs[0,1].set_ylim(np.min(self.evolution.beam.divergence_x)*0.9e3, max_sig_xp_beam.divergence_x()*1.1e3)
             axs[0,1].set_ylim(ylim_min, ylim_max)
             axs[0,1].set_xscale('log')
             axs[0,1].set_yscale('log')
@@ -2012,10 +2041,10 @@ class StagePrtclTransWakeInstability(Stage):
             # plot centroid evolution
             x0s.append(beam.x_offset())
             xp0s.append(beam.x_angle())
-            xlim_min = pad_downwards(np.min([np.min(x0s), np.min(self.evolution.x_offset)]), padding=0.1)*1e6
-            xlim_max = pad_upwards(np.max([np.max(x0s), np.max(self.evolution.x_offset)]), padding=0.1)*1e6
-            ylim_min = pad_downwards(np.min([np.min(xp0s), np.min(self.evolution.x_angle)]), padding=0.1)*1e6
-            ylim_max = pad_upwards(np.max([np.max(xp0s), np.max(self.evolution.x_angle)]), padding=0.1)*1e6
+            xlim_min = pad_downwards(np.min([np.min(x0s), np.min(self.evolution.beam.x)]), padding=0.1)*1e6
+            xlim_max = pad_upwards(np.max([np.max(x0s), np.max(self.evolution.beam.x)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(xp0s), np.min(self.evolution.beam.x_angle)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(xp0s), np.max(self.evolution.beam.x_angle)]), padding=0.1)*1e6
             axs[2,1].cla()
             axs[2,1].plot(np.array(x0s)*1e6, np.array(xp0s)*1e6, '-', color=col0)
             axs[2,1].plot(x0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
@@ -2050,7 +2079,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         files = sorted(os.listdir(evolution_folder))
 
-        if len(files) != len(self.evolution.prop_length):
+        if len(files) != len(self.evolution.beam.location):
             raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
 
         # Set default font size
@@ -2070,13 +2099,13 @@ class StagePrtclTransWakeInstability(Stage):
         beam_init = beam_init.load(evolution_folder + os.fsdecode(files[0]))
 
         # get max beam size beam
-        max_sig_index = np.argmax(self.evolution.beam_size_y)
+        max_sig_index = np.argmax(self.evolution.beam.beam_size_y)
         max_sig_beam = Beam()
         max_sig_beam = max_sig_beam.load(evolution_folder + os.fsdecode(files[max_sig_index]))
         dQdydpy0, ys0, _ = max_sig_beam.phase_space_density(max_sig_beam.ys, max_sig_beam.pys)
 
         # get max divergence beam
-        max_sig_yp_index = np.argmax(self.evolution.divergence_y)
+        max_sig_yp_index = np.argmax(self.evolution.beam.divergence_y)
         max_sig_yp_beam = Beam()
         max_sig_yp_beam = max_sig_yp_beam.load(evolution_folder + os.fsdecode(files[max_sig_yp_index]))
         _, _, pys0 = max_sig_yp_beam.phase_space_density(max_sig_yp_beam.ys, max_sig_yp_beam.pys)
@@ -2120,7 +2149,7 @@ class StagePrtclTransWakeInstability(Stage):
             beam = beam.load(evolution_folder + os.fsdecode(files[i]))
             
             # plot emittance evolution
-            ss.append(self.evolution.prop_length[i])
+            ss.append(self.evolution.beam.location[i])
             emitns.append(beam.norm_emittance_y(clean=False))
             ylim_min = np.min([np.min(emitns)*1e6, beam_init.norm_emittance_y()*0.97e6, beam_final.norm_emittance_y()*0.97e6])
             ylim_max = np.max([np.max(emitns)*1e6, beam_init.norm_emittance_y()*1.05e6, beam_final.norm_emittance_y()*1.05e6])
@@ -2129,7 +2158,7 @@ class StagePrtclTransWakeInstability(Stage):
             axs[0,0].plot(ss[-1], emitns[-1]*1e6, 'o', color=col1)
             axs[0,0].set_xlabel('Propagation distance [m]')
             axs[0,0].set_ylabel('Norm. emittance\n[mm mrad]')
-            axs[0,0].set_xlim(np.min(self.evolution.prop_length), np.max(self.evolution.prop_length))
+            axs[0,0].set_xlim(np.min(self.evolution.beam.location), np.max(self.evolution.beam.location))
             axs[0,0].set_ylim(ylim_min, ylim_max)
             #axs[0,0].set_yscale('log')
             #axs[0,0].yaxis.set_minor_formatter(mticker.NullFormatter())
@@ -2142,7 +2171,7 @@ class StagePrtclTransWakeInstability(Stage):
             xlim_min = np.min([np.min(sigys)*0.9e6,  beam_final.beam_size_y()*0.9e6])
             #xlim_max = np.max([np.max(sigys)*1.1e6, max_sig_beam.beam_size_y()*1.1e6])
             xlim_max = np.max([np.max(sigys)*1.1e6, sigys[0]*1.1e6])
-            ylim_min = np.min([np.min(sigyps)*0.9e3, np.min(self.evolution.divergence_y)*0.9e3])
+            ylim_min = np.min([np.min(sigyps)*0.9e3, np.min(self.evolution.beam.divergence_y)*0.9e3])
             #ylim_max = np.max([np.max(sigyps)*1.1e3, max_sig_yp_beam.divergence_y()*1.1e3])
             ylim_max = np.max([np.max(sigyps)*1.1e3, sigyps[0]*1.1e3])
             axs[0,1].cla()
@@ -2196,10 +2225,10 @@ class StagePrtclTransWakeInstability(Stage):
             # plot centroid evolution
             y0s.append(beam.y_offset())
             yp0s.append(beam.y_angle())
-            xlim_min = pad_downwards(np.min([np.min(y0s), np.min(self.evolution.y_offset)]), padding=0.1)*1e6
-            xlim_max = pad_upwards(np.max([np.max(y0s), np.max(self.evolution.y_offset)]), padding=0.1)*1e6
-            ylim_min = pad_downwards(np.min([np.min(yp0s), np.min(self.evolution.y_angle)]), padding=0.1)*1e6
-            ylim_max = pad_upwards(np.max([np.max(yp0s), np.max(self.evolution.y_angle)]), padding=0.1)*1e6
+            xlim_min = pad_downwards(np.min([np.min(y0s), np.min(self.evolution.beam.y)]), padding=0.1)*1e6
+            xlim_max = pad_upwards(np.max([np.max(y0s), np.max(self.evolution.beam.y)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(yp0s), np.min(self.evolution.beam.y_angle)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(yp0s), np.max(self.evolution.beam.y_angle)]), padding=0.1)*1e6
             axs[2,1].cla()
             axs[2,1].plot(np.array(y0s)*1e6, np.array(yp0s)*1e6, '-', color=col0)
             axs[2,1].plot(y0s[-1]*1e6, yp0s[-1]*1e6, 'o', color=col1)
