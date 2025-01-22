@@ -27,7 +27,7 @@ from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 class IonMotionConfig():
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
         Contains calculation configuration for calculating the ion wakefield perturbation.
         
@@ -57,13 +57,20 @@ class IonMotionConfig():
 
         ion_wkfld_update_period : int, optional
             Sets the update period for calculating the ion wakefield perturbation in units of time step. E.g. ``ion_wkfld_update_period=1`` updates the ion wakefield perturbation every time step.
+
+        ...
         """
 
         # Control the inputs
         if not isinstance(ion_wkfld_update_period, int):
             raise TypeError("ion_wkfld_update_period must be an integer.")
-        if ion_wkfld_update_period < 1:
-            raise ValueError("ion_wkfld_update_period must be a positive integer.")
+        elif ion_wkfld_update_period < 1:
+            raise ValueError("ion_wkfld_update_period must be a positive integer >= 1.")
+        
+        if not isinstance(drive_beam_update_period, int):
+            raise TypeError("drive_beam_update_period must be an integer.")
+        elif drive_beam_update_period < 0:
+            raise ValueError("drive_beam_update_period must be a positive integer.")
         
             # Add more input tests...
 
@@ -113,6 +120,9 @@ class IonMotionConfig():
         # Ion wakefield perturbation update configuraiton quantities
         self.ion_wkfld_update_period = ion_wkfld_update_period
         self.update_ion_wakefield = True  # Internal variable that is True when it is time to update the ion wakefield perturbation.
+
+        # Drive beam evolution quantities
+        self.drive_beam_update_period = drive_beam_update_period
         
         # Store ion wakefield perturbation for time steps that skip calculating the wakefield
         self.Wx_perts = None
@@ -128,6 +138,15 @@ class IonMotionConfig():
     def set_probing_coordinates(self, drive_beam, main_beam, set_driver_sc_coords=False):
         """
         Sets the coordinates used to probe the beam fields of the drive beam and main beam. Has to be called at every ion wakefield calculation step.
+
+        Parameters
+        ----------
+        ...
+
+
+        Returns
+        ----------
+        N/A
         """
         
         if drive_beam.zs().min() < main_beam.zs().max():
@@ -283,7 +302,7 @@ def ion_motion_quantifier2(beam_size_x, beam_size_y, bunch_length, beam_peak_cur
 ###################################################
 def probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj):
     """
-    Probes the drive beam ``SpaceCharge_Field`` object and returns the drive beam E-fields stored in 3D numpy arrays where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step.
+    Probes the RF-Track drive beam ``SpaceCharge_Field`` object and returns the drive beam E-fields stored in 3D numpy arrays where the first, second and third dimensions correspond to positions along x, y and z. Needs to be called at every ion wakefield calculation step.
 
     Parameters
     ----------
@@ -586,6 +605,8 @@ def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_pert
     # Set label and other properties for the colorbar
     cbar_ax = fig.add_axes([0.15, 0.96, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
     fig.colorbar(p, cax=cbar_ax, orientation='horizontal', label=r'$z$ [µm]')
+
+
 
 
 

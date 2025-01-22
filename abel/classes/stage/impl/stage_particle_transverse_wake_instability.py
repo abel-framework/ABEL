@@ -37,7 +37,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1):
+    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
         Parameters
         ----------
@@ -60,31 +60,39 @@ class StagePrtclTransWakeInstability(Stage):
         plasma_density : [m^-3] float
             Plasma density.
 
-        time_step_mod : [beta_wave_length/c] float
+        time_step_mod : [beta_wave_length/c] float, optional
             Determines the time step of the instability tracking in units of beta_wave_length/c.
             
-        Ez_fit_obj : [V/m] interpolation object
+        #Ez_fit_obj : [V/m] interpolation object
             1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
 
-        Ez_roi : [V/m] 1D ndarray
+        #Ez_roi : [V/m] 1D ndarray
             Longitudinal E-field in the region of interest fitted to a selection of zs along the main beam (main beam head to tail).
 
-        rb_fit_obj : [m] interpolation object
+        #rb_fit_obj : [m] interpolation object
             1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
         
-        bubble_radius_roi : [m] 1D ndarray
+        #bubble_radius_roi : [m] 1D ndarray
             The bubble radius in the region of interest fitted to a selection of zs along the main beam.
 
-        ramp_beta_mag : float
-            Used for demagnifying and magnifying beams passing through entrance and exit plasma ramps.
+        ramp_beta_mag : float, optional
+            Used for demagnifying and magnifying beams passing through entrance and exit plasma ramps. Default value: 5.0.
 
-        enable_radiation_reaction : bool
-            Flag for enabling radiation reactions.
-
-        probe_evol_period : int
-            Set to larger than 0 to determine the probing period for beam evolution diagnostics.
+        enable_radiation_reaction : bool, optional
+            Flag for enabling radiation reactions. Defaults to `True`.
 
         ...
+
+        probe_evol_period : int, optional
+            Set to larger than 0 to determine the probing period for beam evolution diagnostics. This is given in units of time steps, so that e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd time step. Default value: 0.
+
+        ...
+
+        ion_wkfld_update_period : int, optional
+            Determines the ion wakefield perturbation update period. This is given in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will update the ion wakefield perturbation every 3rd time step. Default value: 1
+        
+        drive_beam_update_period : int, optional
+            Set to larger than 0 to activate and determine the drive beam update period. Default value: 0.
         """
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
@@ -110,6 +118,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.num_xy_cells_probe = num_xy_cells_probe
         self.uniform_z_grid = uniform_z_grid
         self.ion_wkfld_update_period=ion_wkfld_update_period
+        self.drive_beam_update_period=drive_beam_update_period
 
         # Longitudinal electric field and plasma ion bubble radius
         self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
@@ -155,6 +164,9 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Track the particles through. Note that when called as part of a Linac object, a copy of the original stage (where no changes has been made) is sent to track() every time. All changes done to self here are saved to a separate stage under the Linac object.
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
+        """
+        Tracks the particles through the stage.
+        """
 
         # Set the diagnostics directory
         if runnable is not None:
@@ -366,6 +378,9 @@ class StagePrtclTransWakeInstability(Stage):
             os.mkdir(tmpfolder)
         else:
             tmpfolder = None
+            
+        if self.drive_beam_update_period > 0:
+            wake_t_fields = plasma_stage.fields[0]  # TODO: pass this to the instability model
 
         # Set up the configuration for the instability model
         trans_wake_config = PrtclTransWakeConfig(
@@ -392,7 +407,8 @@ class StagePrtclTransWakeInstability(Stage):
             uniform_z_grid=self.uniform_z_grid, 
             driver_x_jitter=self.driver_source.jitter.x, 
             driver_y_jitter=self.driver_source.jitter.y, 
-            ion_wkfld_update_period=self.ion_wkfld_update_period
+            ion_wkfld_update_period=self.ion_wkfld_update_period, 
+            drive_beam_update_period=self.drive_beam_update_period
         )
         
         inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]

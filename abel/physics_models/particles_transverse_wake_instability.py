@@ -30,7 +30,7 @@ class PrtclTransWakeConfig():
     """
 
     # =============================================
-    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, probe_evol_period=0, make_animations=False, tmpfolder=None, shot_path=None, stage_num=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1):
+    def __init__(self, plasma_density, stage_length, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=False, probe_evol_period=0, make_animations=False, tmpfolder=None, shot_path=None, stage_num=None, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1, drive_beam_update_period=0):
         
         self.plasma_density = plasma_density  # [m^-3]
         self.stage_length = stage_length
@@ -64,7 +64,8 @@ class PrtclTransWakeConfig():
                 uniform_z_grid=uniform_z_grid, 
                 driver_x_jitter=driver_x_jitter, 
                 driver_y_jitter=driver_y_jitter, 
-                ion_wkfld_update_period=ion_wkfld_update_period
+                ion_wkfld_update_period=ion_wkfld_update_period, 
+                drive_beam_update_period=drive_beam_update_period
             )
 
 
@@ -122,7 +123,7 @@ class PrtclTransWakeEvolution:
         self.driver.plasma_density = np.empty(data_length)  # [m^-3]
 
     # =============================================
-    def save_evolution(self, location, beam, driver, clean):
+    def save_evolution(self, location, beam, driver, clean, is_wake_t_driver=False):
         if self.index >= len(self.beam.location):
             raise ValueError('Data recording already completed.')
             
@@ -148,24 +149,62 @@ class PrtclTransWakeEvolution:
         #self.beam.plasma_density = plasma_density
         
         self.driver.location[self.index] = location
-        self.driver.x[self.index] = driver.x_offset(clean=clean)
-        self.driver.y[self.index] = driver.y_offset(clean=clean)
-        self.driver.z[self.index] = driver.z_offset(clean=clean)
-        self.driver.energy[self.index] = driver.energy(clean=clean)
-        self.driver.x_angle[self.index] = driver.x_angle(clean=clean)
-        self.driver.y_angle[self.index] = driver.y_angle(clean=clean)
-        self.driver.beam_size_x[self.index] = driver.beam_size_x(clean=clean)
-        self.driver.beam_size_y[self.index] = driver.beam_size_y(clean=clean)
-        self.driver.bunch_length[self.index] = driver.bunch_length(clean=clean)
-        self.driver.rel_energy_spread[self.index] = driver.rel_energy_spread(clean=clean)
-        self.driver.divergence_x[self.index] = driver.divergence_x(clean=clean)
-        self.driver.divergence_y[self.index] = driver.divergence_y(clean=clean)
-        self.driver.beta_x[self.index] = driver.beta_x(clean=clean)
-        self.driver.beta_y[self.index] = driver.beta_y(clean=clean)
-        self.driver.emit_nx[self.index] = driver.norm_emittance_x(clean=clean)
-        self.driver.emit_ny[self.index] = driver.norm_emittance_y(clean=clean)
-        self.driver.num_particles[self.index] = len(driver)
-        self.driver.charge[self.index] = driver.charge()
+        if is_wake_t_driver:
+            weightings = driver.w
+            self.driver.x[self.index] = weighted_mean(driver.x, weightings, clean)
+            self.driver.y[self.index] = weighted_mean(driver.y, weightings, clean)
+            self.driver.z[self.index] = weighted_mean(driver.xi, weightings, clean)
+
+            driver_pzs = driver.pz*SI.c*SI.m_e
+            driver_energies = abel.utilities.relativity.momentum2energy(driver_pzs)
+            self.driver.energy[self.index] = weighted_mean(driver_energies, weightings, clean)
+
+            driver_xps = driver.px/driver_pzs
+            driver_yps = driver.py/driver_pzs
+            self.driver.x_angle[self.index] = weighted_mean(driver_xps, weightings, clean)
+            self.driver.y_angle[self.index] = weighted_mean(driver_yps, weightings, clean)
+
+            self.driver.beam_size_x[self.index] = weighted_std(driver.x, weightings, clean)
+            self.driver.beam_size_y[self.index] = weighted_std(driver.y, weightings, clean)
+            self.driver.bunch_length[self.index] = weighted_std(driver.xi, weightings, clean)
+            self.driver.rel_energy_spread[self.index] = weighted_std(driver_energies, weightings, clean) / self.driver.energy[self.index]
+            self.driver.divergence_x[self.index] = weighted_std(driver_xps, weightings, clean)
+            self.driver.divergence_y[self.index] = weighted_std(driver_yps, weightings, clean)
+
+            covx = weighted_cov(driver.x, driver_xps, weightings, clean)
+            self.driver.beta_x[self.index] = covx[0,0]/np.sqrt(np.linalg.det(covx))
+
+            covy = weighted_cov(driver.y, driver_yps, weightings, clean)
+            self.driver.beta_y[self.index] = covy[0,0]/np.sqrt(np.linalg.det(covy))
+
+            driver_uzs = (energy2proper_velocity(driver_energies))
+            driver_uxs = driver_xps * driver_uzs
+            self.driver.emit_nx[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.x, driver_uxs/SI.c, weightings, clean)))
+            driver_uys = driver_yps * driver_uzs
+            self.driver.emit_ny[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.y, driver_uys/SI.c, weightings, clean)))
+            
+            self.driver.num_particles[self.index] = len(driver_pzs)
+            self.driver.charge[self.index] = driver.q_species * np.nansum(weightings)  #TODO: should also clean this
+        
+        else:
+            self.driver.x[self.index] = driver.x_offset(clean=clean)
+            self.driver.y[self.index] = driver.y_offset(clean=clean)
+            self.driver.z[self.index] = driver.z_offset(clean=clean)
+            self.driver.energy[self.index] = driver.energy(clean=clean)
+            self.driver.x_angle[self.index] = driver.x_angle(clean=clean)
+            self.driver.y_angle[self.index] = driver.y_angle(clean=clean)
+            self.driver.beam_size_x[self.index] = driver.beam_size_x(clean=clean)
+            self.driver.beam_size_y[self.index] = driver.beam_size_y(clean=clean)
+            self.driver.bunch_length[self.index] = driver.bunch_length(clean=clean)
+            self.driver.rel_energy_spread[self.index] = driver.rel_energy_spread(clean=clean)
+            self.driver.divergence_x[self.index] = driver.divergence_x(clean=clean)
+            self.driver.divergence_y[self.index] = driver.divergence_y(clean=clean)
+            self.driver.beta_x[self.index] = driver.beta_x(clean=clean)
+            self.driver.beta_y[self.index] = driver.beta_y(clean=clean)
+            self.driver.emit_nx[self.index] = driver.norm_emittance_x(clean=clean)
+            self.driver.emit_ny[self.index] = driver.norm_emittance_y(clean=clean)
+            self.driver.num_particles[self.index] = len(driver)
+            self.driver.charge[self.index] = driver.charge()
 
         self.index += 1
 
@@ -183,11 +222,7 @@ def calc_tr_instability_wakefield(skin_depth, bubble_radius, zs_sorted, weights_
 
     Returns
     ----------
-    intpl_Wx_perts : [V/m] 1D float ndarray
-        The x-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle.
-
-    intpl_Wy_perts : [V/m] 1D float ndarray
-        The y-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle.
+    ...
     """
     
     a = bubble_radius + 0.75*skin_depth
@@ -486,10 +521,10 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
         
         current_beam = Beam()
         evolution = PrtclTransWakeEvolution( data_length=1+int(np.ceil( (num_time_steps - 1)/probe_evol_period ) ) )
-            
     else:
         evolution = PrtclTransWakeEvolution( data_length=0 )
 
+    is_wake_t_driver = trans_wake_config.ion_motion_config.drive_beam_update_period > 0  # Use Wake-T ParticleBunch driver if using driver evolution.
     
     while prop_length < stage_length-0.5*c*time_step:
 
@@ -506,7 +541,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
                                          weightings=weights_sorted,
                                          particle_mass=particle_mass)
             
-            evolution.save_evolution(prop_length, current_beam, drive_beam, clean=False)
+            evolution.save_evolution(prop_length, current_beam, drive_beam, clean=False, is_wake_t_driver=is_wake_t_driver)
             
             if trans_wake_config.make_animations:
                 save_beam(current_beam, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
@@ -662,7 +697,7 @@ def transverse_wake_instability_particles(beam, drive_beam, Ez_fit_obj, rb_fit_o
 
         if evolution.index < len(evolution.beam.location):
         # Last step in the evolution arrays already written to if num_time_steps % probe_evol_period != 0.
-            evolution.save_evolution(prop_length, beam_out, drive_beam, clean=False)
+            evolution.save_evolution(prop_length, beam_out, drive_beam, clean=False, is_wake_t_driver=is_wake_t_driver)
         
             if trans_wake_config.make_animations:
                 save_beam(beam_out, trans_wake_config.tmpfolder, trans_wake_config.stage_num, time_step_count, num_time_steps)
