@@ -2,13 +2,25 @@ import scipy.constants as SI
 import numpy as np
 from abel import Beam
 import warnings
-#from abel.utilities.relativity import momentum2energy
 
 
 # ==================================================
-def abel_beam2rft_beam(beam):
+def abel_beam2rft_beam(beam, homogen_beam_charge=True):
     """
     Converts an ABEL ``Beam`` object to a RF-Track ``Bunch6dT`` object.
+
+    Parameters
+    ----------
+    beam : ABEL ``Beam`` object
+        The beam to be converted.
+
+    homogen_beam_charge : bool, optional
+        Flag for indicating the whether the macroparticles of ``beam`` all have the same charges. Defaults to ``True``, which allows for using a faster version of the ``Bunch6dT`` constructor.
+
+
+    Returns
+    ----------
+    beam_rft : RF-Track ``Bunch6dT`` object
     """
 
     from RF_Track import Bunch6dT
@@ -28,17 +40,28 @@ def abel_beam2rft_beam(beam):
         weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
 
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
-    ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
+    
+    if not homogen_beam_charge:   
+        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ]
+        ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
+        phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
+                                        ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
+                                        zs_abel*1e3, pzs_abel*SI.c/SI.e/1e6, 
+                                        ms_abel, qs_abel/SI.e/weightings_abel, 
+                                        weightings_abel))
 
-    # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ]
-    phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
-                                       ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
-                                       zs_abel*1e3, pzs_abel*SI.c/SI.e/1e6, 
-                                       ms_abel, qs_abel/SI.e/weightings_abel, 
-                                       weightings_abel))
+        # Construct a RFT beam
+        beam_rft = Bunch6dT(phase_space_rft)
 
-    # Construct a RFT beam
-    beam_rft = Bunch6dT(phase_space_rft) 
+    else:
+        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz ] 
+        phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
+                                        ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
+                                        zs_abel*1e3, pzs_abel*SI.c/SI.e/1e6))
+        
+        # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] )
+        single_particle_charge = qs_abel[0]/SI.e/weightings_abel[0]  # Charge of a single physical particle [e].
+        beam_rft = Bunch6dT(particle_mass, len(beam), single_particle_charge, phase_space_rft)
     
     return beam_rft
 
@@ -88,7 +111,7 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
 
     # Convert ABEL beam to RF-Track beam
     beam_rft = abel_beam2rft_beam(abel_beam)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
-
+        
     # Set the solver resolution and calculate fields
     sc_fields_obj = SpaceCharge_Field(beam_rft, num_x_cells, num_y_cells, num_z_cells, num_t_bins)  # num_x_cells, num_y_cells, num_z_cells, number of velocity slices
     
@@ -132,18 +155,67 @@ def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t
 
 
 # ==================================================
-def wake_t_bunch2rft_beam(beam):
+def wake_t_bunch2rft_beam(wake_t_bunch, homogen_beam_charge=True):
     """
-    Converts a Wake-T ``ParticleBunch`` to a RF-Track ``Beam`` object.
+    Converts a Wake-T ``ParticleBunch`` to a RF-Track ``Bunch6dT`` object.
+
+    Parameters
+    ----------
+    wake_t_bunch : Wake-T ``ParticleBunch``
+        The beam to be converted.
+
+    homogen_beam_charge : bool, optional
+        Flag for indicating the whether the macroparticles of ``wake_t_bunch`` all have the same charges. Defaults to ``True``, which allows for using a faster version of the ``Bunch6dT`` constructor.
+
+
+    Returns
+    ----------
+    beam_rft : RF-Track ``Bunch6dT`` object
     """
 
-    return
+    from RF_Track import Bunch6dT
+
+    xs_wt = wake_t_bunch.x    # [m]
+    pxs_wt = wake_t_bunch.px  # [kg m/s / (m c)] p/
+    ys_wt = wake_t_bunch.y
+    pys_wt = wake_t_bunch.py
+    zs_wt = wake_t_bunch.xi
+    pzs_wt = wake_t_bunch.pz
+    weightings_wt = wake_t_bunch.w
+
+    particle_mass = wake_t_bunch.m_species * SI.c**2 / SI.e / 1e6  # [MeV/c^2], also the same as the conversion factor from Wake-T momenta to RF-Track momenta.
+    particle_charge = wake_t_bunch.q_species  # [C] single particle charge
+    
+    if not homogen_beam_charge:   
+        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ]
+        ms = particle_mass * np.ones(len(xs_wt))  # [MeV/c^2] single particle masses.
+        qs = particle_charge/SI.e * np.ones(len(xs_wt))  # [e] single particle charges.
+        
+        phase_space_rft = np.column_stack((xs_wt*1e3, pxs_wt*particle_mass, 
+                                        ys_wt*1e3, pys_wt*particle_mass, 
+                                        zs_wt*1e3, pzs_wt*particle_mass, 
+                                        ms, qs, 
+                                        weightings_wt))
+
+        # Construct a RFT beam
+        beam_rft = Bunch6dT(phase_space_rft)
+
+    else:
+        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz ] 
+        phase_space_rft = np.column_stack((xs_wt*1e3, pxs_wt*particle_mass, 
+                                        ys_wt*1e3, pys_wt*particle_mass, 
+                                        zs_wt*1e3, pzs_wt*particle_mass))
+        
+        # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] )
+        beam_rft = Bunch6dT(particle_mass, len(xs_wt), particle_charge/SI.e, phase_space_rft)
+    
+    return beam_rft
 
 
-# ==================================================
-def rft_beam2abel_beam(beam_rft):
-    """
-    Converts a RF-Track ``Beam`` object to a Wake-T ``ParticleBunch``.
-    """
+# # ==================================================
+# def rft_beam2wake_t_bunch(beam_rft):
+#     """
+#     Converts a RF-Track ``Bunch6dT`` object to a Wake-T ``ParticleBunch``.
+#     """
 
-    return
+#     return
