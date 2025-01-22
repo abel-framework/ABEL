@@ -562,9 +562,11 @@ class Beam():
         return int(np.nansum(self.weightings()))
     
     def charge(self):
+        "Total beam charge."
         return np.nansum(self.qs())
     
     def abs_charge(self):
+        "Total absolute beam charge."
         return abs(self.charge())
     
     def charge_sign(self):
