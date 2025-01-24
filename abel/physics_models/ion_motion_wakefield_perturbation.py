@@ -27,7 +27,7 @@ from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
 class IonMotionConfig():
     
     # ==================================================
-    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, drive_beam, main_beam, plasma_ion_density, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, driver_x_jitter=0.0, driver_y_jitter=0.0, ion_wkfld_update_period=1, drive_beam_update_period=0, wake_t_fields=None):
         """
         Contains calculation configuration for calculating the ion wakefield perturbation.
         
@@ -123,6 +123,7 @@ class IonMotionConfig():
 
         # Drive beam evolution quantities
         self.drive_beam_update_period = drive_beam_update_period
+        self.wake_t_fields = wake_t_fields
         
         # Store ion wakefield perturbation for time steps that skip calculating the wakefield
         self.Wx_perts = None
@@ -275,6 +276,15 @@ class IonMotionConfig():
         num_z = int( (combined_beam.zs().max() - combined_beam.zs().min())/dz )
         
         return calc_sc_fields_obj(combined_beam, num_x, num_y, num_z, num_t_bins=1)
+
+
+
+###################################################
+def push_driver(wake_t_driver, wake_t_fields, time_step, pusher='boris'):
+    "Evolves a Wake-T drive beam ``wake_t_driver``for one time step ``time_step``."
+    wake_t_driver.evolve([wake_t_fields], t=wake_t_driver.prop_distance/SI.c, dt=time_step, pusher=pusher)
+
+    #return wake_t_driver
 
 
 

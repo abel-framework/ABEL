@@ -79,7 +79,7 @@ class StagePrtclTransWakeInstability(Stage):
             Used for demagnifying and magnifying beams passing through entrance and exit plasma ramps. Default value: 5.0.
 
         enable_radiation_reaction : bool, optional
-            Flag for enabling radiation reactions. Defaults to `True`.
+            Flag for enabling radiation reactions. Defaults to ``True``.
 
         ...
 
@@ -181,7 +181,7 @@ class StagePrtclTransWakeInstability(Stage):
         # Extract quantities
         plasma_density = self.plasma_density
         stage_length = self.length
-        gamma0 = beam_incoming.gamma()
+        #gamma0 = beam_incoming.gamma()
         time_step_mod = self.time_step_mod
 
         particle_mass = beam_incoming.particle_mass
@@ -241,14 +241,20 @@ class StagePrtclTransWakeInstability(Stage):
         
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:
+            print('Before upramp:', drive_beam_rotated.norm_emittance_x(), drive_beam_rotated.norm_emittance_y(), drive_beam_rotated.beta_x())  ##############
+
+            # Pass the rotated drive beam and beam_incoming to track_upramp() and get the ramped beams in return
             beam0, drive_beam_ramped = self.track_upramp(beam_incoming, drive_beam_rotated) # TODO: check if track_upramp rotates the beams correctly
+
+            #drive_beam_ramped.remove_halo_particles(nsigma=20)
+            print('After upramp:', drive_beam_ramped.norm_emittance_x(), drive_beam_ramped.norm_emittance_y(), drive_beam_ramped.beta_x())  ##############
         else:
             beam0 = copy.deepcopy(beam_incoming)
             drive_beam_ramped = copy.deepcopy(driver_incoming)
             if self.ramp_beta_mag is not None:
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-
+        
 
         # ========== Record longitudinal number profile ==========
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
@@ -378,9 +384,11 @@ class StagePrtclTransWakeInstability(Stage):
             os.mkdir(tmpfolder)
         else:
             tmpfolder = None
-            
+
         if self.drive_beam_update_period > 0:
-            wake_t_fields = plasma_stage.fields[0]  # TODO: pass this to the instability model
+            wake_t_fields = plasma_stage.fields[0]  # TODO: since wake_t_fields is calculated with drive_beam_ramped on axis, does drive_beam_ramped need to be put on axis as well before further use?
+        else:
+            wake_t_fields = None
 
         # Set up the configuration for the instability model
         trans_wake_config = PrtclTransWakeConfig(
@@ -408,7 +416,8 @@ class StagePrtclTransWakeInstability(Stage):
             driver_x_jitter=self.driver_source.jitter.x, 
             driver_y_jitter=self.driver_source.jitter.y, 
             ion_wkfld_update_period=self.ion_wkfld_update_period, 
-            drive_beam_update_period=self.drive_beam_update_period
+            drive_beam_update_period=self.drive_beam_update_period, 
+            wake_t_fields=wake_t_fields
         )
         
         inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
@@ -425,7 +434,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # Start tracking
-        if self.parallel_track_2D is True:
+        if self.parallel_track_2D is True:  # TODO: remove this and associated files
             
             with joblib_progress('Tracking x and y in parallel:', 2):
                 results = Parallel(n_jobs=2)([
@@ -450,22 +459,25 @@ class StagePrtclTransWakeInstability(Stage):
                                  pzs=pzs_sorted,
                                  weightings=weights_sorted,
                                  particle_mass=particle_mass)
-            
         else:
             
-            beam, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
+            beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
 
+            print('After instability:', driver.norm_emittance_x(), driver.norm_emittance_y(), driver.beta_x())  ##############
+
+            #driver.remove_halo_particles(nsigma=20)
             self.evolution = evolution
 
             
         # Save the final step with ramped beams in rotated coordinate system
-        driver = drive_beam_ramped  # TODO: output the evolved driver from the model
         #self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
 
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver) # TODO: check if track_downramp rotates the beams correctly
+            #driver_outgoing.remove_halo_particles(nsigma=20)
+            print('After downramp:', driver_outgoing.norm_emittance_x(), driver_outgoing.norm_emittance_y(), driver_outgoing.beta_x())  ##############
         else:
             beam_outgoing = copy.deepcopy(beam)
             driver_outgoing = copy.deepcopy(driver)
@@ -473,7 +485,7 @@ class StagePrtclTransWakeInstability(Stage):
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
-        
+
         # ========== Rotate the coordinate system of the beams back to original ==========
         if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
 
@@ -1585,6 +1597,7 @@ class StagePrtclTransWakeInstability(Stage):
         
         if len(files) != len(self.evolution.beam.location):
             raise ValueError('The stored beam parameter evolution data does not have the same length as the number of beam files.')
+        # TODO: make this function independent on self.evolution by using e.g. ss.append(beam.location) below.
 
         # Set default font size
         plt.rc('axes', titlesize=13)    # fontsize of the axes title
@@ -1637,6 +1650,7 @@ class StagePrtclTransWakeInstability(Stage):
             
             # plot mean energy evolution
             ss.append(self.evolution.beam.location[i])
+            #ss.append(beam.location)                           ####### TODO: test this and replace ss.append(self.evolution.beam.location[i]) so that this function does not depend on self.evolution.
             Emeans.append(beam.energy())
             axs[0,0].cla()
             axs[0,0].plot(np.array(ss), np.array(Emeans)/1e9, '-', color=col0)
