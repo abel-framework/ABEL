@@ -43,6 +43,8 @@ def beam2wake_t_bunch(beam, name='beam'):
                                  pz=beam.pzs()/(SI.c*SI.m_e),
                                  name=name)
     
+    bunch.prop_distance = beam.location
+    
     return bunch
 
 
