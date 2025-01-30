@@ -241,13 +241,9 @@ class StagePrtclTransWakeInstability(Stage):
         
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:
-            print('Before upramp:', drive_beam_rotated.norm_emittance_x(), drive_beam_rotated.norm_emittance_y(), drive_beam_rotated.beta_x())  ##############
 
             # Pass the rotated drive beam and beam_incoming to track_upramp() and get the ramped beams in return
             beam0, drive_beam_ramped = self.track_upramp(beam_incoming, drive_beam_rotated) # TODO: check if track_upramp rotates the beams correctly
-
-            #drive_beam_ramped.remove_halo_particles(nsigma=20)
-            print('After upramp:', drive_beam_ramped.norm_emittance_x(), drive_beam_ramped.norm_emittance_y(), drive_beam_ramped.beta_x())  ##############
         else:
             beam0 = copy.deepcopy(beam_incoming)
             drive_beam_ramped = copy.deepcopy(driver_incoming)
@@ -462,10 +458,6 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             
             beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
-
-            print('After instability:', driver.norm_emittance_x(), driver.norm_emittance_y(), driver.beta_x())  ##############
-
-            #driver.remove_halo_particles(nsigma=20)
             self.evolution = evolution
 
             
@@ -476,8 +468,6 @@ class StagePrtclTransWakeInstability(Stage):
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver) # TODO: check if track_downramp rotates the beams correctly
-            #driver_outgoing.remove_halo_particles(nsigma=20)
-            print('After downramp:', driver_outgoing.norm_emittance_x(), driver_outgoing.norm_emittance_y(), driver_outgoing.beta_x())  ##############
         else:
             beam_outgoing = copy.deepcopy(beam)
             driver_outgoing = copy.deepcopy(driver)

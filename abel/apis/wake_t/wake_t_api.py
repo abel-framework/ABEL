@@ -4,6 +4,7 @@ import numpy as np
 import warnings
 import wake_t
 from abel.utilities.plasma_physics import k_p, blowout_radius
+from abel.utilities.statistics import weighted_mean, weighted_std
 from abel.classes.stage.stage import SimulationDomainSizeError
 
 
@@ -285,7 +286,50 @@ def extract_initial_and_final_Ez_rho(tmpfolder):
     return wake_t_evolution
 
 
+# ==================================================
+def wake_t_remove_halo_particles(bunch, nsigma=20):
+    """
+    Bunch halo cleaning (extreme outliers)
+    """
 
+    weightings = bunch.w
+    x_offset = weighted_mean(bunch.x, weightings, clean=True)
+    y_offset = weighted_mean(bunch.y, weightings, clean=True)
+    xps = bunch.px/bunch.pz
+    yps = bunch.py/bunch.pz
+    x_angle = weighted_mean(xps, weightings, clean=True)
+    y_angle = weighted_mean(yps, weightings, clean=True)
+
+    beam_size_x = weighted_std(bunch.x, weightings, clean=True)
+    beam_size_y = weighted_std(bunch.y, weightings, clean=True)
+    divergence_x = weighted_std(xps, weightings, clean=True)
+    divergence_y = weighted_std(yps, weightings, clean=True)
+    
+    xfilter = np.abs(bunch.x-x_offset) > nsigma*beam_size_x
+    xpfilter = np.abs(xps-x_angle) > nsigma*divergence_x
+    yfilter = np.abs(bunch.y-y_offset) > nsigma*beam_size_y
+    ypfilter = np.abs(yps-y_angle) > nsigma*divergence_y
+    filter = np.logical_or(np.logical_or(xfilter, xpfilter), np.logical_or(yfilter, ypfilter))
+
+    if hasattr(filter, 'len'):
+        if len(filter) == len(bunch):
+            filter = np.where(filter)
+    
+    phase_space = bunch.get_6D_matrix_with_charge()
+    filtered_phasespace = np.ascontiguousarray(np.delete(phase_space, filter, 1))
+
+    filtered_bunch = wake_t.ParticleBunch(w=filtered_phasespace[6] / bunch.q_species,
+                                 x=filtered_phasespace[0],
+                                 y=filtered_phasespace[2],
+                                 xi=filtered_phasespace[4], 
+                                 px=filtered_phasespace[1],
+                                 py=filtered_phasespace[3],
+                                 pz=filtered_phasespace[5],
+                                 name=bunch.name)
+    
+    filtered_bunch.prop_distance = bunch.prop_distance
+
+    return filtered_bunch
 
 
 
