@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 ABEL : Core Tests
-=========================
+=================
 
-This file is a part of ABEL
+This file is a part of ABEL.
 Copyright 2022– C.A.Lindstrøm, B.Chen, O.G. Finnerud,
 D. Kallvik, E. Hørlyk, K.N. Sjobak, E.Adli, University of Oslo
 
