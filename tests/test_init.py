@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-MadXTools : TableFS Tests
+ABEL : Core Tests
 =========================
 
-This file is a part of MadXTools
+This file is a part of ABEL
 Copyright 2022– C.A.Lindstrøm, B.Chen, O.G. Finnerud,
 D. Kallvik, E. Hørlyk, K.N. Sjobak, E.Adli, University of Oslo
 
