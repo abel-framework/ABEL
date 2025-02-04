@@ -43,3 +43,11 @@ readme = "README.md"
 
 #[tool.setuptools.packages.find]
 #where = ["Python"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+markers = [
+  "core: Test core functionality",
+]
