@@ -548,7 +548,7 @@ class Stage(Trackable, CostModeled):
             if self.nom_accel_gradient_flattop is None:
                 if self.length_flattop is not None and self.nom_energy_gain_flattop is not None:
                     self._nom_accel_gradient_flattop_calc = self.nom_energy_gain_flattop / self.length_flattop
-                    self._printVerb("nom_accel_gradient_flattop (2)>",self.nom_energy_gain_flattop)
+                    self._printVerb("nom_accel_gradient_flattop (2)>",self.nom_accel_gradient_flattop)
                     updateCounter += 1
 
             #Relationships total <-> flattop+ramp
