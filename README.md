@@ -27,3 +27,5 @@ from the root folder of ABEL.
 
 The tests are stored in in the `tests` subdirectory, in files with names starting with `test_`.
 In these files, the functions with names starting with `test_` are represent one test; if it makes it to the end without any of the asserts triggering and all the expected exceptions happening, the test has PASSED.
+
+Pytest is configured in the `[tool.pytest.ini_options]` section of `pyproject.toml`. This especially defines the "markers", which are named groups of tests that can be specified to run.
