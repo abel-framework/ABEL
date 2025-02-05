@@ -508,7 +508,7 @@ class Stage(Trackable, CostModeled):
             self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
             self._resetLengthEnergyGradient()
             self._recalcLengthEnergyGradient()
-        except:
+        except VariablesOutOfRangeError:
             self._nom_accel_gradient_flattop = nom_accel_gradient_flattop_old
             self._resetLengthEnergyGradient()
             self._recalcLengthEnergyGradient()
