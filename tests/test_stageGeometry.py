@@ -25,10 +25,17 @@ import os
 import pytest
 
 from abel import *
-from abel.classes.stage.stage import VariablesOverspecifiedError
+from abel.classes.stage.stage import VariablesOverspecifiedError, VariablesOutOfRangeError, StageError
+
+#For numbers set as floating points, calculated from numbers set by floating point,
+# or calculated using operations returning floating point (e.g. Python3 standard division operator)
+# do not check for equality of result vs expected result but check that the absolute difference 
+# is less than a tolerance value. For reference, float64 has a precission of ca 10^-12.
+fTol = 1e-10 # Floating point absolute tolerance
 
 
-#Helpers
+
+#Helper function - pretty printed debug outputs of current stage status
 def printStuff(stage):
     print("length / flattop                  =",stage.length, stage.length_flattop, '[m]')
     if stage.upramp is not None:
@@ -50,22 +57,30 @@ def printStuff(stage):
 
     print()
 
+#Helper function - pretty printed debug outputs of internal variables
 def printStuff_internal(stage):
     stage._printLengthEnergyGradient_internal()
     print()
 
 @pytest.mark.stageGeometry
 def testStageGeom_basic():
-    """
-    """
+    "Test the basic functionality of stage geometry (length/energy gain/gradient); no ramps."
     stageTest = StageBasic()
     stageTest.doVerbosePrint_debug = True
+
+    assert stageTest.length == None
+    assert stageTest.nom_energy_gain == None
+    assert stageTest.nom_accel_gradient == None
+    assert stageTest.length_flattop == None
+    assert stageTest.nom_energy_gain_flattop == None
+    assert stageTest.nom_accel_gradient_flattop == None
 
     #Mess around with length and length_flattop
     print("Set length:")
     stageTest.length = 10
     printStuff(stageTest)
-    assert stageTest.length == 10
+
+    assert stageTest.length == 10 #Explicit
     assert stageTest.nom_energy_gain == None
     assert stageTest.nom_accel_gradient == None
     assert stageTest.length_flattop == 10
@@ -75,7 +90,7 @@ def testStageGeom_basic():
     print("Change length:")
     stageTest.length = 15
     printStuff(stageTest)
-    assert stageTest.length == 15
+    assert stageTest.length == 15 #Explicit
     assert stageTest.nom_energy_gain == None
     assert stageTest.nom_accel_gradient == None
     assert stageTest.length_flattop == 15
@@ -86,12 +101,12 @@ def testStageGeom_basic():
     stageTest.nom_accel_gradient = 10
     printStuff_internal(stageTest)
     printStuff(stageTest)
-    assert stageTest.length == 15
+    assert stageTest.length == 15 #Explicit
     assert stageTest.nom_energy_gain == 10*15
-    assert stageTest.nom_accel_gradient == 10
+    assert stageTest.nom_accel_gradient == 10 #Explicit
     assert stageTest.length_flattop == 15
     assert stageTest.nom_energy_gain_flattop == 10*15
-    assert abs(stageTest.nom_accel_gradient_flattop - 10.0) < 1e-10
+    assert abs(stageTest.nom_accel_gradient_flattop - 10.0) < fTol
 
     #Try to explicitly set or delete the calculated and thus known values
     #This should crash the calculation
@@ -136,7 +151,7 @@ def testStageGeom_basic():
     assert stageTest.length == 5
     assert stageTest.nom_energy_gain == None
     assert stageTest.nom_accel_gradient == None
-    assert stageTest.length_flattop == 5
+    assert stageTest.length_flattop == 5 #Explicit
     assert stageTest.nom_energy_gain_flattop == None
     assert stageTest.nom_accel_gradient_flattop == None
     
@@ -147,9 +162,9 @@ def testStageGeom_basic():
     assert stageTest.length == 5
     assert stageTest.nom_energy_gain == 5*10
     assert stageTest.nom_accel_gradient == 10
-    assert stageTest.length_flattop == 5
+    assert stageTest.length_flattop == 5 #Explicit
     assert stageTest.nom_energy_gain_flattop == 5*10
-    assert stageTest.nom_accel_gradient_flattop == 10
+    assert stageTest.nom_accel_gradient_flattop == 10 #Explicit
     
     #Try to explicitly set or delete the calculated and thus known values
     #This should crash the calculation
@@ -177,29 +192,1212 @@ def testStageGeom_basic():
     
     print("length_flattop out, nom_energy_gain_flattop in")
     stageTest.length_flattop = None
-    #printStuff(stageTest)
-    stageTest.nom_energy_gain_flattop = 20
     printStuff(stageTest)
     
+    assert stageTest.length == None
+    assert stageTest.nom_energy_gain == None
+    assert stageTest.nom_accel_gradient == 10
+    assert stageTest.length_flattop == None
+    assert stageTest.nom_energy_gain_flattop == None
+    assert stageTest.nom_accel_gradient_flattop == 10 #Explicit
+
+    stageTest.nom_energy_gain_flattop = 20
+    printStuff(stageTest)
+
+    assert abs(stageTest.length - 20/10) < fTol
+    assert stageTest.nom_energy_gain == 20
+    assert stageTest.nom_accel_gradient == 10
+    assert abs(stageTest.length_flattop - 20/10) < fTol
+    assert stageTest.nom_energy_gain_flattop == 20 #Explicit
+    assert stageTest.nom_accel_gradient_flattop == 10 #Explicit
+        
     print("nom_accel_gradient_flattop out, length_flattop in:")
     stageTest.nom_accel_gradient_flattop = None
+    printStuff(stageTest)
+
+    assert stageTest.length == None
+    assert stageTest.nom_energy_gain == 20
+    assert stageTest.nom_accel_gradient == None
+    assert stageTest.length_flattop == None
+    assert stageTest.nom_energy_gain_flattop == 20 #Explicit
+    assert stageTest.nom_accel_gradient_flattop == None
+
     #stageTest.length = 2
     stageTest.length_flattop = 2
     printStuff(stageTest)
     
+    assert stageTest.length == 2
+    assert stageTest.nom_energy_gain == 20
+    assert abs(stageTest.nom_accel_gradient - 20/2) < fTol
+    assert stageTest.length_flattop == 2 #Explicit
+    assert stageTest.nom_energy_gain_flattop == 20 #Explicit
+    assert abs(stageTest.nom_accel_gradient_flattop - 20/2) < fTol
+
     print("nom_energy_gain_flattop out, nom_accel_gradient_flattop in:")
     stageTest.nom_energy_gain_flattop = None
+    printStuff(stageTest)
+
+    assert stageTest.length == 2
+    assert stageTest.nom_energy_gain == None
+    assert stageTest.nom_accel_gradient == None
+    assert stageTest.length_flattop == 2 #Explicit
+    assert stageTest.nom_energy_gain_flattop == None
+    assert stageTest.nom_accel_gradient_flattop == None
+
     #stageTest.length = 2
     stageTest.nom_accel_gradient_flattop = 2
     printStuff(stageTest)
 
+    assert stageTest.length == 2
+    assert stageTest.nom_energy_gain == 2*2
+    assert stageTest.nom_accel_gradient == 2
+    assert stageTest.length_flattop == 2 #Explicit
+    assert stageTest.nom_energy_gain_flattop == 2*2
+    assert stageTest.nom_accel_gradient_flattop == 2 # Explicit
+
     #Trigger a test failure and printout
-    assert False
+    #assert False
 
 @pytest.mark.stageGeometry
 def testStageGeom_ramps():
-    """
-    """
+    "Test the basic functionality of stage geometry (length/energy gain/gradient); with ramps."
+    
     stageTest_L = StageBasic()
     stageTest_L.upramp = stageTest_L.__class__()
     stageTest_L.downramp = stageTest_L.__class__()
+
+    printStuff(stageTest_L)
+    printStuff_internal(stageTest_L)
+    printStuff_internal(stageTest_L.upramp)
+    printStuff_internal(stageTest_L.downramp)
+
+    stageTest_L.doVerbosePrint_debug = True
+    stageTest_L.upramp.doVerbosePrint_debug = True
+    stageTest_L.downramp.doVerbosePrint_debug = True
+
+    assert stageTest_L.length == None
+    assert stageTest_L.nom_energy_gain == None
+    assert stageTest_L.nom_accel_gradient == None
+    assert stageTest_L.length_flattop == None
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == None
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == None
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == None
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == None
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Set upramp length, show overall and upramp:")
+    stageTest_L.upramp.length = 1
+    printStuff(stageTest_L)
+    printStuff(stageTest_L.upramp)
+
+    assert stageTest_L.length == None
+    assert stageTest_L.nom_energy_gain == None
+    assert stageTest_L.nom_accel_gradient == None
+    assert stageTest_L.length_flattop == None
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == None
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == None
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set total length")
+    stageTest_L.length = 10
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10 #Explicit
+    assert stageTest_L.nom_energy_gain == None
+    assert stageTest_L.nom_accel_gradient == None
+    assert stageTest_L.length_flattop == None
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == None
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == None
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set downramp - now length is fully defined")
+    stageTest_L.downramp.length = 2
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10 #Explicit
+    assert stageTest_L.nom_energy_gain == None
+    assert stageTest_L.nom_accel_gradient == None
+    assert stageTest_L.length_flattop == 10-1-2
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Switch from setting total to flattop - still fully defined")
+    stageTest_L.length = None
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == None
+    assert stageTest_L.nom_energy_gain == None
+    assert stageTest_L.nom_accel_gradient == None
+    assert stageTest_L.length_flattop == None
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    stageTest_L.length_flattop = 10
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == None
+    assert stageTest_L.nom_accel_gradient == None
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set energy gain - should now have overall gradient")
+    stageTest_L.nom_energy_gain = 10
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == 10 #Explicit
+    assert abs(stageTest_L.nom_accel_gradient - 10/(10+1+2)) < fTol
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Switch from setting energy gain to setting gradient")
+    stageTest_L.nom_energy_gain = None
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == None
+    assert stageTest_L.nom_accel_gradient == None
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    stageTest_L.nom_accel_gradient = 2
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == 2*(10+1+2)
+    assert stageTest_L.nom_accel_gradient == 2 #Explicit
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Set the flattop energy gain, should define the flattop gradient")
+    stageTest_L.nom_energy_gain_flattop = 10
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == 2*(10+1+2)
+    assert stageTest_L.nom_accel_gradient == 2 #Explicit
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert stageTest_L.nom_energy_gain_flattop == 10 #Explicit
+    assert abs(stageTest_L.nom_accel_gradient_flattop - 10/10) < fTol
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Switch from setting flattop energy gain to setting flattop gradient")
+    stageTest_L.nom_energy_gain_flattop    = None
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == 2*(10+1+2)
+    assert stageTest_L.nom_accel_gradient == 2 #Explicit
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert stageTest_L.nom_energy_gain_flattop == None
+    assert stageTest_L.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    stageTest_L.nom_accel_gradient_flattop = 0.5
+    printStuff(stageTest_L)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == 2*(10+1+2)
+    assert stageTest_L.nom_accel_gradient == 2 #Explicit
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert abs(stageTest_L.nom_energy_gain_flattop - 10*0.5) < fTol
+    assert abs(stageTest_L.nom_accel_gradient_flattop - 0.5) < fTol #Explicit
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == None
+    assert stageTest_L.upramp.nom_accel_gradient == None
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert stageTest_L.downramp.nom_energy_gain == None
+    assert stageTest_L.downramp.nom_accel_gradient == None
+    assert stageTest_L.downramp.length_flattop == 2
+    assert stageTest_L.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L.downramp.nom_accel_gradient_flattop == None
+
+    print("Add in the upramp energy gain  - now we should be fully defined")
+    stageTest_L.upramp.nom_energy_gain = 1
+    printStuff(stageTest_L)
+    printStuff(stageTest_L.upramp)
+    printStuff(stageTest_L.downramp)
+
+    assert stageTest_L.length == 10+1+2
+    assert stageTest_L.nom_energy_gain == 2*(10+1+2)
+    assert stageTest_L.nom_accel_gradient == 2 #Explicit
+    assert stageTest_L.length_flattop == 10 #Explicit
+    assert abs(stageTest_L.nom_energy_gain_flattop - 10*0.5) < fTol
+    assert abs(stageTest_L.nom_accel_gradient_flattop - 0.5) < fTol #Explicit
+
+    assert stageTest_L.upramp.length == 1 #Explicit
+    assert stageTest_L.upramp.nom_energy_gain == 1 #Explicit
+    assert abs(stageTest_L.upramp.nom_accel_gradient - 1/1) < fTol
+    assert stageTest_L.upramp.length_flattop == 1
+    assert stageTest_L.upramp.nom_energy_gain_flattop == 1
+    assert abs(stageTest_L.upramp.nom_accel_gradient_flattop - 1/1) < fTol
+
+    assert stageTest_L.downramp.length == 2 #Explicit
+    assert abs(stageTest_L.downramp.nom_energy_gain - ( 2*(10+1+2) - 1 - 10*0.5)) < fTol
+    assert abs(stageTest_L.downramp.nom_accel_gradient - ( 2*(10+1+2) - 1 - 10*0.5)/2 ) < fTol
+    assert stageTest_L.downramp.length_flattop == 2
+    assert abs(stageTest_L.downramp.nom_energy_gain_flattop - ( 2*(10+1+2) - 1 - 10*0.5)) < fTol
+    assert abs(stageTest_L.downramp.nom_accel_gradient_flattop - ( 2*(10+1+2) - 1 - 10*0.5)/2 ) < fTol
+
+    #Trigger a test failure and printout
+    #assert False
+
+@pytest.mark.stageGeometry
+def testStageGeom_eGain():
+    "Test of energy gain"
+
+    stageTest_E = StageBasic()
+    stageTest_E.upramp = stageTest_E.__class__()
+    stageTest_E.downramp = stageTest_E.__class__()
+    #printStuff(stageTest_G)
+
+    stageTest_E.doVerbosePrint_debug = True
+    stageTest_E.upramp.doVerbosePrint_debug = True
+    stageTest_E.downramp.doVerbosePrint_debug = True
+
+    assert stageTest_E.length == None
+    assert stageTest_E.nom_energy_gain == None
+    assert stageTest_E.nom_accel_gradient == None
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == None
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == None
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == None
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == None
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == None
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    print("Set upramp energy gain:")
+    stageTest_E.upramp.nom_energy_gain = 1
+    printStuff(stageTest_E)
+    #printStuff(stageTest_G.upramp)
+
+    assert stageTest_E.length == None
+    assert stageTest_E.nom_energy_gain == None
+    assert stageTest_E.nom_accel_gradient == None
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == None
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == None
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == None
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set total")
+    #stageTest_E.upramp.nom_energy_gain = 1 #Overwrite upramp's total, as a test
+    stageTest_E.nom_energy_gain = 10
+    printStuff(stageTest_E)
+
+    assert stageTest_E.length == None
+    assert stageTest_E.nom_energy_gain == 10 #Explicit
+    assert stageTest_E.nom_accel_gradient == None
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == None
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == None
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == None
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set downramp")
+    stageTest_E.downramp.nom_energy_gain = 2
+    printStuff(stageTest_E)
+
+    assert stageTest_E.length == None
+    assert stageTest_E.nom_energy_gain == 10 #Explicit
+    assert stageTest_E.nom_accel_gradient == None
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == 10-1-2
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == 2 #Explicit
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == 2
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    print("Switch from setting total to flattop")
+    stageTest_E.nom_energy_gain = None
+    printStuff(stageTest_E)
+
+    assert stageTest_E.length == None
+    assert stageTest_E.nom_energy_gain == None
+    assert stageTest_E.nom_accel_gradient == None
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == None
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == 2 #Explicit
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == 2
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    stageTest_E.nom_energy_gain_flattop = 10
+    printStuff(stageTest_E)
+
+    assert stageTest_E.length == None
+    assert stageTest_E.nom_energy_gain == 10+1+2
+    assert stageTest_E.nom_accel_gradient == None
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == 10 #Explicit
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == 2 #Explicit
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == 2
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set overall length - should get overall gradient")
+    stageTest_E.length = 10
+    printStuff(stageTest_E)
+
+    assert stageTest_E.length == 10 #Explicit
+    assert stageTest_E.nom_energy_gain == 10+1+2
+    assert abs(stageTest_E.nom_accel_gradient - (10+1+2)/10) < fTol
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == 10 #Explicit
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == 2 #Explicit
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == 2
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    print("Unset length, set gradient")
+    stageTest_E.length = None
+    printStuff(stageTest_E)
+
+    assert stageTest_E.length == None
+    assert stageTest_E.nom_energy_gain == 10+1+2
+    assert stageTest_E.nom_accel_gradient == None
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == 10 #Explicit
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == 2 #Explicit
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == 2
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    stageTest_E.nom_accel_gradient = 20
+    printStuff(stageTest_E)
+
+    assert abs(stageTest_E.length - (10+1+2)/20) < fTol
+    assert stageTest_E.nom_energy_gain == 10+1+2
+    assert stageTest_E.nom_accel_gradient == 20 # Explicit
+    assert stageTest_E.length_flattop == None
+    assert stageTest_E.nom_energy_gain_flattop == 10 #Explicit
+    assert stageTest_E.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.upramp.length == None
+    assert stageTest_E.upramp.nom_energy_gain == 1 #Explicit
+    assert stageTest_E.upramp.nom_accel_gradient == None
+    assert stageTest_E.upramp.length_flattop == None
+    assert stageTest_E.upramp.nom_energy_gain_flattop == 1
+    assert stageTest_E.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_E.downramp.length == None
+    assert stageTest_E.downramp.nom_energy_gain == 2 #Explicit
+    assert stageTest_E.downramp.nom_accel_gradient == None
+    assert stageTest_E.downramp.length_flattop == None
+    assert stageTest_E.downramp.nom_energy_gain_flattop == 2
+    assert stageTest_E.downramp.nom_accel_gradient_flattop == None
+
+    #Trigger a test failure and printout
+    #assert False
+
+@pytest.mark.stageGeometry
+def testStageGeom_gradient():
+    "Test of gradient"
+
+    stageTest_G = StageBasic()
+    stageTest_G.upramp = stageTest_G.__class__()
+    stageTest_G.downramp = stageTest_G.__class__()
+
+    stageTest_G.doVerbosePrint_debug = True
+    stageTest_G.upramp.doVerbosePrint_debug = True
+    stageTest_G.downramp.doVerbosePrint_debug = True
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == None
+    assert stageTest_G.length_flattop == None
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == None
+    assert stageTest_G.upramp.nom_energy_gain == None
+    assert stageTest_G.upramp.nom_accel_gradient == None
+    assert stageTest_G.upramp.length_flattop == None
+    assert stageTest_G.upramp.nom_energy_gain_flattop == None
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == None
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == None
+
+    print("Set upramp, show overall and upramp:")
+    stageTest_G.upramp.nom_accel_gradient = 1
+    printStuff(stageTest_G)
+    printStuff(stageTest_G.upramp) #Should show some of the same as above
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == None
+    assert stageTest_G.length_flattop == None
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == None
+    assert stageTest_G.upramp.nom_energy_gain == None
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == None
+    assert stageTest_G.upramp.nom_energy_gain_flattop == None
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == None
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set total")
+    stageTest_G.upramp.nom_accel_gradient = 1 # Overwrite upramps total, as a test
+    printStuff(stageTest_G)
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == None
+    assert stageTest_G.length_flattop == None
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == None
+    assert stageTest_G.upramp.nom_energy_gain == None
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == None
+    assert stageTest_G.upramp.nom_energy_gain_flattop == None
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == None
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == None
+
+    stageTest_G.nom_accel_gradient = 10
+    printStuff(stageTest_G)
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == 10 #Explicit
+    assert stageTest_G.length_flattop == None
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == None
+    assert stageTest_G.upramp.nom_energy_gain == None
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == None
+    assert stageTest_G.upramp.nom_energy_gain_flattop == None
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == None
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == None
+
+    print("Also set downramp")
+    stageTest_G.downramp.nom_accel_gradient = 2
+    printStuff(stageTest_G)
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == 10 #Explicit
+    assert stageTest_G.length_flattop == None
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == None
+    assert stageTest_G.upramp.nom_energy_gain == None
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == None
+    assert stageTest_G.upramp.nom_energy_gain_flattop == None
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
+
+    print("Also set lengths - this should give energies")
+    stageTest_G.length = 10
+    stageTest_G.length_flattop = 8.5
+    stageTest_G.upramp.length = 1
+    printStuff(stageTest_G)
+
+    assert stageTest_G.length == 10 #Explicit
+    assert stageTest_G.nom_energy_gain == 10*10
+    assert stageTest_G.nom_accel_gradient == 10 #Explicit
+    assert abs(stageTest_G.length_flattop - 8.5) < fTol #Explicit
+    assert abs(stageTest_G.nom_energy_gain_flattop - (10*10 - 1*1 - (10-8.5-1)*2)) < fTol
+    assert abs(stageTest_G.nom_accel_gradient_flattop - (10*10 - 1*1 - (10-8.5-1)*2)/8.5) < fTol
+
+    assert stageTest_G.upramp.length == 1 #Explicit
+    assert stageTest_G.upramp.nom_energy_gain == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == 1
+    assert stageTest_G.upramp.nom_energy_gain_flattop == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert abs(stageTest_G.downramp.length - (10-8.5-1)) < fTol
+    assert abs(stageTest_G.downramp.nom_energy_gain - (10-8.5-1)*2) < fTol
+    assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
+    assert abs(stageTest_G.downramp.length_flattop - (10-8.5-1)) < fTol
+    assert abs(stageTest_G.downramp.nom_energy_gain_flattop - (10-8.5-1)*2) < fTol
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
+
+    print("Switch from setting total to flattop")
+    stageTest_G.length = None
+    stageTest_G.length_flattop = 10
+    printStuff(stageTest_G)
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == 10 #Explicit
+    assert stageTest_G.length_flattop == 10 #Explicit
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == 1 #Explicit
+    assert stageTest_G.upramp.nom_energy_gain == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == 1
+    assert stageTest_G.upramp.nom_energy_gain_flattop == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
+
+    print("Also set energy gain - should now have overall gradient")
+    stageTest_G.nom_energy_gain = 1000
+    printStuff(stageTest_G)
+
+    assert abs(stageTest_G.length - 1000/10) < fTol
+    assert stageTest_G.nom_energy_gain == 1000 # Explicit
+    assert stageTest_G.nom_accel_gradient == 10 #Explicit
+    assert stageTest_G.length_flattop == 10 #Explicit
+    assert abs(stageTest_G.nom_energy_gain_flattop - (1000 - 1*1 - (1000/10 - 10 - 1)*2)) < fTol
+    assert abs(stageTest_G.nom_accel_gradient_flattop - (1000 - 1*1 - (1000/10 - 10 - 1)*2)/10) < fTol
+
+    assert stageTest_G.upramp.length == 1 #Explicit
+    assert stageTest_G.upramp.nom_energy_gain == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == 1
+    assert stageTest_G.upramp.nom_energy_gain_flattop == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert abs(stageTest_G.downramp.length - (1000/10 - 10 - 1)) < fTol
+    assert abs(stageTest_G.downramp.nom_energy_gain - (1000/10 - 10 - 1)*2) < fTol
+    assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
+    assert abs(stageTest_G.downramp.length_flattop - (1000/10 - 10 - 1)) < fTol
+    assert abs(stageTest_G.downramp.nom_energy_gain_flattop - (1000/10 - 10 - 1)*2) < fTol
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
+
+    print("Switch from setting energy gain to setting gradient")
+    stageTest_G.nom_energy_gain = None
+    printStuff(stageTest_G)
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == 10 #Explicit
+    assert stageTest_G.length_flattop == 10 #Explicit
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == 1 #Explicit
+    assert stageTest_G.upramp.nom_energy_gain == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == 1
+    assert stageTest_G.upramp.nom_energy_gain_flattop == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
+
+    stageTest_G.nom_accel_gradient = 2
+    printStuff(stageTest_G)
+
+    assert stageTest_G.length == None
+    assert stageTest_G.nom_energy_gain == None
+    assert stageTest_G.nom_accel_gradient == 2 #Explicit
+    assert stageTest_G.length_flattop == 10 #Explicit
+    assert stageTest_G.nom_energy_gain_flattop == None
+    assert stageTest_G.nom_accel_gradient_flattop == None
+
+    assert stageTest_G.upramp.length == 1 #Explicit
+    assert stageTest_G.upramp.nom_energy_gain == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient == 1 #Explicit
+    assert stageTest_G.upramp.length_flattop == 1
+    assert stageTest_G.upramp.nom_energy_gain_flattop == 1*1
+    assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
+
+    assert stageTest_G.downramp.length == None
+    assert stageTest_G.downramp.nom_energy_gain == None
+    assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
+    assert stageTest_G.downramp.length_flattop == None
+    assert stageTest_G.downramp.nom_energy_gain_flattop == None
+    assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
+
+    #Trigger a test failure and printout
+    #assert False
+
+def test_sanityCheckLengths1():
+    "Testing of stage.sanityCheckLengths logic without ramps"
+
+    stageTest_L1 = StageBasic()
+
+    printStuff(stageTest_L1)
+    printStuff_internal(stageTest_L1)
+
+    stageTest_L1.doVerbosePrint_debug = True
+    
+    assert stageTest_L1.length == None
+    assert stageTest_L1.nom_energy_gain == None
+    assert stageTest_L1.nom_accel_gradient == None
+    assert stageTest_L1.length_flattop == None
+    assert stageTest_L1.nom_energy_gain_flattop == None
+    assert stageTest_L1.nom_accel_gradient_flattop == None
+
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L1.length = -1
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L1.length_flattop = -1
+
+    #The error is caught before setting
+    assert stageTest_L1.length == None
+    assert stageTest_L1.nom_energy_gain == None
+    assert stageTest_L1.nom_accel_gradient == None
+    assert stageTest_L1.length_flattop == None
+    assert stageTest_L1.nom_energy_gain_flattop == None
+    assert stageTest_L1.nom_accel_gradient_flattop == None
+
+    #Disable sanity checking
+    stageTest_L1.sanityCheckLengths = False
+    stageTest_L1.length = -1
+
+    assert stageTest_L1.length == -1 #Explicit
+    assert stageTest_L1.nom_energy_gain == None
+    assert stageTest_L1.nom_accel_gradient == None
+    assert stageTest_L1.length_flattop == -1
+    assert stageTest_L1.nom_energy_gain_flattop == None
+    assert stageTest_L1.nom_accel_gradient_flattop == None
+
+    stageTest_L1.length = None
+    stageTest_L1.length_flattop = -1
+
+    assert stageTest_L1.length == -1
+    assert stageTest_L1.nom_energy_gain == None
+    assert stageTest_L1.nom_accel_gradient == None
+    assert stageTest_L1.length_flattop == -1 # Explicit
+    assert stageTest_L1.nom_energy_gain_flattop == None
+    assert stageTest_L1.nom_accel_gradient_flattop == None
+
+    #Reset and test calculations
+    stageTest_L1.length_flattop = None
+    stageTest_L1.sanityCheckLengths = True
+
+    stageTest_L1.nom_energy_gain = -1
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L1.nom_accel_gradient = 1
+    stageTest_L1.sanityCheckLengths = False
+    stageTest_L1.nom_accel_gradient = 1
+
+    assert stageTest_L1.length == -1*1
+    assert stageTest_L1.nom_energy_gain == -1 #Explicit
+    assert stageTest_L1.nom_accel_gradient == 1 #Explicit
+    assert stageTest_L1.length_flattop == 1*-1
+    assert stageTest_L1.nom_energy_gain_flattop == -1
+    assert stageTest_L1.nom_accel_gradient_flattop == 1
+
+    #Reset and test other calculation
+    stageTest_L1.nom_energy_gain = None
+    stageTest_L1.nom_accel_gradient = None
+    stageTest_L1.sanityCheckLengths = True
+
+    stageTest_L1.nom_accel_gradient = -1
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L1.nom_energy_gain = 1
+    stageTest_L1.sanityCheckLengths = False
+    stageTest_L1.nom_energy_gain = 1
+
+    assert stageTest_L1.length == 1*-1
+    assert stageTest_L1.nom_energy_gain == 1 #Explicit
+    assert stageTest_L1.nom_accel_gradient == -1 #Explicit
+    assert stageTest_L1.length_flattop == 1*-1
+    assert stageTest_L1.nom_energy_gain_flattop == 1
+    assert stageTest_L1.nom_accel_gradient_flattop == -1
+
+    #Trigger a test failure and printout
+    #assert False
+
+def test_sanityCheckLengths2():
+    "Testing of stage.sanityCheckLengths logic with ramps"
+
+    stageTest_L2 = StageBasic()
+    stageTest_L2.upramp = stageTest_L2.__class__()
+    stageTest_L2.downramp = stageTest_L2.__class__()
+
+    printStuff(stageTest_L2)
+    printStuff_internal(stageTest_L2)
+    printStuff_internal(stageTest_L2.upramp)
+    printStuff_internal(stageTest_L2.downramp)
+
+    stageTest_L2.doVerbosePrint_debug = True
+    stageTest_L2.upramp.doVerbosePrint_debug = True
+    stageTest_L2.downramp.doVerbosePrint_debug = True
+
+    assert stageTest_L2.length == None
+    assert stageTest_L2.nom_energy_gain == None
+    assert stageTest_L2.nom_accel_gradient == None
+    assert stageTest_L2.length_flattop == None
+    assert stageTest_L2.nom_energy_gain_flattop == None
+    assert stageTest_L2.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.upramp.length == None
+    assert stageTest_L2.upramp.nom_energy_gain == None
+    assert stageTest_L2.upramp.nom_accel_gradient == None
+    assert stageTest_L2.upramp.length_flattop == None
+    assert stageTest_L2.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.downramp.length == None
+    assert stageTest_L2.downramp.nom_energy_gain == None
+    assert stageTest_L2.downramp.nom_accel_gradient == None
+    assert stageTest_L2.downramp.length_flattop == None
+    assert stageTest_L2.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.downramp.nom_accel_gradient_flattop == None
+
+    #Try to explicitly set negative values
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L2.length = -1
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L2.length_flattop = -1
+
+    #Nothing has changed
+    assert stageTest_L2.length == None
+    assert stageTest_L2.nom_energy_gain == None
+    assert stageTest_L2.nom_accel_gradient == None
+    assert stageTest_L2.length_flattop == None
+    assert stageTest_L2.nom_energy_gain_flattop == None
+    assert stageTest_L2.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.upramp.length == None
+    assert stageTest_L2.upramp.nom_energy_gain == None
+    assert stageTest_L2.upramp.nom_accel_gradient == None
+    assert stageTest_L2.upramp.length_flattop == None
+    assert stageTest_L2.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.downramp.length == None
+    assert stageTest_L2.downramp.nom_energy_gain == None
+    assert stageTest_L2.downramp.nom_accel_gradient == None
+    assert stageTest_L2.downramp.length_flattop == None
+    assert stageTest_L2.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.downramp.nom_accel_gradient_flattop == None
+
+    #Implicitly make the main flattop negative
+    stageTest_L2.upramp.length = 3
+    stageTest_L2.downramp.length = 3
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L2.length = 5
+    printStuff(stageTest_L2)
+
+    assert stageTest_L2.length == None #Unwound explicit
+    assert stageTest_L2.nom_energy_gain == None
+    assert stageTest_L2.nom_accel_gradient == None
+    assert stageTest_L2.length_flattop == None #Would be negative
+    assert stageTest_L2.nom_energy_gain_flattop == None
+    assert stageTest_L2.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.upramp.length == 3 # Explicit
+    assert stageTest_L2.upramp.nom_energy_gain == None
+    assert stageTest_L2.upramp.nom_accel_gradient == None
+    assert stageTest_L2.upramp.length_flattop == 3
+    assert stageTest_L2.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.downramp.length == 3 #Explicit
+    assert stageTest_L2.downramp.nom_energy_gain == None
+    assert stageTest_L2.downramp.nom_accel_gradient == None
+    assert stageTest_L2.downramp.length_flattop == 3
+    assert stageTest_L2.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.downramp.nom_accel_gradient_flattop == None
+
+    #Disable sanity checking and retry
+    stageTest_L2.sanityCheckLengths = False
+    stageTest_L2.length = 5
+
+    assert stageTest_L2.length == 5 #Explicit
+    assert stageTest_L2.nom_energy_gain == None
+    assert stageTest_L2.nom_accel_gradient == None
+    assert stageTest_L2.length_flattop == 5-3-3
+    assert stageTest_L2.nom_energy_gain_flattop == None
+    assert stageTest_L2.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.upramp.length == 3 #Explicit
+    assert stageTest_L2.upramp.nom_energy_gain == None
+    assert stageTest_L2.upramp.nom_accel_gradient == None
+    assert stageTest_L2.upramp.length_flattop == 3
+    assert stageTest_L2.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.downramp.length == 3 #Explicit
+    assert stageTest_L2.downramp.nom_energy_gain == None
+    assert stageTest_L2.downramp.nom_accel_gradient == None
+    assert stageTest_L2.downramp.length_flattop == 3
+    assert stageTest_L2.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.downramp.nom_accel_gradient_flattop == None
+
+    #Undo it
+    stageTest_L2.length = None
+    stageTest_L2.sanityCheckLengths = True
+
+    #Implicitly make the downramp length negative
+    stageTest_L2.downramp.length = None
+    stageTest_L2.length = 5
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L2.length_flattop = 3
+    
+    assert stageTest_L2.length == 5 #Explicit
+    assert stageTest_L2.nom_energy_gain == None
+    assert stageTest_L2.nom_accel_gradient == None
+    assert stageTest_L2.length_flattop == None #Unwound explicit
+    assert stageTest_L2.nom_energy_gain_flattop == None
+    assert stageTest_L2.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.upramp.length == 3 #Explicit
+    assert stageTest_L2.upramp.nom_energy_gain == None
+    assert stageTest_L2.upramp.nom_accel_gradient == None
+    assert stageTest_L2.upramp.length_flattop == 3
+    assert stageTest_L2.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.downramp.length == None #Would be negative
+    assert stageTest_L2.downramp.nom_energy_gain == None
+    assert stageTest_L2.downramp.nom_accel_gradient == None
+    assert stageTest_L2.downramp.length_flattop == None
+    assert stageTest_L2.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.downramp.nom_accel_gradient_flattop == None
+
+    #Disable sanity checking and retry
+    # main stage not enough...
+    stageTest_L2.sanityCheckLengths = False
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L2.length_flattop = 3
+    # Error happens in downramp - disable here
+    stageTest_L2.sanityCheckLengths = True
+    stageTest_L2.downramp.sanityCheckLengths = False
+    stageTest_L2.length_flattop = 3
+
+    assert stageTest_L2.length == 5 #Explicit
+    assert stageTest_L2.nom_energy_gain == None
+    assert stageTest_L2.nom_accel_gradient == None
+    assert stageTest_L2.length_flattop == 3 #Explicit
+    assert stageTest_L2.nom_energy_gain_flattop == None
+    assert stageTest_L2.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.upramp.length == 3 #Explicit
+    assert stageTest_L2.upramp.nom_energy_gain == None
+    assert stageTest_L2.upramp.nom_accel_gradient == None
+    assert stageTest_L2.upramp.length_flattop == 3
+    assert stageTest_L2.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.downramp.length == 5-3-3 #Calculated negative
+    assert stageTest_L2.downramp.nom_energy_gain == None
+    assert stageTest_L2.downramp.nom_accel_gradient == None
+    assert stageTest_L2.downramp.length_flattop == 5-3-3
+    assert stageTest_L2.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.downramp.nom_accel_gradient_flattop == None
+
+    #Undo it
+    stageTest_L2.length_flattop = None
+    stageTest_L2.downramp.sanityCheckLengths = True
+
+    #Implicitly make the upramp length negative
+    stageTest_L2.upramp.length = None
+    stageTest_L2.downramp.length = 3
+    with pytest.raises(VariablesOutOfRangeError):
+        stageTest_L2.length_flattop = 3
+    
+    assert stageTest_L2.length == 5 #Explicit
+    assert stageTest_L2.nom_energy_gain == None
+    assert stageTest_L2.nom_accel_gradient == None
+    assert stageTest_L2.length_flattop == None #Unwound explicit
+    assert stageTest_L2.nom_energy_gain_flattop == None
+    assert stageTest_L2.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.upramp.length == None #Would be negative
+    assert stageTest_L2.upramp.nom_energy_gain == None
+    assert stageTest_L2.upramp.nom_accel_gradient == None
+    assert stageTest_L2.upramp.length_flattop == None
+    assert stageTest_L2.upramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.upramp.nom_accel_gradient_flattop == None
+
+    assert stageTest_L2.downramp.length == 3 #Explicit
+    assert stageTest_L2.downramp.nom_energy_gain == None
+    assert stageTest_L2.downramp.nom_accel_gradient == None
+    assert stageTest_L2.downramp.length_flattop == 3
+    assert stageTest_L2.downramp.nom_energy_gain_flattop == None
+    assert stageTest_L2.downramp.nom_accel_gradient_flattop == None
+
+    #Trigger a test failure and printout
+    #assert False
