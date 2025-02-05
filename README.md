@@ -19,3 +19,11 @@ How to edit it is explained with comments in the file. It uses the file format "
 Please do not edit the template file `abelconfig.toml` or `CONFIG.py` in the source code folder.
 
 The as-loaded configuration of ABEL is printed to the terminal when abel starts, along with the name of the config file it has loaded.
+
+## Unit tests
+Unit tests are implemented with `pytest`; to run the tests on an installed version of ABEL please run
+``pytest -v``
+from the root folder of ABEL.
+
+The tests are stored in in the `tests` subdirectory, in files with names starting with `test_`.
+In these files, the functions with names starting with `test_` are represent one test; if it makes it to the end without any of the asserts triggering and all the expected exceptions happening, the test has PASSED.
