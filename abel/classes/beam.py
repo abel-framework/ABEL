@@ -561,6 +561,10 @@ class Beam():
     def total_particles(self):
         return int(np.nansum(self.weightings()))
     
+    def population(self):
+        "Total number of physical particles."
+        return np.sum(self.weightings())
+    
     def charge(self):
         "Total beam charge."
         return np.nansum(self.qs())

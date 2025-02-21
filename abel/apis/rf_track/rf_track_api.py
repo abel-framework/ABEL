@@ -61,7 +61,7 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
         
         # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] )
         single_particle_charge = qs_abel[0]/SI.e/weightings_abel[0]  # Charge of a single physical particle [e].
-        beam_rft = Bunch6dT(particle_mass, len(beam), single_particle_charge, phase_space_rft)
+        beam_rft = Bunch6dT(particle_mass, beam.population(), single_particle_charge, phase_space_rft)
     
     return beam_rft
 
@@ -110,7 +110,7 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
 
     # Convert ABEL beam to RF-Track beam
-    beam_rft = abel_beam2rft_beam(abel_beam)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
+    beam_rft = abel_beam2rft_beam(abel_beam, homogen_beam_charge=True)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
         
     # Set the solver resolution and calculate fields
     sc_fields_obj = SpaceCharge_Field(beam_rft, num_x_cells, num_y_cells, num_z_cells, num_t_bins)  # num_x_cells, num_y_cells, num_z_cells, number of velocity slices
