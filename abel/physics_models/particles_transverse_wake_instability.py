@@ -20,7 +20,9 @@ from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2e
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_mean, weighted_std
 from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam, beam2wake_t_bunch, wake_t_remove_halo_particles
-from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation, push_driver
+#from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation, push_driver
+from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig
+import abel.physics_models.ion_motion_wakefield_perturbation as ion_motion
 
 
 
@@ -81,7 +83,8 @@ class PrtclTransWakeConfig():
 
 ###################################################
 class PrtclTransWakeEvolution:
-    
+    "For recording the beam parameter evolution."
+
     # =============================================
     def __init__(self, data_length):
         self.index = 0  # Keeping track of the current index.
@@ -312,20 +315,20 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
         driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
 
         # Probe drive beam E-field component in 3D
-        driver_Exs_3d, driver_Eys_3d = probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj)
+        driver_Exs_3d, driver_Eys_3d = ion_motion.probe_driver_beam_field(ion_motion_config, driver_sc_fields_obj)
         
         # Update the RF-Track SpaceCharge_Field object for the main beam
-        sc_fields_obj = assemble_main_sc_fields_obj(ion_motion_config, main_beam=beam)
+        sc_fields_obj = ion_motion.assemble_main_sc_fields_obj(ion_motion_config, main_beam=beam)
         
         # Probe main beam field component in 3D
-        main_Exs_3d, main_Eys_3d = probe_main_beam_field(ion_motion_config, sc_fields_obj)
+        main_Exs_3d, main_Eys_3d = ion_motion.probe_main_beam_field(ion_motion_config, sc_fields_obj)
         
         # Calculate the ion wakefield perturbation
-        Wx_perts, Wy_perts = ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driver_Exs_3d, driver_Eys_3d)  # [V/m], 3D array
+        Wx_perts, Wy_perts = ion_motion.ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driver_Exs_3d, driver_Eys_3d)  # [V/m], 3D array
 
         # Interpolate the ion wakefield perturbation to macroparticle positions
-        intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
-        intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+        intpl_Wx_perts, _ = ion_motion.intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+        intpl_Wy_perts, _ = ion_motion.intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
 
         # Save Wx_perts and Wy_perts for time steps that skip calculating the wakefield
         if trans_wake_config.ion_motion_config.ion_wkfld_update_period > 1:
@@ -334,9 +337,9 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
     
     else:
         Wx_perts = ion_motion_config.Wx_perts
-        intpl_Wx_perts, _ = intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+        intpl_Wx_perts, _ = ion_motion.intplt_ion_wakefield_perturbation(beam, Wx_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
         Wy_perts = ion_motion_config.Wy_perts
-        intpl_Wy_perts, _ = intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+        intpl_Wy_perts, _ = ion_motion.intplt_ion_wakefield_perturbation(beam, Wy_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
             
     return intpl_Wx_perts, intpl_Wy_perts
     
@@ -542,7 +545,6 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         drive_beam = beam2wake_t_bunch(drive_beam0, name='driver')
     else:
         drive_beam = drive_beam0
-
     
 
 
@@ -617,7 +619,9 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         if trans_wake_config.enable_ion_motion:
             # temporary workaround. TODO: make set_probing_coordinates() compatible with Wake-T driver
             if use_wake_t_driver:  # temporary workaround.
-                drive_beam_abel = wake_t_bunch2beam(drive_beam) # temporary workaround.
+                drive_beam_abel = wake_t_bunch2beam(drive_beam) # TODO temporary workaround.
+            else:
+                drive_beam_abel = drive_beam
 
             intpl_Wx_perts, intpl_Wy_perts = calc_ion_wakefield_perturbation(filtered_beam, drive_beam_abel, trans_wake_config) # temporary workaround.
 
@@ -676,7 +680,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         # ============= Evolve drive beam =============
         if enable_driver_evolution:
             if time_step_count % ion_motion_config.drive_beam_update_period == 0:  # It is time to update drive_beam.
-                push_driver(drive_beam, trans_wake_config.ion_motion_config.wake_t_fields, ion_motion_config.drive_beam_update_period*time_step, pusher='boris')
+                ion_motion.push_driver(drive_beam, trans_wake_config.ion_motion_config.wake_t_fields, ion_motion_config.drive_beam_update_period*time_step, pusher='boris')
                 if time_step_count % (ion_motion_config.drive_beam_update_period * 10) == 0:  # It is time to clean drive_beam.
                     drive_beam = wake_t_remove_halo_particles(drive_beam, nsigma=20)
         else:
@@ -737,6 +741,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         drive_beam_out = wake_t_bunch2beam(drive_beam)
     else:
         drive_beam_out = drive_beam
+        #drive_beam_out.remove_halo_particles(nsigma=20)
     
 
     # ============= Save evolution =============
@@ -777,7 +782,7 @@ def save_beam(main_beam, file_path, stage_num, time_step, num_time_steps):
     """
     Saves ``main_beam`` as a .h5 file to ``file_path``. Only used in ``transverse_wake_instability_particles()`` when ``PrtclTransWakeEvolution.save_evolution()`` is called and ``PrtclTransWakeConfig.trans_wake_config.make_animations=True``, as one needs to save as many beam files as the length of ``PrtclTransWakeEvolution.beam.location``.
 
-     Parameters
+    Parameters
     ----------
     ...
 

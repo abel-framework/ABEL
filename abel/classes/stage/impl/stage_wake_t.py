@@ -58,7 +58,7 @@ class StageWakeT(Stage):
         box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
 
         if box_min_z > beam0.zs().min() or box_max_z < driver0.zs().max():
-            raise SimulationDomainSizeError('The simulation domain is too small along z.')
+            raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
         #box_range_z = [box_min_z, box_max_z]
         
         

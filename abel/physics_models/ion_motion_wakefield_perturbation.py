@@ -61,7 +61,7 @@ class IonMotionConfig():
         ...
         """
 
-        # Control the inputs
+        # Check the inputs
         if not isinstance(ion_wkfld_update_period, int):
             raise TypeError("ion_wkfld_update_period must be an integer.")
         elif ion_wkfld_update_period < 1:
@@ -70,7 +70,7 @@ class IonMotionConfig():
         if not isinstance(drive_beam_update_period, int):
             raise TypeError("drive_beam_update_period must be an integer.")
         elif drive_beam_update_period < 0:
-            raise ValueError("drive_beam_update_period must be a positive integer.")
+            raise ValueError("drive_beam_update_period must be an integer >= 0.")
         
             # Add more input tests...
 
