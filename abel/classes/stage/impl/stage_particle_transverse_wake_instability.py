@@ -219,11 +219,11 @@ class StagePrtclTransWakeInstability(Stage):
             beam_incoming.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
 
             if np.abs( drive_beam_rotated.x_angle() ) > 5e-10:
-                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'drive_beam_rotated x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_ramped x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'driver_incoming x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_rotated x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
                 warnings.warn(driver_error_string)
 
             if np.abs( drive_beam_rotated.y_angle() ) > 5e-10:
-                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'drive_beam_rotated y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_ramped y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'driver_incoming y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_rotated y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
                 warnings.warn(driver_error_string)
     
             if np.abs( -(beam_incoming.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
@@ -261,7 +261,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ========== Wake-T simulation and extraction ==========
         drive_beam_wakeT = copy.deepcopy(drive_beam_ramped)
-        beam0_copy = copy.deepcopy(beam0)
+        beam0_wakeT = copy.deepcopy(beam0)
 
         # The drive beam must be centred around r=0 before being used in Wake-T
         driver_x_offset = drive_beam_ramped.x_offset()
@@ -272,13 +272,13 @@ class StagePrtclTransWakeInstability(Stage):
         drive_beam_wakeT.set_ys(drive_beam_wakeT_ys - driver_y_offset)
 
         # Also subtract the drive beam offset from the main beam used in Wake-T
-        beam0_copy_xs = beam0_copy.xs()
-        beam0_copy.set_xs(beam0_copy_xs - driver_x_offset)
-        beam0_copy_ys = beam0_copy.ys()
-        beam0_copy.set_xs(beam0_copy_ys - driver_y_offset)
+        beam0_wakeT_xs = beam0_wakeT.xs()
+        beam0_wakeT.set_xs(beam0_wakeT_xs - driver_x_offset)
+        beam0_wakeT_ys = beam0_wakeT.ys()
+        beam0_wakeT.set_ys(beam0_wakeT_ys - driver_y_offset)
         
         # Construct a Wake-T plasma acceleration stage
-        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_copy, stage_length=None, dz_fields=None)
+        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_wakeT, stage_length=None, dz_fields=None)
 
         # Make temp folder
         if not os.path.exists(CONFIG.temp_path):
@@ -289,9 +289,9 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Convert beams to Wake-T bunches
         driver0_wake_t = beam2wake_t_bunch(drive_beam_wakeT, name='driver')
-        beam0_wake_t = beam2wake_t_bunch(beam0_copy, name='beam')
+        beam0_wake_t = beam2wake_t_bunch(beam0_wakeT, name='beam')
 
-        bunches = plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
+        plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
         
         wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
         
@@ -306,7 +306,7 @@ class StagePrtclTransWakeInstability(Stage):
         info_rho = wake_t_evolution.initial.plasma.density.metadata
         zs_rho = info_rho.z
 
-        # Make corrections to the Wake-T data
+        # Add the driver offsets to the Wake-T r-coordinate
         rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
         info_rho.r = rs_rho
         info_rho.imshow_extent[2] = rs_rho.min()
@@ -381,8 +381,8 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             tmpfolder = None
 
-        if self.drive_beam_update_period > 0:
-            wake_t_fields = plasma_stage.fields[0]  # TODO: since wake_t_fields is calculated with drive_beam_ramped on axis, does drive_beam_ramped need to be put on axis as well before further use?
+        if self.drive_beam_update_period > 0:  # Do drive beam evolution
+            wake_t_fields = plasma_stage.fields[0]  # Extract the wakefields used for driver tracking. TODO: since wake_t_fields is calculated with drive_beam_ramped on axis, does drive_beam_ramped need to be put on axis as well before further use?
         else:
             wake_t_fields = None
 
@@ -2294,12 +2294,22 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
             
         print(f"Ramp beta magnification:\t\t\t\t {self.ramp_beta_mag :.3f}")
+
         if self.main_source is None:
-            main_symmetrise = 'Not registered.'
+            print(f"Symmetrised main beam:\t\t\t\t\t Not registered")
+        elif self.main_source.symmetrize:
+            print(f"Symmetrised main beam:\t\t\t\t\t x, y, xp, yp symmetrised")
+        elif self.main_source.symmetrize_6d:
+            print(f"Symmetrised main beam:\t\t\t\t\t 6D symmetrised")
         else:
-            main_symmetrise = str(self.main_source.symmetrize)
-        print(f"Symmetrised main beam:\t\t\t\t\t {str(self.main_source.symmetrize) :s}")
-        print(f"Symmetrised drive beam:\t\t\t\t\t {str(self.driver_source.symmetrize) :s}\n")
+            print(f"Symmetrised main beam:\t\t\t\t\t Not symmetrised.")
+
+        if self.driver_source.symmetrize:
+            print(f"Symmetrised drive beam:\t\t\t\t\t x, y, xp, yp symmetrised\n")
+        elif self.driver_source.symmetrize_6d:
+            print(f"Symmetrised drive beam:\t\t\t\t\t 6D symmetrised\n")
+        else:
+            print(f"Symmetrised drive beam:\t\t\t\t\t Not symmetrised.\n")
         
         print(f"Transverse wake instability enabled:\t\t\t {str(self.enable_tr_instability) :s}")
         print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
@@ -2373,7 +2383,7 @@ class StagePrtclTransWakeInstability(Stage):
                 print(f"Interstage dipole field:\t\t\t {interstage_dipole_field :.3f}", file=f)
             
             if self.main_source is None:
-                main_symmetrise = 'Not registered.'
+                print(f"Symmetrised main beam:\t\t\t\t Not registered", file=f)
             elif self.main_source.symmetrize:
                 print(f"Symmetrised main beam:\t\t\t\t x, y, xp, yp symmetrised", file=f)
             elif self.main_source.symmetrize_6d:
