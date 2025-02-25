@@ -195,31 +195,36 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
         stage_length = 0.05*lambda_betatron
 
     if dz_fields is None:
-        dz_fields = 1.1*stage_length
+        dz_fields = 1.1*stage_length  # Set to larger than the stage length so that the fields will only be calculated once.
 
     # Set box ranges
     R_blowout = blowout_radius(plasma_density, abel_drive_beam.peak_current())
+
     if box_size_r is None:
-        box_size_r = np.max([4/k_p(plasma_density), 3*R_blowout])
+        box_size_r = np.max([3/k_p(plasma_density), 2*R_blowout, 1.2*abel_drive_beam.rs().max()])
+
     if box_min_z is None:
-        box_min_z = abel_drive_beam.z_offset() - 4 * R_blowout
+        if abel_main_beam is None:
+            box_min_z = abel_drive_beam.z_offset() - 4 * R_blowout
+        else:
+            box_min_z = min( abel_drive_beam.z_offset()-4*R_blowout, abel_main_beam.z_offset()-6*abel_main_beam.bunch_length() )
     if box_max_z is None:
-        box_max_z = min(abel_drive_beam.z_offset() + 6 * abel_drive_beam.bunch_length(), np.max(abel_drive_beam.zs()) + 0.5*R_blowout)
-    box_range_z = [box_min_z, box_max_z]
+        box_max_z = min( abel_drive_beam.z_offset()+6*abel_drive_beam.bunch_length(), np.max(abel_drive_beam.zs())+0.5*R_blowout )
 
     # Check the simulation domain
     if driver_only:
         if box_min_z > abel_drive_beam.zs().min() or box_max_z < abel_drive_beam.zs().max():
-            raise SimulationDomainSizeError('The simulation box is too short.')
-        if box_size_r < abel_drive_beam.rs().max():
+            raise SimulationDomainSizeError(f"The simulation box is too short. Min box z: {box_min_z*1e6 :.3f} um, max box z: {box_max_z*1e6 :.3f} um, min particle z: {abel_drive_beam.zs().min()*1e6 :.3f} um, max particle z: {abel_drive_beam.zs().max()*1e6 :.3f} um")
+        if box_size_r < 1.2*abel_drive_beam.rs().max():
             #raise SimulationDomainSizeError('The simulation box is too narrow.')
-            warnings.warn('The simulation box is too narrow.')
+            warnings.warn(f"The simulation box is too narrow. Max box r: {box_size_r*1e6 :.3f} um, max particle r: {abel_drive_beam.rs().max()*1e6 :.3f} um.")
     else:
         if box_min_z > abel_main_beam.zs().min() or box_max_z < abel_drive_beam.zs().max():
-            raise SimulationDomainSizeError('The simulation box is too short.')
+            raise SimulationDomainSizeError(f"The simulation box is too short. Min box z: {box_min_z*1e6 :.3f} um, max box z: {box_max_z*1e6 :.3f} um, min particle z: {abel_main_beam.zs().min()*1e6 :.3f} um, max particle z: {abel_drive_beam.zs().max()*1e6 :.3f} um")
+        
         max_r = np.max( [abel_drive_beam.rs().max(), abel_main_beam.rs().max()] )
-        if box_size_r < max_r:
-            warnings.warn('The simulation box is too narrow.')
+        if box_size_r < 1.2*max_r:
+            warnings.warn(f"The simulation box is too narrow. Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
         
         
     # Calculate number of cells
@@ -231,6 +236,7 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
                                                 r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                                 n_out=n_out, n_r=num_cell_xy, n_xi=int(num_cell_z), dz_fields=dz_fields, ppc=1)
 
+    #print(f"Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
     return plasma_stage
 
 
