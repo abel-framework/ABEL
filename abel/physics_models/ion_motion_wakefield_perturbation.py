@@ -280,15 +280,6 @@ class IonMotionConfig():
 
 
 ###################################################
-def push_driver(wake_t_driver, wake_t_fields, time_step, pusher='boris'):
-    "Evolves a Wake-T drive beam ``wake_t_driver``for one time step ``time_step``."
-    wake_t_driver.evolve([wake_t_fields], t=wake_t_driver.prop_distance/SI.c, dt=time_step, pusher=pusher)
-
-    #return wake_t_driver
-
-
-
-###################################################
 # Benedetti's ion motion quantifier Gamma
 def ion_motion_quantifier(bunch_length, beam_peak_dens, plasma_density, ion_charge_num=1.0, ion_mass=None):
     if ion_mass is None:
