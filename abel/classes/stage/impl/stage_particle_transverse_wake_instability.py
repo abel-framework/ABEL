@@ -92,7 +92,7 @@ class StagePrtclTransWakeInstability(Stage):
             Determines the ion wakefield perturbation update period. This is given in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will update the ion wakefield perturbation every 3rd time step. Default value: 1
         
         drive_beam_update_period : int, optional
-            Set to larger than 0 to activate and determine the drive beam update period. Default value: 0.
+            Set to larger than 0 to activate driver evolution and determine the drive beam update period. Default value: 0.
         """
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
@@ -278,7 +278,10 @@ class StagePrtclTransWakeInstability(Stage):
         beam0_wakeT.set_ys(beam0_wakeT_ys - driver_y_offset)
         
         # Construct a Wake-T plasma acceleration stage
-        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_wakeT, stage_length=None, dz_fields=None)
+        wakeT_xy_res = 3e-6
+        wakeT_max_box_r = 4/k_p(plasma_density)
+        wakeT_num_cell_xy = int(wakeT_max_box_r/wakeT_xy_res)
+        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_wakeT, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy)
 
         # Make temp folder
         if not os.path.exists(CONFIG.temp_path):
