@@ -27,12 +27,6 @@ import pytest
 from abel import *
 from abel.classes.stage.stage import VariablesOverspecifiedError, VariablesOutOfRangeError, StageError
 
-#For numbers set as floating points, calculated from numbers set by floating point,
-# or calculated using operations returning floating point (e.g. Python3 standard division operator)
-# do not check for equality of result vs expected result but check that the absolute difference 
-# is less than a tolerance value. For reference, float64 has a precission of ca 10^-12.
-fTol = 1e-10 # Floating point absolute tolerance
-
 #Helper function - pretty printed debug outputs of current stage status
 def printStuff(stage):
     print("length / flattop                  =",stage.length, stage.length_flattop, '[m]')
@@ -104,7 +98,7 @@ def test_StageGeom_basic():
     assert stageTest.nom_accel_gradient == 10 #Explicit
     assert stageTest.length_flattop == 15
     assert stageTest.nom_energy_gain_flattop == 10*15
-    assert abs(stageTest.nom_accel_gradient_flattop - 10.0) < fTol
+    assert np.allclose(stageTest.nom_accel_gradient_flattop, 10.0)
 
     #Try to explicitly set or delete the calculated and thus known values
     #This should crash the calculation
@@ -202,10 +196,10 @@ def test_StageGeom_basic():
     stageTest.nom_energy_gain_flattop = 20
     printStuff(stageTest)
 
-    assert abs(stageTest.length - 20/10) < fTol
+    assert np.allclose(stageTest.length, 20/10)
     assert stageTest.nom_energy_gain == 20
     assert stageTest.nom_accel_gradient == 10
-    assert abs(stageTest.length_flattop - 20/10) < fTol
+    assert np.allclose(stageTest.length_flattop, 20/10)
     assert stageTest.nom_energy_gain_flattop == 20 #Explicit
     assert stageTest.nom_accel_gradient_flattop == 10 #Explicit
         
@@ -226,10 +220,10 @@ def test_StageGeom_basic():
     
     assert stageTest.length == 2
     assert stageTest.nom_energy_gain == 20
-    assert abs(stageTest.nom_accel_gradient - 20/2) < fTol
+    assert np.allclose(stageTest.nom_accel_gradient, 20/2)
     assert stageTest.length_flattop == 2 #Explicit
     assert stageTest.nom_energy_gain_flattop == 20 #Explicit
-    assert abs(stageTest.nom_accel_gradient_flattop - 20/2) < fTol
+    assert np.allclose(stageTest.nom_accel_gradient_flattop, 20/2)
 
     print("nom_energy_gain_flattop out, nom_accel_gradient_flattop in:")
     stageTest.nom_energy_gain_flattop = None
@@ -425,7 +419,7 @@ def test_StageGeom_ramps():
 
     assert stageTest_L.length == 10+1+2
     assert stageTest_L.nom_energy_gain == 10 #Explicit
-    assert abs(stageTest_L.nom_accel_gradient - 10/(10+1+2)) < fTol
+    assert np.allclose(stageTest_L.nom_accel_gradient, 10/(10+1+2))
     assert stageTest_L.length_flattop == 10 #Explicit
     assert stageTest_L.nom_energy_gain_flattop == None
     assert stageTest_L.nom_accel_gradient_flattop == None
@@ -502,7 +496,7 @@ def test_StageGeom_ramps():
     assert stageTest_L.nom_accel_gradient == 2 #Explicit
     assert stageTest_L.length_flattop == 10 #Explicit
     assert stageTest_L.nom_energy_gain_flattop == 10 #Explicit
-    assert abs(stageTest_L.nom_accel_gradient_flattop - 10/10) < fTol
+    assert np.allclose(stageTest_L.nom_accel_gradient_flattop, 10/10)
 
     assert stageTest_L.upramp.length == 1 #Explicit
     assert stageTest_L.upramp.nom_energy_gain == None
@@ -550,8 +544,8 @@ def test_StageGeom_ramps():
     assert stageTest_L.nom_energy_gain == 2*(10+1+2)
     assert stageTest_L.nom_accel_gradient == 2 #Explicit
     assert stageTest_L.length_flattop == 10 #Explicit
-    assert abs(stageTest_L.nom_energy_gain_flattop - 10*0.5) < fTol
-    assert abs(stageTest_L.nom_accel_gradient_flattop - 0.5) < fTol #Explicit
+    assert np.allclose(stageTest_L.nom_energy_gain_flattop, 10*0.5)
+    assert np.allclose(stageTest_L.nom_accel_gradient_flattop, 0.5) #Explicit
 
     assert stageTest_L.upramp.length == 1 #Explicit
     assert stageTest_L.upramp.nom_energy_gain == None
@@ -577,22 +571,22 @@ def test_StageGeom_ramps():
     assert stageTest_L.nom_energy_gain == 2*(10+1+2)
     assert stageTest_L.nom_accel_gradient == 2 #Explicit
     assert stageTest_L.length_flattop == 10 #Explicit
-    assert abs(stageTest_L.nom_energy_gain_flattop - 10*0.5) < fTol
-    assert abs(stageTest_L.nom_accel_gradient_flattop - 0.5) < fTol #Explicit
+    assert np.allclose(stageTest_L.nom_energy_gain_flattop, 10*0.5)
+    assert np.allclose(stageTest_L.nom_accel_gradient_flattop, 0.5) #Explicit
 
     assert stageTest_L.upramp.length == 1 #Explicit
     assert stageTest_L.upramp.nom_energy_gain == 1 #Explicit
-    assert abs(stageTest_L.upramp.nom_accel_gradient - 1/1) < fTol
+    assert np.allclose(stageTest_L.upramp.nom_accel_gradient, 1/1)
     assert stageTest_L.upramp.length_flattop == 1
     assert stageTest_L.upramp.nom_energy_gain_flattop == 1
-    assert abs(stageTest_L.upramp.nom_accel_gradient_flattop - 1/1) < fTol
+    assert np.allclose(stageTest_L.upramp.nom_accel_gradient_flattop, 1/1)
 
     assert stageTest_L.downramp.length == 2 #Explicit
-    assert abs(stageTest_L.downramp.nom_energy_gain - ( 2*(10+1+2) - 1 - 10*0.5)) < fTol
-    assert abs(stageTest_L.downramp.nom_accel_gradient - ( 2*(10+1+2) - 1 - 10*0.5)/2 ) < fTol
+    assert np.allclose(stageTest_L.downramp.nom_energy_gain, ( 2*(10+1+2) - 1 - 10*0.5))
+    assert np.allclose(stageTest_L.downramp.nom_accel_gradient, ( 2*(10+1+2) - 1 - 10*0.5)/2 )
     assert stageTest_L.downramp.length_flattop == 2
-    assert abs(stageTest_L.downramp.nom_energy_gain_flattop - ( 2*(10+1+2) - 1 - 10*0.5)) < fTol
-    assert abs(stageTest_L.downramp.nom_accel_gradient_flattop - ( 2*(10+1+2) - 1 - 10*0.5)/2 ) < fTol
+    assert np.allclose(stageTest_L.downramp.nom_energy_gain_flattop, ( 2*(10+1+2) - 1 - 10*0.5))
+    assert np.allclose(stageTest_L.downramp.nom_accel_gradient_flattop, ( 2*(10+1+2) - 1 - 10*0.5)/2 )
 
     #Trigger a test failure and printout
     #assert False
@@ -763,7 +757,7 @@ def test_StageGeom_eGain():
 
     assert stageTest_E.length == 10 #Explicit
     assert stageTest_E.nom_energy_gain == 10+1+2
-    assert abs(stageTest_E.nom_accel_gradient - (10+1+2)/10) < fTol
+    assert np.allclose(stageTest_E.nom_accel_gradient, (10+1+2)/10)
     assert stageTest_E.length_flattop == None
     assert stageTest_E.nom_energy_gain_flattop == 10 #Explicit
     assert stageTest_E.nom_accel_gradient_flattop == None
@@ -810,7 +804,7 @@ def test_StageGeom_eGain():
     stageTest_E.nom_accel_gradient = 20
     printStuff(stageTest_E)
 
-    assert abs(stageTest_E.length - (10+1+2)/20) < fTol
+    assert np.allclose(stageTest_E.length, (10+1+2)/20)
     assert stageTest_E.nom_energy_gain == 10+1+2
     assert stageTest_E.nom_accel_gradient == 20 # Explicit
     assert stageTest_E.length_flattop == None
@@ -976,9 +970,9 @@ def test_StageGeom_gradient():
     assert stageTest_G.length == 10 #Explicit
     assert stageTest_G.nom_energy_gain == 10*10
     assert stageTest_G.nom_accel_gradient == 10 #Explicit
-    assert abs(stageTest_G.length_flattop - 8.5) < fTol #Explicit
-    assert abs(stageTest_G.nom_energy_gain_flattop - (10*10 - 1*1 - (10-8.5-1)*2)) < fTol
-    assert abs(stageTest_G.nom_accel_gradient_flattop - (10*10 - 1*1 - (10-8.5-1)*2)/8.5) < fTol
+    assert np.allclose(stageTest_G.length_flattop, 8.5) #Explicit
+    assert np.allclose(stageTest_G.nom_energy_gain_flattop, (10*10 - 1*1 - (10-8.5-1)*2))
+    assert np.allclose(stageTest_G.nom_accel_gradient_flattop, (10*10 - 1*1 - (10-8.5-1)*2)/8.5)
 
     assert stageTest_G.upramp.length == 1 #Explicit
     assert stageTest_G.upramp.nom_energy_gain == 1*1
@@ -987,11 +981,11 @@ def test_StageGeom_gradient():
     assert stageTest_G.upramp.nom_energy_gain_flattop == 1*1
     assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
 
-    assert abs(stageTest_G.downramp.length - (10-8.5-1)) < fTol
-    assert abs(stageTest_G.downramp.nom_energy_gain - (10-8.5-1)*2) < fTol
+    assert np.allclose(stageTest_G.downramp.length, (10-8.5-1))
+    assert np.allclose(stageTest_G.downramp.nom_energy_gain, (10-8.5-1)*2)
     assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
-    assert abs(stageTest_G.downramp.length_flattop - (10-8.5-1)) < fTol
-    assert abs(stageTest_G.downramp.nom_energy_gain_flattop - (10-8.5-1)*2) < fTol
+    assert np.allclose(stageTest_G.downramp.length_flattop, (10-8.5-1))
+    assert np.allclose(stageTest_G.downramp.nom_energy_gain_flattop, (10-8.5-1)*2)
     assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
 
     print("Switch from setting total to flattop")
@@ -1024,12 +1018,12 @@ def test_StageGeom_gradient():
     stageTest_G.nom_energy_gain = 1000
     printStuff(stageTest_G)
 
-    assert abs(stageTest_G.length - 1000/10) < fTol
+    assert np.allclose(stageTest_G.length, 1000/10)
     assert stageTest_G.nom_energy_gain == 1000 # Explicit
     assert stageTest_G.nom_accel_gradient == 10 #Explicit
     assert stageTest_G.length_flattop == 10 #Explicit
-    assert abs(stageTest_G.nom_energy_gain_flattop - (1000 - 1*1 - (1000/10 - 10 - 1)*2)) < fTol
-    assert abs(stageTest_G.nom_accel_gradient_flattop - (1000 - 1*1 - (1000/10 - 10 - 1)*2)/10) < fTol
+    assert np.allclose(stageTest_G.nom_energy_gain_flattop, (1000 - 1*1 - (1000/10 - 10 - 1)*2))
+    assert np.allclose(stageTest_G.nom_accel_gradient_flattop, (1000 - 1*1 - (1000/10 - 10 - 1)*2)/10)
 
     assert stageTest_G.upramp.length == 1 #Explicit
     assert stageTest_G.upramp.nom_energy_gain == 1*1
@@ -1038,11 +1032,11 @@ def test_StageGeom_gradient():
     assert stageTest_G.upramp.nom_energy_gain_flattop == 1*1
     assert stageTest_G.upramp.nom_accel_gradient_flattop == 1
 
-    assert abs(stageTest_G.downramp.length - (1000/10 - 10 - 1)) < fTol
-    assert abs(stageTest_G.downramp.nom_energy_gain - (1000/10 - 10 - 1)*2) < fTol
+    assert np.allclose(stageTest_G.downramp.length, (1000/10 - 10 - 1))
+    assert np.allclose(stageTest_G.downramp.nom_energy_gain, (1000/10 - 10 - 1)*2)
     assert stageTest_G.downramp.nom_accel_gradient == 2 #Explicit
-    assert abs(stageTest_G.downramp.length_flattop - (1000/10 - 10 - 1)) < fTol
-    assert abs(stageTest_G.downramp.nom_energy_gain_flattop - (1000/10 - 10 - 1)*2) < fTol
+    assert np.allclose(stageTest_G.downramp.length_flattop, (1000/10 - 10 - 1))
+    assert np.allclose(stageTest_G.downramp.nom_energy_gain_flattop, (1000/10 - 10 - 1)*2)
     assert stageTest_G.downramp.nom_accel_gradient_flattop == 2
 
     print("Switch from setting energy gain to setting gradient")
