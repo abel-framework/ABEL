@@ -341,12 +341,15 @@ class Stage(Trackable, CostModeled):
     # If the calculation takes too many iterations, something is probably gone wrong (bug),
     # and we raise a StageError exception.
     #
+    # If the calculation goes wrong in some other way (e.g. produces a negative stage length),
+    # we raise a VariablesOutOfRangeError and unwind the set.
+    #
     # Traversing and keeping track of the hierarchy of Stages is done using the properties parent, upramp, and downramp.
     # These are ensured to be a Stage or None. The parent cannot be unset, but upramp and downramp can be removed (set to None).
     # Helper methods _getOtherRamp() and _getOverallestStage() are used to traverse the hierarchy.
 
-    # Setting and getting the variables
 
+    # Methods for setting and getting the variables
 
     # ==================================================
     @property
@@ -358,21 +361,35 @@ class Stage(Trackable, CostModeled):
         if self._length_calc is not None and self._length is None:
             # If there is a known value, and we're not trying to modify a user-set value -> ERROR!
             raise VariablesOverspecifiedError("length already known/calculateable, cannot set.")
+        if length is not None:
+            if length < 0.0 and self.sanityCheckLengths:
+                raise VariablesOutOfRangeError(f"Setting length = {length} < 0; check variables or disable check by setting stage.sanityCheckLengths=False")
         #Set user value and recalculate
-        self._length = length
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
+        length_old = self._length
+        try:
+            self._length = length
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            #Something went wrong in the calculation - unwind
+            self._length = length_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            #Re-raise the exception so that the user gets the fantastically useful traceback and error message.
+            raise
 
-
-    # ==================================================
-    def get_length(self) -> float:
-        "Alias of length"
-        return self.length
     # Variables are internal to the length/energy/gradient logic
     # do not modify externally!
     _length      = None #User-set value
     _length_calc = None #Dynamic version, current best-known value
 
+    sanityCheckLengths = True # Set to False to disable raising VariablesOutOfRangeError exception on negative lengths.
+                              # If it is unclear why negative lengths are happening,
+                              # set doVerbosePrint_debug to True in order to spy on the calculation.
+
+    def get_length(self) -> float:
+        "Alias of length"
+        return self.length
 
     # ==================================================
     @property
@@ -383,18 +400,24 @@ class Stage(Trackable, CostModeled):
     def nom_energy_gain(self, nom_energy_gain : float):
         if self._nom_energy_gain_calc is not None and self._nom_energy_gain is None:
             raise VariablesOverspecifiedError("nom_energy_gain already known/calculateable, cannot set.")
-        self._nom_energy_gain = nom_energy_gain
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
-
-
-    # ==================================================
-    def get_nom_energy_gain(self):
-        "Alias of nom_energy_gain"
-        return self.nom_energy_gain
+        
+        nom_energy_gain_old = self._nom_energy_gain
+        try:
+            self._nom_energy_gain = nom_energy_gain
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            #Make variables consistent again
+            self._nom_energy_gain = nom_energy_gain_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
     _nom_energy_gain      = None
     _nom_energy_gain_calc = None
 
+    def get_nom_energy_gain(self):
+        "Alias of nom_energy_gain"
+        return self.nom_energy_gain
 
     # ==================================================
     @property
@@ -405,9 +428,17 @@ class Stage(Trackable, CostModeled):
     def nom_accel_gradient(self, nom_accel_gradient : float):
         if self._nom_accel_gradient_calc is not None and self._nom_accel_gradient is None:
             raise VariablesOverspecifiedError("nom_accel_gradient already known/calculateable, cannot set")
-        self._nom_accel_gradient = nom_accel_gradient
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
+        
+        nom_accel_gradient_old = self._nom_accel_gradient
+        try:
+            self._nom_accel_gradient = nom_accel_gradient
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._nom_accel_gradient = nom_accel_gradient_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
     _nom_accel_gradient      = None
     _nom_accel_gradient_calc = None
 
@@ -421,12 +452,22 @@ class Stage(Trackable, CostModeled):
     def length_flattop(self, length_flattop : float):
         if self._length_flattop_calc is not None and self._length_flattop is None:
             raise VariablesOverspecifiedError("length_flattop already known/calculateable, cannot set")
-        self._length_flattop = length_flattop
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
+        if length_flattop is not None:
+            if length_flattop < 0.0 and self.sanityCheckLengths:
+                raise VariablesOutOfRangeError(f"Setting length_flattop = {length_flattop} < 0; check variables or disable check by setting stage.sanityCheckLengths=False")
+        
+        length_flattop_old = self._length_flattop
+        try:
+            self._length_flattop = length_flattop
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._length_flattop = length_flattop_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
     _length_flattop      = None
     _length_flattop_calc = None
-
 
     # ==================================================
     @property
@@ -437,9 +478,17 @@ class Stage(Trackable, CostModeled):
     def nom_energy_gain_flattop(self,nom_energy_gain_flattop : float):
         if self._nom_energy_gain_flattop_calc is not None and self._nom_energy_gain_flattop is None:
             raise VariablesOverspecifiedError("nom_energy_gain_flattop is already known/calculateable, cannot set")
-        self._nom_energy_gain_flattop = nom_energy_gain_flattop
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
+        
+        nom_energy_gain_flattop_old = self._nom_energy_gain_flattop
+        try:
+            self._nom_energy_gain_flattop = nom_energy_gain_flattop
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._nom_energy_gain_flattop = nom_energy_gain_flattop_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
     _nom_energy_gain_flattop      = None
     _nom_energy_gain_flattop_calc = None
 
@@ -453,13 +502,19 @@ class Stage(Trackable, CostModeled):
     def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
         if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
             raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
-        self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
+        
+        nom_accel_gradient_flattop_old = self._nom_accel_gradient_flattop
+        try:
+            self._nom_accel_gradient_flattop = nom_accel_gradient_flattop
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._nom_accel_gradient_flattop = nom_accel_gradient_flattop_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
     _nom_accel_gradient_flattop      = None
     _nom_accel_gradient_flattop_calc = None
-
-
 
     ## Recalculation methods
 
@@ -520,7 +575,10 @@ class Stage(Trackable, CostModeled):
             #Indirect setting of overall
             if self.length is None:
                 if self.nom_energy_gain is not None and self.nom_accel_gradient is not None:
-                    self._length_calc = self.nom_energy_gain / self.nom_accel_gradient
+                    L = self.nom_energy_gain / self.nom_accel_gradient
+                    if L < 0.0 and self.sanityCheckLengths:
+                        raise VariablesOutOfRangeError(f"Calculated length = {L} < 0; check variables or disable check by setting stage.sanityCheckLengths=False.")
+                    self._length_calc = L
                     self._printVerb("length                     (2)>",self.length)
                     updateCounter += 1
             if self.nom_energy_gain is None:
@@ -537,7 +595,10 @@ class Stage(Trackable, CostModeled):
             #Indirect setting of flattop
             if self.length_flattop is None:
                 if self.nom_energy_gain_flattop is not None and self.nom_accel_gradient_flattop is not None:
-                    self._length_flattop_calc = self.nom_energy_gain_flattop / self.nom_accel_gradient_flattop
+                    L = self.nom_energy_gain_flattop / self.nom_accel_gradient_flattop
+                    if L < 0.0 and self.sanityCheckLengths:
+                        raise VariablesOutOfRangeError(f"Calculated length_flattop = {L} < 0; check variables or disable check by setting stage.sanityCheckLengths=False.")
+                    self._length_flattop_calc = L
                     self._printVerb("length_flattop             (2)>",self.length_flattop)
                     updateCounter += 1
             if self.nom_energy_gain_flattop is None:
@@ -548,7 +609,7 @@ class Stage(Trackable, CostModeled):
             if self.nom_accel_gradient_flattop is None:
                 if self.length_flattop is not None and self.nom_energy_gain_flattop is not None:
                     self._nom_accel_gradient_flattop_calc = self.nom_energy_gain_flattop / self.length_flattop
-                    self._printVerb("nom_accel_gradient_flattop (2)>",self.nom_energy_gain_flattop)
+                    self._printVerb("nom_accel_gradient_flattop (2)>",self.nom_accel_gradient_flattop)
                     updateCounter += 1
 
             #Relationships total <-> flattop+ramp
@@ -567,7 +628,9 @@ class Stage(Trackable, CostModeled):
                         else:
                             L += self.downramp.length
                     if isDef:
-                        self._printVerb("length                  (3)>",L)
+                        self._printVerb("length                     (3)>",L)
+                        if L < 0.0 and self.sanityCheckLengths:
+                            raise VariablesOutOfRangeError(f"Calculated length = {L} < 0; check variables or disable check by setting stage.sanityCheckLengths=False.")
                         self._length_calc = L
                         updateCounter += 1
 
@@ -586,7 +649,9 @@ class Stage(Trackable, CostModeled):
                         else:
                             L -= self.downramp.length
                     if isDef:
-                        self._printVerb("length_flattop          (3)>",L)
+                        self._printVerb("length_flattop             (3)>",L)
+                        if L < 0.0 and self.sanityCheckLengths:
+                            raise VariablesOutOfRangeError(f"Calculated length_flattop = {L} < 0; check variables or disable check by setting stage.sanityCheckLengths=False.")
                         self._length_flattop_calc = L
                         updateCounter += 1
 
@@ -605,7 +670,7 @@ class Stage(Trackable, CostModeled):
                         else:
                             dE += self.downramp.nom_energy_gain
                     if isDef:
-                        self._printVerb("nom_energy_gain         (3)>",dE)
+                        self._printVerb("nom_energy_gain            (3)>",dE)
                         self._nom_energy_gain_calc = dE
                         updateCounter += 1
 
@@ -624,7 +689,7 @@ class Stage(Trackable, CostModeled):
                         else:
                             dE -= self.downramp.nom_energy_gain
                     if isDef:
-                        self._printVerb("nom_energy_gain_flattop (3)>",dE)
+                        self._printVerb("nom_energy_gain_flattop    (3)>",dE)
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
 
@@ -634,6 +699,19 @@ class Stage(Trackable, CostModeled):
             #       G_total = E_total/L_total = (E_up+E_flat+E_dn)/(L_up+L_flat+L_dn)
             #   Nom_accel_gradient_flattop works the same way
             #       G_flat = E_flat/L_flat = (E_total-E_up-E_dn)/L_flat
+            #   However this only works if this objects has ramps; if not then just copy flattop<->overall
+            if self.nom_accel_gradient is None:
+                if self.nom_accel_gradient_flattop is not None and \
+                    self.upramp is None and self.downramp is None:
+                    self._printVerb("nom_accel_gradient         (3)>",self.nom_accel_gradient_flattop)
+                    self._nom_accel_gradient_calc = self.nom_accel_gradient_flattop
+                    updateCounter += 1
+            if self.nom_accel_gradient_flattop is None:
+                if self.nom_accel_gradient is not None and \
+                    self.upramp is None and self.downramp is None:
+                    self._printVerb("nom_accel_gradient_flattop (3)>",self.nom_accel_gradient)
+                    self._nom_accel_gradient_flattop_calc = self.nom_accel_gradient
+                    updateCounter += 1
 
             #Use data from parent to update itself (i.e. if self is a ramp)
             if self.parent is not None:
@@ -644,7 +722,10 @@ class Stage(Trackable, CostModeled):
                         otherRamp = self.parent._getOtherRamp(self)
                         if otherRamp is not None:
                             if otherRamp.length is not None:
-                                self._length_calc = self.parent.length - self.parent.length_flattop - otherRamp.length
+                                L = self.parent.length - self.parent.length_flattop - otherRamp.length
+                                if L < 0.0 and self.sanityCheckLengths:
+                                    raise VariablesOutOfRangeError(f"Calculated length = {L} < 0; check variables or disable check by setting stage.sanityCheckLengths=False.")
+                                self._length_calc = L
                                 self._printVerb("length          (4)>", self.length)
                                 updateCounter += 1
 
@@ -681,6 +762,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     doVerbosePrint_debug = False
     def _printVerb(self, *args, **kwargs):
+        "Print() if doVerbosePrint_debug == True, else NOP."
         if self.doVerbosePrint_debug:
             print(*args, **kwargs)
 
@@ -1142,6 +1224,8 @@ class Stage(Trackable, CostModeled):
 class VariablesOverspecifiedError(Exception):
     "Exception class to throw when trying to set too many overlapping variables"
     pass
+class VariablesOutOfRangeError(Exception):
+    "Exception class to throw when calculated or set variables are out of allowed range."
 class StageError(Exception):
     "Exception class for Stege to throw in other cases"
 
