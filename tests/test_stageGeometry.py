@@ -33,8 +33,6 @@ from abel.classes.stage.stage import VariablesOverspecifiedError, VariablesOutOf
 # is less than a tolerance value. For reference, float64 has a precission of ca 10^-12.
 fTol = 1e-10 # Floating point absolute tolerance
 
-
-
 #Helper function - pretty printed debug outputs of current stage status
 def printStuff(stage):
     print("length / flattop                  =",stage.length, stage.length_flattop, '[m]')
@@ -63,7 +61,7 @@ def printStuff_internal(stage):
     print()
 
 @pytest.mark.stageGeometry
-def testStageGeom_basic():
+def test_StageGeom_basic():
     "Test the basic functionality of stage geometry (length/energy gain/gradient); no ramps."
     stageTest = StageBasic()
     stageTest.doVerbosePrint_debug = True
@@ -259,7 +257,7 @@ def testStageGeom_basic():
     #assert False
 
 @pytest.mark.stageGeometry
-def testStageGeom_ramps():
+def test_StageGeom_ramps():
     "Test the basic functionality of stage geometry (length/energy gain/gradient); with ramps."
     
     stageTest_L = StageBasic()
@@ -600,7 +598,7 @@ def testStageGeom_ramps():
     #assert False
 
 @pytest.mark.stageGeometry
-def testStageGeom_eGain():
+def test_StageGeom_eGain():
     "Test of energy gain"
 
     stageTest_E = StageBasic()
@@ -837,7 +835,7 @@ def testStageGeom_eGain():
     #assert False
 
 @pytest.mark.stageGeometry
-def testStageGeom_gradient():
+def test_StageGeom_gradient():
     "Test of gradient"
 
     stageTest_G = StageBasic()
@@ -1099,7 +1097,8 @@ def testStageGeom_gradient():
     #Trigger a test failure and printout
     #assert False
 
-def test_sanityCheckLengths1():
+@pytest.mark.stageGeometry
+def test_StageGeom_sanityCheckLengths1():
     "Testing of stage.sanityCheckLengths logic without ramps"
 
     stageTest_L1 = StageBasic()
@@ -1188,7 +1187,8 @@ def test_sanityCheckLengths1():
     #Trigger a test failure and printout
     #assert False
 
-def test_sanityCheckLengths2():
+@pytest.mark.stageGeometry
+def test_StageGeom_sanityCheckLengths2():
     "Testing of stage.sanityCheckLengths logic with ramps"
 
     stageTest_L2 = StageBasic()
