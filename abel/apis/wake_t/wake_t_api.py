@@ -4,6 +4,7 @@ import numpy as np
 import warnings
 import wake_t
 from abel.utilities.plasma_physics import k_p, blowout_radius
+from abel.utilities.relativity import momentum2energy
 from abel.utilities.statistics import weighted_mean, weighted_std
 from abel.classes.stage.stage import SimulationDomainSizeError
 
@@ -201,15 +202,15 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     R_blowout = blowout_radius(plasma_density, abel_drive_beam.peak_current())
 
     if box_size_r is None:
-        box_size_r = np.max([3/k_p(plasma_density), 2*R_blowout, 1.2*abel_drive_beam.rs().max()])
+        box_size_r = np.max([2/k_p(plasma_density), 2*R_blowout, 1.2*abel_drive_beam.rs().max()])
 
     if box_min_z is None:
-        if abel_main_beam is None:
+        if driver_only:
             box_min_z = abel_drive_beam.z_offset() - 4 * R_blowout
         else:
             box_min_z = min( abel_drive_beam.z_offset()-4*R_blowout, abel_main_beam.z_offset()-6*abel_main_beam.bunch_length() )
     if box_max_z is None:
-        box_max_z = min( abel_drive_beam.z_offset()+6*abel_drive_beam.bunch_length(), np.max(abel_drive_beam.zs())+0.5*R_blowout )
+            box_max_z = min( abel_drive_beam.z_offset()+6*abel_drive_beam.bunch_length(), np.max(abel_drive_beam.zs())+0.5*R_blowout )
 
     # Check the simulation domain
     if driver_only:
@@ -226,6 +227,8 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
         if box_size_r < 1.2*max_r:
             warnings.warn(f"The simulation box is too narrow. Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
         
+        print(f"Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
+        
         
     # Calculate number of cells
     dr = box_size_r/num_cell_xy
@@ -235,8 +238,7 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     plasma_stage = wake_t.beamline_elements.PlasmaStage(length=stage_length, density=plasma_density, wakefield_model='quasistatic_2d',
                                                 r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                                 n_out=n_out, n_r=num_cell_xy, n_xi=int(num_cell_z), dz_fields=dz_fields, ppc=1)
-
-    #print(f"Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
+    
     return plasma_stage
 
 
@@ -339,5 +341,56 @@ def wake_t_remove_halo_particles(bunch, nsigma=20):
 
 
 
+# ==================================================
+def wakeT_r_E_filter(bunch, r_thres, pz_thres):
+    """
+    Bunch cleaning for particles located further away than a given distance ``r_thres`` from axis. Also discards particles that have lower momentum than pz_thres.
+
+    Parameters
+    ----------
+    bunch : Wake-T ``ParticleBunch``
+        
+    r_thres : [m] float
+        Transverse coordinate (x^2+y^2) threshold for selecting particles.
+        
+    pz_thres : [beta*gamma] float
+        Momentum threshold for selecting particles.
+
+        
+    Returns
+    ----------
+    filtered_bunch : Wake-T ``ParticleBunch``
+    """
+
+    rs = np.sqrt(bunch.x**2 + bunch.y**2)
+    r_filter = rs > r_thres
+
+    
+
+    #Es = momentum2energy(bunch.pz*SI.c*SI.m_e)
+    pzs = bunch.pz
+    pz_filter = pzs < pz_thres
+
+    filter = np.logical_or(r_filter, pz_filter)
+
+    if hasattr(filter, 'len'):
+        if len(filter) == len(bunch):
+            filter = np.where(filter)
+    
+    phase_space = bunch.get_6D_matrix_with_charge()
+    filtered_phasespace = np.ascontiguousarray(np.delete(phase_space, filter, 1))
+
+    filtered_bunch = wake_t.ParticleBunch(w=filtered_phasespace[6] / bunch.q_species,
+                                 x=filtered_phasespace[0],
+                                 y=filtered_phasespace[2],
+                                 xi=filtered_phasespace[4], 
+                                 px=filtered_phasespace[1],
+                                 py=filtered_phasespace[3],
+                                 pz=filtered_phasespace[5],
+                                 name=bunch.name)
+    
+    filtered_bunch.prop_distance = bunch.prop_distance
+
+    return filtered_bunch
 
 
