@@ -19,7 +19,7 @@ from abel.classes.beam import *  # TODO: no need to import everything.
 from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2energy
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_mean, weighted_std
-from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam, beam2wake_t_bunch, wake_t_remove_halo_particles
+from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam, beam2wake_t_bunch, wakeT_r_E_filter #, wake_t_remove_halo_particles
 #from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation, push_driver
 from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig
 import abel.physics_models.ion_motion_wakefield_perturbation as ion_motion
@@ -519,7 +519,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     # Calculate Ez and rb based on interpolations of Ez and rb vs z
     Ez = Ez_fit_obj(zs_sorted)
     bubble_radius = rb_fit_obj(zs_sorted)
-        
+    max_bubble_radius = bubble_radius.max()
 
     
     ############# Beam propagation through the plasma cell #############
@@ -553,6 +553,8 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     use_wake_t_driver = enable_driver_evolution  # Use Wake-T ParticleBunch driver if using driver evolution.
     if use_wake_t_driver:
         drive_beam = beam2wake_t_bunch(drive_beam0, name='driver')
+        #pz_thres = 0.01 * np.mean(drive_beam.pz)  # Later used to remove drive beam particles with too low momentum.
+        pz_thres = 5.5e-20/(SI.c*SI.m_e)  # Later used to remove drive beam particles with too low momentum. Corresponds to 0.1 GeV.
     else:
         drive_beam = drive_beam0
     
@@ -691,8 +693,11 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         if enable_driver_evolution:
             if time_step_count % drive_beam_update_period == 0:  # It is time to update drive_beam.
                 push_driver(drive_beam, trans_wake_config.wake_t_fields, drive_beam_update_period*time_step, pusher='boris')
-                #if time_step_count % (drive_beam_update_period * 10) == 0:  # It is time to clean drive_beam.
-                #    drive_beam = wake_t_remove_halo_particles(drive_beam, nsigma=20)
+                if time_step_count % (drive_beam_update_period * 5) == 0:  # It is time to clean drive_beam.
+                    #drive_beam = wake_t_remove_halo_particles(drive_beam, nsigma=20)
+
+                    # Remove particles that are too far out or have too low energy
+                    drive_beam = wakeT_r_E_filter(drive_beam, r_thres=max_bubble_radius, pz_thres=pz_thres)
         else:
             drive_beam.location = initial_driver_location + prop_length
 
@@ -748,10 +753,12 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     
     # Prepare the drive beam for return
     if use_wake_t_driver:
+        # Remove particles that are too far out or have too low energy
+        drive_beam = wakeT_r_E_filter(drive_beam, r_thres=max_bubble_radius, pz_thres=pz_thres)
         drive_beam_out = wake_t_bunch2beam(drive_beam)
     else:
         drive_beam_out = drive_beam
-        #drive_beam_out.remove_halo_particles(nsigma=20)
+    #drive_beam_out.remove_halo_particles(nsigma=20)
     
 
     # ============= Save evolution =============
