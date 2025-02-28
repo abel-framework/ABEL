@@ -151,7 +151,10 @@ class IonMotionConfig():
         """
         
         if drive_beam.zs().min() < main_beam.zs().max():
-            raise ValueError('Beams have to propagate towards increasing z with drive beam placed in front of main beam.')
+            warnings.warn('There are some overlap between drive beam and main beam.', UserWarning)
+        
+            if drive_beam.z_offset()-2*drive_beam.bunch_length() < main_beam.zs().max():
+                raise ValueError('There is significant overlap between drive beam and main beam.')
 
         if set_driver_sc_coords:
             # Set the xy limits used by assemble_driver_sc_fields_obj()
