@@ -278,7 +278,7 @@ class StagePrtclTransWakeInstability(Stage):
         beam0_wakeT.set_ys(beam0_wakeT_ys - driver_y_offset)
         
         # Construct a Wake-T plasma acceleration stage
-        wakeT_xy_res = 3e-6
+        wakeT_xy_res = 0.1*beam0_wakeT.bunch_length()
         wakeT_max_box_r = 4/k_p(plasma_density)
         wakeT_num_cell_xy = int(wakeT_max_box_r/wakeT_xy_res)
         plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_wakeT, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy)
@@ -308,18 +308,12 @@ class StagePrtclTransWakeInstability(Stage):
         plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
         info_rho = wake_t_evolution.initial.plasma.density.metadata
         zs_rho = info_rho.z
-
-        # Add the driver offsets to the Wake-T r-coordinate
-        rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
-        info_rho.r = rs_rho
-        info_rho.imshow_extent[2] = rs_rho.min()
-        info_rho.imshow_extent[3] = rs_rho.max()
         
         # Cut out axial Ez over the ROI
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
-        bubble_radius_wakeT = self.get_bubble_radius_WakeT(plasma_num_density, rs_rho, threshold=0.8)
+        bubble_radius_wakeT = self.get_bubble_radius_WakeT(plasma_num_density, info_rho.r, threshold=0.8)  # Extracts rb with driver placed on axis.
 
         # Cut out bubble radius over the ROI
         bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead...
@@ -371,7 +365,6 @@ class StagePrtclTransWakeInstability(Stage):
         
         if self.num_z_cells_main is None:
             self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
-
         
         # Set up animations for beam evolution inside the stage
         if self.make_animations:
@@ -385,7 +378,8 @@ class StagePrtclTransWakeInstability(Stage):
             tmpfolder = None
 
         if self.drive_beam_update_period > 0:  # Do drive beam evolution
-            wake_t_fields = plasma_stage.fields[0]  # Extract the wakefields used for driver tracking. TODO: since wake_t_fields is calculated with drive_beam_ramped on axis, does drive_beam_ramped need to be put on axis as well before further use?
+            wake_t_fields = plasma_stage.fields[0]  # Extract the wakefields used for driver tracking.
+            wake_t_fields.r_fld = wake_t_fields.r_fld + np.sqrt(driver_x_offset**2 + driver_y_offset**2)  # Compensate for the drive beam offset.
         else:
             wake_t_fields = None
 
@@ -427,6 +421,11 @@ class StagePrtclTransWakeInstability(Stage):
             print(none_indices)
             raise ValueError('At least one input is set to None.')
 
+        # Add the driver offsets to the Wake-T r-coordinate
+        rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
+        info_rho.r = rs_rho
+        info_rho.imshow_extent[2] = rs_rho.min()
+        info_rho.imshow_extent[3] = rs_rho.max()
         
         # Save the initial step with ramped beams in rotated coordinate system
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
@@ -1129,30 +1128,27 @@ class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
     # Overloads the plot_wake method in the Stage class.
-    def plot_wake(self, savefig=None):
+    def plot_wake(self, show_Ez=True, trace_rb=False, savefig=None, aspect='auto'):
         
-        # extract density if not already existing
+        # Extract density if not already existing
         assert hasattr(self.initial.plasma.density, 'rho'), 'No wake'
         assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield'
         
-        # calculate densities and extents
-        Ezmax = 0.8*wave_breaking_field(self.plasma_density)
-        
-        # make figures
+        # Make figures
         has_final_step = hasattr(self.final.plasma.density, 'rho')
         num_plots = 1 + int(has_final_step)
         fig, ax = plt.subplots(num_plots,1)
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.5*num_plots)
 
-        # cycle through initial and final step
+        # Cycle through initial and final step
         for i in range(num_plots):
             if not has_final_step:
                 ax1 = ax
             else:
                 ax1 = ax[i]
 
-            # extract initial or final
+            # Extract initial or final
             if i==0:
                 data_struct = self.initial
                 title = 'Initial step'
@@ -1160,52 +1156,61 @@ class StagePrtclTransWakeInstability(Stage):
                 data_struct = self.final
                 title = 'Final step'
 
-            # get data
+            # Get data
             extent = data_struct.plasma.density.extent
             zs0 = data_struct.plasma.wakefield.onaxis.zs
             Ezs0 = data_struct.plasma.wakefield.onaxis.Ezs
             rho0_plasma = data_struct.plasma.density.rho
             rho0_beam = data_struct.beam.density.rho
-
-            # plot on-axis wakefield and axes
-            zlims = [min(zs0)*1e6, max(zs0)*1e6]
-            ax2 = ax1.twinx()
-            ax2.plot(zs0*1e6, Ezs0/1e9, color='black')
-            ax2.set_ylabel(r'$E_{z}$' ' [GV/m]')
-            ax2.set_xlim(zlims)
-            #ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
+            
             axpos = ax1.get_position()
             pad_fraction = 0.15  # Fraction of the figure width to use as padding between the ax and colorbar
             cbar_width_fraction = 0.03  # Fraction of the figure width for the colorbar width
     
-            # create colorbar axes based on the relative position and size
+            # Create colorbar axes based on the relative position and size
             cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
             cax2 = fig.add_axes([axpos.x1 + pad_fraction + cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
             clims = np.array([1e-2, 1e3])*self.plasma_density
             
-            # plot plasma electrons
-            plasma_plot = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float))
+            # Plot plasma electrons
+            plasma_plot = ax1.imshow(rho0_plasma/1e6, extent=extent*1e6, norm=LogNorm(), origin='lower', cmap='Blues', alpha=np.array(rho0_plasma>clims.min()*2, dtype=float), aspect=aspect)
             cb = plt.colorbar(plasma_plot, cax=cax1)
             plasma_plot.set_clim(clims/1e6)
             cb.ax.tick_params(axis='y',which='both', direction='in')
             cb.set_ticklabels([])
             
-            # plot beam electrons
-            charge_density_plot0 = ax1.imshow(rho0_beam/1e6, extent=data_struct.beam.density.extent*1e6, norm=LogNorm(), origin='lower', cmap=CONFIG.default_cmap, alpha=np.array(rho0_beam>clims.min()*2, dtype=float))
+            # Plot beam electrons
+            charge_density_plot0 = ax1.imshow(rho0_beam/1e6, extent=data_struct.beam.density.extent*1e6, norm=LogNorm(), origin='lower', cmap=CONFIG.default_cmap, alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
             cb2 = plt.colorbar(charge_density_plot0, cax = cax2)
             cb2.set_label(label=r'Electron density ' + r'[$\mathrm{cm^{-3}}$]',size=10)
             cb2.ax.tick_params(axis='y',which='both', direction='in')
             charge_density_plot0.set_clim(clims/1e6)
+
+            # Plot traced bubble radius
+            if trace_rb:
+                ax1.plot(self.zs_bubble_radius_axial*1e6, self.bubble_radius_axial*1e6, color='red', alpha=0.4)
+
+            # Plot on-axis wakefield
+            if show_Ez:
+                ax2 = ax1.twinx()
+                ax2.plot(zs0*1e6, Ezs0/1e9, color='black')
+                ax2.set_ylabel(r'$E_{z}$' ' [GV/m]')
+                #zlims = [min(zs0)*1e6, max(zs0)*1e6]
+                #ax2.set_xlim(zlims)
+                #Ezmax = 0.8*wave_breaking_field(self.plasma_density)
+                #ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
+
+            plasma_plot.set_extent(extent*1e6)  # Ensure that the extent is the same as data_struct.plasma.density.extent
     
-            # set labels
+            # Set labels
             if i==(num_plots-1):
                 ax1.set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
             ax1.set_ylabel(r'$x$ [$\mathrm{\mu}$m]')
             ax1.set_title(title)
-            ax1.grid(False)
-            ax2.grid(False)
             
-        # save the figure
+            ax1.grid(False)
+            
+        # Save the figure
         if savefig is not None:
             fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
         
