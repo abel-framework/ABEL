@@ -129,6 +129,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.bubble_radius_roi = bubble_radius_roi  # [m] bubble radius in the region of interest.
         self.bubble_radius_axial = None
         self.zs_bubble_radius_axial = None
+        self.estm_R_blowout = None  # [m] estimated (max) blowout radius to be calculated.
         
         self.main_num_profile = None
         self.z_slices = None
@@ -251,6 +252,8 @@ class StagePrtclTransWakeInstability(Stage):
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
         
+        R_blowout = blowout_radius(self.plasma_density, drive_beam_ramped.peak_current())
+        self.estm_R_blowout = R_blowout
 
         # ========== Record longitudinal number profile ==========
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
@@ -313,12 +316,19 @@ class StagePrtclTransWakeInstability(Stage):
         Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
-        bubble_radius_wakeT = self.get_bubble_radius_WakeT(plasma_num_density, info_rho.r, threshold=0.8)  # Extracts rb with driver placed on axis.
+        self.zs_bubble_radius_axial = zs_rho
+        bubble_radius_wakeT = self.trace_bubble_radius_WakeT(plasma_num_density, info_rho.r, zs_rho, threshold=0.8)  # Extracts rb with driver placed on axis.
+
+        print('max_bubble_radius:', bubble_radius_wakeT.max()*1e6, 'um\n')
 
         # Cut out bubble radius over the ROI
-        bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices) # TODO: Actually same as Ez_shift_fit. Consider making just one function instead...
+        bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices)
+        #R_blowout = blowout_radius(self.plasma_density, self.drive_beam.peak_current())
+        
+        #if bubble_radius_roi.max() > 1.1*R_blowout:
+        #    warnings.warn('The fitted plasma ion bubble radius may be too large.\n', UserWarning)
 
-        if bubble_radius_wakeT.max() < 0.5 * blowout_radius(self.plasma_density, drive_beam_ramped.peak_current()) or bubble_radius_roi.any()==0:
+        if bubble_radius_wakeT.max() < 0.5 * R_blowout or bubble_radius_roi.any()==0:
             warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
 
         idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
@@ -334,7 +344,6 @@ class StagePrtclTransWakeInstability(Stage):
         #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
         self.bubble_radius_roi = bubble_radius_roi
         self.bubble_radius_axial = bubble_radius_wakeT
-        self.zs_bubble_radius_axial = zs_rho
         
         # Make plots for control if necessary
         #self.plot_Ez_rb_cut(z_slices, main_num_profile, zs_Ez_wakeT, Ez_axis_wakeT, Ez, zs_rho, bubble_radius_wakeT, bubble_radius_roi, zlab=r'$z$ [$\mathrm{\mu}$m]')
@@ -798,11 +807,11 @@ class StagePrtclTransWakeInstability(Stage):
 
 
     # ==================================================
-    def get_bubble_radius(self, plasma_num_density, plasma_tr_coord, driver_offset, threshold=0.8):
+    def trace_bubble_radius(self, plasma_num_density, plasma_tr_coord, plasma_z_coord, driver_offset, threshold=0.8):
         """
         - For extracting the plasma ion bubble radius by finding the coordinates in which the plasma number density goes from zero to a threshold value.
         - The symmetry axis is determined using the transverse offset of the drive beam.
-        - xi is the propagation direction pointing to the right.
+        - z is the propagation direction pointing to the right.
         
         Parameters
         ----------
@@ -811,6 +820,9 @@ class StagePrtclTransWakeInstability(Stage):
             
         plasma_tr_coord : [m] 1D float ndarray 
             Transverse coordinate of ``plasma_num_density``. Needs to be strictly growing from start to end.
+
+        plasma_z_coord : [m] 1D float ndarray 
+            Longitudinal coordinate of ``plasma_num_density``. Needs to be strictly growing from start to end.
 
         driver_offset : [m] float
             Mean transverse offset of the drive beam.
@@ -880,16 +892,111 @@ class StagePrtclTransWakeInstability(Stage):
                     idx = idxs_valley_above_middle[idx_valley_above_middle_closest2thres]
                     
                     bubble_radius[i] = np.abs(plasma_tr_coord[idx] - driver_offset)
+
+        if self.estm_R_blowout is None:
+            drive_beam = self.driver_source.track()
+            R_blowout = blowout_radius(self.plasma_density, drive_beam.peak_current())
+        else:
+            R_blowout = self.estm_R_blowout
+
+        while bubble_radius.max() > R_blowout:
+        
+            mask = self.mask_bubble_radius_spikes(bubble_radius, plasma_z_coord)
+            num_rm_elements = np.sum(~mask)  # Number of elements to remove
+
+            if num_rm_elements > 0:
+                if num_rm_elements > 0.33*len(bubble_radius):
+                    warnings.warn('bubble_radius may contain too many abnormal peaks.')
+                if num_rm_elements == len(bubble_radius):
+                    raise ValueError('Cannot remove all elements from bubble_radius.')
+
+                # Use interpolation to replace the deleted points
+                f_interp = interp1d(plasma_z_coord[mask], bubble_radius[mask], kind='slinear', fill_value="extrapolate") 
+                bubble_radius = f_interp(plasma_z_coord)  # Cleaned bubble radius
         
         return bubble_radius
 
 
     # ==================================================
-    def get_bubble_radius_WakeT(self, plasma_num_density, plasma_tr_coord, threshold=0.8):
+    def mask_bubble_radius_spikes(self, bubble_radius, zs_bubble_radius, make_plot=False):
         """
-        The plasma wake calculated by Wake-T is always centered around r = 0.0, so that driver_offset=0.0 are used as inputs in get_bubble_radius().
+        For identifying large abnormal spikes in ``bubble_radius``.
+
+        Parameters
+        ----------
+        bubble_radius : [m] 1D float ndarray
+            Plasma ion bubble radius along the whole simulation domain.
+            
+        zs_bubble_radius_axial : [m] 1D float ndarray, optional
+            Co-moving coordinates of the bubble radius. Same length as ``bubble_radius``
+
+            
+        Returns
+        ----------
+        mask : [m] 1D bool ndarray
+            An array of the same length as ``bubble_radius`` where the elements corresponding to abnormal spikes are ``False``.
         """
-        bubble_radius = self.get_bubble_radius(plasma_num_density=plasma_num_density, plasma_tr_coord=plasma_tr_coord, driver_offset=0.0, threshold=0.8)
+
+        # Mask based on the first derivative of bubble_radius
+        drb_dz = np.gradient(bubble_radius, zs_bubble_radius)  # First derivative
+
+        lower_p = np.percentile(np.abs(drb_dz), 10)  # Lower percentile
+        upper_p = np.percentile(np.abs(drb_dz), 90)  # Upper percentile
+        IPR = upper_p - lower_p  # Interpercentile range
+        lower_bound = lower_p - 1.5 * IPR
+        upper_bound = upper_p + 1.5 * IPR
+        d1_outliers = np.where((np.abs(drb_dz) < lower_bound) | (np.abs(drb_dz) > upper_bound))[0]
+
+        d1_mask = np.ones_like(bubble_radius, dtype=bool)
+        d1_mask[d1_outliers] = False  # Set the outlier indices to False.
+
+        # Mask based on curvature
+        d2rb_dz2 = np.gradient(drb_dz, zs_bubble_radius)  # Second derivative
+        curvature = np.abs(d2rb_dz2)/(1+drb_dz**2)**(3/2)
+
+        lower_p = np.percentile(np.abs(curvature), 10)  # Lower percentile
+        upper_p = np.percentile(np.abs(curvature), 90)  # Upper percentile
+        IPR = upper_p - lower_p  # Interpercentile range
+        lower_bound = lower_p - 1.5 * IPR
+        upper_bound = upper_p + 1.5 * IPR
+        curvature_outliers = np.where((np.abs(curvature) < lower_bound) | (np.abs(curvature) > upper_bound))[0]
+
+        curvature_mask = np.ones_like(bubble_radius, dtype=bool)
+        curvature_mask[curvature_outliers] = False
+
+        # Mask based on peaks
+        if self.estm_R_blowout is None:
+            drive_beam = self.driver_source.track()
+            R_blowout = blowout_radius(self.plasma_density, drive_beam.peak_current())
+        else:
+            R_blowout = self.estm_R_blowout
+        idxs_peaks, _ = signal.find_peaks(bubble_radius, height=0.9*R_blowout, width=1.5, prominence=None)
+        peak_mask = np.ones_like(bubble_radius, dtype=bool)
+        peak_mask[idxs_peaks] = False
+
+        if make_plot:
+            plt.figure()
+            plt.plot(bubble_radius*1e6, '-x')
+            plt.plot(idxs_peaks, bubble_radius[idxs_peaks]*1e6, 'x', label='Peaks filter')
+            plt.plot(d1_outliers, bubble_radius[d1_outliers]*1e6, 'o', label='First derivative filter')
+            plt.plot(curvature_outliers, bubble_radius[curvature_outliers]*1e6, 'o', label='Curvature filter')
+            plt.xlabel('Index')
+            plt.ylabel(r'Bubble radius [$\mathrm{\mu}$m]')
+            plt.title('Bubble radius and elements to be removed')
+            plt.legend()
+
+        # Final mask
+        mask = np.logical_and(np.logical_and(d1_mask, peak_mask), curvature_mask)
+
+        return mask
+
+
+    # ==================================================
+    def trace_bubble_radius_WakeT(self, plasma_num_density, plasma_tr_coord, plasma_z_coord, threshold=0.8):
+        """
+        The plasma wake calculated by Wake-T is always centered around r = 0.0, so that driver_offset=0.0 are used as inputs in trace_bubble_radius().
+        """
+        bubble_radius = self.trace_bubble_radius(plasma_num_density=plasma_num_density, plasma_tr_coord=plasma_tr_coord, plasma_z_coord=plasma_z_coord, driver_offset=0.0, threshold=threshold)
 
         return bubble_radius
 
@@ -902,7 +1009,7 @@ class StagePrtclTransWakeInstability(Stage):
         Parameters
         ----------
         rb : [m] 1D float ndarray
-            Plasma ion bubble radius.
+            Plasma ion bubble radius along the whole simulation domain.
             
         zs_rb : [m] 1D float ndarray
             z-coordinates for ``rb``. Monotonically increasing from first to last element.
@@ -918,8 +1025,8 @@ class StagePrtclTransWakeInstability(Stage):
         rb_roi : [m] 1D float ndarray
             Plasma ion bubble radius for the region of interest shifted to the location of the beam.
 
-        rb_fit : [V/m] 1D interpolation object 
-            Interpolated axial longitudinal Ez from beam head to tail.
+        rb_fit : [m] 1D interpolation object 
+            Interpolated plasma ion bubble radius from beam head to tail.
         """
         
         zs = beam.zs()
@@ -938,6 +1045,7 @@ class StagePrtclTransWakeInstability(Stage):
         zs_cut = zs_rb[tail_idx:head_idx+1]
 
         rb_fit = interp1d(zs_cut, rb_cut, kind='slinear', bounds_error=False, fill_value='extrapolate')
+        #rb_fit = interp1d(zs_cut, rb_cut, kind='quadratic', bounds_error=False, fill_value='extrapolate')
         
         # Calculate sum of squared errors (sse)
         sse_rb = np.sum((rb_cut - rb_fit(zs_cut))**2)
