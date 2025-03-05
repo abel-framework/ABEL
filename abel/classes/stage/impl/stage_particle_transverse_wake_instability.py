@@ -196,43 +196,7 @@ class StagePrtclTransWakeInstability(Stage):
             driver_incoming = self.driver_source.track() # Generate a drive beam with jitter. 
             self.drive_beam = driver_incoming                    ######################
         
-        drive_beam_rotated = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
         
-        
-        # ========== Rotate the coordinate system of the beams ==========
-        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
-
-            driver_x_angle = driver_incoming.x_angle()
-            driver_y_angle = driver_incoming.y_angle()
-            
-            beam0_x_angle = beam_incoming.x_angle()
-            beam0_y_angle = beam_incoming.y_angle()
-
-            # Calculate the angles that will be used to rotate the beams' frame
-            rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
-            rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
-
-            # The model currently does not support drive beam tilt not aligned with beam propagation, so need to first ensure that the drive beam is aligned to its own propagation direction. This is done using active transformation to rotate the beam around x- and y-axis
-            drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
-
-            # Use passive transformation to rotate the frame of the beams
-            drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
-            beam_incoming.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
-
-            if np.abs( drive_beam_rotated.x_angle() ) > 5e-10:
-                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'driver_incoming x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_rotated x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
-                warnings.warn(driver_error_string)
-
-            if np.abs( drive_beam_rotated.y_angle() ) > 5e-10:
-                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'driver_incoming y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_rotated y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
-                warnings.warn(driver_error_string)
-    
-            if np.abs( -(beam_incoming.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
-                warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
-                
-            if np.abs( (beam_incoming.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
-                warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
-
                 
         # ========== Prepare ramps ==========
         # If ramps exist, set ramp lengths, nominal energies, nominal energy gains
@@ -242,16 +206,82 @@ class StagePrtclTransWakeInstability(Stage):
         
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:
+            print("Driver x/y angle before upramp:", driver_incoming.x_angle(), driver_incoming.y_angle())
+            print("Beam x/y angle before upramp:", beam_incoming.x_angle(), beam_incoming.y_angle())
 
-            # Pass the rotated drive beam and beam_incoming to track_upramp() and get the ramped beams in return
-            beam0, drive_beam_ramped = self.track_upramp(beam_incoming, drive_beam_rotated) # TODO: check if track_upramp rotates the beams correctly
-        else:
-            beam0 = copy.deepcopy(beam_incoming)
-            drive_beam_ramped = copy.deepcopy(driver_incoming)
-            if self.ramp_beta_mag is not None:
+            # Pass the drive beam and beam_incoming to track_upramp() and get the ramped beams in return
+            beam0, drive_beam_ramped = self.track_upramp(beam_incoming, driver_incoming) # TODO: check if track_upramp() rotates the beams correctly
+
+            print("Driver x/y angle after track_upramp():", drive_beam_ramped.x_angle(), drive_beam_ramped.y_angle())
+            print("Beam x/y angle after track_upramp():", beam0.x_angle(), beam0.y_angle())
+            
+
+        # else:  # Do the following if there are no upramp
+        #     beam0 = copy.deepcopy(beam_incoming)
+        #     drive_beam_ramped = copy.deepcopy(driver_incoming)
+        #     if self.ramp_beta_mag is not None:
+        #         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        #         drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        
+
+        # ========== Rotate the coordinate system of the beams ==========
+        if self.upramp is None:  # Only perform the rotation if the stage does not have an upramp (this will also be True for the first upramp).
+            drive_beam_rotated = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
+            beam_rotated = copy.deepcopy(beam_incoming)
+
+            # Check if the driver source of stage has angular jitter
+            if self.parent is None:  # No parent, i.e. this is just a stage without ramps
+                has_angular_jitter = self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0
+            else:  # Has parent, i.e. this is a ramp
+                has_angular_jitter = self.parent.driver_source.jitter.xp != 0 or self.parent.driver_source.x_angle != 0 or self.parent.driver_source.jitter.yp != 0 or self.parent.driver_source.y_angle != 0
+
+            # Perform rotation if there is angular jitter
+            if has_angular_jitter:
+
+                driver_x_angle = driver_incoming.x_angle()
+                driver_y_angle = driver_incoming.y_angle()
+                
+                beam0_x_angle = beam_incoming.x_angle()
+                beam0_y_angle = beam_incoming.y_angle()
+
+                # Calculate the angles that will be used to rotate the beams' frame
+                rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
+                rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+                # The model currently does not support drive beam tilt not aligned with beam propagation, so need to first ensure that the drive beam is aligned to its own propagation direction. This is done using active transformation to rotate the beam around x- and y-axis
+                drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+
+                # Use passive transformation to rotate the frame of the beams
+                drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
+                beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+
+                if np.abs( drive_beam_rotated.x_angle() ) > 5e-10:
+                    driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'driver_incoming x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_rotated x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
+                    warnings.warn(driver_error_string)
+
+                if np.abs( drive_beam_rotated.y_angle() ) > 5e-10:
+                    driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'driver_incoming y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_rotated y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
+                    warnings.warn(driver_error_string)
+        
+                if np.abs( -(beam_rotated.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
+                    warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
+                    
+                if np.abs( (beam_rotated.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
+                    warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
+
+                print("Driver x/y angle after upramp rotation:", drive_beam_rotated.x_angle(), drive_beam_rotated.y_angle())
+                print("Beam x/y angle after upramp rotation:", beam_rotated.x_angle(), beam_rotated.y_angle())
+
+        # ========== Manipulate the rotated beams at the first upramp and if the stage does not have an upramp ==========
+        if self.upramp is None:
+            drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
+            beam0 = copy.deepcopy(beam_rotated)
+
+            if self.ramp_beta_mag is not None:  # Do the following after rotating the frames.
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-        
+
+
         R_blowout = blowout_radius(self.plasma_density, drive_beam_ramped.peak_current())
         self.estm_R_blowout = R_blowout
 
@@ -479,44 +509,51 @@ class StagePrtclTransWakeInstability(Stage):
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver) # TODO: check if track_downramp rotates the beams correctly
-        else:
+        
+            print("Driver x/y angle after downramp:", driver_outgoing.x_angle(), driver_outgoing.y_angle())
+            print("Beam x/y angle after downramp:", beam_outgoing.x_angle(), beam_outgoing.y_angle())
+
+        else:  # Do the following if there are no downramp. 
             beam_outgoing = copy.deepcopy(beam)
             driver_outgoing = copy.deepcopy(driver)
-            if self.ramp_beta_mag is not None:
+            if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
-        if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
+        if self.downramp is None:
+            driver_outgoing = copy.deepcopy(driver)
+            beam_outgoing = copy.deepcopy(beam)
 
-            # Angles of beam before rotating back to original coordinate system
-            beam_x_angle = beam_outgoing.x_angle()
-            beam_y_angle = beam_outgoing.y_angle()
+            if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
 
-            driver_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True) # TODO: check if this roates back correctly.
-            beam_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
-            
+                # Angles of beam before rotating back to original coordinate system
+                beam_x_angle = beam_outgoing.x_angle()
+                beam_y_angle = beam_outgoing.y_angle()
 
-            # Add drifts to the beam
-            x_drift = self.length * np.tan(driver_x_angle)
-            y_drift = self.length * np.tan(driver_y_angle)
-            xs = beam_outgoing.xs()
-            ys = beam_outgoing.ys()
-            beam_outgoing.set_xs(xs + x_drift)
-            beam_outgoing.set_ys(ys + y_drift)
-            xs_driver = driver_outgoing.xs()
-            ys_driver = driver_outgoing.ys()
-            driver_outgoing.set_xs(xs_driver + x_drift)
-            driver_outgoing.set_ys(ys_driver + y_drift)
-            
-            #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
-        
-            if driver_incoming.x_angle() != 0 and np.abs( (beam_outgoing.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
-                warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
+                driver_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True) # TODO: check if this roates back correctly.
+                beam_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
                 
-            if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
-                warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
+                # Add drifts to the beam
+                x_drift = self.length * np.tan(driver_x_angle)
+                y_drift = self.length * np.tan(driver_y_angle)
+                xs = beam_outgoing.xs()
+                ys = beam_outgoing.ys()
+                beam_outgoing.set_xs(xs + x_drift)
+                beam_outgoing.set_ys(ys + y_drift)
+                xs_driver = driver_outgoing.xs()
+                ys_driver = driver_outgoing.ys()
+                driver_outgoing.set_xs(xs_driver + x_drift)
+                driver_outgoing.set_ys(ys_driver + y_drift)
+                
+                #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
+            
+                if driver_incoming.x_angle() != 0 and np.abs( (beam_outgoing.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+                    warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
+                    
+                if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+                    warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
 
         
         # ==========  Make animations ==========
