@@ -196,44 +196,18 @@ class StagePrtclTransWakeInstability(Stage):
             driver_incoming = self.driver_source.track() # Generate a drive beam with jitter. 
             self.drive_beam = driver_incoming                    ######################
         
-        
-                
-        # ========== Prepare ramps ==========
-        # If ramps exist, set ramp lengths, nominal energies, nominal energy gains
-        # and flattop nominal energy if not already done.
-        self._prepare_ramps()
-
-        
-        # ========== Apply plasma density up ramp (demagnify beta function) ==========
-        if self.upramp is not None:
-            print("Driver x/y angle before upramp:", driver_incoming.x_angle(), driver_incoming.y_angle())
-            print("Beam x/y angle before upramp:", beam_incoming.x_angle(), beam_incoming.y_angle())
-
-            # Pass the drive beam and beam_incoming to track_upramp() and get the ramped beams in return
-            beam0, drive_beam_ramped = self.track_upramp(beam_incoming, driver_incoming) # TODO: check if track_upramp() rotates the beams correctly
-
-            print("Driver x/y angle after track_upramp():", drive_beam_ramped.x_angle(), drive_beam_ramped.y_angle())
-            print("Beam x/y angle after track_upramp():", beam0.x_angle(), beam0.y_angle())
-            
-
-        # else:  # Do the following if there are no upramp
-        #     beam0 = copy.deepcopy(beam_incoming)
-        #     drive_beam_ramped = copy.deepcopy(driver_incoming)
-        #     if self.ramp_beta_mag is not None:
-        #         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-        #         drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-        
 
         # ========== Rotate the coordinate system of the beams ==========
-        if self.upramp is None:  # Only perform the rotation if the stage does not have an upramp (this will also be True for the first upramp).
+        # Perform beam rotations before calling on upramp tracking.
+        if self.parent is None:  # Ensures that this is the main stage and not a ramp.
             drive_beam_rotated = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
             beam_rotated = copy.deepcopy(beam_incoming)
 
+            print("Driver x/y angle before rotation:", drive_beam_rotated.x_angle(), drive_beam_rotated.y_angle())
+            print("Beam x/y angle before rotation:", beam_rotated.x_angle(), beam_rotated.y_angle())
+
             # Check if the driver source of stage has angular jitter
-            if self.parent is None:  # No parent, i.e. this is just a stage without ramps
-                has_angular_jitter = self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0
-            else:  # Has parent, i.e. this is a ramp
-                has_angular_jitter = self.parent.driver_source.jitter.xp != 0 or self.parent.driver_source.x_angle != 0 or self.parent.driver_source.jitter.yp != 0 or self.parent.driver_source.y_angle != 0
+            has_angular_jitter = self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0
 
             # Perform rotation if there is angular jitter
             if has_angular_jitter:
@@ -269,21 +243,41 @@ class StagePrtclTransWakeInstability(Stage):
                 if np.abs( (beam_rotated.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
                     warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
 
-                print("Driver x/y angle after upramp rotation:", drive_beam_rotated.x_angle(), drive_beam_rotated.y_angle())
-                print("Beam x/y angle after upramp rotation:", beam_rotated.x_angle(), beam_rotated.y_angle())
+                print("Driver x/y angle after rotation:", drive_beam_rotated.x_angle(), drive_beam_rotated.y_angle())
+                print("Beam x/y angle after rotation:", beam_rotated.x_angle(), beam_rotated.y_angle())
 
-        # ========== Manipulate the rotated beams at the first upramp and if the stage does not have an upramp ==========
-        if self.upramp is None:
-            drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
-            beam0 = copy.deepcopy(beam_rotated)
+                
+        # ========== Prepare ramps ==========
+        # If ramps exist, set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done.
+        self._prepare_ramps()
 
-            if self.ramp_beta_mag is not None:  # Do the following after rotating the frames.
-                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        
+        # ========== Apply plasma density up ramp (demagnify beta function) ==========
+        if self.upramp is not None:
 
+            # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
+            beam0, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated) # TODO: check if track_upramp() rotates the beams correctly
 
+            print("Driver x/y angle after track_upramp():", drive_beam_ramped.x_angle(), drive_beam_ramped.y_angle())
+            print("Beam x/y angle after track_upramp():", beam0.x_angle(), beam0.y_angle())
+            
+        else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
+            if self.parent is None:  # Just a lone stage
+                beam0 = copy.deepcopy(beam_rotated)
+                drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
+            else:
+                beam0 = copy.deepcopy(beam_incoming)
+                drive_beam_ramped = copy.deepcopy(driver_incoming)
+
+            if self.ramp_beta_mag is not None:
+                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
+                drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
+       
+       
         R_blowout = blowout_radius(self.plasma_density, drive_beam_ramped.peak_current())
         self.estm_R_blowout = R_blowout
+
 
         # ========== Record longitudinal number profile ==========
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
@@ -522,7 +516,8 @@ class StagePrtclTransWakeInstability(Stage):
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
-        if self.downramp is None:
+        # Perform un-rotation after track_downramp()
+        if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not its ramps.
             driver_outgoing = copy.deepcopy(driver)
             beam_outgoing = copy.deepcopy(beam)
 
@@ -554,6 +549,9 @@ class StagePrtclTransWakeInstability(Stage):
                     
                 if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
                     warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
+
+            print("Driver x/y angle after un-rotation:", driver_outgoing.x_angle(), driver_outgoing.y_angle())
+            print("Beam x/y angle after un-rotation:", beam_outgoing.x_angle(), beam_outgoing.y_angle())
 
         
         # ==========  Make animations ==========
