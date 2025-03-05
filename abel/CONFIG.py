@@ -1,5 +1,6 @@
 import os
 import abel.utilities.colors as cmaps
+import matplotlib.pyplot as plt
 
 class CONFIG:
 

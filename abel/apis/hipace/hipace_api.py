@@ -8,7 +8,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0, filename_test_particle='empty.h5'):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -30,6 +30,9 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         beam_components = 'driver'
     else:
         beam_components = 'driver beam'
+
+    if not filename_test_particle == 'empty.h5':
+        beam_components += ' test_particle'
     
     # plasma-density profile from file
     if density_table_file is not None:
@@ -71,15 +74,13 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'radiation_reaction': int(radiation_reaction),
               'beam_components': beam_components,
               'plasma_components': plasma_components,
-              'density_table_file': density_table_file,
-              'density_comment1': density_comment1,
-              'density_comment2': density_comment2,
               'ion_species': ion_species,
               'beam_ionization': int(beam_ionization),
               'external_focusing_radial': abs(external_focusing_radial),
               'external_focusing_radial_comment': external_focusing_radial_comment,
               'filename_beam': filename_beam,
-              'filename_driver': filename_driver}
+              'filename_driver': filename_driver,
+              'filename_test_particle': filename_test_particle}
 
     # fill in template file
     with open(filename_input_template, 'r') as fin, open(filename_input, 'w') as fout:
@@ -264,4 +265,20 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
         # wait for some time
         wait_time = 3 # [s]
         time.sleep(wait_time)
+    
+    # when finished, load the beam and driver
+    filename = runfolder + "/diags/hdf5/openpmd_{:06}.h5".format(int(num_steps))
+    try:
+        beam = Beam.load(filename, beam_name='beam')
+    except:
+        beam = None
+    driver = Beam.load(filename, beam_name='driver')
+    
+    try:
+        test_particle = Beam.load(filename, beam_name='test_particle')
+    except:
+        test_particle = None
+    
+    return beam, driver, test_particle
+
 

@@ -31,7 +31,7 @@ class SourceBasic(Source):
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
-        
+        rng = np.random.default_rng()
         # make empty beam
         beam = Beam()
         
@@ -48,7 +48,7 @@ class SourceBasic(Source):
         if self.symmetrize_6d is False:
             
             # horizontal and vertical phase spaces
-            xs, xps, ys, yps = generate_trace_space_xy(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, self.angular_momentum/gamma, symmetrize=self.symmetrize)
+            xs, xps, ys, yps = generate_trace_space_xy(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, rng, self.angular_momentum/gamma, symmetrize=self.symmetrize)
             
             # longitudinal phase space
             if self.symmetrize:
@@ -56,14 +56,14 @@ class SourceBasic(Source):
                 num_particles_actual = round(self.num_particles/num_tiling)
             else:
                 num_particles_actual = self.num_particles
-            zs = np.random.normal(loc=self.z_offset, scale=self.bunch_length, size=num_particles_actual)
-            Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
+            zs = rng.normal(loc=self.z_offset, scale=self.bunch_length, size=num_particles_actual)
+            Es = rng.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
             if self.symmetrize:
                 zs = np.tile(zs, num_tiling)
                 Es = np.tile(Es, num_tiling)
 
         else:
-            xs, xps, ys, yps, zs, Es = generate_symm_trace_space_xyz(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, self.bunch_length, self.energy_spread, self.angular_momentum/gamma)
+            xs, xps, ys, yps, zs, Es = generate_symm_trace_space_xyz(self.emit_nx/gamma, self.beta_x, self.alpha_x, self.emit_ny/gamma, self.beta_y, self.alpha_y, self.num_particles, self.bunch_length, self.energy_spread, rng, self.angular_momentum/gamma)
             
             # add longitudinal offsets
             zs += self.z_offset

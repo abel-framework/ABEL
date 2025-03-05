@@ -1026,6 +1026,7 @@ class Stage(Trackable, CostModeled):
             fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
         
         plt.show()
+        return fig
 
 
     # ==================================================  
@@ -1111,7 +1112,6 @@ class Stage(Trackable, CostModeled):
         --------
           None
         """
-        
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
             print('No wake calculated')
@@ -1207,7 +1207,7 @@ class Stage(Trackable, CostModeled):
         if savefig is not None:
             fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
         
-        return 
+        return fig
 
     
     # ==================================================

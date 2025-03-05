@@ -18,7 +18,7 @@ geometry.is_periodic = 1 1 0  # Is periodic?
 geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
 geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z
 
-beams.names = $beam_components # 'driver' or 'driver beam'
+beams.names = $beam_components # 'driver' or 'driver beam' or 'driver beam test_particle'
 beams.insitu_period = 1
 
 beam.injection_type = from_file
@@ -30,30 +30,30 @@ driver.injection_type = from_file
 driver.input_file = $filename_driver
 driver.iteration = 0
 
+test_particle.injection_type = from_file
+test_particle.input_file = $filename_test_particle
+test_particle.iteration = 0
+test_particle.do_radiation_reaction = $radiation_reaction
+
 # external focusing
 ${external_focusing_radial_comment}beams.external_B(x,y,z,t) = "$external_focusing_radial*y" "-$external_focusing_radial*x" "0.0"
 
 plasmas.names = $plasma_components # 'plasma' or 'electrons ions'
 
 # if ion motion disabled
-${density_comment1}plasma.density(x,y,z) = $plasma_density
-${density_comment2}plasma.density_table_file = $density_table_file 
+plasma.density(x,y,z) = $plasma_density
 plasma.ppc = 1 1
 plasma.element = electron
 plasma.do_symmetrize = 1
 
-
 # if ion motion enabled
 electrons.element = electron
-${density_comment1}electrons.density(x,y,z) = $plasma_density
-${density_comment2}electrons.density_table_file = $density_table_file 
+electrons.density(x,y,z) = $plasma_density
 electrons.do_symmetrize = 1
 electrons.ppc = 1 1
-electrons.neutralize_background = 0
-
+electrons.neutralize_background = 0 
 ions.element = $ion_species
-${density_comment1}ions.density(x,y,z) = $plasma_density
-${density_comment2}ions.density_table_file = $density_table_file 
+ions.density(x,y,z) = $plasma_density
 ions.do_symmetrize = 1
 ions.ppc = 1 1
 ions.neutralize_background = 0

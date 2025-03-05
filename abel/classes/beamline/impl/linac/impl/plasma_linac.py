@@ -421,21 +421,24 @@ class PlasmaLinac(Linac):
         af = 0.2
         
         # plot evolution
+        plt.rcParams.update({'font.size': 18})
         fig, axs = plt.subplots(3,3)
-        fig.set_figwidth(20)
+        fig.set_figwidth(16)
         fig.set_figheight(12)
+        fig.suptitle('Evolution of Beam Parameters')
+        plt.subplots_adjust(wspace=0.4)
         
         axs[0,0].plot(long_axis, Es_nom / 1e9, ':', color=col0)
         axs[0,0].plot(long_axis, Es / 1e9, color=col1)
         axs[0,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Es+Es_error, np.flip(Es-Es_error))) / 1e9, color=col1, alpha=af)
-        axs[0,0].set_xlabel(long_label)
         axs[0,0].set_ylabel('Energy [GeV]')
+        axs[0,0].set_xticks([])
         
         axs[1,0].plot(long_axis, sigdeltas * 100, color=col1)
         axs[1,0].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigdeltas+sigdeltas_error, np.flip(sigdeltas-sigdeltas_error))) * 100, color=col1, alpha=af)
-        axs[1,0].set_xlabel(long_label)
         axs[1,0].set_ylabel('Energy spread [%]')
         axs[1,0].set_yscale('log')
+        axs[1,0].set_xticks([])
         
         axs[2,0].plot(long_axis, np.zeros(deltas.shape), ':', color=col0)
         axs[2,0].plot(long_axis, deltas * 100, color=col1)
@@ -446,12 +449,13 @@ class PlasmaLinac(Linac):
         axs[0,1].plot(long_axis, Q0 * np.ones(Qs.shape) * 1e9, ':', color=col0)
         axs[0,1].plot(long_axis, Qs * 1e9, color=col1)
         axs[0,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((Qs+Qs_error, np.flip(Qs-Qs_error))) * 1e9, color=col1, alpha=af)
-        axs[0,1].set_xlabel(long_label)
         axs[0,1].set_ylabel('Charge [nC]')
-        #axs[0,1].set_ylim(0, Q0 * 1.3 * 1e9)
+        axs[0,1].set_ylim(0, Q0 * 1.3 * 1e9)
+        axs[0,1].set_xticks([])
         
         axs[1,1].plot(long_axis, sigzs*1e6, color=col1)
         axs[1,1].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigzs+sigzs_error, np.flip(sigzs-sigzs_error))) * 1e6, color=col1, alpha=af)
+
         axs[1,1].set_xlabel(long_label)
         axs[1,1].set_ylabel(r'Bunch length [$\mathrm{\mu}$m]')
         
@@ -481,8 +485,10 @@ class PlasmaLinac(Linac):
         axs[1,2].plot(long_axis, sigys*1e6, color=col2, label=r'$\sigma_y$')
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigxs+sigxs_error, np.flip(sigxs-sigxs_error))) * 1e6, color=col1, alpha=af)
         axs[1,2].fill(np.concatenate((long_axis, np.flip(long_axis))), np.concatenate((sigys+sigys_error, np.flip(sigys-sigys_error))) * 1e6, color=col2, alpha=af)
+
         axs[1,2].set_xlabel(long_label)
         axs[1,2].set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
+
         axs[1,2].set_yscale('log')
         axs[1,2].legend()
         
@@ -504,7 +510,7 @@ class PlasmaLinac(Linac):
             filename = plot_path + 'evolution' + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
     
-    
+        return fig
     
     # density plots
     def plot_waterfalls(self, shot=None, save_fig=False):
@@ -575,10 +581,11 @@ class PlasmaLinac(Linac):
                 os.makedirs(plot_path)
             filename = plot_path + 'waterfalls_shot' + str(self.shot) + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+        return fig
 
     
     # animate the longitudinal phase space
-    def animate_lps(self, rel_energy_window=0.06):
+    def animate_lps(self, rel_energy_window=0.06, file_name=None):
         
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
@@ -640,7 +647,7 @@ class PlasmaLinac(Linac):
             axs[0,1].set_xlim(min([min(sigzs)*0.9e6, sigzs[0]*0.7e6]), max([max(sigzs)*1.1e6, sigzs[0]*1.3e6]))
             axs[0,1].set_xlabel(r'Bunch length [$\mathrm{\mu}$m]')
             axs[0,1].set_ylabel('Energy spread [%]')
-            axs[0,1].set_yscale('log')
+            #axs[0,1].set_yscale('log')
             axs[0,1].yaxis.tick_right()
             axs[0,1].yaxis.set_label_position('right')
             axs[0,1].xaxis.tick_top()
@@ -702,7 +709,10 @@ class PlasmaLinac(Linac):
         plot_path = self.run_path() + 'plots/'
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
-        filename = plot_path + 'lps_shot' + str(self.shot) + '.gif'
+        if file_name is None:
+            filename = plot_path + 'lps_shot' + str(self.shot) + '.gif'
+        else:
+            filename = file_name + '.gif'
         animation.save(filename, writer="pillow", fps=10)
 
         # hide the figure

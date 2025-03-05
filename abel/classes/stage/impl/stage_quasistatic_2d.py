@@ -65,7 +65,7 @@ class StageQuasistatic2d(Stage):
         k_beta_beam = k_p(self.plasma_density)/np.sqrt(2*beam0.gamma())
         lambda_betatron_min = 2*np.pi/max(k_beta_beam, k_beta_driver)
         lambda_betatron_max = 2*np.pi/min(k_beta_beam, k_beta_driver)
-        dz = lambda_betatron_min/10
+        dz = lambda_betatron_min/2
         
         # need to make sufficiently many steps
         n_out = max(1, round(lambda_betatron_max/lambda_betatron_min/2))
@@ -165,7 +165,7 @@ class StageQuasistatic2d(Stage):
             
             # accelerate beam (and remove nans)
             beam.set_Es(Es_final)
-            
+                
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length_flattop*(driver0.Es()-driver_waket.Es())/dz
         driver = copy.deepcopy(driver0)
@@ -197,7 +197,7 @@ class StageQuasistatic2d(Stage):
         
         # save current profile
         self.calculate_beam_current(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
-        
+
         # return the beam (and optionally the driver)
         if self._return_tracked_driver:
             return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing

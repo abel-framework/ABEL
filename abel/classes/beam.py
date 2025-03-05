@@ -10,6 +10,7 @@ from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
 from abel.physics_models.betatron_motion import evolve_betatron_motion
+#from abel.physics_models.beta_multistep import evolve_betatron_motion
 
 import scipy.sparse as sp
 from scipy.spatial.transform import Rotation as Rot
@@ -1275,16 +1276,28 @@ class Beam():
             
         # calculate final positions and angles after betatron motion
         if radiation_reaction:
-            xs, uxs, ys, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.uxs(), self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+            xs, ys, uxs, uys, Es_final, evolution, location = evolve_betatron_motion(self.qs(), self.xs()-x0_driver, self.ys()-y0_driver, self.uxs(), self.uys(), L, gamma0s, dgamma_ds, k_p(n0), save_evolution)
+            # set new beam positions and angles (shift back driver offsets)
+            self.set_xs(xs+x0_driver)
+            self.set_uxs(uxs)
+            self.set_ys(ys+y0_driver)
+            self.set_uys(uys)
+            if save_evolution:
+                return Es_final, evolution, location
+            else:
+                return Es_final
         else:
             xs, uxs = evolve_hills_equation_analytic(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
             ys, uys = evolve_hills_equation_analytic(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
         
-        # set new beam positions and angles (shift back driver offsets)
-        self.set_xs(xs+x0_driver)
-        self.set_uxs(uxs)
-        self.set_ys(ys+y0_driver)
-        self.set_uys(uys)
+            # set new beam positions and angles (shift back driver offsets)
+            self.set_xs(xs+x0_driver)
+            self.set_uxs(uxs)
+            self.set_ys(ys+y0_driver)
+            self.set_uys(uys)
+            if save_evolution:
+                print('Save_evolution has not yet been implemented without radiation reaction, set save_evolution to False')
+
 
         if calc_evolution:
             return Es_final, evol

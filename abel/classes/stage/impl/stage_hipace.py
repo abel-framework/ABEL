@@ -17,11 +17,11 @@ try:
     sys.path.append(os.path.join(CONFIG.hipace_path, 'tools'))
     import read_insitu_diagnostics
 except:
-    print(f'Could not import HiPACE++ tools from {os.path.join(CONFIG.hipace_path, 'tools')}')
+    print(f"Could not import HiPACE++ tools from {os.path.join(CONFIG.hipace_path, 'tools')}")
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0, test_particle_source=None):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -34,6 +34,9 @@ class StageHipace(Stage):
         self.plasma_density_from_file = plasma_density_from_file
         self.save_drivers = save_drivers
         self.no_plasma = no_plasma
+
+        self.test_particle_source = test_particle_source
+        self.test_particle_evolution = SimpleNamespace()
 
         # external focusing (APL-like) [T/m]
         self.external_focusing_radial = external_focusing_radial
@@ -105,6 +108,14 @@ class StageHipace(Stage):
         path_driver = tmpfolder + filename_driver
         driver0.save(filename = path_driver, beam_name = 'driver')
 
+        if self.test_particle_source is not None:
+            test_particle0 = self.test_particle_source.track()
+            filename_test_particle = 'test_particle.h5'
+            path_test_particle = tmpfolder + filename_test_particle
+            test_particle0.save(filename = path_test_particle, beam_name = 'test_particle')
+        else: 
+            filename_test_particle = 'empty.h5'
+            
         # make directory
         if self.plasma_density_from_file is not None:
             density_table_file = os.path.basename(self.plasma_density_from_file)
@@ -160,7 +171,8 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial)
+
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial, filename_test_particle=filename_test_particle)
         
         
         ## RUN SIMULATION
@@ -170,10 +182,14 @@ class StageHipace(Stage):
         hipace_write_jobscript(filename_job_script, filename_input, num_nodes=self.num_nodes)
         
         # run HiPACE++
-        beam, driver = hipace_run(filename_job_script, self.num_steps)
+        if self.test_particle_source:
+            beam, driver, test_particle = hipace_run(filename_job_script, self.num_steps)
+        else:
+            beam, driver = hipace_run(filename_job_script, self.num_steps)
         if self.driver_only:
             beam = beam0
         
+
         ## ADD METADATA
         
         # copy meta data from input beam (will be iterated by super)
@@ -249,7 +265,7 @@ class StageHipace(Stage):
             insitu_file = insitu_path + 'reduced_' + bunch + '.*.txt'
             all_data = read_insitu_diagnostics.read_file(insitu_file)
             average_data = all_data['average']
-            
+    
             # store variables
             evol = SimpleNamespace()
             evol.slices = SimpleNamespace()
@@ -340,7 +356,40 @@ class StageHipace(Stage):
         if self.keep_data:
             destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number) + '/insitu'
             shutil.move(insitu_path, destination_path)
+            
+    def __extract_test_particle_evolution(self, tmpfolder, beam0):
+
+        insitu_path = tmpfolder + 'diags/insitu/'
         
+        if self.test_particle_source is not None:
+            
+            insitu_file = insitu_path + 'reduced_test_particle.*.txt'
+                
+            # extract in-situ data
+            all_data = read_insitu_diagnostics.read_file(insitu_file)
+            average_data = all_data['average']
+    
+            # store variables
+            self.test_particle_evolution.location = beam0.location + all_data['time']*SI.c
+            self.test_particle_evolution.charge = read_insitu_diagnostics.total_charge(all_data)
+            self.test_particle_evolution.energy = read_insitu_diagnostics.energy_mean_eV(all_data)
+            self.test_particle_evolution.z = average_data['[z]']
+            self.test_particle_evolution.x = average_data['[x]']
+            self.test_particle_evolution.y = average_data['[y]']
+            self.test_particle_evolution.xp = average_data['[ux]']/average_data['[uz]']
+            self.test_particle_evolution.yp = average_data['[uy]']/average_data['[uz]']
+
+            """
+            self.test_particle_evolution.energy_spread = read_insitu_diagnostics.energy_spread_eV(all_data)
+            self.test_particle_evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
+            self.test_particle_evolution.beam_size_x = read_insitu_diagnostics.position_std(average_data, direction='x')
+            self.test_particle_evolution.beam_size_y = read_insitu_diagnostics.position_std(average_data, direction='y')
+            self.test_particle_evolution.bunch_length = read_insitu_diagnostics.position_std(average_data, direction='z')
+            self.test_particle_evolution.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
+            self.test_particle_evolution.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
+            """
+            # TODO: add angular momentum and normalized amplitude
+        return self
         
     def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
         
@@ -598,4 +647,47 @@ class StageHipace(Stage):
         
         E_z_rms = np.mean(Ez0[index_witness_tail:index_witness_head])
         return E_z_rms
-    
+        
+    def plot_test_particle_evolution(self):
+
+        # extract wakefield if not already existing
+        if not hasattr(self.test_particle_evolution, 'location'):
+            print('No evolution calculated')
+            return
+            
+        # preprate plot
+        fig = plt.figure()
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*0.8)
+
+        gs = fig.add_gridspec(2,1)
+        ax1 = fig.add_subplot(gs[0,:])
+        ax2 = fig.add_subplot(gs[1,:])
+        ax1.grid()
+        ax2.grid()
+        fig.suptitle('Test Particle Evolution')
+        
+        ax1.set_xticks([])
+        
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        long_label = 'Location (m)'
+        long_limits = [min(self.test_particle_evolution.location), max(self.test_particle_evolution.location)]
+
+        # plot energy
+        ax1.plot(self.test_particle_evolution.location, self.test_particle_evolution.energy / 1e9, color=col1)
+        ax1.set_ylabel('Energy (GeV)')
+        ax1.set_xlim(long_limits)
+
+        # plot transverse offset
+        ax2.plot(self.test_particle_evolution.location, np.zeros(self.test_particle_evolution.location.shape), ':', color=col0)
+        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.x*1e6, color=col1, label = 'x')
+        ax2.plot(self.test_particle_evolution.location, self.test_particle_evolution.y*1e6, color=col2, label = 'y')  
+        ax2.set_ylabel('Transverse offset (um)')
+        ax2.set_xlabel(long_label)
+        ax2.set_xlim(long_limits)
+        ax2.legend()
+        
+        plt.show()
+        return fig, self.test_particle_evolution.energy
