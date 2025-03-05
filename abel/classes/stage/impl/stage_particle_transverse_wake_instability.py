@@ -264,10 +264,6 @@ class StagePrtclTransWakeInstability(Stage):
             if self.ramp_beta_mag is not None:
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
-       
-
-        R_blowout = blowout_radius(self.plasma_density, drive_beam_ramped.peak_current())
-        self.estm_R_blowout = R_blowout
 
 
         # ========== Record longitudinal number profile ==========
@@ -337,11 +333,9 @@ class StagePrtclTransWakeInstability(Stage):
         print('max_bubble_radius:', bubble_radius_wakeT.max()*1e6, 'um\n')
 
         # Cut out bubble radius over the ROI
+        R_blowout = blowout_radius(self.plasma_density, drive_beam_ramped.peak_current())
+        self.estm_R_blowout = R_blowout
         bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices)
-        #R_blowout = blowout_radius(self.plasma_density, self.drive_beam.peak_current())
-        
-        #if bubble_radius_roi.max() > 1.1*R_blowout:
-        #    warnings.warn('The fitted plasma ion bubble radius may be too large.\n', UserWarning)
 
         if bubble_radius_wakeT.max() < 0.5 * R_blowout or bubble_radius_roi.any()==0:
             warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
@@ -401,6 +395,7 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             tmpfolder = None
 
+        # Prepare fields from Wake-T for use in drive beam tracking
         if self.drive_beam_update_period > 0:  # Do drive beam evolution
             wake_t_fields = plasma_stage.fields[0]  # Extract the wakefields used for driver tracking.
             wake_t_fields.r_fld = wake_t_fields.r_fld + np.sqrt(driver_x_offset**2 + driver_y_offset**2)  # Compensate for the drive beam offset.
@@ -446,11 +441,11 @@ class StagePrtclTransWakeInstability(Stage):
             raise ValueError('At least one input is set to None.')
 
         # Add the driver offsets to the Wake-T r-coordinate
+        # Changes to info_rho should only be done after the plasma ion bubble radius has been traced and extracted.
         rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
         info_rho.r = rs_rho
         info_rho.imshow_extent[2] = rs_rho.min()
         info_rho.imshow_extent[3] = rs_rho.max()
-        
         # Save the initial step with ramped beams in rotated coordinate system
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
 
@@ -537,7 +532,7 @@ class StagePrtclTransWakeInstability(Stage):
                     
                 if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
                     warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
-                    
+
         
         # ==========  Make animations ==========
         if self.probe_evol_period > 0 and self.make_animations:
@@ -919,20 +914,20 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             R_blowout = self.estm_R_blowout
 
+        # Apply corrections until there are no more elements in bubble_radius > R_blowout
         while bubble_radius.max() > R_blowout:
         
             mask = self.mask_bubble_radius_spikes(bubble_radius, plasma_z_coord)
             num_rm_elements = np.sum(~mask)  # Number of elements to remove
 
-            if num_rm_elements > 0:
-                if num_rm_elements > 0.33*len(bubble_radius):
-                    warnings.warn('bubble_radius may contain too many abnormal peaks.')
-                if num_rm_elements == len(bubble_radius):
-                    raise ValueError('Cannot remove all elements from bubble_radius.')
+            if num_rm_elements > 0.33*len(bubble_radius):
+                warnings.warn('bubble_radius may contain too many abnormal peaks. Removing these many elements may result in a bad interpolation later.')
+            if num_rm_elements == len(bubble_radius):
+                raise ValueError('Cannot remove all elements from bubble_radius.')
 
-                # Use interpolation to replace the deleted points
-                f_interp = interp1d(plasma_z_coord[mask], bubble_radius[mask], kind='slinear', fill_value="extrapolate") 
-                bubble_radius = f_interp(plasma_z_coord)  # Cleaned bubble radius
+            # Use interpolation to replace the deleted points
+            f_interp = interp1d(plasma_z_coord[mask], bubble_radius[mask], kind='slinear', fill_value="extrapolate") 
+            bubble_radius = f_interp(plasma_z_coord)  # Cleaned bubble radius
         
         return bubble_radius
 
