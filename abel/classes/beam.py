@@ -38,7 +38,7 @@ class Beam():
     
     # reset phase space
     def reset_phase_space(self, num_particles):
-        self.__phasespace = np.zeros((8, num_particles))
+        self.__phasespace = np.zeros((11, num_particles))
     
     # filter out macroparticles based on a mask (true means delete)
     def __delitem__(self, indices):
@@ -52,7 +52,7 @@ class Beam():
         del self[np.isnan(self).any(axis=1)]
         
     # set phase space
-    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None, particle_mass=SI.m_e):
+    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, sxs=None, sys=None, szs=None, weightings=None, particle_mass=SI.m_e):
         
         # make empty phase space
         num_particles = len(xs)
@@ -85,6 +85,7 @@ class Beam():
                 uys = yps * uzs
         self.__phasespace[4,:] = uys
         
+        
         # charge
         if weightings is None:
             self.__phasespace[6,:] = Q/num_particles
@@ -93,6 +94,19 @@ class Beam():
         
         # ids
         self.__phasespace[7,:] = np.arange(num_particles)
+        
+        # add spins
+        if sxs is None:
+            sxs = np.zeros(num_particles)
+        self.__phasespace[8,:] = sxs
+        
+        if sys is None:
+            sys = np.zeros(num_particles)
+        self.__phasespace[9,:] = sys
+        
+        if szs is None:
+            szs = np.zeros(num_particles)
+        self.__phasespace[10,:] = szs
 
         # single particle mass [kg]
         self.particle_mass = particle_mass
@@ -162,6 +176,12 @@ class Beam():
         return self.__phasespace[6,:]
     def ids(self):
         return self.__phasespace[7,:]
+    def sxs(self):
+        return self.__phasespace[8,:]
+    def sys(self):
+        return self.__phasespace[9,:]
+    def szs(self):
+        return self.__phasespace[10,:]
     
     # set phase space variables
     def set_xs(self, xs):
@@ -188,6 +208,12 @@ class Beam():
         self.__phasespace[6,:] = qs
     def set_ids(self, ids):
         self.__phasespace[7,:] = ids
+    def set_sxs(self, sxs):
+        self.__phasespace[8,:] = sxs
+    def set_sys(self, sys):
+        self.__phasespace[9,:] = sys
+    def set_szs(self, szs):
+        self.__phasespace[10,:] = szs
         
     def weightings(self):
         return self.__phasespace[6,:]/(self.charge_sign()*SI.e)
@@ -699,7 +725,93 @@ class Beam():
         Is, _ = self.current_profile()
         return max(abs(Is))
     
+    ## SPIN STATISTICS
+    def spin_check(self):
+        "Checks if any spin norms are close to zero."
+        s_norm = np.sqrt(self.sxs()**2 + self.sys()**2 + self.szs()**2)
+        return not np.any(s_norm < 1e-8) 
 
+    def set_spin_unpolarized(self):
+        "Sets the spin of the beam to be unpolarized."
+        phi = np.random.uniform(0, 2*np.pi, len(self))
+        theta = np.arccos(1-2*np.random.uniform(0, 1, len(self)))
+        sxs = np.sin(theta)*np.cos(phi)
+        sys = np.sin(theta)*np.sin(phi)
+        szs = np.cos(theta)
+        self.set_sxs(sxs)
+        self.set_sys(sys)
+        self.set_szs(szs)
+
+    def set_spin_polarized_x(self, sign=1):
+        self.set_sxs(np.ones(len(self))*np.sign(sign))
+        self.set_sys(np.zeros(len(self)))
+        self.set_szs(np.zeros(len(self)))
+        
+    def set_spin_polarized_y(self, sign=1):
+        self.set_sxs(np.zeros(len(self)))
+        self.set_sys(np.ones(len(self))*np.sign(sign))
+        self.set_szs(np.zeros(len(self)))
+        
+    def set_spin_polarized_z(self, sign=1):
+        self.set_sxs(np.zeros(len(self)))
+        self.set_sys(np.zeros(len(self)))
+        self.set_szs(np.ones(len(self))*np.sign(sign))
+
+    def renormalize_spin(self):
+        "Renormalizing the spin vectors."
+        sxs = self.sxs()
+        sys = self.sys()
+        szs = self.szs()
+        s_norm = np.sqrt(sxs**2 + sys**2 + szs**2)
+        if not np.any(s_norm < 1e-8):
+            self.set_sxs(sxs/s_norm)
+            self.set_sys(sys/s_norm)
+            self.set_szs(szs/s_norm)
+        else:
+            raise ValueError("One of the spins have length zero, can not renormalize")
+
+    def spin_polarization_x(self):
+        return np.mean(self.sxs())
+
+    def spin_polarization_y(self):
+        return np.mean(self.sys())
+
+    def spin_polarization_z(self):
+        return np.mean(self.szs())
+
+    def spin_polarization_vector(self):
+        return np.array([self.spin_polarization_x(), self.spin_polarization_y(), self.spin_polarization_z()])
+
+    def spin_polarization(self):
+        return np.sqrt(np.sum(self.spin_polarization_vector()**2))
+
+    def plot_spins(self, num_bins=None):
+        if num_bins is None:
+            num_bins = int(min(np.round(np.sqrt(len(self)/2)), 100))
+        print(num_bins)
+        fig, axs = plt.subplots(1,3)
+        fig.set_figwidth(12)
+        fig.set_figheight(4) 
+        axs[0].hist(self.sxs(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
+        axs[0].set_xlim(-1,1)
+        axs[0].set_xlabel(r'$s_x$')
+        axs[0].set_ylabel('Count')
+
+        axs[1].hist(self.sys(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
+        axs[1].set_xlim(-1,1)
+        axs[1].set_xlabel(r'$s_y$')
+
+        axs[2].hist(self.szs(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
+        axs[2].set_xlim(-1,1)
+        axs[2].set_xlabel(r'$s_z$')
+
+
+
+
+
+
+
+    
     ## BEAM HALO CLEANING (EXTREME OUTLIERS)
     def remove_halo_particles(self, nsigma=20):
         xfilter = np.abs(self.xs()-self.x_offset(clean=True)) > nsigma*self.beam_size_x(clean=True)
@@ -1346,6 +1458,9 @@ class Beam():
         dset_id = io.Dataset(self.ids().dtype, extent=self.ids().shape)
         dset_q = io.Dataset(np.dtype('float64'), extent=[1])
         dset_m = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_sz = io.Dataset(self.szs().dtype, extent=self.szs().shape)
+        dset_sx = io.Dataset(self.sxs().dtype, extent=self.sxs().shape)
+        dset_sy = io.Dataset(self.sys().dtype, extent=self.sys().shape)
         
         dset_n = io.Dataset(self.ids().dtype, extent=[1])
         dset_f = io.Dataset(np.dtype('float64'), extent=[1])
@@ -1364,6 +1479,9 @@ class Beam():
         particles['id'][io.Record_Component.SCALAR].reset_dataset(dset_id)        
         particles['charge'][io.Record_Component.SCALAR].reset_dataset(dset_q)
         particles['mass'][io.Record_Component.SCALAR].reset_dataset(dset_m)
+        particles['spin']['z'].reset_dataset(dset_sz)
+        particles['spin']['x'].reset_dataset(dset_sx)
+        particles['spin']['y'].reset_dataset(dset_sy)
         
         # store data
         particles['position']['z'].store_chunk(self.zs())
@@ -1379,6 +1497,9 @@ class Beam():
         particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
         particles['charge'][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
         particles['mass'][io.Record_Component.SCALAR].make_constant(SI.m_e)
+        particles['spin']['z'].store_chunk(self.szs())
+        particles['spin']['x'].store_chunk(self.sxs())
+        particles['spin']['y'].store_chunk(self.sys())
         
         # set SI units (scaling factor)
         particles['momentum']['z'].unit_SI = SI.m_e
@@ -1424,6 +1545,9 @@ class Beam():
         pxs_unscaled = particles['momentum']['x'].load_chunk()
         pys_unscaled = particles['momentum']['y'].load_chunk()
         pzs_unscaled = particles['momentum']['z'].load_chunk()
+        sxs = particles['spin']['x'].load_chunk()
+        sys = particles['spin']['y'].load_chunk()
+        szs = particles['spin']['z'].load_chunk()
         series.flush()
         
         # apply SI scaling
@@ -1433,7 +1557,7 @@ class Beam():
         
         # make beam
         beam = Beam()
-        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
+        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, sxs=sxs, sys=sys, szs=szs, weightings=weightings)
         
         # add metadata to beam
         try:
