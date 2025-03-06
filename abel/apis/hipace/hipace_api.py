@@ -8,7 +8,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0, filename_test_particle='empty.h5'):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0, external_focusing_longitudinal=0, filename_test_particle='empty.h5'):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -56,6 +56,11 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         external_focusing_radial_comment = ''
     else:
         external_focusing_radial_comment = '#'
+
+    if abs(external_focusing_longitudinal) > 0:
+        external_focusing_longitudinal_comment = ''
+    else:
+        external_focusing_longitudinal_comment = '#' 
     
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
@@ -78,6 +83,8 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'beam_ionization': int(beam_ionization),
               'external_focusing_radial': abs(external_focusing_radial),
               'external_focusing_radial_comment': external_focusing_radial_comment,
+              'external_focusing_longitudinal': abs(external_focusing_longitudinal),
+              'external_focusing_longitudinal_comment': external_focusing_longitudinal_comment,
               'filename_beam': filename_beam,
               'filename_driver': filename_driver,
               'filename_test_particle': filename_test_particle}
