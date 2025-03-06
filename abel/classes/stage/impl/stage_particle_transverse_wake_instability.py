@@ -240,7 +240,7 @@ class StagePrtclTransWakeInstability(Stage):
                 if np.abs( (beam_rotated.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
                     warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
 
-                
+
         # ========== Prepare ramps ==========
         # If ramps exist, set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done.
@@ -251,8 +251,8 @@ class StagePrtclTransWakeInstability(Stage):
         if self.upramp is not None:
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
-            beam0, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated) # TODO: check if track_upramp() rotates the beams correctly
-            
+            beam0, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
+
         else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
             if self.parent is None:  # Just a lone stage
                 beam0 = copy.deepcopy(beam_rotated)
@@ -488,7 +488,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
-            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver) # TODO: check if track_downramp rotates the beams correctly
+            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
 
         else:  # Do the following if there are no downramp. 
             beam_outgoing = copy.deepcopy(beam)
@@ -501,8 +501,6 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Rotate the coordinate system of the beams back to original ==========
         # Perform un-rotation after track_downramp()
         if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not its ramps.
-            driver_outgoing = copy.deepcopy(driver)
-            beam_outgoing = copy.deepcopy(beam)
 
             if self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0:
 
@@ -532,7 +530,7 @@ class StagePrtclTransWakeInstability(Stage):
                     
                 if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
                     warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
-
+        
         
         # ==========  Make animations ==========
         if self.probe_evol_period > 0 and self.make_animations:
