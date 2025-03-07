@@ -24,7 +24,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import pytest
 from abel import *
 
-def setup_trapezoid_driver_source(enable_driver_jitter=False):
+def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False):
     driver = SourceTrapezoid()
     driver.current_head = 0.1e3                                                   # [A]
     driver.bunch_length = 1050e-6                                                 # [m] This value is for trapezoid.
@@ -39,11 +39,13 @@ def setup_trapezoid_driver_source(enable_driver_jitter=False):
     driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
     driver.beta_x, driver.beta_y = 0.5, 0.5                                       # [m]
 
-    if enable_driver_jitter is True:
+    if enable_xy_jitter:
         driver.jitter.x = 100e-9                                                  # [m], std
         driver.jitter.y = 100e-9                                                  # [m], std
-        #driver.jitter.xp = 1.0e-6                                                 # [rad], std
-        #driver.jitter.yp = 1.0e-6                                                 # [rad], std
+
+    if enable_xpyp_jitter:
+        driver.jitter.xp = 1.0e-6                                                 # [rad], std
+        driver.jitter.yp = 1.0e-6                                                 # [rad], std
 
     driver.symmetrize = True
 
@@ -124,20 +126,22 @@ def setup_InterstageElegant(stage):
     return interstage
 
 
-@pytest.mark.transverse_wake_instability_particles
+@pytest.mark.transverse_wake_instability_linac
 def test_baseline_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, no ramps."
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
     ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = False
     enable_tr_instability = False
     enable_radiation_reaction = False
     enable_ion_motion = False
     use_ramps = False
     drive_beam_update_period = 0
 
-    driver_source = setup_trapezoid_driver_source(enable_driver_jitter=False)
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageElegant(stage)
@@ -148,20 +152,23 @@ def test_baseline_linac():
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
 
 
-@pytest.mark.transverse_wake_instability_particles
-def test_baseline_ramped_linac():
+
+@pytest.mark.transverse_wake_instability_linac
+def test_ramped_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, with ramps."
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
     ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = False
     enable_tr_instability = False
     enable_radiation_reaction = False
     enable_ion_motion = False
     use_ramps = True
     drive_beam_update_period = 0
 
-    driver_source = setup_trapezoid_driver_source(enable_driver_jitter=False)
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageElegant(stage)
@@ -169,5 +176,173 @@ def test_baseline_ramped_linac():
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
     # Perform tracking
-    linac.run('test_baseline_ramped_linac', overwrite=True, verbose=False)
+    linac.run('test_ramped_linac', overwrite=True, verbose=False)
+
+
+
+###################################################
+# Drive beam evolution tests
+
+@pytest.mark.transverse_wake_instability_linac
+def test_driveBeamEvol_linac():
+    "All ``StagePrtclTransWakeInstability`` physics effects disabled, driver evolution, driver angular jitter, no ramps."
+
+    num_stages = 2
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = False
+    enable_tr_instability = False
+    enable_radiation_reaction = False
+    enable_ion_motion = False
+    use_ramps = False
+    drive_beam_update_period = 1
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    interstage = setup_InterstageElegant(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_driveBeamEvol_linac', overwrite=True, verbose=False)
+
+
+@pytest.mark.transverse_wake_instability_linac
+def test_driveBeamEvol_ramped_linac():
+    "All ``StagePrtclTransWakeInstability`` physics effects disabled, driver evolution, driver angular jitter, with ramps."
+
+    num_stages = 2
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = False
+    enable_tr_instability = False
+    enable_radiation_reaction = False
+    enable_ion_motion = False
+    use_ramps = True
+    drive_beam_update_period = 1
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    interstage = setup_InterstageElegant(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_driveBeamEvol_ramped_linac', overwrite=True, verbose=False)
+
+
+
+###################################################
+# Angular jitter tests
+
+@pytest.mark.transverse_wake_instability_linac
+def test_angular_jitter_linac():
+    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, driver angular jitter, no ramps."
+
+    num_stages = 2
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = True
+    enable_tr_instability = False
+    enable_radiation_reaction = False
+    enable_ion_motion = False
+    use_ramps = False
+    drive_beam_update_period = 0
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    interstage = setup_InterstageElegant(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_angular_jitter_linac', overwrite=True, verbose=False)
+
+
+@pytest.mark.transverse_wake_instability_linac
+def test_angular_jitter_ramped_linac():
+    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, driver angular jitter, with ramps."
+
+    num_stages = 2
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = True
+    enable_tr_instability = False
+    enable_radiation_reaction = False
+    enable_ion_motion = False
+    use_ramps = True
+    drive_beam_update_period = 0
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    interstage = setup_InterstageElegant(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_angular_jitter_ramped_linac', overwrite=True, verbose=False)
+
+
+
+###################################################
+# Physics effects tests
+
+@pytest.mark.transverse_wake_instability_linac
+def test_tr_instability_linac():
+    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, no driver evolution, no driver jitter, no ramps."
+
+    num_stages = 2
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = False
+    enable_tr_instability = True
+    enable_radiation_reaction = True
+    enable_ion_motion = False
+    use_ramps = False
+    drive_beam_update_period = 0
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    interstage = setup_InterstageElegant(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_tr_instability_linac', overwrite=True, verbose=False)
+
+
+@pytest.mark.transverse_wake_instability_linac
+def test_jitter_tr_instability_ramped_linac():
+    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, no driver evolution, xy driver jitter, with ramps."
+
+    num_stages = 2
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = True
+    enable_xpyp_jitter = False
+    enable_tr_instability = True
+    enable_radiation_reaction = True
+    enable_ion_motion = False
+    use_ramps = True
+    drive_beam_update_period = 0
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    interstage = setup_InterstageElegant(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_jitter_tr_instability_ramped_linac', overwrite=True, verbose=False)
 
