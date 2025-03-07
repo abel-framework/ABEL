@@ -449,4 +449,4 @@ def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
     # Perform tracking
-    linac.run('test_trInstability_ionMotion_linac', overwrite=True, verbose=False)
+    linac.run('test_driverEvol_jitter_trInstability_ionMotion_ramped_linac', overwrite=True, verbose=False)
