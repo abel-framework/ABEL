@@ -23,7 +23,7 @@ dependencies = [
    "Wake-T",
    "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
    "ax-platform",
-   "CLICopti",
+   "CLICopti >= 2.2",
    "RF-Track"
 ]
 requires-python = ">= 3"
