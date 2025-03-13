@@ -137,14 +137,10 @@ def test_beam_between_ramps():
 
     # Assert that there has been no significant changes in the beams between parents and its upramp
     # Between a upramp and main stage
-    #print('stage.upramp.driver_out.beam_size_x:', stage.upramp.driver_out.beam_size_x(), 'stage.driver_in.beam_size_x:', stage.driver_in.beam_size_x())
-    #print('stage.upramp.beam_out.beam_size_x:', stage.upramp.beam_out.beam_size_x(), 'stage.beam_in.beam_size_x:', stage.beam_in.beam_size_x())
     Beam.comp_beams(stage.upramp.driver_out, stage.driver_in)
     Beam.comp_beams(stage.upramp.beam_out, stage.beam_in)
 
     # Between a main stage and downramp
-    #print('stage.downramp.driver_out.beta_y:', stage.downramp.driver_in.beta_y(), 'stage.driver_out.beta_y:', stage.driver_out.beta_y())
-    #print('stage.downramp.beam_in.beta_y:', stage.downramp.beam_in.beta_y(), 'stage.beam_out.beta_y:', stage.beam_out.beta_y())
     Beam.comp_beams(stage.driver_out, stage.downramp.driver_in)
     Beam.comp_beams(stage.beam_out, stage.downramp.beam_in)
 
