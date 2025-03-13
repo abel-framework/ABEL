@@ -231,6 +231,23 @@ class Beam():
     def ts(self):
         return self.zs()/SI.c
     
+
+    def comp_beams(beam1, beam2, comp_location=False, rtol=1e-05, atol=1e-08):
+        "Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within a tolerance."
+
+        if comp_location:
+            assert np.allclose(beam1.location, beam2.location, rtol, atol)
+        assert np.allclose(beam1.qs(), beam2.qs(), rtol, atol)
+        assert np.allclose(beam1.weightings(), beam2.weightings(), rtol, atol)
+        assert np.allclose(beam1.xs(), beam2.xs(), rtol, atol)
+        assert np.allclose(beam1.ys(), beam2.ys(), rtol, atol)
+        assert np.allclose(beam1.zs(), beam2.zs(), rtol, atol)
+        assert np.allclose(beam1.uxs(), beam2.uxs(), rtol, atol)
+        assert np.allclose(beam1.uys(), beam2.uys(), rtol, atol)
+        assert np.allclose(beam1.uzs(), beam2.uzs(), rtol, atol)
+        assert np.allclose(beam1.particle_mass, beam2.particle_mass, rtol, atol)
+    
+
     # vector of transverse positions and angles: (x, x', y, y')
     def transverse_vector(self):
         vector = np.zeros((4,len(self)))
