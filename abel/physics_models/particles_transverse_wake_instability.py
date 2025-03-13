@@ -446,8 +446,6 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     evolution : ``PrtclTransWakeEvolution`` object
         ...
     """
-    
-    #print(trans_wake_config.wake_t_fields.e_z.max()/1e9)      ##############################
 
     plasma_density = trans_wake_config.plasma_density
     stage_length = trans_wake_config.stage_length
@@ -474,8 +472,6 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
     num_time_steps = int(np.ceil(stage_length/(c*time_step)))
     time_step = stage_length/(c*num_time_steps)
-
-    print(plasma_density, beam.energy()/1e9, beta_wave_length, stage_length, num_time_steps)                                         ###############################
     
     # Extract beam phase space and other information
     initial_beam_location = beam.location
@@ -767,8 +763,6 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         drive_beam_out = drive_beam
     #drive_beam_out.remove_halo_particles(nsigma=20)
     
-
-    #print(plasma_density, stage_length, time_step, time_step_count)                                                    ###############################
 
     # ============= Save evolution =============
     if probe_evolution:

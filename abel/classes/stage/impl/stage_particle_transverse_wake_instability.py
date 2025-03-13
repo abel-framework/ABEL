@@ -251,12 +251,8 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:  # if self has an upramp
 
-            #print('I am an upramp. Density: ', self.upramp.plasma_density, 'length:', self.upramp.length)                 ########################
-
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
             beam0, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
-
-            #print('track_upramp() done. Density: ', self.upramp.plasma_density, 'length:', self.upramp.length)             ########################
 
         else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
             if self.parent is None:  # Just a lone stage
@@ -267,14 +263,11 @@ class StagePrtclTransWakeInstability(Stage):
                 drive_beam_ramped = copy.deepcopy(driver_incoming)
 
             if self.ramp_beta_mag is not None:
-                #print('Before incoming magnify_beta_function()', 'beam beta_y:', beam0.beta_y(), 'driver beta_y:', drive_beam_ramped.beta_y())           ########################
 
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
 
                 ## NOTE: beam0 and drive_beam_ramped should not be changed after this line to check for continuity between ramps and stage.
-                
-                #print('incoming magnify_beta_function()', 'beam beta_y:', beam0.beta_y(), 'driver beta_y:', drive_beam_ramped.beta_y())           ########################
 
 
         # ========== Record longitudinal number profile ==========
@@ -460,16 +453,6 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Save the initial step with ramped beams in rotated coordinate system after upramp
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
-
-        # # Assert that there has been no significant changes in the beams between parents and its upramp
-        # if self.upramp is not None and self.run_tests:  # Between a upramp and its parent
-        #     print('Before instability tracking', 'beam x_offset:', beam_filtered.x_offset(), 'driver x_offset:', drive_beam_ramped.x_offset())   #########################
-        #     Beam.comp_beams(self.upramp.driver_outgoing, drive_beam_ramped)
-        #     Beam.comp_beams(self.upramp.beam_outgoing, beam0)
-        # elif self.parent is not None and isinstance(self.driver_source, SourceCapsule) and self.run_tests:  # Between a parent and its downramp
-        #     print('Before instability tracking', 'beam x_offset:', beam_filtered.x_offset(), 'driver x_offset:', drive_beam_ramped.x_offset())   #########################
-        #     Beam.comp_beams(self.driver_source.track(), drive_beam_ramped)
-        #     Beam.comp_beams(self.parent.beam_outgoing, beam0)
         
         # Start tracking
         if self.parallel_track_2D is True:  # TODO: remove this and associated files
@@ -499,46 +482,25 @@ class StagePrtclTransWakeInstability(Stage):
                                  particle_mass=particle_mass)
         else:
 
-            print('Before instability tracking', 'beam beta_y:', beam_filtered.beta_y(), 'driver beta_y:', drive_beam_ramped.beta_y())   #########################
-
             beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
             self.evolution = evolution
 
             ## NOTE: beam and driver cannot be changed after this line in order to test for continuity between ramps and stage.
-
-            print('After instability tracking', 'beam beta_y:', beam.beta_y(), 'driver beta_y:', driver.beta_y())   #########################
 
         # Save the final step with ramped beams in rotated coordinate system before downramp
         self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
-
-            # if self.parent is None:
-            #     print('driver after instability', driver)                              ################################
-            # else:
-            #     print('ramp driver after instability', driver)                              ################################
-
-
-
-            print('\nI am a downramp. Density: ', self.downramp.plasma_density, 'length:', self.downramp.length)           ########################
-
             beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
-
-            print('track_downramp() done. Density: ', self.downramp.plasma_density, 'length:', self.downramp.length)           ########################
 
         else:  # Do the following if there are no downramp. 
             beam_outgoing = copy.deepcopy(beam)
             driver_outgoing = copy.deepcopy(driver)
             if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
 
-                #print('Before outgoing magnify_beta_function()', 'beam beta_y:', beam_outgoing.beta_y(), 'driver beta_y:', driver_outgoing.beta_y()) ###################
-
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-
-                #print('outgoing magnify_beta_function()', 'beam beta_y:', beam_outgoing.beta_y(), 'driver beta_y:', driver_outgoing.beta_y())    #####################
-                #print('outgoing magnify_beta_function()', 'beam x_offset:', beam_outgoing.x_offset(), 'driver x_offset:', driver_outgoing.x_offset())   #########################
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -598,17 +560,12 @@ class StagePrtclTransWakeInstability(Stage):
         if self.run_tests:
             if self.parent is None:
                 # The outgoing beams for the main stage need to be recorded before potential rotation for correct comparison with its ramps.
-                print('\nBefore saving', 'self.beam_out beta_y:', beam.beta_y(), 'self.driver_out.beta_y', driver.beta_y())   #########################
                 self.beam_out = beam
                 self.driver_out = driver
             else:
                 # Ramps record the final beams as their output beams, as they should not perform any rotation between instability tracking and this line.
                 self.beam_out = beam_outgoing
                 self.driver_out = driver_outgoing
-
-            if self.parent is not None:
-                print('Before saving', 'self.beam_in beta_y:', beam0.beta_y(), 'self.driver_in.beta_y', drive_beam_ramped.beta_y())   #########################
-
             self.driver_in = drive_beam_ramped  # Drive beam before instability tracking
             self.beam_in = beam0  # Main beam before instability tracking
 
