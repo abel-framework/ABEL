@@ -447,6 +447,8 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         ...
     """
     
+    #print(trans_wake_config.wake_t_fields.e_z.max()/1e9)      ##############################
+
     plasma_density = trans_wake_config.plasma_density
     stage_length = trans_wake_config.stage_length
     time_step_mod = trans_wake_config.time_step_mod
@@ -465,13 +467,17 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     if enable_driver_evolution:
         drive_beam_update_period = trans_wake_config.drive_beam_update_period
 
+    # Calculate the time step length
     skin_depth = 1/k_p(plasma_density)  # [m] 1/kp, plasma skin depth.
     beta_func = c/e*np.sqrt(2* beam.gamma() * eps0*m_e/plasma_density)  # [m] matched beta function.
     beta_wave_length = 2*np.pi*beta_func  # [m] betatron wavelength.
     time_step = time_step_mod*beta_wave_length/c  # [s] beam time step.
     num_time_steps = int(np.ceil(stage_length/(c*time_step)))
     time_step = stage_length/(c*num_time_steps)
+
+    print(plasma_density, beam.energy()/1e9, beta_wave_length, stage_length, num_time_steps)                                         ###############################
     
+    # Extract beam phase space and other information
     initial_beam_location = beam.location
     xs = beam.xs()
     ys = beam.ys()
@@ -554,7 +560,8 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     if use_wake_t_driver:
         drive_beam = beam2wake_t_bunch(drive_beam0, name='driver')
         #pz_thres = 0.01 * np.mean(drive_beam.pz)  # Later used to remove drive beam particles with too low momentum.
-        pz_thres = 5.5e-20/(SI.c*SI.m_e)  # Later used to remove drive beam particles with too low momentum. Corresponds to 0.1 GeV.
+        #pz_thres = 5.5e-20/(SI.c*SI.m_e)  # Later used to remove drive beam particles with too low momentum. Corresponds to 0.1 GeV.
+        pz_thres = 1.375e-20/(SI.c*SI.m_e)  # Later used to remove drive beam particles with too low momentum. Corresponds to 0.02555 GeV, i.e. 50 * electron rest energy.
     else:
         drive_beam = drive_beam0
     
@@ -585,7 +592,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         
         # ============= Apply filters =============
         # Filter out particles that have too small energies
-        bool_indices = (pzs_sorted > velocity2gamma(0.99*c)*m_e*c*0.99)  # Corresponds to 0.99c.
+        bool_indices = (pzs_sorted > velocity2gamma(0.99*c)*m_e*c*0.99)  # Corresponds to 0.99c. TODO: this is perhaps too strict.
         zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius = bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius)
         
         # Filter out particles that diverge too much for applying small angle approximation
@@ -697,7 +704,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
                     #drive_beam = wake_t_remove_halo_particles(drive_beam, nsigma=20)
 
                     # Remove particles that are too far out or have too low energy
-                    drive_beam = wakeT_r_E_filter(drive_beam, r_thres=max_bubble_radius, pz_thres=pz_thres)
+                    drive_beam = wakeT_r_E_filter(drive_beam, r_thres=1.5*max_bubble_radius, pz_thres=pz_thres)
         else:
             drive_beam.location = initial_driver_location + prop_length
 
@@ -754,12 +761,14 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     # Prepare the drive beam for return
     if use_wake_t_driver:
         # Remove particles that are too far out or have too low energy
-        drive_beam = wakeT_r_E_filter(drive_beam, r_thres=max_bubble_radius, pz_thres=pz_thres)
+        drive_beam = wakeT_r_E_filter(drive_beam, r_thres=1.5*max_bubble_radius, pz_thres=pz_thres)
         drive_beam_out = wake_t_bunch2beam(drive_beam)
     else:
         drive_beam_out = drive_beam
     #drive_beam_out.remove_halo_particles(nsigma=20)
     
+
+    #print(plasma_density, stage_length, time_step, time_step_count)                                                    ###############################
 
     # ============= Save evolution =============
     if probe_evolution:

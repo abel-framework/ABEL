@@ -193,7 +193,13 @@ class StagePrtclTransWakeInstability(Stage):
         if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    #############################
             driver_incoming = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
-            driver_incoming = self.driver_source.track() # Generate a drive beam with jitter. 
+            driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
+
+            # if self.parent is None:
+            #     print('driver incoming', driver_incoming)                              ################################
+            # else:
+            #     print('ramp driver incoming', driver_incoming)                              ################################
+
             self.drive_beam = driver_incoming                    ######################
         
 
@@ -248,10 +254,14 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
-        if self.upramp is not None:
+        if self.upramp is not None:  # if self has an upramp
+
+            print('I am an upramp. Density: ', self.upramp.plasma_density, 'length:', self.upramp.length)                 ########################
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
             beam0, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
+
+            print('track_upramp() done. Density: ', self.upramp.plasma_density, 'length:', self.upramp.length)             ########################
 
         else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
             if self.parent is None:  # Just a lone stage
@@ -262,8 +272,12 @@ class StagePrtclTransWakeInstability(Stage):
                 drive_beam_ramped = copy.deepcopy(driver_incoming)
 
             if self.ramp_beta_mag is not None:
+                print('Before incoming magnify_beta_function()', 'beam beta_y:', beam0.beta_y(), 'driver beta_y:', drive_beam_ramped.beta_y())           ########################
+
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
+                
+                print('incoming magnify_beta_function()', 'beam beta_y:', beam0.beta_y(), 'driver beta_y:', drive_beam_ramped.beta_y())           ########################
 
 
         # ========== Record longitudinal number profile ==========
@@ -309,6 +323,8 @@ class StagePrtclTransWakeInstability(Stage):
         beam0_wake_t = beam2wake_t_bunch(beam0_wakeT, name='beam')
 
         plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
+
+        print('Wake-T plasma_stage.track()')                                                                                ########################
         
         wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
         
@@ -330,7 +346,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.zs_bubble_radius_axial = zs_rho
         bubble_radius_wakeT = self.trace_bubble_radius_WakeT(plasma_num_density, info_rho.r, zs_rho, threshold=0.8)  # Extracts rb with driver placed on axis.
 
-        print('max_bubble_radius:', bubble_radius_wakeT.max()*1e6, 'um\n')
+        #print('max_bubble_radius:', bubble_radius_wakeT.max()*1e6, 'um\n')                                    ######################################
 
         # Cut out bubble radius over the ROI
         R_blowout = blowout_radius(self.plasma_density, drive_beam_ramped.peak_current())
@@ -397,12 +413,14 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Prepare fields from Wake-T for use in drive beam tracking
         if self.drive_beam_update_period > 0:  # Do drive beam evolution
-            wake_t_fields = plasma_stage.fields[0]  # Extract the wakefields used for driver tracking.
+            wake_t_fields = plasma_stage.fields[-1]  # Extract the wakefields used for driver tracking.
             wake_t_fields.r_fld = wake_t_fields.r_fld + np.sqrt(driver_x_offset**2 + driver_y_offset**2)  # Compensate for the drive beam offset.
         else:
             wake_t_fields = None
 
         # Set up the configuration for the instability model
+        if self.parent is not None:
+            self.probe_evol_period = 1  # Probe every time step if self is a ramp.
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
             stage_length=self.length, 
@@ -446,7 +464,8 @@ class StagePrtclTransWakeInstability(Stage):
         info_rho.r = rs_rho
         info_rho.imshow_extent[2] = rs_rho.min()
         info_rho.imshow_extent[3] = rs_rho.max()
-        # Save the initial step with ramped beams in rotated coordinate system
+        
+        # Save the initial step with ramped beams in rotated coordinate system after upramp
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
 
         
@@ -478,24 +497,52 @@ class StagePrtclTransWakeInstability(Stage):
                                  particle_mass=particle_mass)
         else:
             
+            # if self.parent is None:
+            #     print('driver before instability', drive_beam_ramped)                              ################################
+            # else:
+            #     print('ramp driver before instability', drive_beam_ramped)                              ################################
+
+            print('Before instability tracking', 'beam beta_y:', beam_filtered.beta_y(), 'driver beta_y:', drive_beam_ramped.beta_y())   #########################
+
             beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
             self.evolution = evolution
 
+            print('After instability tracking', 'beam beta_y:', beam.beta_y(), 'driver beta_y:', driver.beta_y())   #########################
             
-        # Save the final step with ramped beams in rotated coordinate system
-        #self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
+            if self.parent is None:
+                print('driver after instability', driver)                              ################################
+            else:
+                print('ramp driver after instability', driver)                              ################################
 
+            
+        # Save the final step with ramped beams in rotated coordinate system before downramp
+        self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
+
+            # if self.parent is None:
+            #     print('driver after instability', driver)                              ################################
+            # else:
+            #     print('ramp driver after instability', driver)                              ################################
+
+            print('\nI am a downramp. Density: ', self.downramp.plasma_density, 'length:', self.downramp.length)           ########################
+
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
+
+            print('track_downramp() done. Density: ', self.downramp.plasma_density, 'length:', self.downramp.length)           ########################
 
         else:  # Do the following if there are no downramp. 
             beam_outgoing = copy.deepcopy(beam)
             driver_outgoing = copy.deepcopy(driver)
             if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
+
+                print('Before outgoing magnify_beta_function()', 'beam beta_y:', beam_outgoing.beta_y(), 'driver beta_y:', driver_outgoing.beta_y()) ###################
+
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+
+                print('outgoing magnify_beta_function()', 'beam beta_y:', beam_outgoing.beta_y(), 'driver beta_y:', driver_outgoing.beta_y())    #####################
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -551,6 +598,11 @@ class StagePrtclTransWakeInstability(Stage):
         beam_outgoing.stage_number = beam_incoming.stage_number
         beam_outgoing.location = beam_incoming.location
         
+        # if self.parent is None:
+        #     print('driver outgoing', driver_outgoing)                              ################################
+        # else:
+        #     print('ramp driver outgoing', driver_outgoing)                              ################################
+
         # Return the beam (and optionally the driver)
         if self._return_tracked_driver:
             return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing

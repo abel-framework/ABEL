@@ -227,7 +227,7 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
         if box_size_r < 1.2*max_r:
             warnings.warn(f"The simulation box is too narrow. Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
         
-        print(f"Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
+        #print(f"Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
         
         
     # Calculate number of cells
@@ -364,8 +364,6 @@ def wakeT_r_E_filter(bunch, r_thres, pz_thres):
 
     rs = np.sqrt(bunch.x**2 + bunch.y**2)
     r_filter = rs > r_thres
-
-    
 
     #Es = momentum2energy(bunch.pz*SI.c*SI.m_e)
     pzs = bunch.pz
