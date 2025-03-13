@@ -227,9 +227,6 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
         if box_size_r < 1.2*max_r:
             warnings.warn(f"The simulation box is too narrow. Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
         
-        #print(f"Max box r: {box_size_r*1e6 :.3f} um, max particle r: {max_r*1e6 :.3f} um.")
-        
-        
     # Calculate number of cells
     dr = box_size_r/num_cell_xy
     num_cell_z = round((box_max_z-box_min_z)/dr)
