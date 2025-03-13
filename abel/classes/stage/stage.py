@@ -10,7 +10,7 @@ import scipy.constants as SI
 from matplotlib import pyplot as plt
 from types import SimpleNamespace
 from matplotlib.colors import LogNorm
-from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
+#from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
 
 from typing import Self
 
