@@ -334,7 +334,7 @@ class StageWakeT(Stage):
 
 
     # ==================================================
-    def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+    def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, nsig=5, args=None):
         '''
         Extracts data for waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
 
@@ -351,6 +351,9 @@ class StageWakeT(Stage):
 
         remove_halo_nsigma : float, optional
             Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+
+        nsig : float, optional
+            Helps define the range of the histograms. E.g. the range in x is defined by the beam x offset +- nsig * x beam size.
 
         args : float list, optional
             Allows passing additional arguments to the functions in fcns.
@@ -374,7 +377,6 @@ class StageWakeT(Stage):
         file_path = data_dir + files[0]
         beam0 = wake_t_hdf5_load(file_path=file_path, species=species)
         num_bins = int(np.sqrt(len(beam0)*2))
-        nsig = 5
         
         if species == 'driver':
             deltaedges = np.linspace(-0.5, 0.5, num_bins)
