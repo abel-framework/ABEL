@@ -23,10 +23,10 @@ dependencies = [
    "Wake-T",
    "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
    "ax-platform",
-   "CLICopti@git+https://gitlab.cern.ch/clic-software/clicopti.git",
+   "CLICopti",
    "RF-Track"
 ]
-requires-python = ">= 3"
+requires-python = ">=3.11"
 
 authors = [
   {name = "Carl Andreas Lindstrøm", email = "c.a.lindstrom@fys.uio.no"},
@@ -43,3 +43,12 @@ readme = "README.md"
 
 #[tool.setuptools.packages.find]
 #where = ["Python"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+markers = [
+  "core: Test core functionality",
+  "stageGeometry: Test stage geometry calculation functionality",
+]

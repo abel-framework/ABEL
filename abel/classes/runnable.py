@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from abel import CONFIG, Beam
 import os, shutil, time, sys, csv
 from datetime import datetime
@@ -47,7 +47,6 @@ class Runnable(ABC):
             # save object to file
             self.save()
 
-    
     ## SCAN FUNCTIONALITY
     
     def is_scan(self):
@@ -136,6 +135,7 @@ class Runnable(ABC):
         self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
     
     
+
     
     # generate run folder
     def run_path(self):

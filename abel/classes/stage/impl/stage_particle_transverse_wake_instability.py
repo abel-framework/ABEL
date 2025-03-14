@@ -1040,171 +1040,6 @@ class StagePrtclTransWakeInstability(Stage):
 
     
     # ==================================================
-    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', reduce_cax_pad=False):
-
-        if weights is None:
-            weights = self.main_beam.weightings()
-        if hist_bins is None:
-            nbins = int(np.sqrt(len(arr1)/2))
-            hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
-        if hist_range is None:
-            hist_range = [[None, None], [None, None]]
-            hist_range[0] = [ arr1.min(), arr1.max() ]  # List contains 2 lists of 2 floats. Extent of the histogram along each direction
-            hist_range[1] = [ arr2.min(), arr2.max() ]
-        if extent is None:
-            extent = hist_range[0] + hist_range[1]
-        
-        binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
-        beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
-        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, 
-                  xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
-
-    
-    # ==================================================
-    def density_map_diags(self, beam=None, plot_centroids=False, save_plots=True):
-        
-        #colors = ['white', 'aquamarine', 'lightgreen', 'green']
-        #colors = ['white', 'forestgreen', 'limegreen', 'lawngreen', 'aquamarine', 'deepskyblue']
-        #bounds = [0, 0.2, 0.4, 0.8, 1]
-        #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
-        
-        cmap = CONFIG.default_cmap
-
-        if beam is None:
-            beam = self.main_beam
-
-        # Macroparticles data
-        zs = beam.zs()
-        xs = beam.xs()
-        xps = beam.xps()
-        ys = beam.ys()
-        yps = beam.yps()
-        Es = beam.Es()
-        weights = beam.weightings()
-
-        # Labels for plots
-        zlab = r'$z$ [$\mathrm{\mu}$m]'
-        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
-        xlab = r'$x$ [$\mathrm{\mu}$m]'
-        ylab = r'$y$ [$\mathrm{\mu}$m]'
-        xps_lab = '$x\'$ [mrad]'
-        yps_lab = '$y\'$ [mrad]'
-        energ_lab = r'$\mathcal{E}$ [GeV]'
-        
-        # Set up a figure with axes
-        fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
-        fig.suptitle(r'$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
-
-        nbins = int(np.sqrt(len(weights)/2))
-        hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
-
-        # 2D z-x distribution
-        hist_range = [[None, None], [None, None]]
-        hist_range[0] = [ zs.min(), zs.max() ]  # [m], list contains 2 lists of 2 floats. Extent of the histogram along each direction
-        hist_range[1] = [ xs.min(), xs.max() ]
-        extent_zx = hist_range[0] + hist_range[1]
-        extent_zx = [i*1e6 for i in extent_zx]  # [um]
-
-        self.distribution_plot_2D(arr1=zs, arr2=xs, weights=weights, hist_bins=hist_bins, hist_range=hist_range, axes=axs[0][0], extent=extent_zx, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xlab, clab=r'$\partial^2 N/\partial\xi \partial x$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D z-x' distribution
-        hist_range_xps = [[None, None], [None, None]]
-        hist_range_xps[0] = hist_range[0]
-        hist_range_xps[1] = [ xps.min(), xps.max() ]  # [rad]
-        extent_xps = hist_range_xps[0] + hist_range_xps[1]
-        extent_xps[0] = extent_xps[0]*1e6  # [um]
-        extent_xps[1] = extent_xps[1]*1e6  # [um]
-        extent_xps[2] = extent_xps[2]*1e3  # [mrad]
-        extent_xps[3] = extent_xps[3]*1e3  # [mrad]
-
-        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        
-        
-        # 2D x-x' distribution
-        hist_range_xxp = [[None, None], [None, None]]
-        hist_range_xxp[0] = hist_range[1]
-        hist_range_xxp[1] = [ xps.min(), xps.max() ]  # [rad]
-        extent_xxp = hist_range_xxp[0] + hist_range_xxp[1]
-        extent_xxp[0] = extent_xxp[0]*1e6  # [um]
-        extent_xxp[1] = extent_xxp[1]*1e6  # [um]
-        extent_xxp[2] = extent_xxp[2]*1e3  # [mrad]
-        extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
-
-        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D z-y distribution
-        hist_range_zy = [[None, None], [None, None]]
-        hist_range_zy[0] = hist_range[0]
-        hist_range_zy[1] = [ ys.min(), ys.max() ]
-        extent_zy = hist_range_zy[0] + hist_range_zy[1]
-        extent_zy = [i*1e6 for i in extent_zy]  # [um]
-
-        self.distribution_plot_2D(arr1=zs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_zy, axes=axs[1][0], extent=extent_zy, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=ylab, clab=r'$\partial^2 N/\partial\xi \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D z-y' distribution
-        hist_range_yps = [[None, None], [None, None]]
-        hist_range_yps[0] = hist_range[0]
-        hist_range_yps[1] = [ yps.min(), yps.max() ]  # [rad]
-        extent_yps = hist_range_yps[0] + hist_range_yps[1]
-        extent_yps[0] = extent_yps[0]*1e6  # [um]
-        extent_yps[1] = extent_yps[1]*1e6  # [um]
-        extent_yps[2] = extent_yps[2]*1e3  # [mrad]
-        extent_yps[3] = extent_yps[3]*1e3  # [mrad]
-        
-        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-        
-
-        # 2D y-y' distribution
-        hist_range_yyp = [[None, None], [None, None]]
-        hist_range_yyp[0] = hist_range_zy[1]
-        hist_range_yyp[1] = [ yps.min(), yps.max() ]  # [rad]
-        extent_yyp = hist_range_yyp[0] + hist_range_yyp[1]
-        extent_yyp[0] = extent_yyp[0]*1e6  # [um]
-        extent_yyp[1] = extent_yyp[1]*1e6  # [um]
-        extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
-        extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
-        
-        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
-       
-
-        # 2D x-y distribution
-        hist_range_xy = [[None, None], [None, None]]
-        hist_range_xy[0] = hist_range[1]
-        hist_range_xy[1] = hist_range_zy[1]
-        extent_xy = hist_range_xy[0] + hist_range_xy[1]
-        extent_xy = [i*1e6 for i in extent_xy]  # [um]
-
-        self.distribution_plot_2D(arr1=xs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xy, axes=axs[2][0], extent=extent_xy, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=ylab, clab=r'$\partial^2 N/\partial x \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
-        
-
-        # Energy distribution
-        ax = axs[2][1]
-        dN_dE, rel_energ = beam.rel_energy_spectrum()
-        dN_dE = dN_dE/-e
-        ax.fill_between(rel_energ*100, y1=dN_dE, y2=0, color='b', alpha=0.3)
-        ax.plot(rel_energ*100, dN_dE, color='b', alpha=0.3, label='Relative energy density')
-        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-        ax.set_xlabel(r'$\mathcal{E}/\langle\mathcal{E}\rangle-1$ [%]')
-        ax.set_ylabel('Relative energy density')
-        # Add text to the plot
-        ax.text(0.05, 0.95, r'$\sigma_\mathcal{E}/\langle\mathcal{E}\rangle=$' f'{format(beam.rel_energy_spread()*100, ".2f")}' '%', fontsize=12, color='black', ha='left', va='top', transform=ax.transAxes)
-
-        # 2D z-energy distribution
-        hist_range_energ = [[None, None], [None, None]]
-        hist_range_energ[0] = hist_range[0]
-        hist_range_energ[1] = [ Es.min(), Es.max() ]  # [eV]
-        extent_energ = hist_range_energ[0] + hist_range_energ[1]
-        extent_energ[0] = extent_energ[0]*1e6  # [um]
-        extent_energ[1] = extent_energ[1]*1e6  # [um]
-        extent_energ[2] = extent_energ[2]/1e9  # [GeV]
-        extent_energ[3] = extent_energ[3]/1e9  # [GeV]
-        self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
-
-    
-    # ==================================================
     def scatter_diags(self, beam=None, n_th_particle=1):
         '''
         n_th_particle:  Use this to reduce the amount of plotted particles by only plotting every n_th_particle particle.
@@ -1408,7 +1243,7 @@ class StagePrtclTransWakeInstability(Stage):
         norm_emittance_ys = evolution.norm_emittance_y
         
         #long_label = '$s_\mathrm{stage}$ [m]'
-        long_label = '$\Delta s$ [m]'
+        long_label = r'$\Delta s$ [m]'
         xlim_max = prop_length.max()
         xlim_min = prop_length.min()
 
@@ -1455,8 +1290,8 @@ class StagePrtclTransWakeInstability(Stage):
         #axs[1,1].set_xlabel(long_label)
         #axs[1,1].set_ylabel(r'Bunch length [$\mathrm{\mu}$m]')
 
-        axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label='$\sigma_{x\'} $')
-        axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label='$\sigma_{y\'} $')
+        axs[1,1].plot(prop_length, divergence_xs*1e6, color=col1, label=r"$\sigma_{x'} $")
+        axs[1,1].plot(prop_length, divergence_ys*1e6, color=col2, label=r"$\sigma_{y'} $")
         #axs[1,1].set_xlabel(long_label)
         axs[1,1].set(xticklabels=[])
         axs[1,1].set_ylabel(r'Divergence [$\mathrm{\mu}$rad]')
@@ -2414,7 +2249,176 @@ class StagePrtclTransWakeInstability(Stage):
         f.close()
 
 #vvvvvvvvvvvvvvvvvvvvvv Not currently in use vvvvvvvvvvvvvvvvvvvvvv
-'''
+
+#    
+#
+#    
+#    # ==================================================
+#    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', reduce_cax_pad=False):
+#
+#        if weights is None:
+#            weights = self.main_beam.weightings()
+#        if hist_bins is None:
+#            nbins = int(np.sqrt(len(arr1)/2))
+#            hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
+#        if hist_range is None:
+#            hist_range = [[None, None], [None, None]]
+#            hist_range[0] = [ arr1.min(), arr1.max() ]  # List contains 2 lists of 2 floats. Extent of the histogram along each direction
+#            hist_range[1] = [ arr2.min(), arr2.max() ]
+#        if extent is None:
+#            extent = hist_range[0] + hist_range[1]
+#        
+#        binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
+#        beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
+#        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, 
+#                  xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
+#
+#    
+#    # ==================================================
+#    def density_map_diags(self, beam=None, plot_centroids=False, save_plots=True):
+#        
+#        #colors = ['white', 'aquamarine', 'lightgreen', 'green']
+#        #colors = ['white', 'forestgreen', 'limegreen', 'lawngreen', 'aquamarine', 'deepskyblue']
+#        #bounds = [0, 0.2, 0.4, 0.8, 1]
+#        #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
+#        
+#        cmap = CONFIG.default_cmap
+#
+#        if beam is None:
+#            beam = self.main_beam
+#
+#        # Macroparticles data
+#        zs = beam.zs()
+#        xs = beam.xs()
+#        xps = beam.xps()
+#        ys = beam.ys()
+#        yps = beam.yps()
+#        Es = beam.Es()
+#        weights = beam.weightings()
+#
+#        # Labels for plots
+#        zlab = r'$z$ [$\mathrm{\mu}$m]'
+#        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
+#        xlab = r'$x$ [$\mathrm{\mu}$m]'
+#        ylab = r'$y$ [$\mathrm{\mu}$m]'
+#        xps_lab = '$x\'$ [mrad]'
+#        yps_lab = '$y\'$ [mrad]'
+#        energ_lab = r'$\mathcal{E}$ [GeV]'
+#        
+#        # Set up a figure with axes
+#        fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
+#        fig.suptitle(r'$\Delta s=$' f'{format(beam.location, ".2f")}' ' m')
+#
+#        nbins = int(np.sqrt(len(weights)/2))
+#        hist_bins = [ nbins, nbins ]  # list of 2 ints. Number of bins along each direction, for the histograms
+#
+#        # 2D z-x distribution
+#        hist_range = [[None, None], [None, None]]
+#        hist_range[0] = [ zs.min(), zs.max() ]  # [m], list contains 2 lists of 2 floats. Extent of the histogram along each direction
+#        hist_range[1] = [ xs.min(), xs.max() ]
+#        extent_zx = hist_range[0] + hist_range[1]
+#        extent_zx = [i*1e6 for i in extent_zx]  # [um]
+#
+#        self.distribution_plot_2D(arr1=zs, arr2=xs, weights=weights, hist_bins=hist_bins, hist_range=hist_range, axes=axs[0][0], extent=extent_zx, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xlab, clab=r'$\partial^2 N/\partial\xi \partial x$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D z-x' distribution
+#        hist_range_xps = [[None, None], [None, None]]
+#        hist_range_xps[0] = hist_range[0]
+#        hist_range_xps[1] = [ xps.min(), xps.max() ]  # [rad]
+#        extent_xps = hist_range_xps[0] + hist_range_xps[1]
+#        extent_xps[0] = extent_xps[0]*1e6  # [um]
+#        extent_xps[1] = extent_xps[1]*1e6  # [um]
+#        extent_xps[2] = extent_xps[2]*1e3  # [mrad]
+#        extent_xps[3] = extent_xps[3]*1e3  # [mrad]
+#
+#        self.distribution_plot_2D(arr1=zs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xps, axes=axs[0][1], extent=extent_xps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=xps_lab, clab='$\partial^2 N/\partial z \partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#        
+#        
+#        # 2D x-x' distribution
+#        hist_range_xxp = [[None, None], [None, None]]
+#        hist_range_xxp[0] = hist_range[1]
+#        hist_range_xxp[1] = [ xps.min(), xps.max() ]  # [rad]
+#        extent_xxp = hist_range_xxp[0] + hist_range_xxp[1]
+#        extent_xxp[0] = extent_xxp[0]*1e6  # [um]
+#        extent_xxp[1] = extent_xxp[1]*1e6  # [um]
+#        extent_xxp[2] = extent_xxp[2]*1e3  # [mrad]
+#        extent_xxp[3] = extent_xxp[3]*1e3  # [mrad]
+#
+#        self.distribution_plot_2D(arr1=xs, arr2=xps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xxp, axes=axs[0][2], extent=extent_xxp, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=xps_lab, clab='$\partial^2 N/\partial x\partial x\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D z-y distribution
+#        hist_range_zy = [[None, None], [None, None]]
+#        hist_range_zy[0] = hist_range[0]
+#        hist_range_zy[1] = [ ys.min(), ys.max() ]
+#        extent_zy = hist_range_zy[0] + hist_range_zy[1]
+#        extent_zy = [i*1e6 for i in extent_zy]  # [um]
+#
+#        self.distribution_plot_2D(arr1=zs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_zy, axes=axs[1][0], extent=extent_zy, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=ylab, clab=r'$\partial^2 N/\partial\xi \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D z-y' distribution
+#        hist_range_yps = [[None, None], [None, None]]
+#        hist_range_yps[0] = hist_range[0]
+#        hist_range_yps[1] = [ yps.min(), yps.max() ]  # [rad]
+#        extent_yps = hist_range_yps[0] + hist_range_yps[1]
+#        extent_yps[0] = extent_yps[0]*1e6  # [um]
+#        extent_yps[1] = extent_yps[1]*1e6  # [um]
+#        extent_yps[2] = extent_yps[2]*1e3  # [mrad]
+#        extent_yps[3] = extent_yps[3]*1e3  # [mrad]
+#        
+#        self.distribution_plot_2D(arr1=zs, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yps, axes=axs[1][1], extent=extent_yps, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=yps_lab, clab='$\partial^2 N/\partial z \partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # 2D y-y' distribution
+#        hist_range_yyp = [[None, None], [None, None]]
+#        hist_range_yyp[0] = hist_range_zy[1]
+#        hist_range_yyp[1] = [ yps.min(), yps.max() ]  # [rad]
+#        extent_yyp = hist_range_yyp[0] + hist_range_yyp[1]
+#        extent_yyp[0] = extent_yyp[0]*1e6  # [um]
+#        extent_yyp[1] = extent_yyp[1]*1e6  # [um]
+#        extent_yyp[2] = extent_yyp[2]*1e3  # [mrad]
+#        extent_yyp[3] = extent_yyp[3]*1e3  # [mrad]
+#        
+#        self.distribution_plot_2D(arr1=ys, arr2=yps, weights=weights, hist_bins=hist_bins, hist_range=hist_range_yyp, axes=axs[1][2], extent=extent_yyp, vmin=None, vmax=None, colmap=cmap, xlab=ylab, ylab=yps_lab, clab='$\partial^2 N/\partial y\partial y\'$ [$\mathrm{m}^{-1}$ $\mathrm{rad}^{-1}$]', origin='lower', interpolation='nearest')
+#       
+#
+#        # 2D x-y distribution
+#        hist_range_xy = [[None, None], [None, None]]
+#        hist_range_xy[0] = hist_range[1]
+#        hist_range_xy[1] = hist_range_zy[1]
+#        extent_xy = hist_range_xy[0] + hist_range_xy[1]
+#        extent_xy = [i*1e6 for i in extent_xy]  # [um]
+#
+#        self.distribution_plot_2D(arr1=xs, arr2=ys, weights=weights, hist_bins=hist_bins, hist_range=hist_range_xy, axes=axs[2][0], extent=extent_xy, vmin=None, vmax=None, colmap=cmap, xlab=xlab, ylab=ylab, clab=r'$\partial^2 N/\partial x \partial y$ [$\mathrm{m}^{-2}$]', origin='lower', interpolation='nearest')
+#        
+#
+#        # Energy distribution
+#        ax = axs[2][1]
+#        dN_dE, rel_energ = beam.rel_energy_spectrum()
+#        dN_dE = dN_dE/-e
+#        ax.fill_between(rel_energ*100, y1=dN_dE, y2=0, color='b', alpha=0.3)
+#        ax.plot(rel_energ*100, dN_dE, color='b', alpha=0.3, label='Relative energy density')
+#        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+#        ax.set_xlabel(r'$\mathcal{E}/\langle\mathcal{E}\rangle-1$ [%]')
+#        ax.set_ylabel('Relative energy density')
+#        # Add text to the plot
+#        ax.text(0.05, 0.95, r'$\sigma_\mathcal{E}/\langle\mathcal{E}\rangle=$' f'{format(beam.rel_energy_spread()*100, ".2f")}' '%', fontsize=12, color='black', ha='left', va='top', transform=ax.transAxes)
+#
+#        # 2D z-energy distribution
+#        hist_range_energ = [[None, None], [None, None]]
+#        hist_range_energ[0] = hist_range[0]
+#        hist_range_energ[1] = [ Es.min(), Es.max() ]  # [eV]
+#        extent_energ = hist_range_energ[0] + hist_range_energ[1]
+#        extent_energ[0] = extent_energ[0]*1e6  # [um]
+#        extent_energ[1] = extent_energ[1]*1e6  # [um]
+#        extent_energ[2] = extent_energ[2]/1e9  # [GeV]
+#        extent_energ[3] = extent_energ[3]/1e9  # [GeV]
+#        self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
+
+
+'''    
 ###################################################
 def growing_end_seq(arr, idxs):
     

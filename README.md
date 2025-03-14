@@ -4,9 +4,32 @@ The ABEL simulation framework is a particle-tracking framework for plasma-accele
 
 ## Installation with pip
 1. Clone the repository to a local folder
-2. Edit the file abel/config.py. In particular, you'll need to install HiPACE and tell it where it is located; ABEL needs the "tools" python module in their source folder.
-3. In your target python environment, run `pip install path-to-ABEL` where `path-to-ABEL` is where you have cloned ABEL to.
+2. In your target python environment, run `pip install path-to-ABEL` where `path-to-ABEL` is where you have cloned ABEL to.
    If you want to be able to modify ABEL without uninstalling and reinstalling, you can run `pip install -e path-to-abel`, and the `abel`
    folder in your local clone will effectively be put into your `$PYTHONPATH`.
 
 To remove ABEL, run `pip uninstall abel`.
+
+## Configuration of ABEL
+To use ABEL, you must configure it. This is done with the file `.abelconfig.toml`, which is automatically created in your home directory the first time you import ABEL.
+Edit this file with your text editor to tell ABEL where to find tools such as ELEGANT, HIPACE, and GUINEAPIG, as well as configure it for your computing cluster, if needed.
+
+How to edit it is explained with comments in the file. It uses the file format "TOML", which is a simple text file similar to .ini, but better defined.
+
+Please do not edit the template file `abelconfig.toml` or `CONFIG.py` in the source code folder.
+
+The as-loaded configuration of ABEL is printed to the terminal when abel starts, along with the name of the config file it has loaded.
+
+## Unit tests
+Unit tests are implemented with `pytest`; to run the tests on an installed version of ABEL please run
+``pytest -v``
+from the root folder of ABEL.
+It is also possible to run single tests by name, for example: `pytest -v tests/test_init.py::testCore_init`
+
+The tests are stored in in the `tests` subdirectory, in files with names starting with `test_`.
+In these files, the functions with names starting with `test_` are represent one test; if it makes it to the end without any of the asserts triggering and all the expected exceptions happening, the test has PASSED.
+The test functions are also annotated with `@pytest.mark.MARKNAME`.
+
+Pytest is configured in the `[tool.pytest.ini_options]` section of `pyproject.toml`. This especially defines the "markers", which are named groups of tests that can be specified to run using `pytest -v -m MARKNAME`.
+
+When the tests succeed, no output (except `testfile::testfile PASSED`) is printed. If a test fails, a traceback and the printouts of that test is printed. If may tests fail, this can be very verbose.

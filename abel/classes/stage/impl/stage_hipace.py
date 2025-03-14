@@ -17,7 +17,7 @@ try:
     sys.path.append(os.path.join(CONFIG.hipace_path, 'tools'))
     import read_insitu_diagnostics
 except:
-    print('Could not import HiPACE++ tools')
+    print(f"Could not import HiPACE++ tools from {os.path.join(CONFIG.hipace_path, 'tools')}")
 
 class StageHipace(Stage):
     
@@ -72,6 +72,10 @@ class StageHipace(Stage):
         
         # generate driver
         driver_incoming = self.driver_source.track()
+
+        # Set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done
+        self._prepare_ramps()
 
         # plasma-density ramps (de-magnify beta function)
         location_flattop_start = 0
@@ -312,6 +316,14 @@ class StageHipace(Stage):
                 evol.energy_spread_fwhm[:] = np.nan
             
             evol.rel_energy_spread_fwhm = evol.energy_spread_fwhm/evol.energy
+
+            # peak current
+            slice_charges_tuple = (evol.slices.charge[:, :-1] + evol.slices.charge[:, 1:])/2
+            slice_thicknesses_tuple = np.diff(evol.slices.z)
+            slice_zs_tuple = (evol.slices.z[:, :-1] + evol.slices.z[:, 1:])/2
+            slice_currents_tuple = np.sign(slice_charges_tuple)*slice_charges_tuple*SI.c/slice_thicknesses_tuple
+            peak_currents = np.max(np.stack(slice_currents_tuple), axis=1)
+            evol.peak_current = peak_currents
             
             # assign it
             if bunch == 'beam':

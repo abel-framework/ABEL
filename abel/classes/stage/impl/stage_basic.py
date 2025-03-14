@@ -26,6 +26,10 @@ class StageBasic(Stage):
         if self.plasma_density is None:
             self.optimize_plasma_density()
 
+        # Set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done
+        self._prepare_ramps()
+
         # plasma-density ramps (de-magnify beta function)
         if self.upramp is not None:
             beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
@@ -34,7 +38,7 @@ class StageBasic(Stage):
             driver0 = copy.deepcopy(driver_incoming)
             if self.ramp_beta_mag is not None:
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)   
                 
         # apply plasma-density up ramp (demagnify beta function)
         beam = copy.deepcopy(beam0)
@@ -82,11 +86,11 @@ class StageBasic(Stage):
                 
 
         # ========== Betatron oscillations ==========
-        beam.apply_betatron_motion(self.length_flattop, self.plasma_density, self.nom_energy_gain, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+        beam.apply_betatron_motion(self.length_flattop, self.plasma_density, self.nom_energy_gain_flattop, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
 
 
         # ========== Accelerate beam with homogeneous energy gain ==========
-        beam.set_Es(beam.Es() + self.nom_energy_gain)
+        beam.set_Es(beam.Es() + self.nom_energy_gain_flattop)
 
         # ========== Rotate the coordinate system of the beams back to original ==========
         if isinstance(self.driver_source, Source) and (self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0):

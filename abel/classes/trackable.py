@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 import warnings
 import numpy as np
 
+# For type checking
+from abel.classes.beam     import Beam
+from abel.classes.runnable import Runnable
+
 class Trackable(ABC):
     
     # constructor
@@ -148,7 +152,7 @@ class Trackable(ABC):
     # Tracking function                       #
     #=========================================#
     
-    def track(self, beam, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam : Beam, savedepth : int = 0, runnable : Runnable | None = None, verbose : bool = False):
         
         # remove nan particles
         beam.remove_nans()
@@ -204,17 +208,9 @@ class Trackable(ABC):
     
     # length of the trackable element
     @abstractmethod
-    def get_length(self):
+    def get_length(self) -> float:
         "Length of the trackable element, added to the Beam location after tracking [m]"
         pass
-
-    
-    # abbreviation of the get_length() function
-    #TODO: Maybe not a good idea, since this is usually "number of elements" type length?
-    def __len__(self):
-        "Alias of the get_length() function [m]"
-        return self.get_length()
-        
     
     # object for survey plotting
     def survey_object(self):
