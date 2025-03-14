@@ -43,11 +43,10 @@ class DampingRing(Trackable, CostModeled):
 
     
     def get_cost_breakdown(self):
-        breakdown = []
-        breakdown.append(('Ring components', self.get_circumference() * CostModeled.cost_per_length_damping_ring))
-        breakdown.append(('Civil construction', self.get_circumference() * CostModeled.cost_per_length_tunnel))
-        return (self.name, breakdown)
+        return (f'{self.name} ({self.num_rings} rings)', self.num_rings * self.get_circumference() * CostModeled.cost_per_length_damping_ring)
 
+    def get_cost_civil_construction(self):
+        return self.get_circumference() * CostModeled.cost_per_length_cutandcover_small
     
     @abstractmethod 
     def energy_usage(self):
@@ -56,12 +55,12 @@ class DampingRing(Trackable, CostModeled):
     def survey_object(self):
         #return patches.Circle((0, self.get_circumference()/(2*np.pi)), self.get_circumference()/(2*np.pi)) # make into semicircle or droplet shape
 
-        thetas = np.linspace(0, 2*np.pi, 200)
+        thetas = np.linspace(0, 3*np.pi, 200)
         radius = self.get_circumference()/(2*np.pi)
         x_points = radius*np.sin(thetas)
         y_points = -radius*(1-np.cos(thetas))
             
-        final_angle = 0
+        final_angle = np.pi
         label = self.name
         color = 'green'
         return x_points, y_points, final_angle, label, color

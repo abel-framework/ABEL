@@ -42,6 +42,7 @@ class Stage(Trackable, CostModeled):
         self.evolution.driver.slices = SimpleNamespace()
         
         self.efficiency = SimpleNamespace()
+        self.efficiency.dumped_power = None
         
         self.initial = SimpleNamespace()
         self.initial.beam = SimpleNamespace()
@@ -205,7 +206,7 @@ class Stage(Trackable, CostModeled):
     def get_cost_breakdown(self):
         breakdown = []
         breakdown.append(('Plasma cell', self.get_length() * CostModeled.cost_per_length_plasma_stage))
-        breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
+        #breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
         return (self.name, breakdown)
     
     def get_nom_energy_gain(self):
@@ -234,7 +235,7 @@ class Stage(Trackable, CostModeled):
 
     #@abstractmethod   # TODO: calculate the dumped power and use it for the dump cost model.
     def dumped_power(self):
-        return None
+        return self.efficiency.dumped_power
 
     
     def calculate_efficiency(self, beam0, driver0, beam, driver):
@@ -245,6 +246,10 @@ class Stage(Trackable, CostModeled):
         self.efficiency.driver_to_wake = (Etot0_driver-Etot_driver)/Etot0_driver
         self.efficiency.wake_to_beam = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
         self.efficiency.driver_to_beam = self.efficiency.driver_to_wake*self.efficiency.wake_to_beam
+        if self.get_rep_rate_average() is not None:
+            self.efficiency.dumped_power = Etot_driver*self.get_rep_rate_average()
+        else:    
+            self.efficiency.dumped_power = None
 
     def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
         
@@ -472,9 +477,9 @@ class Stage(Trackable, CostModeled):
         # get wakefield
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
-            axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
+            axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source.energy is not None:
-            Ez_driver_max = self.driver_source.energy/self.get_length()
+            Ez_driver_max = self.driver_source.energy/self.length_flattop
             axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
@@ -542,7 +547,7 @@ class Stage(Trackable, CostModeled):
                 z_beam = zs_I[np.abs(Is[zs_I < z_mid]).argmax()]
                 Ez_driver = Ezs0[zs0 > z_mid].max()
                 Ez_beam = np.interp(z_beam, zs0, Ezs0)
-                Ezmax = 1.7*np.max([np.abs(Ez_driver), np.abs(Ez_beam)])
+                Ezmax = 2.3*1.7*np.max([np.abs(Ez_driver), np.abs(Ez_beam)])
             
             # plot on-axis wakefield and axes
             ax2 = ax1.twinx()
@@ -590,7 +595,7 @@ class Stage(Trackable, CostModeled):
             
         # save the figure
         if savefig is not None:
-            fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
         
         return 
 

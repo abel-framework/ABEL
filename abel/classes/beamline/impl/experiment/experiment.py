@@ -43,6 +43,9 @@ class Experiment(Beamline):
     def energy_usage(self):
         return 0
 
+    def get_nom_beam_power(self):
+        return 0
+
     def get_cost_breakdown():
         return ('Experiment', 0)
     

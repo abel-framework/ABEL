@@ -2,31 +2,32 @@ from abel import *
 import scipy.constants as SI
 import numpy as np
 
-class PWFACollider(Collider):
+class HALHFgg(Collider):
 
     def __init__(self):
 
         super().__init__()
 
         # OPTIMIZATION VARIABLES
-        self.com_energy = 10e12 # [eV]
+        self.com_energy = 160e9 # [eV]
         
-        self.num_bunches_in_train = 80
-        self.rep_rate_trains = 80.0 # [Hz]
+        self.num_bunches_in_train = 160
+        self.rep_rate_trains = 100.0 # [Hz]
         
-        self.driver_separation_num_buckets = 12
+        self.driver_separation_num_buckets = 4
         self.driver_linac_rf_frequency = 1e9 # [Hz]
         self.driver_linac_gradient = 4e6 # [V/m]
-        self.driver_linac_structure_num_rf_cells = 70
+        self.driver_linac_structure_num_rf_cells = 23
         self.driver_linac_num_structures_per_klystron = 1.0
 
-        self.combiner_ring_compression_factor = 5
+        self.combiner_ring_compression_factor = 12
+        self.num_combiner_rings = 2
         
-        self.pwfa_num_stages = 120
+        self.pwfa_num_stages = 32
         self.pwfa_transformer_ratio = 2
-        self.pwfa_gradient = 3e9
+        self.pwfa_gradient = 1e9
 
-        self.target_integrated_luminosity = 20e46
+        self.target_integrated_luminosity = 2e46
         
         
 
@@ -60,13 +61,19 @@ class PWFACollider(Collider):
         driver_accel.nom_accel_gradient = self.driver_linac_gradient * driver_accel.fill_factor # [V/m]  # OPTIMIZATION VARIABLE
         driver_accel.num_rf_cells = self.driver_linac_structure_num_rf_cells
         driver_accel.num_structures_per_klystron = self.driver_linac_num_structures_per_klystron
+
         
         # define driver complex
         driver_complex = DriverComplex()
         driver_complex.source = driver_source
         driver_complex.rf_accelerator = driver_accel
         driver_complex.bunch_separation = driver_separation
-        driver_complex.turnaround = TurnaroundBasic()
+        
+        #driver_complex.turnaround = TurnaroundBasic()
+        driver_complex.combiner_ring = CombinerRingBasic()
+        driver_complex.combiner_ring.num_rings = self.num_combiner_rings
+        driver_complex.combiner_ring.compression_factor = self.combiner_ring_compression_factor
+        driver_complex.combiner_ring.exit_angle = np.pi
         
         # define beam
         esource = SourceBasic()
@@ -109,7 +116,7 @@ class PWFACollider(Collider):
         einjector = RFAcceleratorBasic()
         einjector.fill_factor = 0.75
         einjector.nom_accel_gradient = 20e6
-        einjector.nom_energy_gain = 5e9 - esource.energy # [eV]
+        einjector.nom_energy_gain = 1e9 - esource.energy # [eV]
         einjector.rf_frequency = 3e9
         einjector.num_rf_cells = 100
         einjector.num_structures_per_klystron = 1

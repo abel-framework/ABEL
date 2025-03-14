@@ -15,6 +15,9 @@ class Turnaround(Trackable, CostModeled):
         self.use_semi_circle = use_semi_circle
         self.start_with_semi_circle = start_with_semi_circle
 
+        self.use_tunnel = False
+        self.use_cutandcover = True
+
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -33,6 +36,14 @@ class Turnaround(Trackable, CostModeled):
         
     def get_cost_breakdown(self):
         return ('Turnaround', self.get_length() * CostModeled.cost_per_length_turnaround)
+
+    def get_cost_civil_construction(self):
+        cost_civil_construction = 0
+        if self.use_tunnel:
+            cost_civil_construction += self.get_length() * CostModeled.cost_per_length_tunnel
+        elif self.use_cutandcover:
+            cost_civil_construction += self.get_length() * CostModeled.cost_per_length_cutandcover_small
+        return 0
     
     def energy_usage(self):
         return 0.0

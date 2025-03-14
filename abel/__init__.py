@@ -65,6 +65,7 @@ from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCL
 from .classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
 from .classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
 from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
+from .classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
 from .classes.bds.impl.bds_basic import *
 from .classes.bds.impl.bds_fbt import *
 from .classes.spectrometer.impl.spectrometer_facet_ocelot import *
@@ -74,3 +75,9 @@ from .classes.ip.impl.ip_guineapig import *
 
 from abel.classes.collider.preset.halhf_v1 import HALHFv1
 from abel.classes.collider.preset.halhf_v2 import HALHFv2
+from abel.classes.collider.preset.halhf_gg import HALHFgg
+from abel.classes.collider.preset.pwfa_collider import PWFACollider
+from abel.classes.collider.preset.c3 import C3
+from abel.classes.collider.preset.ilc import ILC
+from abel.classes.collider.preset.clic import CLIC
+

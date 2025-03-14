@@ -1,8 +1,9 @@
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.cost_modeled import CostModeled
+from abel.CONFIG import CONFIG
 import scipy.constants as SI
 import numpy as np
-import copy
+import copy, os
 import matplotlib.pyplot as plt
 from types import SimpleNamespace
 
@@ -86,7 +87,7 @@ class RFAcceleratorCLICopti(RFAccelerator):
         import CLICopti
         
         # make database
-        cellbase = '/Users/carlal/UiO/Code/software/clicopti/cellBase/TD_12GHz_v1.dat' # TODO: fix this
+        cellbase = os.path.join(CONFIG.software_path, 'clicopti/cellBase/TD_12GHz_v1.dat') # TODO: fix this
         database = CLICopti.CellBase.CellBase_linearInterpolation_freqScaling(cellbase, ("a_n","d_n"), self.rf_frequency/1e9)
 
         # make structure

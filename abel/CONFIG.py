@@ -52,12 +52,12 @@ class CONFIG:
     elegant_use_container = True
     elegant_path = os.path.join(software_path, 'elegant/')
     if elegant_use_container:
-        bind_path = '/pfs/lustrep2/scratch/project_465001375'
+        bind_path = '/pfs/lustrep4/scratch/project_465001375'
         elegant_exec = 'singularity exec --bind ' + bind_path + ':' + bind_path + ' ' + elegant_path + 'elegant.sif '
         elegant_rpnflag = ''
     else:
         elegant_exec = elegant_path
-        elegant_rpnflag = ' -rpnDefns=' + CONFIG.elegant_path + 'defns.rpn'
+        elegant_rpnflag = ' -rpnDefns=' + elegant_path + 'defns.rpn'
     
     # path to HiPACE++ directory
     hipace_path = os.path.join(software_path, 'hipace')
