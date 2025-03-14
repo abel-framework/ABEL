@@ -1,6 +1,5 @@
-from abel import Interstage
+from abel.classes.interstage.interstage import Interstage
 import numpy as np
-import impactx
 from abel.apis.impactx.impactx_api import run_impactx
 import contextlib, os
 from types import SimpleNamespace
@@ -40,6 +39,8 @@ class InterstageImpactX(Interstage):
 
     def get_lattice(self):
 
+        import impactx
+        
         # initialize lattice
         lattice = []
         
@@ -57,14 +58,11 @@ class InterstageImpactX(Interstage):
         phi = B1*L1*SI.e/p0
         ns = 25  # number of slices per ds in the element
         bend = impactx.elements.ExactSbend(name="dipole", ds=L1, phi=np.rad2deg(phi), B=B1, nslice=ns)
-
+        
         # define plasma lens
         f0 = L1*L2/(L1+L2)
         dtaper = int(self.enable_nonlinearity)*1/Dx
         pl = impactx.elements.TaperedPL(k=1/f0, taper=dtaper, name="plasmalens")
-
-        # add beam diagnostics
-        monitor = impactx.elements.BeamMonitor("monitor", backend="h5")
 
         B2 = int(self.enable_chicane)*self.B2_by_B1*B1
         if abs(B2) > 0:
@@ -85,22 +83,25 @@ class InterstageImpactX(Interstage):
         m_sext = int(self.enable_sextupole)*2*DDxp_mid/Dx_mid**2
         sextupole = impactx.elements.Multipole(multipole=3, K_normal=m_sext, K_skew=0, name="sextupole")
         
+        # add beam diagnostics
+        #monitor = impactx.elements.BeamMonitor("monitor", backend="h5")
+
         # specify the lattice sequence
-        lattice.append(monitor)
+        #lattice.append(monitor)
         lattice.append(bend)
-        lattice.append(monitor)
+        #lattice.append(monitor)
         lattice.append(pl)
-        lattice.append(monitor)
-        lattice.extend([chicane1, monitor, chicane2])
-        lattice.append(monitor)
+        #lattice.append(monitor)
+        lattice.extend([chicane1, chicane2]) #lattice.extend([chicane1, monitor, chicane2])
+        #lattice.append(monitor)
         lattice.append(sextupole)
-        lattice.append(monitor)
-        lattice.extend([chicane2, monitor, chicane1])
-        lattice.append(monitor)
+        #lattice.append(monitor)
+        lattice.extend([chicane2, chicane1]) #lattice.extend([chicane2, monitor, chicane1])
+        #lattice.append(monitor)
         lattice.append(pl)
-        lattice.append(monitor)
+        #lattice.append(monitor)
         lattice.append(bend)
-        lattice.append(monitor)
+        #lattice.append(monitor)
         
         return lattice
 
@@ -112,7 +113,7 @@ class InterstageImpactX(Interstage):
         
         # run ImpactX
         beam, evol = run_impactx(lattice, beam0, verbose=False, runnable=runnable, keep_data=self.keep_data, space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
-
+        
         # save evolution
         self.evolution = evol
         

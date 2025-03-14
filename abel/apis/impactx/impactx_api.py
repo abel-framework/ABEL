@@ -22,9 +22,13 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
         os.makedirs(runfolder)
     os.chdir(runfolder)
 
+    # add before the simulation setup
+    pp_prof = amr.ParmParse("tiny_profiler")
+    pp_prof.add("enabled", int(verbose))
+    
     # make simulation
     sim = initialize_impactx_sim(verbose=verbose)
-
+    
     # physics flags
     sim.space_charge = space_charge
     sim.csr = csr
@@ -43,16 +47,17 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     # run simulation
     sim.verbose = int(verbose)
     if verbose:
-        sim.evolve()
+        sim.track_particles()
     else:
-        eval('sim.evolve()')
+        eval('sim.track_particles()')
     
     # convert back to ABEL beam
     beam = particle_container2beam(sim.particle_container())
 
     # clean shutdown
     sim.finalize()
-    
+    finalize_amrex()
+
     # extract evolution
     evol = extract_evolution('');
 
@@ -72,12 +77,9 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
 
 
 def initialize_impactx_sim(verbose=False):
-
+    
     # set AMReX verbosity
-    if verbose:
-        amr.initialize(["amrex.omp_threads=1", f"amrex.verbose={int(verbose)}"])
-    else:
-        eval('amr.initialize(["amrex.omp_threads=1", f"amrex.verbose={int(verbose)}"])')
+    initialize_amrex(verbose)
 
     # make simulation object
     sim = ImpactX()
@@ -96,15 +98,36 @@ def initialize_impactx_sim(verbose=False):
     sim.init_grids()
     
     return sim
+
+
+# initialize AMReX
+def initialize_amrex(verbose=False):
+    if not amr.initialized():
+        if verbose:
+            amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
+        else:
+            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
+
+
+def finalize_amrex(verbose=False):
+    if amr.initialized():
+        if verbose:
+            amr.finalize()
+        else:
+            eval('amr.finalize()')
+
+
+def extract_evolution(path='', second_order=False):
     
-
-def extract_evolution(path='', second_order=True):
-
     # read CSV file
     import pandas as pd
-    ref = pd.read_csv(path+"diags/ref_particle.0.0", delimiter=r"\s+")
-    diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0.0", delimiter=r"\s+")
-
+    try:
+        ref = pd.read_csv(path+"diags/ref_particle.0.0", delimiter=r"\s+")
+        diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0.0", delimiter=r"\s+")
+    except:
+        ref = pd.read_csv(path+"diags/ref_particle.0", delimiter=r"\s+")
+        diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0", delimiter=r"\s+")
+    
     # extract numbers
     evol = SimpleNamespace()
     evol.location = diags["s"]
@@ -125,7 +148,7 @@ def extract_evolution(path='', second_order=True):
     evol.dispersion_y = diags["dispersion_y"]
 
     if second_order:
-
+        
         # load OpenPMD series
         series = io.Series(path+"diags/openPMD/monitor.h5", io.Access.read_only)
         steps = list(series.iterations)
@@ -152,6 +175,8 @@ def extract_evolution(path='', second_order=True):
             dispx2[i] = pfit[ordermax-2]*np.math.factorial(2)
         
         evol.second_order_dispersion_x = np.interp(evol.location, ss, dispx2)
+    else:
+        evol.second_order_dispersion_x = np.empty_like(evol.location)
     
     return evol
 
