@@ -19,3 +19,17 @@ How to edit it is explained with comments in the file. It uses the file format "
 Please do not edit the template file `abelconfig.toml` or `CONFIG.py` in the source code folder.
 
 The as-loaded configuration of ABEL is printed to the terminal when abel starts, along with the name of the config file it has loaded.
+
+## Unit tests
+Unit tests are implemented with `pytest`; to run the tests on an installed version of ABEL please run
+``pytest -v``
+from the root folder of ABEL.
+It is also possible to run single tests by name, for example: `pytest -v tests/test_init.py::testCore_init`
+
+The tests are stored in in the `tests` subdirectory, in files with names starting with `test_`.
+In these files, the functions with names starting with `test_` are represent one test; if it makes it to the end without any of the asserts triggering and all the expected exceptions happening, the test has PASSED.
+The test functions are also annotated with `@pytest.mark.MARKNAME`.
+
+Pytest is configured in the `[tool.pytest.ini_options]` section of `pyproject.toml`. This especially defines the "markers", which are named groups of tests that can be specified to run using `pytest -v -m MARKNAME`.
+
+When the tests succeed, no output (except `testfile::testfile PASSED`) is printed. If a test fails, a traceback and the printouts of that test is printed. If may tests fail, this can be very verbose.
