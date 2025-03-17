@@ -59,7 +59,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag):
     main.charge = -e * 1.0e10                                                     # [C]
 
     # Energy parameters
-    main.energy = 3e9                                                             # [eV]
+    main.energy = 369.6e9                                                         # [eV], HALHF v2 energy before last stage
     main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
 
     # Emittances
@@ -116,14 +116,14 @@ def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_sou
 
 
 def test_beam_between_ramps():
-    np.random.seed(42)
+    "Tests for ensuring that the beams are correctly transferred between ramps and stage."
 
     plasma_density = 6.0e+20                                                      # [m^-3]
     ramp_beta_mag = 5.0
-    enable_xy_jitter = False
-    enable_xpyp_jitter = False
-    enable_tr_instability = False
-    enable_radiation_reaction = False
+    enable_xy_jitter = True
+    enable_xpyp_jitter = True
+    enable_tr_instability = True
+    enable_radiation_reaction = True
     enable_ion_motion = False
     use_ramps = True
     drive_beam_update_period = 1
@@ -137,10 +137,19 @@ def test_beam_between_ramps():
 
     # Assert that there has been no significant changes in the beams between parents and its upramp
     # Between a upramp and main stage
-    Beam.comp_beams(stage.upramp.driver_out, stage.driver_in)
-    Beam.comp_beams(stage.upramp.beam_out, stage.beam_in)
+    Beam.comp_beams(stage.upramp.driver_out, stage.driver_in, comp_location=True)
+    Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
 
     # Between a main stage and downramp
-    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in)
-    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in)
+    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True)
+    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True)
+
+    # Assert that the output beam matches the out beam for the downramp
+    final_beam = linac[0].get_beam(-1)
+    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+
+    # Assert that the propagation length of the output beam matches the total length of the stage
+    assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length)
+
+
 
