@@ -272,9 +272,12 @@ class Stage(Trackable, CostModeled):
             if self.upramp.plasma_density is None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-             # perform tracking
+            # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
+
+            print('Inside track_upramp():', driver.location, beam.location)
+            
             beam.stage_number -= 1
             driver.stage_number -= 1
             
@@ -291,6 +294,7 @@ class Stage(Trackable, CostModeled):
         if self.downramp is not None:
 
             # set driver
+            #print('Inside track_downramp():', driver0.location)
             self.downramp.driver_source = SourceCapsule(beam=driver0)
             
             # determine density if not already set
