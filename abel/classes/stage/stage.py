@@ -159,6 +159,7 @@ class Stage(Trackable, CostModeled):
             
         # Everything else now unset, can set this safely.
         # Will also trigger reset/recalc if needed
+        stage_copy.length_flattop = None
         stage_copy.length = ramp_length
         stage_copy.plasma_density = ramp_plasma_density
          
@@ -276,8 +277,6 @@ class Stage(Trackable, CostModeled):
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
 
-            print('Inside track_upramp():', driver.location, beam.location)
-            
             beam.stage_number -= 1
             driver.stage_number -= 1
             
