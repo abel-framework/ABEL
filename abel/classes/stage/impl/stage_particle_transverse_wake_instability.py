@@ -170,6 +170,9 @@ class StagePrtclTransWakeInstability(Stage):
         Tracks the particles through the stage.
         """
 
+        #if self.parent is not None and self.upramp is not None and self.downramp is not None:
+        #    raise ValueError('Currently does not support ramps with both upramp and downramp.')
+
         # Set the diagnostics directory
         if runnable is not None:
             self.run_path = runnable.run_path()
@@ -196,6 +199,8 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
             self.drive_beam = driver_incoming                    ######################
+            #print('driver_source.track()', driver_incoming.location)                                               ######################
+            #print(type(self.driver_source))
         
 
         # ========== Rotate the coordinate system of the beams ==========
@@ -252,7 +257,14 @@ class StagePrtclTransWakeInstability(Stage):
         if self.upramp is not None:  # if self has an upramp
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
+            print('\nUpramp tracking started.')                                               ######################
+        
+
             beam0, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
+            #drive_beam_ramped.location = drive_beam_ramped.location + self.upramp.length_flattop
+            print('After track_upramp()', 'driver:', drive_beam_ramped.location, 'main:', beam0.location)                ##########################
+            print('\nUpramp tracking done.')                                               ######################
+        
 
         else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
             if self.parent is None:  # Just a lone stage
@@ -363,6 +375,7 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Instability tracking ==========
         # Filter out beam particles outside of the plasma bubble
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
+        beam_filtered.location = beam0.location
 
         # Make plots if all beam particles are outside the bubble.
         if len(beam_filtered) == 0:
@@ -409,7 +422,7 @@ class StagePrtclTransWakeInstability(Stage):
             self.probe_evol_period = 1  # Probe every time step if self is a ramp.
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
-            stage_length=self.length, 
+            stage_length=self.length_flattop, 
             drive_beam=drive_beam_ramped, 
             main_beam=beam_filtered, 
             time_step_mod=self.time_step_mod, 
@@ -482,7 +495,12 @@ class StagePrtclTransWakeInstability(Stage):
                                  particle_mass=particle_mass)
         else:
 
+            print('Before instability', 'driver:', drive_beam_ramped.location, 'main:', beam_filtered.location)                ##########################
+
             beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
+
+            print('After instability', 'driver:', driver.location, 'main:', beam.location)                ##########################
+
             self.evolution = evolution
 
             ## NOTE: beam and driver cannot be changed after this line in order to test for continuity between ramps and stage.
@@ -492,7 +510,12 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
+
+            print('\nDownramp tracking started.')                                                             ##########################
+
             beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
+
+            print('\nDownramp tracking done.')                                                             ##########################
 
         else:  # Do the following if there are no downramp. 
             beam_outgoing = copy.deepcopy(beam)
@@ -551,23 +574,48 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Bookkeeping ==========
         self.driver_to_beam_efficiency = (beam_outgoing.energy()-beam_incoming.energy())/driver_outgoing.energy() * beam_outgoing.abs_charge()/driver_outgoing.abs_charge()
         
-        # Copy meta data from input beam_outgoing (will be iterated by super)
-        beam_outgoing.trackable_number = beam_incoming.trackable_number
-        beam_outgoing.stage_number = beam_incoming.stage_number
-        beam_outgoing.location = beam_incoming.location
-        
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.run_tests:
             if self.parent is None:
                 # The outgoing beams for the main stage need to be recorded before potential rotation for correct comparison with its ramps.
                 self.beam_out = beam
                 self.driver_out = driver
+                
+                print('Main stage in beam locations.', 'driver:', drive_beam_ramped.location, 'main:', beam0.location)          #######################
+                print('Main stage out beam locations.', 'driver:', driver.location, 'main:', beam.location)                   #######################
             else:
                 # Ramps record the final beams as their output beams, as they should not perform any rotation between instability tracking and this line.
                 self.beam_out = beam_outgoing
                 self.driver_out = driver_outgoing
+
+                print('ramp in beam locations.', 'driver:', drive_beam_ramped.location, 'main:', beam0.location)          #######################
+                print('ramp out beam locations.', 'driver:', self.driver_out.location, 'main:', self.beam_out.location)        #######################
+
             self.driver_in = drive_beam_ramped  # Drive beam before instability tracking
             self.beam_in = beam0  # Main beam before instability tracking
+
+        # Copy meta data from input beam_outgoing (will be iterated by super)
+        beam_outgoing.trackable_number = beam_incoming.trackable_number
+        beam_outgoing.stage_number = beam_incoming.stage_number
+
+        # if self.run_tests:
+        #     if self.parent is not None:
+        #         # Reset beam_outgoing.location for ramps due to Trackable.track() also adding the length of the ramps.
+        #         beam_outgoing.location = beam_incoming.location
+        #     elif self.parent is None and (self.upramp is not None or self.downramp is not None):
+        #         # Reset beam_outgoing.location for a stage with upramp and/or downramp due to Trackable.track() also adding the length of the stage.
+        #         beam_outgoing.location = beam_outgoing.location - (self.beam_out.location - self.beam_in.location)
+        #     elif self.parent is None and self.upramp is None and self.downramp is None:
+        #         # Reset beam_outgoing.location for a lone stage due to Trackable.track() also adding the length of the stage.
+        #         beam_outgoing.location = beam_incoming.location
+        #     elif self.parent is None and self.upramp is not None and self.downramp is None:
+        #         # Reset beam_outgoing.location for a stage without a downramp due to Trackable.track() also adding the length of the stage.
+        #         beam_outgoing.location = self.beam_in.location
+        # else:
+        #     beam_outgoing.location = beam_outgoing.location - self.length_flattop
+
+        beam_outgoing.location = beam_incoming.location
+            
 
         # Return the beam (and optionally the driver)
         if self._return_tracked_driver:
