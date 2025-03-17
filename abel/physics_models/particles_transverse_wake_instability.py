@@ -16,7 +16,7 @@ import csv, os
 #from types import SimpleNamespace
 
 from abel.classes.beam import *  # TODO: no need to import everything.
-from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2energy
+from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2energy, gamma2momentum
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_mean, weighted_std
 from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam, beam2wake_t_bunch, wakeT_r_E_filter #, wake_t_remove_halo_particles
@@ -555,9 +555,10 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     use_wake_t_driver = enable_driver_evolution  # Use Wake-T ParticleBunch driver if using driver evolution.
     if use_wake_t_driver:
         drive_beam = beam2wake_t_bunch(drive_beam0, name='driver')
-        #pz_thres = 0.01 * np.mean(drive_beam.pz)  # Later used to remove drive beam particles with too low momentum.
-        #pz_thres = 5.5e-20/(SI.c*SI.m_e)  # Later used to remove drive beam particles with too low momentum. Corresponds to 0.1 GeV.
-        pz_thres = 1.375e-20/(SI.c*SI.m_e)  # Later used to remove drive beam particles with too low momentum. Corresponds to 0.02555 GeV, i.e. 50 * electron rest energy.
+        #pz_thres = 0.01 * np.mean(drive_beam.pz)  # [beta*gamma], later used to remove drive beam particles with too low momentum.
+        #pz_thres = 5.5e-20/(SI.c*SI.m_e)  # [beta*gamma], later used to remove drive beam particles with too low momentum. Corresponds to 0.1 GeV.
+        energy_thres = 50*SI.m_e*SI.c**2/SI.e  # [eV], 50 * electron rest energy.
+        pz_thres = gamma2momentum(energy2gamma(energy_thres))/(SI.c*SI.m_e)  # [beta*gamma], later used to remove drive beam particles with too low momentum. 
     else:
         drive_beam = drive_beam0
     
