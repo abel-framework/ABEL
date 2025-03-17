@@ -37,7 +37,7 @@ from abel import Beam
 class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
-    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, main_beam=None, time_step_mod=0.05, show_prog_bar=None, run_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, time_step_mod=0.05, show_prog_bar=None, run_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
         Parameters
         ----------
@@ -49,9 +49,9 @@ class StagePrtclTransWakeInstability(Stage):
 
         driver_beam : ``Beam`` object of drive beam.
 
-        main_beam : ``Beam`` object of main beam.
+        #main_beam : ``Beam`` object of main beam.
         
-        length : [m] float
+        #length : [m] float
             Length of the plasma stage.
         
         nom_energy_gain : [eV] float
@@ -199,8 +199,6 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
             self.drive_beam = driver_incoming                    ######################
-            #print('driver_source.track()', driver_incoming.location)                                               ######################
-            #print(type(self.driver_source))
         
 
         # ========== Rotate the coordinate system of the beams ==========
@@ -257,15 +255,8 @@ class StagePrtclTransWakeInstability(Stage):
         if self.upramp is not None:  # if self has an upramp
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
-            print('\nUpramp tracking started.')                                               ######################
-        
-
             beam0, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
-            #drive_beam_ramped.location = drive_beam_ramped.location + self.upramp.length_flattop
-            print('After track_upramp()', 'driver:', drive_beam_ramped.location, 'main:', beam0.location)                ##########################
-            print('\nUpramp tracking done.')                                               ######################
         
-
         else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
             if self.parent is None:  # Just a lone stage
                 beam0 = copy.deepcopy(beam_rotated)
@@ -418,8 +409,6 @@ class StagePrtclTransWakeInstability(Stage):
             wake_t_fields = None
 
         # Set up the configuration for the instability model
-        if self.parent is not None:
-            self.probe_evol_period = 1  # Probe every time step if self is a ramp.
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
             stage_length=self.length_flattop, 
@@ -495,11 +484,7 @@ class StagePrtclTransWakeInstability(Stage):
                                  particle_mass=particle_mass)
         else:
 
-            print('Before instability', 'driver:', drive_beam_ramped.location, 'main:', beam_filtered.location)                ##########################
-
             beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
-
-            print('After instability', 'driver:', driver.location, 'main:', beam.location)                ##########################
 
             self.evolution = evolution
 
@@ -510,12 +495,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
-
-            print('\nDownramp tracking started.')                                                             ##########################
-
             beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
-
-            print('\nDownramp tracking done.')                                                             ##########################
 
         else:  # Do the following if there are no downramp. 
             beam_outgoing = copy.deepcopy(beam)
@@ -580,16 +560,10 @@ class StagePrtclTransWakeInstability(Stage):
                 # The outgoing beams for the main stage need to be recorded before potential rotation for correct comparison with its ramps.
                 self.beam_out = beam
                 self.driver_out = driver
-                
-                print('Main stage in beam locations.', 'driver:', drive_beam_ramped.location, 'main:', beam0.location)          #######################
-                print('Main stage out beam locations.', 'driver:', driver.location, 'main:', beam.location)                   #######################
             else:
                 # Ramps record the final beams as their output beams, as they should not perform any rotation between instability tracking and this line.
                 self.beam_out = beam_outgoing
                 self.driver_out = driver_outgoing
-
-                print('ramp in beam locations.', 'driver:', drive_beam_ramped.location, 'main:', beam0.location)          #######################
-                print('ramp out beam locations.', 'driver:', self.driver_out.location, 'main:', self.beam_out.location)        #######################
 
             self.driver_in = drive_beam_ramped  # Drive beam before instability tracking
             self.beam_in = beam0  # Main beam before instability tracking
@@ -597,23 +571,6 @@ class StagePrtclTransWakeInstability(Stage):
         # Copy meta data from input beam_outgoing (will be iterated by super)
         beam_outgoing.trackable_number = beam_incoming.trackable_number
         beam_outgoing.stage_number = beam_incoming.stage_number
-
-        # if self.run_tests:
-        #     if self.parent is not None:
-        #         # Reset beam_outgoing.location for ramps due to Trackable.track() also adding the length of the ramps.
-        #         beam_outgoing.location = beam_incoming.location
-        #     elif self.parent is None and (self.upramp is not None or self.downramp is not None):
-        #         # Reset beam_outgoing.location for a stage with upramp and/or downramp due to Trackable.track() also adding the length of the stage.
-        #         beam_outgoing.location = beam_outgoing.location - (self.beam_out.location - self.beam_in.location)
-        #     elif self.parent is None and self.upramp is None and self.downramp is None:
-        #         # Reset beam_outgoing.location for a lone stage due to Trackable.track() also adding the length of the stage.
-        #         beam_outgoing.location = beam_incoming.location
-        #     elif self.parent is None and self.upramp is not None and self.downramp is None:
-        #         # Reset beam_outgoing.location for a stage without a downramp due to Trackable.track() also adding the length of the stage.
-        #         beam_outgoing.location = self.beam_in.location
-        # else:
-        #     beam_outgoing.location = beam_outgoing.location - self.length_flattop
-
         beam_outgoing.location = beam_incoming.location
             
 
@@ -622,6 +579,7 @@ class StagePrtclTransWakeInstability(Stage):
             return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
+
 
 
     # ==================================================
@@ -741,7 +699,7 @@ class StagePrtclTransWakeInstability(Stage):
 
 
     # ==================================================
-    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, probe_evol_period=0, make_animations=False):
+    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, probe_evol_period=1, make_animations=False):
         """
         Used for copying a predefined stage's settings and configurations to set up flat ramps. Overloads the parent class' method.
     
@@ -765,7 +723,7 @@ class StagePrtclTransWakeInstability(Stage):
         stage_copy = super().stage2ramp(ramp_plasma_density, ramp_length)
 
         # Additional configurations 
-        #stage_copy.probe_evol_period = probe_evol_period
+        stage_copy.probe_evol_period = probe_evol_period
         stage_copy.make_animations = make_animations
 
         return stage_copy
@@ -1021,9 +979,9 @@ class StagePrtclTransWakeInstability(Stage):
 
         lower_p = np.percentile(np.abs(drb_dz), 10)  # Lower percentile
         upper_p = np.percentile(np.abs(drb_dz), 90)  # Upper percentile
-        IPR = upper_p - lower_p  # Interpercentile range
-        lower_bound = lower_p - 1.5 * IPR
-        upper_bound = upper_p + 1.5 * IPR
+        ip_range = upper_p - lower_p  # Interpercentile range
+        lower_bound = lower_p - 1.5 * ip_range
+        upper_bound = upper_p + 1.5 * ip_range
         d1_outliers = np.where((np.abs(drb_dz) < lower_bound) | (np.abs(drb_dz) > upper_bound))[0]
 
         d1_mask = np.ones_like(bubble_radius, dtype=bool)
@@ -1035,9 +993,9 @@ class StagePrtclTransWakeInstability(Stage):
 
         lower_p = np.percentile(np.abs(curvature), 10)  # Lower percentile
         upper_p = np.percentile(np.abs(curvature), 90)  # Upper percentile
-        IPR = upper_p - lower_p  # Interpercentile range
-        lower_bound = lower_p - 1.5 * IPR
-        upper_bound = upper_p + 1.5 * IPR
+        ip_range = upper_p - lower_p  # Interpercentile range
+        lower_bound = lower_p - 1.5 * ip_range
+        upper_bound = upper_p + 1.5 * ip_range
         curvature_outliers = np.where((np.abs(curvature) < lower_bound) | (np.abs(curvature) > upper_bound))[0]
 
         curvature_mask = np.ones_like(bubble_radius, dtype=bool)
@@ -1191,21 +1149,6 @@ class StagePrtclTransWakeInstability(Stage):
             plt.ylabel(r'Number profile $N(\xi)$')
 
         return num_profile, z_ctrs
-
-    
-    # ==================================================
-    def get_length(self):
-        return self.length
-
-    
-    # ==================================================
-    def get_nom_energy_gain(self):
-        return self.nom_energy_gain
-
-    
-    # ==================================================
-    def set_nom_energy_gain(self, nom_energy_gain):
-        self.nom_energy_gain = nom_energy_gain
 
     
     # ==================================================
@@ -2510,7 +2453,11 @@ class StagePrtclTransWakeInstability(Stage):
         print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
         print(f"Ion motion enabled:\t\t\t\t\t {str(self.enable_ion_motion) :s}\n")
         
-        print(f"Stage length [m]:\t\t\t\t\t {self.length :.3f}")
+        stage_length = self.length_flattop 
+        if stage_length is None:
+            print(f"Stage flattop length [m]:\t\t\t\t Not set")
+        else:
+            print(f"Stage flattop length [m]:\t\t\t\t {stage_length :.3f}")
         print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}")
         print(f"Drive beam x jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.x*1e6 :.3f}")
         print(f"Drive beam y jitter (std) [um]:\t\t\t\t {self.driver_source.jitter.y*1e6 :.3f}")
@@ -2605,7 +2552,7 @@ class StagePrtclTransWakeInstability(Stage):
             print(f"\tnum_xy_cells_probe:\t\t\t {self.num_xy_cells_probe :d}", file=f)
             print(f"\tion_wkfld_update_period\t\t\t {self.ion_wkfld_update_period :d}\n", file=f)
             
-            print(f"Stage length [m]:\t\t\t\t {self.length :.3f}", file=f)
+            print(f"Stage length [m]:\t\t\t\t {self.get_length() :.3f}", file=f)
             print(f"Propagation length [m]:\t\t\t\t {beam_out.location :.3f}", file=f)
             print(f"Drive beam to main beam efficiency [%]:\t\t {self.driver_to_beam_efficiency*100 :.3f}", file=f)
             print(f"Plasma density [m^-3]:\t\t\t\t {self.plasma_density :.3e}", file=f)
