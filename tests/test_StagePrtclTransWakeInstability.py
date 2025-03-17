@@ -79,11 +79,12 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag):
     return main
 
 
-def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, run_tests=False):
+def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, return_tracked_driver=False, run_tests=False):
+
     stage = StagePrtclTransWakeInstability()
     stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
-    stage.length = 7.8                                                            # [m]
+    stage.length_flattop = 7.8                                                    # [m]
     stage.plasma_density = plasma_density                                         # [m^-3]
     stage.driver_source = driver_source
     stage.main_source = main_source
@@ -105,6 +106,7 @@ def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_sou
     stage.probe_evol_period = 3
     stage.make_animations = False
 
+    stage._return_tracked_driver = return_tracked_driver
     stage.run_tests = run_tests
 
     # Set up ramps after the stage is fully configured
@@ -150,6 +152,48 @@ def test_beam_between_ramps():
 
     # Assert that the propagation length of the output beam matches the total length of the stage
     assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length)
+
+
+def test_stage_length_gradient_energyGain():
+    "Tests ensuring that the flattop length and total length of the stage as well as nominal gradient and nominal energy gain are set correctly."
+
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = False
+    enable_tr_instability = False
+    enable_radiation_reaction = False
+    enable_ion_motion = False
+    use_ramps = True
+    drive_beam_update_period = 0
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, run_tests=False)
+
+    stage.length_flattop = 7.8                                                    # [m]
+    stage.nom_energy_gain = 7.8e9                                                 # [eV]
+
+    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac.run('test_stage_length', overwrite=True, verbose=False)
+    assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9)
+    assert np.allclose(stage.nom_energy_gain, 7.8e9)
+    assert np.allclose(stage.length_flattop, 7.8)
+    assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9)
+    assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop)
+
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, run_tests=False)
+
+    stage.nom_energy_gain = 7.8e9                                                 # [eV]
+    stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
+    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac.run('test_stage_length', overwrite=True, verbose=False)
+    assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9)
+    assert np.allclose(stage.nom_energy_gain, 7.8e9)
+    assert np.allclose(stage.length_flattop, 7.8)
+    assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9)
+    assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop)
+
 
 
 
