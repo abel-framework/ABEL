@@ -59,7 +59,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag):
     main.charge = -e * 1.0e10                                                     # [C]
 
     # Energy parameters
-    main.energy = 369.6e9                                                         # [eV], HALHF v2 energy before last stage
+    main.energy = 369.6e9                                                         # [eV], HALHF v2 last stage nominal input energy
     main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
 
     # Emittances
@@ -117,8 +117,11 @@ def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_sou
     return stage
 
 
+@pytest.mark.StagePrtclTransWakeInstability
 def test_beam_between_ramps():
     "Tests for ensuring that the beams are correctly transferred between ramps and stage."
+
+    np.random.seed(42)
 
     plasma_density = 6.0e+20                                                      # [m^-3]
     ramp_beta_mag = 5.0
@@ -153,9 +156,15 @@ def test_beam_between_ramps():
     # Assert that the propagation length of the output beam matches the total length of the stage
     assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
 
+
+@pytest.mark.StagePrtclTransWakeInstability
 def test_stage_length_gradient_energyGain():
     "Tests ensuring that the flattop length and total length of the stage as well as nominal gradient and nominal energy gain are set correctly."
+
+    np.random.seed(42)
 
     plasma_density = 6.0e+20                                                      # [m^-3]
     ramp_beta_mag = 5.0
@@ -194,9 +203,15 @@ def test_stage_length_gradient_energyGain():
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
 
+
+@pytest.mark.StagePrtclTransWakeInstability
 def test_driver_unrotation():
     "Tests for checking the driver being correctly un-rotated back to its original coordinate system."
+
+    np.random.seed(42)
 
     plasma_density = 6.0e+20                                                      # [m^-3]
     ramp_beta_mag = 5.0
@@ -213,7 +228,7 @@ def test_driver_unrotation():
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, run_tests=True)
 
-    stage.nom_energy = 377.4e9
+    stage.nom_energy = 369.6e9                                                    # [eV], HALHF v2 last stage nominal input energy
     _, driver = stage.track(main_source.track())
     driver0 = stage.drive_beam
 
