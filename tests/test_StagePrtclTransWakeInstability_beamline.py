@@ -59,7 +59,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag):
     main.charge = -e * 1.0e10                                                     # [C]
 
     # Energy parameters
-    main.energy = 3e9                                                             # [eV]
+    main.energy = 361.8e9                                                         # [eV], HALHF v2 second to last stage nominal input energy
     main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
 
     # Emittances
@@ -80,10 +80,11 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag):
 
 
 def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0):
+    
     stage = StagePrtclTransWakeInstability()
     stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
-    stage.length = 7.8                                                            # [m]
+    stage.length_flattop = 7.8                                                            # [m]
     stage.plasma_density = plasma_density                                         # [m^-3]
     stage.driver_source = driver_source
     stage.main_source = main_source
@@ -130,6 +131,8 @@ def setup_InterstageElegant(stage):
 def test_baseline_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, no ramps."
 
+    np.random.seed(42)
+
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
     ramp_beta_mag = 5.0
@@ -150,12 +153,40 @@ def test_baseline_linac():
 
     # Perform tracking
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
+    
+    # Check the outputs
+    assert np.allclose(linac.get_beam(0).energy(), 361.8e9, rtol=0, atol=0.6e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 377.4e9, rtol=0, atol=0.6e9)
+    assert np.allclose(linac.stages[0].nom_energy, 361.8e9)
+    assert np.allclose(linac.stages[1].nom_energy, 369.6e9)
 
+    final_beam = linac.get_beam(-1)
+    final_beam.beam_name = 'Test beam'
+    ref_beam = Beam.load('./tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5')
+    ref_beam.beam_name = 'Reference beam'
+
+    final_beam.print_summary()
+    ref_beam.print_summary()
+    print(final_beam.divergence_x(), ref_beam.divergence_x())
+    print(final_beam.divergence_y(), ref_beam.divergence_y())
+    print(final_beam.geom_emittance_x(), ref_beam.geom_emittance_x())
+    print(final_beam.geom_emittance_y(), ref_beam.geom_emittance_y())
+    print(final_beam.gamma_y(), ref_beam.gamma_y())
+    Beam.comp_beam_params(final_beam, ref_beam, comp_location=False, rtol=1e-05, atol=1e-08)  # Compare output beam with reference beam file.
+
+    # Test plotting functions
+    linac.stages[-1].plot_Ez_rb_cut()
+    linac.stages[-1].plot_wake()
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
 
 
 @pytest.mark.transverse_wake_instability_linac
 def test_ramped_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, with ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -178,6 +209,15 @@ def test_ramped_linac():
     # Perform tracking
     linac.run('test_ramped_linac', overwrite=True, verbose=False)
 
+    # Test plotting
+    linac.stages[-1].plot_evolution(bunch='beam')
+    linac.plot_survey()
+    linac.plot_evolution()
+    linac.plot_waterfalls()
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 
 ###################################################
@@ -186,6 +226,8 @@ def test_ramped_linac():
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, driver evolution, driver angular jitter, no ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -208,10 +250,15 @@ def test_driverEvol_linac():
     # Perform tracking
     linac.run('test_driverEvol_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_ramped_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, driver evolution, driver angular jitter, with ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -234,6 +281,9 @@ def test_driverEvol_ramped_linac():
     # Perform tracking
     linac.run('test_driverEvol_ramped_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 
 ###################################################
@@ -242,6 +292,8 @@ def test_driverEvol_ramped_linac():
 @pytest.mark.transverse_wake_instability_linac
 def test_angular_jitter_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, driver angular jitter, no ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -264,10 +316,15 @@ def test_angular_jitter_linac():
     # Perform tracking
     linac.run('test_angular_jitter_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 @pytest.mark.transverse_wake_instability_linac
 def test_angular_jitter_ramped_linac():
     "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, driver angular jitter, with ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -290,6 +347,9 @@ def test_angular_jitter_ramped_linac():
     # Perform tracking
     linac.run('test_angular_jitter_ramped_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 
 ###################################################
@@ -298,6 +358,8 @@ def test_angular_jitter_ramped_linac():
 @pytest.mark.transverse_wake_instability_linac
 def test_trInstability_linac():
     "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, no driver evolution, no driver jitter, no ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -320,10 +382,15 @@ def test_trInstability_linac():
     # Perform tracking
     linac.run('test_trInstability_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 @pytest.mark.transverse_wake_instability_linac
 def test_jitter_trInstability_ramped_linac():
     "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, no driver evolution, xy driver jitter, with ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -346,10 +413,15 @@ def test_jitter_trInstability_ramped_linac():
     # Perform tracking
     linac.run('test_jitter_trInstability_ramped_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_jitter_trInstability_ramped_linac():
     "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, with driver evolution, xy driver jitter, with ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -372,11 +444,15 @@ def test_driverEvol_jitter_trInstability_ramped_linac():
     # Perform tracking
     linac.run('test_driverEvol_jitter_trInstability_ramped_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
 
 
 @pytest.mark.transverse_wake_instability_linac
 def test_ionMotion_linac():
     "``StagePrtclTransWakeInstability`` ion motion enabled, no driver evolution, no driver jitter, no ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -385,7 +461,7 @@ def test_ionMotion_linac():
     enable_xpyp_jitter = False
     enable_tr_instability = False
     enable_radiation_reaction = True
-    enable_ion_motion = False
+    enable_ion_motion = True
     use_ramps = False
     drive_beam_update_period = 0
 
@@ -399,10 +475,15 @@ def test_ionMotion_linac():
     # Perform tracking
     linac.run('test_ionMotion_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 @pytest.mark.transverse_wake_instability_linac
 def test_jitter_trInstability_ionMotion_linac():
     "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, no ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -425,10 +506,15 @@ def test_jitter_trInstability_ionMotion_linac():
     # Perform tracking
     linac.run('test_trInstability_ionMotion_linac', overwrite=True, verbose=False)
 
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
 
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
     "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, no ramps."
+
+    np.random.seed(42)
 
     num_stages = 2
     plasma_density = 6.0e+20                                                      # [m^-3]
@@ -450,3 +536,6 @@ def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
 
     # Perform tracking
     linac.run('test_driverEvol_jitter_trInstability_ionMotion_ramped_linac', overwrite=True, verbose=False)
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
