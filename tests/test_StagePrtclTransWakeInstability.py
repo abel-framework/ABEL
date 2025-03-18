@@ -195,5 +195,31 @@ def test_stage_length_gradient_energyGain():
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop)
 
 
+def test_driver_unrotation():
+    "Tests for checking the driver being correctly un-rotated back to its original coordinate system."
 
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = True
+    enable_xpyp_jitter = True
+    enable_tr_instability = False
+    enable_radiation_reaction = False
+    enable_ion_motion = False
+    use_ramps = True
+    drive_beam_update_period = 0
+    return_tracked_driver = True
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, run_tests=True)
+
+    stage.nom_energy = 377.4e9
+    _, driver = stage.track(main_source.track())
+    driver0 = stage.drive_beam
+
+    assert np.allclose(driver0.x_angle(), driver.x_angle())
+    assert np.allclose(driver0.y_angle(), driver.y_angle())
+   
+
+# TODO: Test on bubble radius tracing
 
