@@ -30,10 +30,12 @@ requires-python = ">= 3"
 
 authors = [
   {name = "Carl Andreas Lindstrøm", email = "c.a.lindstrom@fys.uio.no"},
-  {name = "Ben Chen"},
+  {name = "Jian Bin Ben Chen"},
   {name = "Ole Gunnar Finnerud"},
   {name = "Kyrre Sjobak"},
-  {name = "Daniel Kalvik"}
+  {name = "Daniel Kalvik"},
+  {name = "Erik Adli"},
+  {name = "Eir Eline Hørlyk"}
 ]
 readme = "README.md"
 #license = {text="LGPL3+"}
@@ -52,4 +54,5 @@ markers = [
   "core: Test core functionality",
   "stageGeometry: Test stage geometry calculation functionality",
   "transverse_wake_instability_linac: Test linacs based on StagePrtclTransWakeInstability",
+  "StagePrtclTransWakeInstability: Tests on StagePrtclTransWakeInstability",
 ]
