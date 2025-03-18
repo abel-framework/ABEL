@@ -233,7 +233,33 @@ class Beam():
     
 
     def comp_beams(beam1, beam2, comp_location=False, rtol=1e-05, atol=1e-08):
-        "Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within a tolerance."
+        """
+        Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within given tolerances.
+
+        Parameters
+        ----------
+        beam1, beam2 : ABEL ``Beam`` object
+            Beams to be compared
+
+        comp_location: bool, optional
+            Flag for comparing the location of the beams. Default set to ``False``.
+            
+        rtol : float, optional
+            The relative tolerance parameter (see [1]_). Default set to 1e-5.
+            
+        rb_fit_obj : float, optional
+            The absolute tolerance parameter (see [1]_). Default set to 1e-8.
+        
+            
+        Returns
+        ----------
+        ``None``
+
+        
+        References
+        ----------
+        .. [1] ``numpy.allclose()`` https://numpy.org/doc/stable/reference/generated/numpy.allclose.html
+        """
 
         if comp_location:
             assert np.allclose(beam1.location, beam2.location, rtol, atol)
@@ -246,6 +272,64 @@ class Beam():
         assert np.allclose(beam1.uys(), beam2.uys(), rtol, atol)
         assert np.allclose(beam1.uzs(), beam2.uzs(), rtol, atol)
         assert np.allclose(beam1.particle_mass, beam2.particle_mass, rtol, atol)
+
+
+    def comp_beam_params(beam1, beam2, comp_location=False, rtol=1e-05, atol=1e-08):
+        """
+        Compare the parameters of two beams to see if they are equal within given tolerances.
+
+        Parameters
+        ----------
+        beam1, beam2 : ABEL ``Beam`` object
+            Beams to be compared
+
+        comp_location: bool, optional
+            Flag for comparing the location of the beams. Default set to ``False``.
+            
+        rtol : float, optional
+            The relative tolerance parameter (see [1]_). Default set to 1e-5.
+            
+        rb_fit_obj : float, optional
+            The absolute tolerance parameter (see [1]_). Default set to 1e-8.
+        
+            
+        Returns
+        ----------
+        ``None``
+
+        
+        References
+        ----------
+        .. [1] ``numpy.allclose()`` https://numpy.org/doc/stable/reference/generated/numpy.allclose.html
+        """
+
+        if comp_location:
+            assert np.allclose(beam1.location, beam2.location, rtol=1e-05, atol=1e-08)
+        assert np.allclose(beam1.particle_mass, beam2.particle_mass, rtol=1e-05, atol=1e-08)
+        assert np.allclose(beam1.total_particles(), beam2.total_particles(), rtol=1e-05, atol=1e-08)
+        assert np.allclose(beam1.charge(), beam2.charge(), rtol=1e-05, atol=1e-08)
+        assert np.allclose(beam1.energy(), beam2.energy(), rtol=0.0, atol=0.6e9)  # Usually rather large discrepancy in energy.
+        assert np.allclose(beam1.energy_spread(), beam2.energy_spread(), rtol=0.0, atol=0.6e9)
+        assert np.allclose(beam1.rel_energy_spread(), beam2.rel_energy_spread(), rtol=0.0, atol=5e-4)
+        assert np.allclose(beam1.z_offset(), beam2.z_offset(), rtol, atol)
+        assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.0, atol=1e-6)
+        assert np.allclose(beam1.x_offset(), beam2.x_offset(), rtol=0.0, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.y_offset(), beam2.y_offset(), rtol=0.0, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.x_angle(), beam2.x_angle(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.y_angle(), beam2.y_angle(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.divergence_x(), beam2.divergence_x(), rtol=0.0, atol=0.1e-6)
+        assert np.allclose(beam1.divergence_y(), beam2.divergence_y(), rtol=0.0, atol=0.1e-6)
+        assert np.allclose(beam1.geom_emittance_x(), beam2.geom_emittance_x(), rtol, atol)
+        assert np.allclose(beam1.geom_emittance_y(), beam2.geom_emittance_y(), rtol, atol)
+        assert np.allclose(beam1.norm_emittance_x(), beam2.norm_emittance_x(), rtol=0.0, atol=3e-6)
+        assert np.allclose(beam1.norm_emittance_y(), beam2.norm_emittance_y(), rtol=0.0, atol=3e-6)
+        assert np.allclose(beam1.beta_x(), beam2.beta_x(), rtol=0.0, atol=50e-3)
+        assert np.allclose(beam1.beta_y(), beam2.beta_y(), rtol=0.0, atol=50e-3)
+        assert np.allclose(beam1.gamma_x(), beam2.gamma_x(), rtol=0.0, atol=0.05)
+        assert np.allclose(beam1.gamma_y(), beam2.gamma_y(), rtol=0.0, atol=0.05)
+        assert np.allclose(beam1.peak_current(), beam2.peak_current(), rtol=0.0, atol=0.7e3)
     
 
     # vector of transverse positions and angles: (x, x', y, y')
@@ -1713,6 +1797,8 @@ class Beam():
         print('---------------------------------------------------')
         print('Quantity \t\t\t\t Value')
         print('---------------------------------------------------')
+        if hasattr(self, 'beam_name'):
+            print(f"Beam name:\t\t\t\t {self.beam_name :s}")
         print(f"Number of macroparticles:\t\t {len(self) :d}")
         print(f"Mean gamma:\t\t\t\t {self.gamma() :.3f}")
         print(f"Mean energy [GeV]:\t\t\t {self.energy()/1e9 :.3f}")
