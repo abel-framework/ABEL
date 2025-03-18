@@ -44,8 +44,16 @@ class InterstageImpactX(Interstage):
         # initialize lattice
         lattice = []
         
-        L1 = self.dipole_length
-        B1 = self.dipole_field
+        if not self.dipole_length:
+            L1 = 0
+        else:
+            L1 = self.dipole_length
+        
+        if not self.dipole_field:
+            B1 = 0
+        else:
+            B1 = self.dipole_field
+
         L2 = self.L2_by_L1*L1
 
         E0 = self.nom_energy
@@ -60,26 +68,32 @@ class InterstageImpactX(Interstage):
         bend = impactx.elements.ExactSbend(name="dipole", ds=L1, phi=np.rad2deg(phi), B=B1, nslice=ns)
         
         # define plasma lens
-        f0 = L1*L2/(L1+L2)
+        if L1 or L2:
+            f0 = L1*L2/(L1+L2)
+            k=1/f0
+        else:
+            f0 = 0
+            k = np.inf
         dtaper = int(self.enable_nonlinearity)*1/Dx
-        pl = impactx.elements.TaperedPL(k=1/f0, taper=dtaper, name="plasmalens")
+        pl = impactx.elements.TaperedPL(k=k, taper=dtaper, name="plasmalens")
 
         B2 = int(self.enable_chicane)*self.B2_by_B1*B1
+        B2_div_B1 = int(self.enable_chicane)*self.B2_by_B1
         if abs(B2) > 0:
             phi2 = B2*(L2/2)*(SI.e/p0)
             chicane1 = impactx.elements.ExactSbend(name="chicane1", ds=L2/2, phi=np.rad2deg(phi2), B=B2, nslice=ns)
         else:
             chicane1 = impactx.elements.ExactDrift(name="chicane1", ds=L2/2, nslice=ns)
 
-        B3 = -B2 - B1*(L1/L2)*(1-L1/L2)
+        B3 = -B2 - B1*(1/self.L2_by_L1)*(1-1/self.L2_by_L1)
         if abs(B3) > 0:
             phi3 = B3*(L2/2)*(SI.e/p0)
             chicane2 = impactx.elements.ExactSbend(name="chicane2", ds=L2/2, phi=np.rad2deg(phi3), B=B3, nslice=ns)
         else:
             chicane2 = impactx.elements.ExactDrift(name="chicane2", ds=L2/2, nslice=ns)
     
-        Dx_mid = Dx*(1/4)*(1 + 3*L2/L1 + 2*(B2*L2**2)/(B1*L1**2))
-        DDxp_mid = (2*B1*L1*SI.e/p0)*((3/4)*(L1/L2 + 1) - 1)*(2.0-int(self.enable_nonlinearity))
+        Dx_mid = Dx*(1/4)*(1 + 3*self.L2_by_L1 + 2*(B2_div_B1)*self.L2_by_L1**2)
+        DDxp_mid = (2*B1*L1*SI.e/p0)*((3/4)*(1/self.L2_by_L1 + 1) - 1)*(2.0-int(self.enable_nonlinearity))
         m_sext = int(self.enable_sextupole)*2*DDxp_mid/Dx_mid**2
         sextupole = impactx.elements.Multipole(multipole=3, K_normal=m_sext, K_skew=0, name="sextupole")
         
