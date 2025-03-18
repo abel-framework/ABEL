@@ -117,8 +117,8 @@ class StagePrtclTransWakeInstability(Stage):
         self.num_y_cells_rft = num_y_cells_rft
         self.num_xy_cells_probe = num_xy_cells_probe
         self.uniform_z_grid = uniform_z_grid
-        self.ion_wkfld_update_period=ion_wkfld_update_period
-        self.drive_beam_update_period=drive_beam_update_period
+        self.ion_wkfld_update_period = ion_wkfld_update_period
+        self.drive_beam_update_period = drive_beam_update_period
 
         # Longitudinal electric field and plasma ion bubble radius
         self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
@@ -711,7 +711,11 @@ class StagePrtclTransWakeInstability(Stage):
         ramp_length : [m] float, optional
             Length of the ramp.
 
-        ...
+        probe_evol_period : int, optional
+            Set to larger than 0 to determine the probing period for beam evolution diagnostics. This is given in units of time steps, so that e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd time step. Default value: 1.
+
+        make_animations : bool, optional
+            Flag for making animations.
     
             
         Returns
