@@ -52,14 +52,14 @@ def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=Fal
     return driver
 
 
-def setup_basic_main_source(plasma_density, ramp_beta_mag):
+def setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9):
     main = SourceBasic()
     main.bunch_length = 40.0e-06                                                  # [m], rms. Standard value
     main.num_particles = 10000                                               
     main.charge = -e * 1.0e10                                                     # [C]
 
     # Energy parameters
-    main.energy = 361.8e9                                                         # [eV], HALHF v2 second to last stage nominal input energy
+    main.energy = energy                                                          # [eV], Default set to HALHF v2 second to last stage nominal input energy
     main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
 
     # Emittances
@@ -155,10 +155,10 @@ def test_baseline_linac():
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
     
     # Check the outputs
-    assert np.allclose(linac.get_beam(0).energy(), 361.8e9, rtol=0, atol=0.6e9)
-    assert np.allclose(linac.get_beam(-1).energy(), 377.4e9, rtol=0, atol=0.6e9)
     assert np.allclose(linac.stages[0].nom_energy, 361.8e9)
     assert np.allclose(linac.stages[1].nom_energy, 369.6e9)
+    assert np.allclose(linac.get_beam(0).energy(), 361.8e9, rtol=0, atol=0.6e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 377.4e9, rtol=0, atol=0.6e9)
 
     final_beam = linac.get_beam(-1)
     final_beam.beam_name = 'Test beam'
@@ -167,7 +167,7 @@ def test_baseline_linac():
 
     final_beam.print_summary()
     ref_beam.print_summary()
-    Beam.comp_beam_params(final_beam, ref_beam, comp_location=False)  # Compare output beam with reference beam file.
+    Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
 
     # Test plotting functions
     linac.stages[-1].plot_Ez_rb_cut()
@@ -203,6 +203,21 @@ def test_ramped_linac():
 
     # Perform tracking
     linac.run('test_ramped_linac', overwrite=True, verbose=False)
+
+    # Check the outputs
+    assert np.allclose(linac.stages[0].nom_energy, 361.8e9)
+    assert np.allclose(linac.stages[1].nom_energy, 369.6e9)
+    assert np.allclose(linac.get_beam(0).energy(), 361.8e9, rtol=0, atol=0.6e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 376.4e9, rtol=0, atol=0.6e9)
+
+    final_beam = linac.get_beam(-1)
+    final_beam.beam_name = 'Test beam'
+    ref_beam = Beam.load('./tests/data/test_StagePrtclTransWakeInstability_beamline/test_ramped_linac/shot_000/beam_003_00052.224498.h5')
+    ref_beam.beam_name = 'Reference beam'
+
+    final_beam.print_summary()
+    ref_beam.print_summary()
+    Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
 
     # Test plotting
     linac.stages[-1].plot_evolution(bunch='beam')
@@ -369,6 +384,7 @@ def test_trInstability_linac():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    main_source.energy = 3.0                                                      # [eV], HALHF v2 start energy
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageElegant(stage)
 
@@ -399,7 +415,7 @@ def test_jitter_trInstability_ramped_linac():
     drive_beam_update_period = 0
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
-    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=3.0e9)
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageElegant(stage)
 
@@ -407,6 +423,21 @@ def test_jitter_trInstability_ramped_linac():
 
     # Perform tracking
     linac.run('test_jitter_trInstability_ramped_linac', overwrite=True, verbose=False)
+
+    # Check the outputs
+    assert np.allclose(linac.stages[0].nom_energy, 3.0e9)
+    assert np.allclose(linac.stages[1].nom_energy, 10.8e9)
+    assert np.allclose(linac.get_beam(0).energy(), 3.0e9, rtol=0, atol=0.2e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 17.957e9, rtol=0, atol=0.6e9)
+
+    final_beam = linac.get_beam(-1)
+    final_beam.beam_name = 'Test beam'
+    ref_beam = Beam.load('./tests/data/test_StagePrtclTransWakeInstability_beamline/test_jitter_trInstability_ramped_linac/shot_000/beam_003_00021.835477.h5')
+    ref_beam.beam_name = 'Reference beam'
+
+    final_beam.print_summary()
+    ref_beam.print_summary()
+    Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
@@ -506,8 +537,54 @@ def test_jitter_trInstability_ionMotion_linac():
 
 
 @pytest.mark.transverse_wake_instability_linac
+def test_jitter_trInstability_ionMotion_ramped_linac():
+    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, with ramps."
+
+    np.random.seed(42)
+
+    num_stages = 2
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = True
+    enable_xpyp_jitter = False
+    enable_tr_instability = True
+    enable_radiation_reaction = True
+    enable_ion_motion = True
+    use_ramps = True
+    drive_beam_update_period = 0
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=3.0e9)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    interstage = setup_InterstageElegant(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_jitter_trInstability_ionMotion_ramped_linac', overwrite=True, verbose=False)
+
+    # Check the outputs
+    assert np.allclose(linac.stages[0].nom_energy, 3.0e9)
+    assert np.allclose(linac.stages[1].nom_energy, 10.8e9)
+    assert np.allclose(linac.get_beam(0).energy(), 3.0e9, rtol=0, atol=0.2e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 17.957e9, rtol=0, atol=0.6e9)
+
+    final_beam = linac.get_beam(-1)
+    final_beam.beam_name = 'Test beam'
+    ref_beam = Beam.load('./tests/data/test_StagePrtclTransWakeInstability_beamline/test_jitter_trInstability_ionMotion_ramped_linac/shot_000/beam_003_00021.835477.h5')
+    ref_beam.beam_name = 'Reference beam'
+
+    final_beam.print_summary()
+    ref_beam.print_summary()
+    Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
-    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, no ramps."
+    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, with driver evolution, with ramps."
 
     np.random.seed(42)
 
@@ -523,7 +600,7 @@ def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
     drive_beam_update_period = 1
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
-    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=3.0e9)
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageElegant(stage)
 
