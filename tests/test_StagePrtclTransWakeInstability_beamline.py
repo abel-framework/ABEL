@@ -129,7 +129,7 @@ def setup_InterstageElegant(stage):
 
 @pytest.mark.transverse_wake_instability_linac
 def test_baseline_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, no ramps."
+    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, no ramps. Also tests some plotting functions."
 
     np.random.seed(42)
 
@@ -184,7 +184,7 @@ def test_baseline_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_ramped_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, with ramps."
+    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, with ramps. Also tests some plotting functions."
 
     np.random.seed(42)
 
