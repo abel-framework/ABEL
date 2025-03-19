@@ -167,12 +167,7 @@ def test_baseline_linac():
 
     final_beam.print_summary()
     ref_beam.print_summary()
-    print(final_beam.divergence_x(), ref_beam.divergence_x())
-    print(final_beam.divergence_y(), ref_beam.divergence_y())
-    print(final_beam.geom_emittance_x(), ref_beam.geom_emittance_x())
-    print(final_beam.geom_emittance_y(), ref_beam.geom_emittance_y())
-    print(final_beam.gamma_y(), ref_beam.gamma_y())
-    Beam.comp_beam_params(final_beam, ref_beam, comp_location=False, rtol=1e-05, atol=1e-08)  # Compare output beam with reference beam file.
+    Beam.comp_beam_params(final_beam, ref_beam, comp_location=False)  # Compare output beam with reference beam file.
 
     # Test plotting functions
     linac.stages[-1].plot_Ez_rb_cut()
