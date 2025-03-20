@@ -193,6 +193,7 @@ def test_scale_charge():
     "Test correct scaling of particle charges, scaling to a larger or smaller total charge. Edge case: scaling to zero charge."
 
     beam = Beam()
+    num_particles = 4352
     xs = np.random.rand(num_particles)
     ys = np.random.rand(num_particles)
     zs = np.random.rand(num_particles)
@@ -216,29 +217,38 @@ def test_scale_charge():
     assert np.isclose(scaled_charges.sum(), 0)
 
 
-# def test_scale_energy():
-#     "Test correct scaling of particle energies, scaling to a higher or lower total energy. Edge case: scaling to zero energy."
+def test_scale_energy():
+    "Test correct scaling of particle energies, scaling to a higher or lower total energy. Edge case: scaling to zero energy."
 
-#     beam = Beam()
-#     beam.set_phase_space(1e-9, [1.0, 2.0], [0.5, 1.5], [0.2, 0.3], Es=[1e6, 2e6])  # Initialize with energies in eV
-#     original_energies = beam._Beam__phasespace[5, :].copy()  # Assuming energy stored in index 5
+    beam = Beam()
+    num_particles = 4352
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    #Es = np.ones_like(num_particles) * 1e9
+    Es = np.random.normal(1e9, 0.02*1e9, num_particles)
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, Es=Es)
+    original_energies = copy.deepcopy(beam.Es())
 
-#     # Scale up energy
-#     beam.scale_energy(4e6)  # Scale total energy to 4 MeV
-#     scaled_energies = beam._Beam__phasespace[5, :]
-#     assert np.isclose(scaled_energies.sum(), 4e6)
-#     assert np.allclose(scaled_energies / original_energies, 2.0)  # Energies scaled proportionally
+    # Scale up energy
+    beam.scale_energy(4e9)
+    scaled_energies = beam.Es()
+    scaled_mean_energy = weighted_mean(scaled_energies, beam.weightings())
+    assert np.isclose(scaled_mean_energy, 4e9, rtol=0.01, atol=1e8)
+    assert np.allclose(scaled_energies / original_energies, 4.0, rtol=0.01, atol=0.1)  # Energies scaled proportionally
 
-#     # Scale down energy
-#     beam.scale_energy(1e6)  # Scale total energy to 1 MeV
-#     scaled_energies = beam._Beam__phasespace[5, :]
-#     assert np.isclose(scaled_energies.sum(), 1e6)
+    # Scale down energy
+    beam.scale_energy(1.7e8)
+    scaled_energies = beam.Es()
+    scaled_mean_energy = weighted_mean(scaled_energies, beam.weightings())
+    assert np.isclose(scaled_mean_energy, 1.7e8, rtol=0.01, atol=1e8)
 
-#     # Edge case: zero energy
-#     try:
-#         beam.scale_energy(0)
-#     except ValueError as e:
-#         assert str(e) == "Energy cannot be scaled to zero"
+    # # Edge case: zero energy
+    # try:
+    #     beam.scale_energy(0)
+    # except ValueError as e:
+    #     assert str(e) == "Energy cannot be scaled to zero"
 
 
 ############# Tests on bunch pattern #############
