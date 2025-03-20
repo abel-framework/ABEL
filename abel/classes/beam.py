@@ -194,6 +194,8 @@ class Beam():
     
     # copy another beam's macroparticle charge
     def copy_particle_charge(self, beam):
+        if beam.__phasespace is None or self.__phasespace is None:
+            raise ValueError('One of the beams is empty.')
         self.set_qs(np.median(beam.qs()))
 
     def scale_charge(self, Q):

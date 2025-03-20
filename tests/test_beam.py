@@ -189,28 +189,31 @@ def test_copy_particle_charge():
     assert (beam1._Beam__phasespace[6, :] == median_charge).all()  # Verify charge is copied correctly
 
 
-# def test_scale_charge():
-#     "Test correct scaling of particle charges, scaling to a larger or smaller total charge. Edge case: scaling to zero charge."
+def test_scale_charge():
+    "Test correct scaling of particle charges, scaling to a larger or smaller total charge. Edge case: scaling to zero charge."
 
-#     beam = Beam()
-#     beam.set_phase_space(1e-9, [1.0, 2.0], [0.5, 1.5], [0.2, 0.3])  # Total charge = 1e-9 C
-#     original_charges = beam._Beam__phasespace[6, :].copy()
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs)
+    original_charges = copy.deepcopy(beam.qs())
 
-#     # Scale up charge
-#     beam.scale_charge(2e-9)  # Scale to 2 nC
-#     scaled_charges = beam._Beam__phasespace[6, :]
-#     assert np.isclose(scaled_charges.sum(), 2e-9)  # Check total charge
-#     assert np.allclose(scaled_charges / original_charges, 2.0)  # Charges scaled proportionally
+    # Scale up charge
+    beam.scale_charge(-SI.e * 2.0e10)
+    scaled_charges = beam.qs()
+    assert np.isclose(scaled_charges.sum(), -SI.e * 2.0e10)  # Check total charge
+    assert np.allclose(scaled_charges / original_charges, 2.0)  # Charges scaled proportionally
 
-#     # Scale down charge
-#     beam.scale_charge(5e-10)  # Scale to 0.5 nC
-#     scaled_charges = beam._Beam__phasespace[6, :]
-#     assert np.isclose(scaled_charges.sum(), 5e-10)
+    # Scale down charge
+    beam.scale_charge(-SI.e * 0.5e10)
+    assert np.isclose(scaled_charges.sum(), -SI.e * 0.5e10)
 
-#     # Edge case: zero charge
-#     beam.scale_charge(0)
-#     scaled_charges = beam._Beam__phasespace[6, :]
-#     assert np.isclose(scaled_charges.sum(), 0)
+    # Edge case: zero charge
+    beam.scale_charge(0)
+    scaled_charges = beam.qs()
+    assert np.isclose(scaled_charges.sum(), 0)
 
 
 # def test_scale_energy():
