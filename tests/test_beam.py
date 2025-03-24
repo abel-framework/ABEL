@@ -25,6 +25,34 @@ from abel import *
 import random
 
 
+def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0):
+    main = SourceBasic()
+    main.bunch_length = bunch_length                                              # [m], rms. Standard value
+    main.num_particles = 10000                                               
+    main.charge = -e * 1.0e10                                                     # [C]
+
+    # Energy parameters
+    main.energy = energy                                                          # [eV], HALHF v2 last stage nominal input energy
+    main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
+
+    # Emittances
+    main.emit_nx, main.emit_ny = 15e-6, 0.1e-6                                    # [m rad]
+
+    # Beta functions
+    main.beta_x = beta_matched(plasma_density, main.energy) * ramp_beta_mag       # [m]
+    main.beta_y = main.beta_x                                                     # [m]
+
+    # Offsets
+    main.z_offset = z_offset                                                      # [m]
+    main.x_offset = x_offset                                                      # [m]
+    main.y_offset = y_offset                                                      # [m]
+
+    # Other
+    main.symmetrize_6d = True
+
+    return main
+
+
 ############# Basic tests #############
 
 @pytest.mark.beam
@@ -54,6 +82,8 @@ def test_set_phase_space():
 
     assert len(beam) == num_particles
     assert np.isclose(beam.particle_mass, SI.m_e)
+    assert np.isclose(beam.charge(), Q)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
     assert np.allclose(beam.xs(), xs)
     assert np.allclose(beam.ys(), ys)
     assert np.allclose(beam.zs(), zs)
@@ -61,8 +91,7 @@ def test_set_phase_space():
     assert np.allclose(beam.uys(), uys)
     assert np.allclose(beam.uzs(), uzs)
     assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
-    assert np.isclose(beam.charge(), Q)
-    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
+
 
     assert np.allclose(beam.xps(), uxs/uzs)
     assert np.allclose(beam.yps(), uys/uzs)
@@ -77,17 +106,34 @@ def test_set_phase_space2():
     "Verify that the phase space is set correctly."
     beam = Beam()
     num_particles = 10042
-    xs = np.random.normal(0.0, 2.0e-6, num_particles)
-    ys = np.random.normal(0.0, 1.0e-6, num_particles)
-    zs = np.random.normal(0.0, 50.0e-6, num_particles)
-    xps = np.random.normal(0.0, 1.5e-4, num_particles)
-    yps = np.random.normal(0.0, 1.0e-5, num_particles)
+    xs = np.random.normal(1.1, 2.0e-6, num_particles)
+    ys = np.random.normal(0.3, 1.0e-6, num_particles)
+    zs = np.random.normal(5.6, 50.0e-6, num_particles)
+    xps = np.random.normal(1.1e-5, 1.5e-7, num_particles)
+    yps = np.random.normal(3.2e-6, 1.0e-8, num_particles)
     Es = np.random.normal(500e9, 0.02*500e9, num_particles)
+    #weightings =  # TODO: make an array for varying weightings
     Q = -SI.e * 1.0e10
     beam.set_phase_space(Q, xs, ys, zs, xps=xps, yps=yps, Es=Es)
 
     assert len(beam) == num_particles
     assert np.isclose(beam.particle_mass, SI.m_e)
+    assert np.isclose(beam.charge(), Q)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
+    assert np.isclose(beam.energy(), 500e9, rtol=0.0001*500e9, atol=1e9)
+    assert np.isclose(beam.gamma(), 500e9*SI.e/SI.m_e/SI.c**2, rtol=0.0001*500e9*SI.e/SI.m_e/SI.c**2, atol=200)
+    assert np.isclose(beam.rel_energy_spread(), 0.02, rtol=0.001, atol=0.001)
+    assert np.isclose(beam.z_offset(), 5.6)
+    assert np.isclose(beam.x_offset(), 1.1)
+    assert np.isclose(beam.y_offset(), 0.3)
+    assert np.isclose(beam.bunch_length(), 50.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.beam_size_x(), 2.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.beam_size_y(), 1.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.x_angle(), 1.1e-5)
+    assert np.isclose(beam.y_angle(), 3.2e-6)
+    assert np.isclose(beam.divergence_x(), 1.5e-7)
+    assert np.isclose(beam.divergence_y(), 1.0e-8)
+
     assert np.allclose(beam.xs(), xs)
     assert np.allclose(beam.ys(), ys)
     assert np.allclose(beam.zs(), zs)
@@ -95,8 +141,6 @@ def test_set_phase_space2():
     assert np.allclose(beam.yps(), yps, rtol=1e-05, atol=1e-08)
     assert np.allclose(beam.Es(), Es)
     assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
-    assert np.isclose(beam.charge(), Q)
-    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
 
     assert np.allclose(beam.uzs(), np.sqrt((Es*SI.e/SI.m_e/SI.c)**2 - SI.c**2) )
     assert np.allclose(beam.uxs(), xps*beam.uzs())
@@ -122,6 +166,8 @@ def test_set_phase_space3():
 
     assert len(beam) == num_particles
     assert np.isclose(beam.particle_mass, SI.m_e)
+    assert np.isclose(beam.charge(), Q)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
     assert np.allclose(beam.xs(), xs)
     assert np.allclose(beam.ys(), ys)
     assert np.allclose(beam.zs(), zs)
@@ -129,8 +175,6 @@ def test_set_phase_space3():
     assert np.allclose(beam.pys(), pys, rtol=1e-05, atol=1e-25)
     assert np.allclose(beam.pzs(), pzs, rtol=1e-05, atol=1e-19)
     assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
-    assert np.isclose(beam.charge(), Q)
-    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
 
     assert np.allclose(beam.xps(), pxs/pzs)
     assert np.allclose(beam.yps(), pys/pzs)
@@ -369,3 +413,16 @@ def test_scale_energy():
 
 
 ############# Tests of rotation methods #############
+
+#def test_x_tilt_angle():
+
+def test_rotate_coord_sys_3D():
+    "Test correct rotation of beam coordinate system."
+
+    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+    beam = source.track()
+    x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
+    y_axis = np.array([0, 0, 1])
+
+    beam.rotate_coord_sys_3D(y_axis, np.pi/2, x_axis, 0.0, invert=False)  # Rotate beam 90 degrees around the y-axis.
+    assert np.isclose(beam.x_tilt_angle(), np.pi/2)
