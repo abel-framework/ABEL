@@ -21,7 +21,7 @@ except:
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=True):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -41,6 +41,7 @@ class StageHipace(Stage):
         # physics flags
         self.ion_motion = ion_motion
         self.ion_species = ion_species
+        self.mesh_refinement = mesh_refinement
         self.beam_ionization = beam_ionization
         self.radiation_reaction = radiation_reaction
         
@@ -129,10 +130,10 @@ class StageHipace(Stage):
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_r = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
+        box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
         
         # calculate number of cells in x to get similar resolution
-        dr = box_size_r/self.num_cell_xy
+        dr = box_size_xy/self.num_cell_xy
         num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # calculate the time step
@@ -160,7 +161,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial, mesh_refinement=self.mesh_refinement)
         
         
         ## RUN SIMULATION
@@ -347,7 +348,7 @@ class StageHipace(Stage):
         # prepare to read simulation data
         source_path = tmpfolder + 'diags/hdf5/'
         ts = OpenPMDTimeSeries(source_path)
-
+        
         # extract initial on-axis wakefield
         Ez0, metadata0 = ts.get_field(field='Ez', slice_across=['x'], iteration=min(ts.iterations))
         self.initial.plasma.wakefield.onaxis.zs = metadata0.z
@@ -532,10 +533,10 @@ class StageHipace(Stage):
         head_f = np.mean(z_w_f) + 3*np.std(z_w_f)
 
         # Extract field data
-        F_trans, m_trans = ts.get_field('ExmBy', iteration = 0)
+        F_trans, m_trans = ts.get_field('ExmBy_lev0', iteration = 0)
         
         # Extract final field data
-        F_trans_f, m_trans_f = ts.get_field('ExmBy', iteration = self.num_steps)
+        F_trans_f, m_trans_f = ts.get_field('ExmBy_lev0', iteration = self.num_steps)
         
         # Get head and tail index 
         index_witness_tail= int(np.round((tail - m_trans.z[0])/m_trans.dz))
