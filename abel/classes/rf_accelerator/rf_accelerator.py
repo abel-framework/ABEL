@@ -359,15 +359,15 @@ class RFAccelerator(Trackable, CostModeled):
             breakdown.append((f"Cryo plants ({self.heat_power_at_cryo_temperature()/1e6:.1f} MW at {self.operating_temperature:.0f} K)", cooling_cost))
         return (self.name, breakdown)
     
-    def get_cost_civil_construction(self):
-        cost_civil_construction = 0
-        if self.use_tunnel:
-            cost_civil_construction += self.get_length() * CostModeled.cost_per_length_tunnel
-        elif self.use_cutandcover:
-            cost_civil_construction += self.get_length() * CostModeled.cost_per_length_cutandcover_large
-        if self.use_surfacebuilding:
-            cost_civil_construction += self.get_length() * CostModeled.cost_per_length_surfacebuilding
-        return cost_civil_construction
+    #def get_cost_civil_construction(self):
+    #    cost_civil_construction = 0
+    #    if self.use_tunnel:
+    #        cost_civil_construction += self.get_length() * CostModeled.cost_per_length_tunnel
+    #    elif self.use_cutandcover:
+    #        cost_civil_construction += self.get_length() * CostModeled.cost_per_length_cutandcover_large
+    #    if self.use_surfacebuilding:
+    #        cost_civil_construction += self.get_length() * CostModeled.cost_per_length_surfacebuilding
+    #    return cost_civil_construction
             
         
 

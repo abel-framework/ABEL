@@ -56,44 +56,6 @@ class HALHFv2(Collider):
 
         self.num_bds = 2
         
-        
-        ## OLD SOLUTION
-        
-        #self.com_energy = com_energy
-        #self.energy_asymmetry = 2.75
-        
-        #self.num_bunches_in_train = 160
-        #self.rep_rate_trains = 100.0 # [Hz]
-        
-        #self.driver_separation_num_buckets = 4
-        #self.driver_linac_rf_frequency = 1e9 # [Hz]
-        #self.driver_linac_gradient = 5e6 # [V/m]
-        #self.driver_linac_structure_num_rf_cells = 23
-        #self.driver_linac_num_structures_per_klystron = 1.0
-
-        #self.positron_charge = 3e10 * SI.e
-        #self.electron_charge = 1e10 * SI.e
-        #self.energy_transfer_efficiency = 0.5
-        #self.driver_depletion_efficiency = 0.8
-
-        #self.combiner_ring_compression_factor = 4
-        
-        #self.pwfa_num_stages = 32
-        #self.pwfa_transformer_ratio = 2
-        #self.pwfa_gradient = 1e9
-        
-        #self.use_cool_copper_positron_linac = use_cool_copper_positron_linac
-
-        #self.positron_linac_rf_frequency = 3e9
-        
-        #self.positron_linac_gradient_cool = 50e6 # [V/m]
-        #self.positron_linac_num_structures_per_klystron_cool = 140.0
-        #self.positron_linac_num_rf_cells_cool = 1
-        #self.positron_linac_temperature_cool = 77 # [K]
-    
-        #self.positron_linac_gradient_warm = 25e6 # [V/m]
-        #self.positron_linac_num_structures_per_klystron_warm = 1.0
-        #self.positron_linac_num_rf_cells_warm = 80
     
 
     # pre-assembly of the collider subsystems
@@ -162,6 +124,7 @@ class HALHFv2(Collider):
         driver_complex.transfer_line.nom_energy = driver_source.energy
 
         driver_complex.turnaround = TurnaroundBasic()
+        driver_complex.turnaround.bend_radius = 61 # [m] 
         driver_complex.turnaround.nom_energy = driver_source.energy
         driver_complex.turnaround.use_semi_circle = True
         
@@ -214,7 +177,8 @@ class HALHFv2(Collider):
         psource.beta_y = 10 # [m]
         psource.num_particles = esource.num_particles
         psource.wallplug_efficiency = esource.wallplug_efficiency
-        psource.accel_gradient = esource.accel_gradient
+        #psource.accel_gradient = esource.accel_gradient
+        psource.length = 176 # [m] based on ILC 500 GeV study.
         psource.bunch_separation = colliding_bunch_separation
         psource.is_polarized = True
         
@@ -295,6 +259,7 @@ class HALHFv2(Collider):
         # define interaction point
         ip = InteractionPointBasic()
         #ip = InteractionPointGuineaPig()
+        ip.num_ips = self.num_bds
         ip.enable_waist_shift = self.enable_waist_shift
         ip.waist_shift_frac = self.waist_shift_frac
         

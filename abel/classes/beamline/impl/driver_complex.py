@@ -77,7 +77,22 @@ class DriverComplex(Beamline):
 
     def get_nom_beam_power(self):
         return abs(self.nom_energy * self.source.get_charge() * self.get_rep_rate_average())
-    
+
+    def get_cost_breakdown_civil_construction(self):
+        breakdown = []
+        for trackable in self.trackables:
+            if isinstance(trackable, Source):
+                breakdown.append((f'{trackable.name} (cut & cover + surface building)', trackable.get_cost_civil_construction(cut_and_cover=True, surface_building=True)))
+            elif isinstance(trackable, RFAccelerator):
+                breakdown.append((f'{trackable.name} (cut & cover + surface building)', trackable.get_cost_civil_construction(cut_and_cover=True, surface_building=True)))
+            elif isinstance(trackable, CombinerRing):
+                breakdown.append((f'{trackable.name} (cut & cover)', trackable.get_cost_civil_construction(cut_and_cover=True)))
+            elif isinstance(trackable, TransferLine):
+                breakdown.append((f'{trackable.name} (small tunnel)', trackable.get_cost_civil_construction(tunnel_diameter=4)))
+            elif isinstance(trackable, Turnaround):
+                breakdown.append((f'{trackable.name} (small tunnel)', trackable.get_cost_civil_construction(tunnel_diameter=4)))
+        return ('Civil construction', breakdown)
+        
     def get_cost_breakdown(self):
         "Cost breakdown for the driver complex [ILC units]"
         

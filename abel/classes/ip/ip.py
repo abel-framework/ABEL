@@ -6,6 +6,10 @@ import numpy as np
 
 class InteractionPoint(Runnable, CostModeled):
     
+    def __init__(self, num_ips=1):
+        self.num_ips = num_ips
+        super().__init__()
+    
     # run simulation
     def run(self, runnable1, runnable2, run_name=None, all_by_all=False, verbose=True, overwrite=False, step_filter=None):
         
@@ -109,7 +113,7 @@ class InteractionPoint(Runnable, CostModeled):
     
     
     def get_cost_breakdown(self):
-        return ('Interaction point', CostModeled.cost_per_ip)
+        return (f'Interaction point ({self.num_ips}x)', CostModeled.cost_per_ip * self.num_ips)
     
     # interact
     @abstractmethod

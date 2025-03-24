@@ -312,15 +312,17 @@ class PlasmaLinac(Linac):
         num_interstages = 0
         for trackable in self.trackables:
             if isinstance(trackable, Stage):
-                cost_plasma_stages += trackable.get_cost_civil_construction()
+                cost_plasma_stages += trackable.get_cost_civil_construction(tunnel_diameter=8.0)
                 num_plasma_stages += 1
             elif isinstance(trackable, Interstage):
-                cost_interstages += trackable.get_cost_civil_construction()
+                cost_interstages += trackable.get_cost_civil_construction(tunnel_diameter=8.0)
                 num_interstages += 1
+            elif isinstance(trackable, BeamDeliverySystem):
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
             else:
-                breakdown.append((trackable.name, trackable.get_cost_civil_construction()))
-        breakdown.append((f'Plasma stages ({num_plasma_stages}x)', cost_plasma_stages))
-        breakdown.append((f'Interstages ({num_interstages}x)', cost_interstages))
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+        breakdown.append((f'Plasma stages ({num_plasma_stages}x, widened 3x)', cost_plasma_stages))
+        breakdown.append((f'Interstages ({num_interstages}x, widened 3x)', cost_interstages))
         return ('Civil construction', breakdown)
         
     

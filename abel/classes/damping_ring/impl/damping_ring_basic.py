@@ -83,5 +83,5 @@ class DampingRingBasic(DampingRing):
         return self.wallplug_power() / (self.rep_rate_trains * self.num_bunches_in_train)
         
         
-    def get_length(self):
-        return 0.0 # does not add to the traversed distance
+    #def get_length(self):
+    #    return 0.0 # does not add to the traversed distance

@@ -25,10 +25,9 @@ class DampingRing(Trackable, CostModeled):
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
-
-    @abstractmethod 
+    
     def get_length(self):
-        pass
+        return self.get_circumference()
     
     def get_nom_energy(self):
         return self.nom_energy 
@@ -44,9 +43,6 @@ class DampingRing(Trackable, CostModeled):
     
     def get_cost_breakdown(self):
         return (f'{self.name} ({self.num_rings} rings)', self.num_rings * self.get_circumference() * CostModeled.cost_per_length_damping_ring)
-
-    def get_cost_civil_construction(self):
-        return self.get_circumference() * CostModeled.cost_per_length_cutandcover_small
     
     @abstractmethod 
     def energy_usage(self):

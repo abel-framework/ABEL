@@ -18,6 +18,9 @@ class BeamDeliverySystem(Trackable, CostModeled):
     def get_length(self):
         pass
 
+    def get_cost_civil_construction(self, tunnel_diameter=None):
+        return super().get_cost_civil_construction(tunnel_diameter=tunnel_diameter, tunnel_widening_factor=(1+0.88*(self.num_bds-1)))
+        
     def get_cost_breakdown(self):
         return (f'{self.name} ({self.num_bds}x)', self.get_length() * CostModeled.cost_per_length_bds * self.num_bds)
     

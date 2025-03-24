@@ -28,10 +28,9 @@ class CombinerRing(Trackable, CostModeled):
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
-
-    @abstractmethod 
+    
     def get_length(self):
-        pass
+        return self.get_circumference()
 
     @abstractmethod 
     def get_bend_radius(self):
@@ -54,9 +53,6 @@ class CombinerRing(Trackable, CostModeled):
         breakdown.append((f'{self.num_rings} rings ({self.get_circumference()/1e3:.1f} km each)', self.num_rings * self.get_circumference() * CostModeled.cost_per_length_combiner_ring))
         breakdown.append(('RF kickers', (self.num_rings*2+2)*CostModeled.cost_per_rfkicker_combiner_ring))
         return (self.name, breakdown)
-
-    def get_cost_civil_construction(self):
-        return self.get_circumference() * CostModeled.cost_per_length_cutandcover_small
     
     def energy_usage(self):
         return 0.0

@@ -117,7 +117,17 @@ class ConventionalLinac(Linac):
              nom_energy_gain += self.rf_accelerator.get_nom_energy_gain()
 
         return nom_energy_gain
-    
+
+    def get_cost_breakdown_civil_construction(self):
+        breakdown = []
+        for trackable in self.trackables:
+            if isinstance(trackable, RFAccelerator):
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+            elif isinstance(trackable, BeamDeliverySystem):
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+            else:
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=5.6)))
+        return ('Civil construction', breakdown)
 
     def get_cost_breakdown(self, include_civil_construction=True):
 

@@ -21,11 +21,22 @@ class CostModeled(ABC):
     # cost per length of tunnel
     # REF: ILC TDR 2013 (using 500 GeV example), same as for FCC
     #cost_per_length_tunnel = 0.06e6 # [ILCU/m]
-    cost_per_length_tunnel = 0.021913e6*1.1811*0.9139*(1.75*0.75) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012, inflated by 75% today [31% in 2012])
 
-    cost_per_length_surfacebuilding = 0.037055e6*1.1811*0.9139 # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012)
-    cost_per_length_cutandcover_small = 0.008768e6*1.1811*0.9139 # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012)
-    cost_per_length_cutandcover_large = 0.012307e6*1.1811*0.9139 # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012)
+    cost_per_volume_tunnel = 714.75/(1.2*1.04) # [ILCU/m^3] CLIC cost, converted from 2018 EUR to USD
+    cost_per_volume_tunnel_widening = 561.65/(1.2*1.04) # [ILCU/m^3] FCC cost, converted from 2018 EUR to USD
+    
+    # 4.3 meter diameter tunnel (transport tunnels)
+    cost_per_length_tunnel_small = 14835.64/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012, inflated by 75% today [31% in 2012])
+    
+    # 5.6 meter diameter tunnel (damping ring tunnels etc.)
+    cost_per_length_tunnel_medium = 25199.694/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012, inflated by 75% today [31% in 2012])
+
+    # 8 meter diameter tunnel (widened tunnel)
+    cost_per_length_tunnel_large = 25199.694*2.0408/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012, inflated by 75% today [31% in 2012])
+
+    cost_per_length_surfacebuilding = 41506/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012)
+    #cost_per_length_cutandcover_small = 0.008768e6*1.1811*0.9139 # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012)
+    cost_per_length_cutandcover = 12308/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to ILCU)
 
     # cost per length of RF structure, not including klystrons (ILC is 0.24e6 with power)
     # REF: CLIC CDR update 2018 (using 380 GeV klystron-based example)
@@ -36,8 +47,7 @@ class CostModeled(ABC):
     # REF: ILC TDR 2013 (using 500 GeV example)
     # 2.753 BILCU / (17804 structures * (1.038/0.711) m/structure)
     cost_per_length_rf_structure_superconducting = 0.106e6 # [ILCU/m]
-
-    # TODO: add cost of dumps
+    
     # TODO: add cost of RTML
     # TODO: add cost of power infrastructure
     # TODO: add cost of He cryo-plants
@@ -86,7 +96,7 @@ class CostModeled(ABC):
 
     # cost of interaction point (the halls etc.)
     # REF: ILC TDR 2013 (using 500 GeV example)
-    cost_per_ip = 184e6 # [ILCU]
+    cost_per_ip = (191.6e6/(1.2*1.04))/2 # [ILCU] Half of CLIC dual IP cost.
 
     cost_per_experimental_area = 20e6 # [ILCU] (from CLIC; 22 MCHF in 2018 deflated to 2012, not converted to dollar)
 
@@ -218,9 +228,25 @@ class CostModeled(ABC):
             
     ignore_cost_civil_construction = False
     
-    def get_cost_civil_construction(self):    
+    def get_cost_civil_construction(self, tunnel_diameter=None, cut_and_cover=False, surface_building=False, tunnel_widening_factor=None):    
         "Get the civil engineering cost of the element [ILC units]"
         if self.ignore_cost_civil_construction:
             return 0
         else:
-            return self.get_length() * self.cost_per_length_tunnel
+            total_cost = 0
+            if cut_and_cover:
+                total_cost = self.get_length() * self.cost_per_length_cutandcover
+                if surface_building:
+                    total_cost += self.get_length() * self.cost_per_length_surfacebuilding
+                return total_cost
+            else:
+                if tunnel_diameter is None:
+                    return self.get_length() * self.cost_per_length_tunnel_large
+                else:
+                    tunnel_area = np.pi*((tunnel_diameter+1.1)/2)**2
+                    tunnel_cost = self.get_length() * tunnel_area * self.cost_per_volume_tunnel
+                    if tunnel_widening_factor is not None:
+                        widening_area = tunnel_area * (tunnel_widening_factor-1)
+                        widening_cost = self.get_length() * widening_area * self.cost_per_volume_tunnel_widening
+                        tunnel_cost += widening_cost
+                    return tunnel_cost
