@@ -42,25 +42,136 @@ def test_initialization():
 def test_set_phase_space():
     "Verify that the phase space is set correctly."
     beam = Beam()
-    xs = np.random.rand(1000)
-    ys = np.random.rand(1000)
-    zs = np.random.rand(1000)
-    uxs = np.random.rand(1000)
-    uys = np.random.rand(1000)
-    uzs = np.random.rand(1000)
+    num_particles = 10042
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.rand(num_particles)
     Q = -SI.e * 1.0e10
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
-    assert len(beam) == 1000
+    assert len(beam) == num_particles
+    assert np.isclose(beam.particle_mass, SI.m_e)
     assert np.allclose(beam.xs(), xs)
     assert np.allclose(beam.ys(), ys)
     assert np.allclose(beam.zs(), zs)
     assert np.allclose(beam.uxs(), uxs)
     assert np.allclose(beam.uys(), uys)
     assert np.allclose(beam.uzs(), uzs)
-    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/1000)
-    assert np.allclose(beam.charge(), Q)
-    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/1000/(-SI.e))
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
+    assert np.isclose(beam.charge(), Q)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
+
+    assert np.allclose(beam.xps(), uxs/uzs)
+    assert np.allclose(beam.yps(), uys/uzs)
+    assert np.allclose(beam.pxs(), SI.m_e*uxs)
+    assert np.allclose(beam.pys(), SI.m_e*uys)
+    assert np.allclose(beam.pzs(), SI.m_e*uzs)
+    assert np.allclose(beam.Es(), np.sqrt((SI.m_e*uzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e )
+
+
+@pytest.mark.beam
+def test_set_phase_space2():
+    "Verify that the phase space is set correctly."
+    beam = Beam()
+    num_particles = 10042
+    xs = np.random.normal(0.0, 2.0e-6, num_particles)
+    ys = np.random.normal(0.0, 1.0e-6, num_particles)
+    zs = np.random.normal(0.0, 50.0e-6, num_particles)
+    xps = np.random.normal(0.0, 1.5e-4, num_particles)
+    yps = np.random.normal(0.0, 1.0e-5, num_particles)
+    Es = np.random.normal(500e9, 0.02*500e9, num_particles)
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, xps=xps, yps=yps, Es=Es)
+
+    assert len(beam) == num_particles
+    assert np.isclose(beam.particle_mass, SI.m_e)
+    assert np.allclose(beam.xs(), xs)
+    assert np.allclose(beam.ys(), ys)
+    assert np.allclose(beam.zs(), zs)
+    assert np.allclose(beam.xps(), xps, rtol=1e-05, atol=1e-08)
+    assert np.allclose(beam.yps(), yps, rtol=1e-05, atol=1e-08)
+    assert np.allclose(beam.Es(), Es)
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
+    assert np.isclose(beam.charge(), Q)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
+
+    assert np.allclose(beam.uzs(), np.sqrt((Es*SI.e/SI.m_e/SI.c)**2 - SI.c**2) )
+    assert np.allclose(beam.uxs(), xps*beam.uzs())
+    assert np.allclose(beam.uys(), yps*beam.uzs())
+    assert np.allclose(beam.pxs(), SI.m_e*xps*beam.uzs(), rtol=1e-05, atol=1e-25)
+    assert np.allclose(beam.pys(), SI.m_e*yps*beam.uzs(), rtol=1e-05, atol=1e-25)
+    assert np.allclose(beam.pzs(), SI.m_e*beam.uzs(), rtol=1e-05, atol=1e-19)
+
+
+@pytest.mark.beam
+def test_set_phase_space3():
+    "Verify that the phase space is set correctly."
+    beam = Beam()
+    num_particles = 10042
+    xs = np.random.normal(1.0, 2.4e-6, num_particles)
+    ys = np.random.normal(0.3, 1.1e-6, num_particles)
+    zs = np.random.normal(10.0, 42.0e-6, num_particles)
+    pxs = np.random.normal(0.0, 5.0e-22, num_particles)
+    pys = np.random.normal(0.0, 5.0e-23, num_particles)
+    pzs = np.random.normal(2.67e-16, 5.4e-18, num_particles)  # Corresponds to 500 GeV.
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, pxs=pxs, pys=pys, pzs=pzs)
+
+    assert len(beam) == num_particles
+    assert np.isclose(beam.particle_mass, SI.m_e)
+    assert np.allclose(beam.xs(), xs)
+    assert np.allclose(beam.ys(), ys)
+    assert np.allclose(beam.zs(), zs)
+    assert np.allclose(beam.pxs(), pxs, rtol=1e-05, atol=1e-25)
+    assert np.allclose(beam.pys(), pys, rtol=1e-05, atol=1e-25)
+    assert np.allclose(beam.pzs(), pzs, rtol=1e-05, atol=1e-19)
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
+    assert np.isclose(beam.charge(), Q)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
+
+    assert np.allclose(beam.xps(), pxs/pzs)
+    assert np.allclose(beam.yps(), pys/pzs)
+    assert np.allclose(beam.uxs(), pxs/SI.m_e)
+    assert np.allclose(beam.uys(), pys/SI.m_e)
+    assert np.allclose(beam.uzs(), pzs/SI.m_e)
+    assert np.allclose(beam.Es(), np.sqrt((pzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e )
+
+
+@pytest.mark.beam
+def test_set_phase_space4():
+    "Verify that the phase space is set correctly."
+    beam = Beam()
+    num_particles = 10042
+    xs = np.random.normal(0.0, 2.0e-6, num_particles)
+    ys = np.random.normal(0.0, 1.0e-6, num_particles)
+    zs = np.random.normal(0.0, 50.0e-6, num_particles)
+    uxs = np.random.normal(0.0, 250.0e6, num_particles)
+    yps = np.random.normal(0.0, 1.0e-5, num_particles)
+    pzs = np.random.normal(1.6e-18, 3.0e-20, num_particles)
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs=uxs, yps=yps, pzs=pzs)
+
+    assert len(beam) == num_particles
+    assert np.isclose(beam.particle_mass, SI.m_e)
+    assert np.allclose(beam.xs(), xs)
+    assert np.allclose(beam.ys(), ys)
+    assert np.allclose(beam.zs(), zs)
+    assert np.allclose(beam.uxs(), uxs)
+    assert np.allclose(beam.yps(), yps)
+    assert np.allclose(beam.pzs(), pzs, rtol=1e-05, atol=1e-25)
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
+    assert np.isclose(beam.charge(), Q)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
+
+    assert np.allclose(beam.uzs(), pzs/SI.m_e)
+    assert np.allclose(beam.xps(), uxs/beam.uzs())
+    assert np.allclose(beam.uys(), yps*beam.uzs())
+    assert np.allclose(beam.pxs(), SI.m_e*uxs, rtol=1e-05, atol=1e-25)
+    assert np.allclose(beam.pys(), SI.m_e*yps*beam.uzs(), rtol=1e-05, atol=1e-25)    
+    assert np.allclose(beam.Es(), np.sqrt((pzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e )
 
 
 @pytest.mark.beam
@@ -189,6 +300,7 @@ def test_copy_particle_charge():
     assert (beam1._Beam__phasespace[6, :] == median_charge).all()  # Verify charge is copied correctly
 
 
+@pytest.mark.beam
 def test_scale_charge():
     "Test correct scaling of particle charges, scaling to a larger or smaller total charge. Edge case: scaling to zero charge."
 
@@ -217,6 +329,7 @@ def test_scale_charge():
     assert np.isclose(scaled_charges.sum(), 0)
 
 
+@pytest.mark.beam
 def test_scale_energy():
     "Test correct scaling of particle energies, scaling to a higher or lower total energy. Edge case: scaling to zero energy."
 
@@ -225,7 +338,6 @@ def test_scale_energy():
     xs = np.random.rand(num_particles)
     ys = np.random.rand(num_particles)
     zs = np.random.rand(num_particles)
-    #Es = np.ones_like(num_particles) * 1e9
     Es = np.random.normal(1e9, 0.02*1e9, num_particles)
     Q = -SI.e * 1.0e10
     beam.set_phase_space(Q, xs, ys, zs, Es=Es)
@@ -256,4 +368,4 @@ def test_scale_energy():
 
 
 
-############# ... #############
+############# Tests of rotation methods #############
