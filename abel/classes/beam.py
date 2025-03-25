@@ -5,7 +5,7 @@ from pytz import timezone
 from abel.CONFIG import CONFIG
 from types import SimpleNamespace
 import scipy.constants as SI
-from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
+from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2momentum
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
@@ -20,6 +20,14 @@ from matplotlib import pyplot as plt
 class Beam():
     
     def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+
+        # check the inputs
+        if num_particles < 1:
+            raise ValueError('num_particles cannot be lower than 1.')
+        if num_bunches_in_train < 1:
+            raise ValueError('num_bunches_in_train cannot be lower than 1.')
+        if bunch_separation < 0.0:
+            raise ValueError('bunch_separation cannot be negative.')
 
         # the phase space variable is private
         if phasespace is not None:
@@ -38,6 +46,9 @@ class Beam():
     
     # reset phase space
     def reset_phase_space(self, num_particles):
+        if num_particles < 1:
+            raise ValueError('num_particles cannot be lower than 1.')
+        
         self.__phasespace = np.zeros((8, num_particles))
     
     # filter out macroparticles based on a mask (true means delete)
@@ -62,13 +73,27 @@ class Beam():
         self.set_xs(xs)
         self.set_ys(ys)
         self.set_zs(zs)
+
+        # minimum thresholds for energy, uz and pz
+        energy_thres = 100*particle_mass*SI.c**2/SI.e  # [eV], 100 * particle rest energy.
+        uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=particle_mass)
+        pz_thres = gamma2momentum(energy2gamma(energy_thres, unit='eV', m=particle_mass))
         
         # add momenta
         if uzs is None:
+            
             if pzs is not None:
+                if np.any(pzs < pz_thres):
+                    raise ValueError('pzs contains values that are too small.')
                 uzs = momentum2proper_velocity(pzs)
+
             elif Es is not None:
+                if np.any(Es < energy_thres):
+                    raise ValueError('Es contains values that are too small.')
                 uzs = energy2proper_velocity(Es)
+        else:
+            if np.any(uzs < uz_thres):
+                raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
         if uxs is None:
@@ -175,6 +200,10 @@ class Beam():
     def set_uys(self, uys):
         self.__phasespace[4,:] = uys
     def set_uzs(self, uzs):
+        energy_thres = 100*self.particle_mass*SI.c**2/SI.e  # [eV], 100 * particle rest energy.
+        uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
+        if np.any(uzs < uz_thres):
+            raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
     def set_xps(self, xps):
@@ -182,6 +211,9 @@ class Beam():
     def set_yps(self, yps):
         self.set_uys(yps*self.uzs())
     def set_Es(self, Es):
+        energy_thres = 100*self.particle_mass*SI.c**2/SI.e  # [eV], 100 * particle rest energy.
+        if np.any(Es < energy_thres):
+            raise ValueError('Es contains values that are too small.')
         self.set_uzs(energy2proper_velocity(Es))
         
     def set_qs(self, qs):
@@ -423,7 +455,7 @@ class Beam():
         
         Parameters
         ----------
-        ...
+        N/A
         
             
         Returns
@@ -468,7 +500,7 @@ class Beam():
     # ==================================================
     def xy_rotate_coord_sys(self, x_angle=None, y_angle=None, invert=False):
         """
-        Rotates the coordinate system of the beam first with x_angle around the y-axis then with y_angle around the x-axis.
+        Rotates the coordinate system of the beam first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis.
         
         Parameters
         ----------
