@@ -112,7 +112,7 @@ def test_set_phase_space2():
     xps = np.random.normal(1.1e-5, 1.5e-7, num_particles)
     yps = np.random.normal(3.2e-6, 1.0e-8, num_particles)
     Es = np.random.normal(500e9, 0.02*500e9, num_particles)
-    #weightings =  # TODO: make an array for varying weightings
+    #weightings =  # TODO: make an array with varying weightings
     Q = -SI.e * 1.0e10
     beam.set_phase_space(Q, xs, ys, zs, xps=xps, yps=yps, Es=Es)
 
@@ -413,8 +413,51 @@ def test_scale_energy():
 
 
 ############# Tests of rotation methods #############
+# def test_slice_centroids():
+#     source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+#     beam = source.track()
+#     beam_quant = beam.xs()  # Use x positions as the beam quantity
+#     x_slices, z_centroids = beam.slice_centroids(beam_quant, bin_number=5)
 
-#def test_x_tilt_angle():
+#     # Check that the output shapes are correct
+#     assert x_slices.shape[0] == z_centroids.shape[0]
+#     assert len(x_slices) == 5  # Should match the number of bins
+
+#     # Check that the centroids are within the expected range
+#     assert np.all(z_centroids >= 0)
+#     assert np.all(z_centroids <= 10)
+
+
+def test_x_tilt_angle():
+    "Test the retrieval of the beam tilt angle in the zx-plane."
+    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+    beam = source.track()
+    nominal_x_angle = random.uniform(-np.pi/2, np.pi/2)
+    beam.set_xs(beam.zs() * np.tan(nominal_x_angle))  # Add a tilt in x
+    x_angle = beam.x_tilt_angle()
+    assert np.isclose(x_angle, nominal_x_angle, rtol=1e-7, atol=1e-3)
+
+
+def test_y_tilt_angle():
+    "Test the retrieval of the beam tilt angle in the zy-plane."
+    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+    beam = source.track()
+    nominal_y_angle = random.uniform(-np.pi/2, np.pi/2)
+    beam.set_ys(beam.zs() * np.tan(nominal_y_angle))  # Add a tilt in x
+    y_angle = beam.y_tilt_angle()
+    assert np.isclose(y_angle, nominal_y_angle, rtol=1e-7, atol=1e-3)
+
+
+def test_xy_rotate_coord_sys1():
+    "Test correct rotation of beam coordinate system around the y-axis."
+    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+    beam = source.track()
+    old_beam = copy.deepcopy(beam)
+    nom_x_angle = random.uniform(-np.pi/2, np.pi/2)
+    beam.xy_rotate_coord_sys(x_angle=nom_x_angle, y_angle=None, invert=False)
+    assert np.allclose(beam.xs(), -old_beam.zs()*np.sin(nom_x_angle) + old_beam.xs()*np.cos(nom_x_angle), rtol=1e-7, atol=1e-13)
+    assert np.allclose(beam.zs(), old_beam.zs()*np.cos(nom_x_angle) + old_beam.xs()*np.sin(nom_x_angle), rtol=1e-7, atol=1e-13)
+
 
 def test_rotate_coord_sys_3D():
     "Test correct rotation of beam coordinate system."
@@ -424,5 +467,6 @@ def test_rotate_coord_sys_3D():
     x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
     y_axis = np.array([0, 0, 1])
 
-    beam.rotate_coord_sys_3D(y_axis, np.pi/2, x_axis, 0.0, invert=False)  # Rotate beam 90 degrees around the y-axis.
-    assert np.isclose(beam.x_tilt_angle(), np.pi/2)
+    nom_x_angle = random.uniform(-np.pi/2, np.pi/2)
+    beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, 0.0, invert=False)  # Rotate beam 90 degrees around the y-axis.
+    assert np.isclose(beam.x_tilt_angle(), nom_x_angle)
