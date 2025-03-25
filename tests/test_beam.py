@@ -27,7 +27,7 @@ import random
 
 def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0):
     main = SourceBasic()
-    main.bunch_length = bunch_length                                              # [m], rms. Standard value
+    main.bunch_length = bunch_length                                              # [m], rms.
     main.num_particles = 10000                                               
     main.charge = -e * 1.0e10                                                     # [C]
 
@@ -71,13 +71,17 @@ def test_set_phase_space():
     "Verify that the phase space is set correctly."
     beam = Beam()
     num_particles = 10042
+    Q = -SI.e * 1.0e10
     xs = np.random.rand(num_particles)
     ys = np.random.rand(num_particles)
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = np.random.rand(num_particles)
-    Q = -SI.e * 1.0e10
+
+    energy_thres = 1001*SI.m_e*SI.c**2/SI.e  # [eV], 1000 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
     assert len(beam) == num_particles
@@ -91,7 +95,6 @@ def test_set_phase_space():
     assert np.allclose(beam.uys(), uys)
     assert np.allclose(beam.uzs(), uzs)
     assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
-
 
     assert np.allclose(beam.xps(), uxs/uzs)
     assert np.allclose(beam.yps(), uys/uzs)
@@ -297,10 +300,10 @@ def test_getitem():
 @pytest.mark.beam
 def test_len():
     "Verify that __len__ returns the correct number of particles."
-    random_integer = random.randint(0, 30000)
+    num_particles = 30001
     beam = Beam()
-    beam.reset_phase_space(random_integer)
-    assert len(beam) == random_integer
+    beam.reset_phase_space(num_particles)
+    assert len(beam) == num_particles
 
 
 # @pytest.mark.beam
@@ -317,14 +320,16 @@ def test_len():
 def test_copy_particle_charge():
 
     num_particles = 8051
-
+    energy_thres = 1001*SI.m_e*SI.c**2/SI.e  # [eV], 1000 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
     beam1 = Beam()
     xs = np.random.rand(num_particles)
     ys = np.random.rand(num_particles)
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = np.random.rand(num_particles)
+    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
     Q = -SI.e * 1.0e10
     beam1.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
@@ -334,7 +339,7 @@ def test_copy_particle_charge():
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = np.random.rand(num_particles)
+    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
     Q = -SI.e * 3.4e10
     ws = np.random.rand(num_particles)*Q/(-SI.e)
     beam2.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs, weightings=ws)
@@ -412,7 +417,14 @@ def test_scale_energy():
 
 
 
-############# Tests of rotation methods #############
+############# Tests of coordinate rotation methods #############
+def passive_rotate_vector(vec, x_angle, yangle):
+    "Rotate a vector ``vec`` with three componets (along xyz) first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis."
+    rotated_z_offset = main_beam.z_offset() * np.cos(test_x_angle)*np.cos(test_y_angle) + main_beam.x_offset() * np.sin(test_x_angle)*np.cos(test_y_angle) - main_beam.y_offset() * np.sin(test_y_angle)
+    rotated_x_offset = -main_beam.z_offset() * np.sin(test_x_angle) + main_beam.x_offset() * np.cos(test_x_angle)
+    rotated_y_offset = main_beam.z_offset() * np.cos(test_x_angle)*np.sin(test_y_angle) + main_beam.x_offset() * np.sin(test_x_angle)*np.sin(test_y_angle) + main_beam.y_offset() * np.cos(test_y_angle)
+
+
 # def test_slice_centroids():
 #     source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
 #     beam = source.track()
@@ -435,7 +447,9 @@ def test_x_tilt_angle():
     nominal_x_angle = random.uniform(-np.pi/2, np.pi/2)
     beam.set_xs(beam.zs() * np.tan(nominal_x_angle))  # Add a tilt in x
     x_angle = beam.x_tilt_angle()
+    y_angle = beam.y_tilt_angle()
     assert np.isclose(x_angle, nominal_x_angle, rtol=1e-7, atol=1e-3)
+    assert np.isclose(y_angle, 0.0, rtol=1e-7, atol=1e-8)
 
 
 def test_y_tilt_angle():
@@ -443,25 +457,42 @@ def test_y_tilt_angle():
     source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
     beam = source.track()
     nominal_y_angle = random.uniform(-np.pi/2, np.pi/2)
-    beam.set_ys(beam.zs() * np.tan(nominal_y_angle))  # Add a tilt in x
+    beam.set_ys(beam.zs() * np.tan(nominal_y_angle))  # Add a tilt in y
+    x_angle = beam.x_tilt_angle()
     y_angle = beam.y_tilt_angle()
     assert np.isclose(y_angle, nominal_y_angle, rtol=1e-7, atol=1e-3)
+    assert np.isclose(x_angle, 0.0, rtol=1e-7, atol=1e-8)
 
+
+def test_beam_alignment_angles():
+    ""
+
+def test_add_pointing_tilts():
+    "Test correct extraction of the beam pointing angles."
 
 def test_xy_rotate_coord_sys1():
     "Test correct rotation of beam coordinate system around the y-axis."
-    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+
+    start_x_angle = random.uniform(-np.pi/2, np.pi/2)  # Define an initial tilt in x.
+    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=0.0)
     beam = source.track()
+    
+    beam.add_pointing_tilts()  # Add an initial tilt in x.
     old_beam = copy.deepcopy(beam)
-    nom_x_angle = random.uniform(-np.pi/2, np.pi/2)
+    nom_x_angle = random.uniform(-np.pi/2, np.pi/2)  # TODO: rather have a loop over different angles. Do not use random angles.
     beam.xy_rotate_coord_sys(x_angle=nom_x_angle, y_angle=None, invert=False)
-    assert np.allclose(beam.xs(), -old_beam.zs()*np.sin(nom_x_angle) + old_beam.xs()*np.cos(nom_x_angle), rtol=1e-7, atol=1e-13)
     assert np.allclose(beam.zs(), old_beam.zs()*np.cos(nom_x_angle) + old_beam.xs()*np.sin(nom_x_angle), rtol=1e-7, atol=1e-13)
+    assert np.allclose(beam.xs(), -old_beam.zs()*np.sin(nom_x_angle) + old_beam.xs()*np.cos(nom_x_angle), rtol=1e-7, atol=1e-13)
+    assert np.allclose(beam.ys(), old_beam.ys(), rtol=1e-7, atol=1e-13)
+    assert np.allclose(beam.uzs(), old_beam.uzs()*np.cos(nom_x_angle) + old_beam.uxs()*np.sin(nom_x_angle), rtol=1e-7, atol=1e-13)
+    assert np.allclose(beam.uxs(), -old_beam.uzs()*np.sin(nom_x_angle) + old_beam.uxs()*np.cos(nom_x_angle), rtol=1e-7, atol=1e-13)
+    assert np.allclose(beam.uys(), old_beam.uys(), rtol=1e-7, atol=1e-13)
+    assert np.isclose(beam.x_angle,  np.arcsin(rotated_ux_offset/rotated_uz_offset))
+    assert np.isclose(beam.x_tilt_angle(), )
 
 
 def test_rotate_coord_sys_3D():
     "Test correct rotation of beam coordinate system."
-
     source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
     beam = source.track()
     x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
@@ -470,3 +501,5 @@ def test_rotate_coord_sys_3D():
     nom_x_angle = random.uniform(-np.pi/2, np.pi/2)
     beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, 0.0, invert=False)  # Rotate beam 90 degrees around the y-axis.
     assert np.isclose(beam.x_tilt_angle(), nom_x_angle)
+
+    # TODO: test un-rotate
