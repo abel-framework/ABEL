@@ -25,32 +25,68 @@ from abel import *
 import random
 
 
-def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0):
-    main = SourceBasic()
-    main.bunch_length = bunch_length                                              # [m], rms.
-    main.num_particles = 10000                                               
-    main.charge = -e * 1.0e10                                                     # [C]
+def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0):
+    source = SourceBasic()
+    source.bunch_length = bunch_length                                              # [m], rms.
+    source.num_particles = 10000                                               
+    source.charge = -e * 1.0e10                                                     # [C]
 
     # Energy parameters
-    main.energy = energy                                                          # [eV], HALHF v2 last stage nominal input energy
-    main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
+    source.energy = energy                                                          # [eV]
+    source.rel_energy_spread = 0.02                                                 # Relative rms energy spread
 
     # Emittances
-    main.emit_nx, main.emit_ny = 15e-6, 0.1e-6                                    # [m rad]
+    source.emit_nx, source.emit_ny = 15e-6, 0.1e-6                                  # [m rad]
 
     # Beta functions
-    main.beta_x = beta_matched(plasma_density, main.energy) * ramp_beta_mag       # [m]
-    main.beta_y = main.beta_x                                                     # [m]
+    source.beta_x = beta_matched(plasma_density, source.energy) * ramp_beta_mag     # [m]
+    source.beta_y = source.beta_x                                                   # [m]
 
     # Offsets
-    main.z_offset = z_offset                                                      # [m]
-    main.x_offset = x_offset                                                      # [m]
-    main.y_offset = y_offset                                                      # [m]
+    source.z_offset = z_offset                                                      # [m]
+    source.x_offset = x_offset                                                      # [m]
+    source.y_offset = y_offset                                                      # [m]
+    source.x_angle = x_angle                                                        # [rad]
+    source.y_angle = y_angle                                                        # [rad]
 
     # Other
-    main.symmetrize_6d = True
+    source.symmetrize_6d = True
 
-    return main
+    return source
+
+
+def setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=1615e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, enable_xy_jitter=False, enable_xpyp_jitter=False):
+    source = SourceTrapezoid()
+    source.current_head = current_head                                              # [A]
+    source.bunch_length = bunch_length                                              # [m]
+
+    source.num_particles = 30000                                                 
+    source.charge = 5.0e10 * -SI.e                                                  # [C]
+    source.energy = 4.9e9                                                           # [eV] 
+    source.gaussian_blur = 50e-6                                                    # [m]
+    source.rel_energy_spread = 0.01                                              
+
+    source.emit_nx, source.emit_ny = 50e-6, 100e-6                                  # [m rad]
+    source.beta_x, source.beta_y = 0.5, 0.5                                         # [m]
+
+     # Offsets
+    source.z_offset = z_offset                                                      # [m]
+    source.x_offset = x_offset                                                      # [m]
+    source.y_offset = y_offset                                                      # [m]
+    source.x_angle = x_angle                                                        # [rad]
+    source.y_angle = y_angle                                                        # [rad]
+
+    if enable_xy_jitter:
+        source.jitter.x = 100e-9                                                    # [m], std
+        source.jitter.y = 100e-9                                                    # [m], std
+
+    if enable_xpyp_jitter:
+        source.jitter.xp = 1.0e-6                                                   # [rad], std
+        source.jitter.yp = 1.0e-6                                                   # [rad], std
+
+    source.symmetrize = True
+
+    return source
 
 
 ############# Basic tests #############
@@ -415,18 +451,36 @@ def test_scale_energy():
 ############# Tests on bunch pattern #############
 
 
+############# Tests for beam statistics #############
+# Need tests for beam parameter calculations such as offsets, emittance, beta functions, peak current
+
+
+############# Tests for beam projections #############
+# ...
+
+
 
 
 ############# Tests of coordinate rotation methods #############
-def passive_rotate_vector(vec, x_angle, yangle):
-    "Rotate a vector ``vec`` with three componets (along xyz) first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis."
-    rotated_z_offset = main_beam.z_offset() * np.cos(test_x_angle)*np.cos(test_y_angle) + main_beam.x_offset() * np.sin(test_x_angle)*np.cos(test_y_angle) - main_beam.y_offset() * np.sin(test_y_angle)
-    rotated_x_offset = -main_beam.z_offset() * np.sin(test_x_angle) + main_beam.x_offset() * np.cos(test_x_angle)
-    rotated_y_offset = main_beam.z_offset() * np.cos(test_x_angle)*np.sin(test_y_angle) + main_beam.x_offset() * np.sin(test_x_angle)*np.sin(test_y_angle) + main_beam.y_offset() * np.cos(test_y_angle)
+def active_rotate_arrs(x_comps, y_comps, z_comps, x_angle, y_angle):
+    "Active rotation of ndarrays ``x_comps``, ``y_comps`` and ``z_comps`` containing the xyz-components of vectors such as position and proper velocity first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis."
+    rotated_z_comps = z_comps * np.cos(x_angle)*np.cos(y_angle) - x_comps * np.sin(x_angle)*np.cos(y_angle) + y_comps * np.sin(y_angle)
+    rotated_x_comps = z_comps * np.sin(x_angle) + x_comps * np.cos(x_angle)
+    rotated_y_comps = -z_comps * np.cos(x_angle)*np.sin(y_angle) + x_comps * np.sin(x_angle)*np.sin(y_angle) + y_comps * np.cos(y_angle)
+
+    return rotated_x_comps, rotated_y_comps, rotated_z_comps
+
+def passive_rotate_arrs(x_comps, y_comps, z_comps, x_angle, y_angle):
+    "Passive rotation of ndarrays ``x_comps``, ``y_comps`` and ``z_comps`` containing the xyz-components of vectors such as position and proper velocity first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis."
+    rotated_z_comps = z_comps * np.cos(x_angle)*np.cos(y_angle) + x_comps * np.sin(x_angle)*np.cos(y_angle) - y_comps * np.sin(y_angle)
+    rotated_x_comps = -z_comps * np.sin(x_angle) + x_comps * np.cos(x_angle)
+    rotated_y_comps = z_comps * np.cos(x_angle)*np.sin(y_angle) + x_comps * np.sin(x_angle)*np.sin(y_angle) + y_comps * np.cos(y_angle)
+
+    return rotated_x_comps, rotated_y_comps, rotated_z_comps
 
 
 # def test_slice_centroids():
-#     source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+#     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
 #     beam = source.track()
 #     beam_quant = beam.xs()  # Use x positions as the beam quantity
 #     x_slices, z_centroids = beam.slice_centroids(beam_quant, bin_number=5)
@@ -440,66 +494,224 @@ def passive_rotate_vector(vec, x_angle, yangle):
 #     assert np.all(z_centroids <= 10)
 
 
+@pytest.mark.beam
 def test_x_tilt_angle():
     "Test the retrieval of the beam tilt angle in the zx-plane."
-    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+    source = setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=1615e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, enable_xy_jitter=False, enable_xpyp_jitter=False)
     beam = source.track()
-    nominal_x_angle = random.uniform(-np.pi/2, np.pi/2)
-    beam.set_xs(beam.zs() * np.tan(nominal_x_angle))  # Add a tilt in x
+    nom_x_angle = -2.82e-8  # [rad]
+
+    # Add tilt in x
+    rotated_xs, rotated_ys, rotated_zs = passive_rotate_arrs(beam.xs(), beam.ys(), beam.zs(), nom_x_angle, y_angle=0.0)
+    rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(beam.uxs(), beam.uys(), beam.uzs(), nom_x_angle, y_angle=0.0)
+    beam.set_phase_space(beam.charge(), rotated_xs, rotated_ys, rotated_zs, rotated_uxs, rotated_uys, rotated_uzs)
+
+    # Compare the angles
     x_angle = beam.x_tilt_angle()
     y_angle = beam.y_tilt_angle()
-    assert np.isclose(x_angle, nominal_x_angle, rtol=1e-7, atol=1e-3)
+    assert np.isclose(x_angle, -nom_x_angle, rtol=1e-3, atol=1e-8)
     assert np.isclose(y_angle, 0.0, rtol=1e-7, atol=1e-8)
 
 
+@pytest.mark.beam
 def test_y_tilt_angle():
     "Test the retrieval of the beam tilt angle in the zy-plane."
-    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+    source = setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=1615e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, enable_xy_jitter=False, enable_xpyp_jitter=False)
     beam = source.track()
-    nominal_y_angle = random.uniform(-np.pi/2, np.pi/2)
-    beam.set_ys(beam.zs() * np.tan(nominal_y_angle))  # Add a tilt in y
+    nom_y_angle = 7.04e-9  # [rad]
+
+    # Add tilt in y
+    rotated_xs, rotated_ys, rotated_zs = passive_rotate_arrs(beam.xs(), beam.ys(), beam.zs(), 0.0, y_angle=nom_y_angle)
+    rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(beam.uxs(), beam.uys(), beam.uzs(), 0.0, y_angle=nom_y_angle)
+    beam.set_phase_space(beam.charge(), rotated_xs, rotated_ys, rotated_zs, rotated_uxs, rotated_uys, rotated_uzs)
+
+    # Compare the angles
     x_angle = beam.x_tilt_angle()
     y_angle = beam.y_tilt_angle()
-    assert np.isclose(y_angle, nominal_y_angle, rtol=1e-7, atol=1e-3)
+    assert np.isclose(y_angle, nom_y_angle, rtol=1e-3, atol=1e-11)
     assert np.isclose(x_angle, 0.0, rtol=1e-7, atol=1e-8)
 
 
+@pytest.mark.beam
 def test_beam_alignment_angles():
-    ""
+    "Test ``Beam.beam_alignment_angles()``, which calculates the angles for rotation around the y- and x-axis to align the z-axis to the beam proper velocity."
+    
+    start_x_angle = 1.2e-7  # [rad], define an angle in the zx-plane.
+    start_y_angle = -2.3e-7  # [rad], define an angle in the zy-plane.
 
+    # Create a source with angular offsets, but not tilted in space
+    source = setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=1615e-6, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=start_y_angle, enable_xy_jitter=False, enable_xpyp_jitter=False)
+
+    # Generate a beam
+    beam = source.track()
+
+    # Get the angles
+    align_x_angle, align_y_angle = beam.beam_alignment_angles()
+
+    # Compare to the chosen angular offsets
+    assert np.isclose(align_x_angle, start_x_angle, rtol=1e-5, atol=1e-13)
+    assert np.isclose(align_y_angle, start_y_angle, rtol=1e-5, atol=1e-13)
+    
+
+
+@pytest.mark.beam
 def test_add_pointing_tilts():
-    "Test correct extraction of the beam pointing angles."
+    "Test ``Beam.add_pointing_tilts()``, which uses active transformation to tilt the beam in the zx- and zy-planes."
 
+    start_x_angle = -2.82328e-08 # [rad], define an angle in the zx-plane.
+    start_y_angle = 7.040999e-09   # [rad], define an angle in the zy-plane.
+
+    # Create a source with angular offsets, but not tilted in space
+    source = setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=1615e-6, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=start_y_angle, enable_xy_jitter=False, enable_xpyp_jitter=False)
+
+    # Generate a beam
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+
+    # Tilt the beam using its angular offset
+    beam.add_pointing_tilts()
+
+    # Rotate the positions and proper velocities of all particles with written out formulas for comparison. Note the sign convention for y_angle.
+    rotated_xs, rotated_ys, rotated_zs = active_rotate_arrs(initial_beam.xs(), initial_beam.ys(), initial_beam.zs(), start_x_angle, -start_y_angle)
+
+    # Examine the resulting beam
+    assert np.isclose(beam.x_angle(), start_x_angle, rtol=1e-3, atol=1e-11)
+    assert np.isclose(beam.y_angle(), start_y_angle, rtol=1e-3, atol=1e-11)
+    assert np.allclose(beam.uxs(), initial_beam.uxs(), rtol=1e-15, atol=0.0)  # The proper velocities should not change.
+    assert np.allclose(beam.uys(), initial_beam.uys(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uzs(), initial_beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.xs(), rotated_xs, rtol=1e-8, atol=0.0)
+    assert np.allclose(beam.ys(), rotated_ys, rtol=1e-8, atol=0.0)
+    assert np.allclose(beam.zs(), rotated_zs, rtol=1e-8, atol=0.0)
+
+
+@pytest.mark.beam
 def test_xy_rotate_coord_sys1():
     "Test correct rotation of beam coordinate system around the y-axis."
 
-    start_x_angle = random.uniform(-np.pi/2, np.pi/2)  # Define an initial tilt in x.
-    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=0.0)
-    beam = source.track()
+    np.random.seed(42)
+
+    start_x_angle = 1e-7  # [rad], define an angle in the zx-plane.
+
+    # Source with angular offset, but no tilt
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=0.0)
     
-    beam.add_pointing_tilts()  # Add an initial tilt in x.
-    old_beam = copy.deepcopy(beam)
-    nom_x_angle = random.uniform(-np.pi/2, np.pi/2)  # TODO: rather have a loop over different angles. Do not use random angles.
-    beam.xy_rotate_coord_sys(x_angle=nom_x_angle, y_angle=None, invert=False)
-    assert np.allclose(beam.zs(), old_beam.zs()*np.cos(nom_x_angle) + old_beam.xs()*np.sin(nom_x_angle), rtol=1e-7, atol=1e-13)
-    assert np.allclose(beam.xs(), -old_beam.zs()*np.sin(nom_x_angle) + old_beam.xs()*np.cos(nom_x_angle), rtol=1e-7, atol=1e-13)
-    assert np.allclose(beam.ys(), old_beam.ys(), rtol=1e-7, atol=1e-13)
-    assert np.allclose(beam.uzs(), old_beam.uzs()*np.cos(nom_x_angle) + old_beam.uxs()*np.sin(nom_x_angle), rtol=1e-7, atol=1e-13)
-    assert np.allclose(beam.uxs(), -old_beam.uzs()*np.sin(nom_x_angle) + old_beam.uxs()*np.cos(nom_x_angle), rtol=1e-7, atol=1e-13)
-    assert np.allclose(beam.uys(), old_beam.uys(), rtol=1e-7, atol=1e-13)
-    assert np.isclose(beam.x_angle,  np.arcsin(rotated_ux_offset/rotated_uz_offset))
-    assert np.isclose(beam.x_tilt_angle(), )
+    nom_x_angles = np.concatenate((-np.logspace(-9, np.log10(0.11), 10), np.logspace(-9, -1, 10)))  # [rad]
+
+    for i in range(len(nom_x_angles)):
+        
+        beam = source.track()
+        beam.add_pointing_tilts()  # Add an initial tilt in the zx-plane.
+        old_beam = copy.deepcopy(beam)
+
+        nom_x_angle = nom_x_angles[i]
+        beam.xy_rotate_coord_sys(x_angle=nom_x_angle, y_angle=None, invert=False)
+
+        # Rotate the positions and proper velocities of all particles with written out formulas for comparison
+        rotated_xs, rotated_ys, rotated_zs = passive_rotate_arrs(old_beam.xs(), old_beam.ys(), old_beam.zs(), nom_x_angle, y_angle=0.0)
+        rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(old_beam.uxs(), old_beam.uys(), old_beam.uzs(), nom_x_angle, y_angle=0.0)
+        rotated_ux_offset, rotated_uy_offset, rotated_uz_offset = passive_rotate_arrs(old_beam.ux_offset(), old_beam.uy_offset(), old_beam.uz_offset(), nom_x_angle, y_angle=0.0)
+
+        # Compare the rotated arrays
+        assert np.allclose(beam.zs(), rotated_zs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.xs(), rotated_xs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.ys(), rotated_ys, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uzs(), rotated_uzs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uxs(), rotated_uxs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uys(), rotated_uys, rtol=1e-7, atol=1e-13)
+        assert np.isclose(beam.x_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=np.abs(beam.x_angle())*1e-3, atol=np.abs(beam.x_angle())*2e-3)
+        assert np.isclose(beam.y_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
+
+        # print(nom_x_angle, beam.x_tilt_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset))
+        # assert np.isclose(beam.x_tilt_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=np.abs(beam.x_angle())*1e-3, atol=np.abs(beam.x_angle())*2e-3)
+        # assert np.isclose(beam.y_tilt_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
 
 
+@pytest.mark.beam
+def test_xy_rotate_coord_sys2():
+    "Test correct rotation of beam coordinate system around the y-axis."
+
+    np.random.seed(42)
+
+    start_y_angle = 1e-6  # [rad], define an angle in the zy-plane.
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=start_y_angle)
+    
+    nom_y_angles = np.concatenate((-np.logspace(-9, np.log10(0.11), 10), np.logspace(-9, -1, 10)))  # [rad]
+
+    for i in range(len(nom_y_angles)):
+        
+        beam = source.track()
+        beam.add_pointing_tilts()  # Add an initial tilt in the zy-plane.
+        old_beam = copy.deepcopy(beam)
+
+        nom_y_angle = nom_y_angles[i]
+        beam.xy_rotate_coord_sys(x_angle=None, y_angle=nom_y_angle, invert=False)
+
+        # Roatate the positions and proper velocities of all particles with written out formulas for comparison
+        rotated_xs, rotated_ys, rotated_zs = passive_rotate_arrs(old_beam.xs(), old_beam.ys(), old_beam.zs(), 0.0, y_angle=nom_y_angle)
+        rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(old_beam.uxs(), old_beam.uys(), old_beam.uzs(), 0.0, y_angle=nom_y_angle)
+        rotated_ux_offset, rotated_uy_offset, rotated_uz_offset = passive_rotate_arrs(old_beam.ux_offset(), old_beam.uy_offset(), old_beam.uz_offset(), 0.0, y_angle=nom_y_angle)
+
+        # Compare the rotated arrays
+        assert np.allclose(beam.zs(), rotated_zs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.xs(), rotated_xs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.ys(), rotated_ys, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uzs(), rotated_uzs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uxs(), rotated_uxs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uys(), rotated_uys, rtol=1e-7, atol=1e-13)
+        assert np.isclose(beam.x_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
+        assert np.isclose(beam.y_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=np.abs(nom_y_angle)*1e-3, atol=np.abs(nom_y_angle)*2e-3)
+
+        # print(nom_y_angle, beam.y_tilt_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset))
+        # assert np.isclose(beam.y_tilt_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=np.abs(nom_y_angle)*1e-3, atol=np.abs(nom_y_angle)*2e-3)
+        # assert np.isclose(beam.x_tilt_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
+
+
+@pytest.mark.beam
 def test_rotate_coord_sys_3D():
-    "Test correct rotation of beam coordinate system."
-    source = setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
-    beam = source.track()
+    "Test correct passive rotation of beam coordinate system."
+
+    np.random.seed(42)
+
+    start_x_angle = -2.82328e-08 # [rad], define an angle in the zx-plane.
+    start_y_angle = 7.040999e-09   # [rad], define an angle in the zy-plane.
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=start_y_angle)
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
+    old_beam = source.track()
+    old_beam.add_pointing_tilts()  # Add an initial tilt in the zy-plane.
+    #old_beam = copy.deepcopy(beam)
+
     x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
     y_axis = np.array([0, 0, 1])
+    nom_x_angles = np.concatenate((-np.logspace(-9, np.log10(0.11), 10), np.logspace(-9, -1, 10)))  # [rad]
+    nom_y_angles = np.concatenate((-np.logspace(-9, np.log10(0.11), 10), np.logspace(-9, -1, 10)))  # [rad]
 
-    nom_x_angle = random.uniform(-np.pi/2, np.pi/2)
-    beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, 0.0, invert=False)  # Rotate beam 90 degrees around the y-axis.
-    assert np.isclose(beam.x_tilt_angle(), nom_x_angle)
+    for i in range(len(nom_x_angles)):
+
+        beam = copy.deepcopy(old_beam)
+
+        nom_x_angle = nom_x_angles[i]
+        nom_y_angle = nom_y_angles[i]
+        beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, nom_y_angle, invert=False)
+
+        # Roatate the positions and proper velocities of all particles with written out formulas for comparison
+        rotated_xs, rotated_ys, rotated_zs = passive_rotate_arrs(old_beam.xs(), old_beam.ys(), old_beam.zs(), nom_x_angle, nom_y_angle)
+        rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(old_beam.uxs(), old_beam.uys(), old_beam.uzs(), nom_x_angle, nom_y_angle)
+        rotated_ux_offset, rotated_uy_offset, rotated_uz_offset = passive_rotate_arrs(old_beam.ux_offset(), old_beam.uy_offset(), old_beam.uz_offset(), nom_x_angle, nom_y_angle)
+
+        # Compare the rotated arrays
+        assert np.allclose(beam.zs(), rotated_zs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.xs(), rotated_xs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.ys(), rotated_ys, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uzs(), rotated_uzs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uxs(), rotated_uxs, rtol=1e-7, atol=1e-13)
+        assert np.allclose(beam.uys(), rotated_uys, rtol=1e-7, atol=1e-13)
+        assert np.isclose(beam.x_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=np.abs(nom_x_angle)*1e-3, atol=np.abs(nom_x_angle)*2e-3)
+        assert np.isclose(beam.y_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=np.abs(nom_y_angle)*1e-3, atol=np.abs(nom_y_angle)*2e-3)
+
+    # nom_x_angle = random.uniform(-np.pi/2, np.pi/2)
+    # beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, 0.0, invert=False)  # Rotate beam 90 degrees around the y-axis.
+    # assert np.isclose(beam.x_tilt_angle(), nom_x_angle)
 
     # TODO: test un-rotate
