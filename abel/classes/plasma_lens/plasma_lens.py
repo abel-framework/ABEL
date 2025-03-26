@@ -4,12 +4,12 @@ from abel import Trackable
 import numpy as np
 
 class PlasmaLens(Trackable):
-    
+
     @abstractmethod
     def __init__(self, length, radius, current, offset_x=0, offset_y=0):
 
         super().__init__()
-        
+
         # common variables
         self.length = length
         self.radius = radius
@@ -17,8 +17,8 @@ class PlasmaLens(Trackable):
 
         self.offset_x = offset_x
         self.offset_y = offset_y
-        
-    
+
+
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
@@ -26,10 +26,13 @@ class PlasmaLens(Trackable):
     @abstractmethod
     def get_focusing_gradient(self):
         pass
-        
+
     def get_length(self):
         return self.length
 
     def survey_object(self):
         return patches.Rectangle((0, -1), self.get_length(), 2)
-    
+
+    @property
+    def l(self):
+        return self.length
