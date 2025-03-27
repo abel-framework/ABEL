@@ -22,6 +22,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
+from abel.utilities.beam_physics import generate_trace_space
 import random
 
 
@@ -121,33 +122,38 @@ def test_set_phase_space():
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
     assert len(beam) == num_particles
-    assert np.isclose(beam.particle_mass, SI.m_e)
-    assert np.isclose(beam.charge(), Q)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge(), Q, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.abs_charge(), np.abs(Q), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.total_particles(), 1.0e10, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
-    assert np.allclose(beam.xs(), xs)
-    assert np.allclose(beam.ys(), ys)
-    assert np.allclose(beam.zs(), zs)
-    assert np.allclose(beam.uxs(), uxs)
-    assert np.allclose(beam.uys(), uys)
-    assert np.allclose(beam.uzs(), uzs)
-    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
+    assert np.allclose(beam.xs(), xs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.ys(), ys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.zs(), zs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), uxs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), uys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uzs(), uzs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles, rtol=1e-15, atol=0.0)
 
-    assert np.allclose(beam.xps(), uxs/uzs)
-    assert np.allclose(beam.yps(), uys/uzs)
-    assert np.allclose(beam.pxs(), SI.m_e*uxs)
-    assert np.allclose(beam.pys(), SI.m_e*uys)
-    assert np.allclose(beam.pzs(), SI.m_e*uzs)
-    assert np.allclose(beam.Es(), np.sqrt((SI.m_e*uzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e )
+    assert np.allclose(beam.xps(), uxs/uzs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.yps(), uys/uzs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pxs(), SI.m_e*uxs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pys(), SI.m_e*uys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pzs(), SI.m_e*uzs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.Es(), np.sqrt((SI.m_e*uzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e, rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.beam
 def test_set_phase_space2():
     "Verify that the phase space is set correctly."
+
+    np.random.seed(42)
+
     beam = Beam()
-    num_particles = 10042
-    xs = np.random.normal(1.1, 2.0e-6, num_particles)
-    ys = np.random.normal(0.3, 1.0e-6, num_particles)
-    zs = np.random.normal(5.6, 50.0e-6, num_particles)
+    num_particles = 100042
+    xs = np.random.normal(1.1e-6, 2.0e-6, num_particles)
+    ys = np.random.normal(0.3e-6, 1.0e-6, num_particles)
+    zs = np.random.normal(5.6e-6, 50.0e-6, num_particles)
     xps = np.random.normal(1.1e-5, 1.5e-7, num_particles)
     yps = np.random.normal(3.2e-6, 1.0e-8, num_particles)
     Es = np.random.normal(500e9, 0.02*500e9, num_particles)
@@ -156,37 +162,40 @@ def test_set_phase_space2():
     beam.set_phase_space(Q, xs, ys, zs, xps=xps, yps=yps, Es=Es)
 
     assert len(beam) == num_particles
-    assert np.isclose(beam.particle_mass, SI.m_e)
-    assert np.isclose(beam.charge(), Q)
-    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
-    assert np.isclose(beam.energy(), 500e9, rtol=0.0001*500e9, atol=1e9)
-    assert np.isclose(beam.gamma(), 500e9*SI.e/SI.m_e/SI.c**2, rtol=0.0001*500e9*SI.e/SI.m_e/SI.c**2, atol=200)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge(), Q, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge_sign(), -1, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.total_energy(), SI.e * np.nansum(beam.weightings()*beam.Es()), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e), rtol=1e-15, atol=0.0)
+
+    assert np.isclose(beam.energy(), 500e9, rtol=1e-4, atol=1e9)
+    assert np.isclose(beam.gamma(), 500e9*SI.e/SI.m_e/SI.c**2, rtol=1e-3, atol=200)
     assert np.isclose(beam.rel_energy_spread(), 0.02, rtol=0.001, atol=0.001)
-    assert np.isclose(beam.z_offset(), 5.6)
-    assert np.isclose(beam.x_offset(), 1.1)
-    assert np.isclose(beam.y_offset(), 0.3)
-    assert np.isclose(beam.bunch_length(), 50.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.z_offset(), 5.6e-6, rtol=0.3, atol=0.0)
+    assert np.isclose(beam.x_offset(), 1.1e-6, rtol=0.05, atol=0.0)
+    assert np.isclose(beam.y_offset(), 0.3e-6, rtol=0.03, atol=0.0)
+    assert np.isclose(beam.bunch_length(), 50.0e-6, rtol=1e-4, atol=0.00)
     assert np.isclose(beam.beam_size_x(), 2.0e-6, rtol=0.005, atol=0.03)
     assert np.isclose(beam.beam_size_y(), 1.0e-6, rtol=0.005, atol=0.03)
-    assert np.isclose(beam.x_angle(), 1.1e-5)
-    assert np.isclose(beam.y_angle(), 3.2e-6)
-    assert np.isclose(beam.divergence_x(), 1.5e-7)
-    assert np.isclose(beam.divergence_y(), 1.0e-8)
+    assert np.isclose(beam.x_angle(), 1.1e-5, rtol=1e-5, atol=0.0)
+    assert np.isclose(beam.y_angle(), 3.2e-6, rtol=1e-4, atol=0.0)
+    assert np.isclose(beam.divergence_x(), 1.5e-7, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.divergence_y(), 1.0e-8, rtol=1e-2, atol=0.0)
 
-    assert np.allclose(beam.xs(), xs)
-    assert np.allclose(beam.ys(), ys)
-    assert np.allclose(beam.zs(), zs)
-    assert np.allclose(beam.xps(), xps, rtol=1e-05, atol=1e-08)
-    assert np.allclose(beam.yps(), yps, rtol=1e-05, atol=1e-08)
-    assert np.allclose(beam.Es(), Es)
-    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
+    assert np.allclose(beam.xs(), xs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.ys(), ys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.zs(), zs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.xps(), xps, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.yps(), yps, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.Es(), Es, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles, rtol=1e-15, atol=0.0)
 
-    assert np.allclose(beam.uzs(), np.sqrt((Es*SI.e/SI.m_e/SI.c)**2 - SI.c**2) )
-    assert np.allclose(beam.uxs(), xps*beam.uzs())
-    assert np.allclose(beam.uys(), yps*beam.uzs())
-    assert np.allclose(beam.pxs(), SI.m_e*xps*beam.uzs(), rtol=1e-05, atol=1e-25)
-    assert np.allclose(beam.pys(), SI.m_e*yps*beam.uzs(), rtol=1e-05, atol=1e-25)
-    assert np.allclose(beam.pzs(), SI.m_e*beam.uzs(), rtol=1e-05, atol=1e-19)
+    assert np.allclose(beam.uzs(), np.sqrt((Es*SI.e/SI.m_e/SI.c)**2 - SI.c**2), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), xps*beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), yps*beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pxs(), SI.m_e*xps*beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pys(), SI.m_e*yps*beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pzs(), SI.m_e*beam.uzs(), rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.beam
@@ -204,23 +213,23 @@ def test_set_phase_space3():
     beam.set_phase_space(Q, xs, ys, zs, pxs=pxs, pys=pys, pzs=pzs)
 
     assert len(beam) == num_particles
-    assert np.isclose(beam.particle_mass, SI.m_e)
-    assert np.isclose(beam.charge(), Q)
-    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
-    assert np.allclose(beam.xs(), xs)
-    assert np.allclose(beam.ys(), ys)
-    assert np.allclose(beam.zs(), zs)
-    assert np.allclose(beam.pxs(), pxs, rtol=1e-05, atol=1e-25)
-    assert np.allclose(beam.pys(), pys, rtol=1e-05, atol=1e-25)
-    assert np.allclose(beam.pzs(), pzs, rtol=1e-05, atol=1e-19)
-    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge(), Q, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.xs(), xs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.ys(), ys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.zs(), zs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pxs(), pxs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pys(), pys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pzs(), pzs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles, rtol=1e-15, atol=0.0)
 
-    assert np.allclose(beam.xps(), pxs/pzs)
-    assert np.allclose(beam.yps(), pys/pzs)
-    assert np.allclose(beam.uxs(), pxs/SI.m_e)
-    assert np.allclose(beam.uys(), pys/SI.m_e)
-    assert np.allclose(beam.uzs(), pzs/SI.m_e)
-    assert np.allclose(beam.Es(), np.sqrt((pzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e )
+    assert np.allclose(beam.xps(), pxs/pzs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.yps(), pys/pzs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), pxs/SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), pys/SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uzs(), pzs/SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.Es(), np.sqrt((pzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e, rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.beam
@@ -239,22 +248,22 @@ def test_set_phase_space4():
 
     assert len(beam) == num_particles
     assert np.isclose(beam.particle_mass, SI.m_e)
-    assert np.allclose(beam.xs(), xs)
-    assert np.allclose(beam.ys(), ys)
-    assert np.allclose(beam.zs(), zs)
-    assert np.allclose(beam.uxs(), uxs)
-    assert np.allclose(beam.yps(), yps)
+    assert np.allclose(beam.xs(), xs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.ys(), ys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.zs(), zs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), uxs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.yps(), yps, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.pzs(), pzs, rtol=1e-05, atol=1e-25)
-    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles)
-    assert np.isclose(beam.charge(), Q)
-    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
+    assert np.allclose(beam.qs(), np.ones_like(xs)*Q/num_particles, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge(), Q, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e), rtol=1e-15, atol=0.0)
 
-    assert np.allclose(beam.uzs(), pzs/SI.m_e)
-    assert np.allclose(beam.xps(), uxs/beam.uzs())
-    assert np.allclose(beam.uys(), yps*beam.uzs())
-    assert np.allclose(beam.pxs(), SI.m_e*uxs, rtol=1e-05, atol=1e-25)
-    assert np.allclose(beam.pys(), SI.m_e*yps*beam.uzs(), rtol=1e-05, atol=1e-25)    
-    assert np.allclose(beam.Es(), np.sqrt((pzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e )
+    assert np.allclose(beam.uzs(), pzs/SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.xps(), uxs/beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), yps*beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pxs(), SI.m_e*uxs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.pys(), SI.m_e*yps*beam.uzs(), rtol=1e-15, atol=0.0)    
+    assert np.allclose(beam.Es(), np.sqrt((pzs*SI.c)**2 + (SI.m_e*SI.c**2)**2)/SI.e, rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.beam
@@ -342,7 +351,7 @@ def test_len():
     assert len(beam) == num_particles
 
 
-# @pytest.mark.beam
+# @pytest.mark.beam TODO
 # def test_str():
 #     "Test the __str__ method for correct formatting of beam properties."
 #     beam = Beam()
@@ -401,17 +410,17 @@ def test_scale_charge():
     # Scale up charge
     beam.scale_charge(-SI.e * 2.0e10)
     scaled_charges = beam.qs()
-    assert np.isclose(scaled_charges.sum(), -SI.e * 2.0e10)  # Check total charge
-    assert np.allclose(scaled_charges / original_charges, 2.0)  # Charges scaled proportionally
+    assert np.isclose(scaled_charges.sum(), -SI.e * 2.0e10, rtol=1e-15, atol=0.0)  # Check total charge
+    assert np.allclose(scaled_charges / original_charges, 2.0, rtol=1e-15, atol=0.0)  # Charges scaled proportionally
 
     # Scale down charge
     beam.scale_charge(-SI.e * 0.5e10)
-    assert np.isclose(scaled_charges.sum(), -SI.e * 0.5e10)
+    assert np.isclose(scaled_charges.sum(), -SI.e * 0.5e10, rtol=1e-15, atol=0.0)
 
     # Edge case: zero charge
     beam.scale_charge(0)
     scaled_charges = beam.qs()
-    assert np.isclose(scaled_charges.sum(), 0)
+    assert np.isclose(scaled_charges.sum(), 0, rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.beam
@@ -441,11 +450,11 @@ def test_scale_energy():
     scaled_mean_energy = weighted_mean(scaled_energies, beam.weightings())
     assert np.isclose(scaled_mean_energy, 1.7e8, rtol=0.01, atol=1e8)
 
-    # # Edge case: zero energy
-    # try:
-    #     beam.scale_energy(0)
-    # except ValueError as e:
-    #     assert str(e) == "Energy cannot be scaled to zero"
+    # Edge case: zero energy
+    try:
+        beam.scale_energy(0)
+    except ValueError as err:
+        assert str(err) == 'Es contains values that are too small.'
 
 
 ############# Tests on bunch pattern #############
@@ -453,6 +462,170 @@ def test_scale_energy():
 
 ############# Tests for beam statistics #############
 # Need tests for beam parameter calculations such as offsets, emittance, beta functions, peak current
+
+@pytest.mark.beam
+def test_param_calcs_generate_trace_space():
+    "Test the beam parameter calculations using a trace space generated with generate_trace_space()."
+    
+    np.random.seed(42)
+
+    alpha_x = -0.239
+    alpha_y = -0.171
+    beta_x = 0.120                                                                    # [m]
+    beta_y = 0.120                                                                    # [m]
+    geo_emitt_x = 2.552865e-09                                                        # [m rad]
+    geo_emitt_y = 1.750833e-11                                                        # [m rad]
+
+    # Generate trace spaces
+    xs, xps = generate_trace_space(geo_emitt_x, beta_x, alpha_x, 10011, symmetrize=False)
+    ys, yps = generate_trace_space(geo_emitt_y, beta_y, alpha_y, 10011, symmetrize=False)
+    zs = np.random.normal(loc=0.0, scale=40.0e-6, size=10011)
+    Es = np.random.normal(loc=3e9, scale=0.02*3e9, size=10011)
+
+    beam = Beam()
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+
+    # Examine the beam parameters
+    assert np.isclose(np.std(xs), np.sqrt(geo_emitt_x*beta_x), rtol=1e-2, atol=0.0)  # Beam size
+    assert np.isclose(np.std(ys), np.sqrt(geo_emitt_y*beta_y), rtol=1e-2, atol=0.0)
+    assert np.isclose(np.std(Es), 0.02*3e9, rtol=0.01, atol=0.0)
+    assert np.isclose(np.std(zs), 50.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.beam_size_x(), np.sqrt(geo_emitt_x*beta_x), rtol=1e-2, atol=0.0)  # Beam size
+    assert np.isclose(beam.beam_size_y(), np.sqrt(geo_emitt_y*beta_y), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.divergence_x(), np.sqrt(geo_emitt_x/beta_x), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.divergence_y(), np.sqrt(geo_emitt_y/beta_y), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.energy_spread(), 0.02*3e9, rtol=0.01, atol=0.0)
+    assert np.isclose(beam.bunch_length(), 50.0e-6, rtol=0.005, atol=0.03)
+
+    assert np.isclose(beam.alpha_x(), alpha_x, rtol=6e-2, atol=0.0)
+    assert np.isclose(beam.alpha_y(), alpha_y, rtol=6e-2, atol=0.0)
+    assert np.isclose(beam.beta_x(), beta_x, rtol=2e-3, atol=0.0)
+    assert np.isclose(beam.beta_y(), beta_y, rtol=1.5e-2, atol=0.0)
+    assert np.isclose(beam.geom_emittance_x(), geo_emitt_x, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.geom_emittance_y(), geo_emitt_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), geo_emitt_x*beam.gamma(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), geo_emitt_y*beam.gamma(), rtol=1e-2, atol=0.0)
+
+
+@pytest.mark.beam
+def test_param_calcs_generate_trace_space_xy():
+    "Test the beam parameter calculations using a trace space generated with generate_trace_space_xy()."
+    
+    np.random.seed(42)
+
+    alpha_x = -0.239
+    alpha_y = -0.171
+    beta_x = 0.120                                                                    # [m]
+    beta_y = 0.120                                                                    # [m]
+    geo_emitt_x = 2.552865e-09                                                        # [m rad]
+    geo_emitt_y = 1.750833e-11                                                        # [m rad]
+    num_particles = 200011
+
+    # Generate trace space
+    xs, xps, ys, yps = generate_trace_space_xy(geo_emitt_x, beta_x, alpha_x, geo_emitt_y, beta_y, alpha_y, num_particles, L=0, symmetrize=False)
+    zs = np.random.normal(loc=0.0, scale=40.0e-6, size=num_particles)
+    Es = np.random.normal(loc=3e9, scale=0.02*3e9, size=num_particles)
+
+    beam = Beam()
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+
+    # Examine the beam parameters
+    assert np.isclose(np.std(xs), np.sqrt(geo_emitt_x*beta_x), rtol=1e-2, atol=0.0)  # Beam size
+    assert np.isclose(np.std(ys), np.sqrt(geo_emitt_y*beta_y), rtol=1e-2, atol=0.0)
+    assert np.isclose(np.std(Es), 0.02*3e9, rtol=0.005, atol=0.0)
+    assert np.isclose(np.std(zs), 50.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.beam_size_x(), np.sqrt(geo_emitt_x*beta_x), rtol=1e-3, atol=0.0)  # Beam size
+    assert np.isclose(beam.beam_size_y(), np.sqrt(geo_emitt_y*beta_y), rtol=5e-3, atol=0.0)
+    assert np.isclose(beam.divergence_x(), np.sqrt(geo_emitt_x/beta_x), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.divergence_y(), np.sqrt(geo_emitt_y/beta_y), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.energy_spread(), 0.02*3e9, rtol=0.005, atol=0.0)
+    assert np.isclose(beam.bunch_length(), 50.0e-6, rtol=0.005, atol=0.03)
+
+    assert np.isclose(beam.alpha_x(), alpha_x, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.alpha_y(), alpha_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.beta_x(), beta_x, rtol=1e-3, atol=0.0)
+    assert np.isclose(beam.beta_y(), beta_y, rtol=3e-3, atol=0.0)
+    assert np.isclose(beam.geom_emittance_x(), geo_emitt_x, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.geom_emittance_y(), geo_emitt_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), geo_emitt_x*beam.gamma(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), geo_emitt_y*beam.gamma(), rtol=1e-2, atol=0.0)
+
+    # Perform the same control with a symmetrised phase space
+    xs, xps, ys, yps = generate_trace_space_xy(geo_emitt_x, beta_x, alpha_x, geo_emitt_y, beta_y, alpha_y, num_particles, L=0, symmetrize=True)
+    num_tiling = 4
+    num_particles_actual = round(num_particles/num_tiling)
+    zs = np.random.normal(loc=0.0, scale=40.0e-6, size=num_particles_actual)
+    Es = np.random.normal(loc=3e9, scale=0.02*3e9, size=num_particles_actual)
+    zs = np.tile(zs, num_tiling)
+    Es = np.tile(Es, num_tiling)
+
+    beam = Beam()
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+
+    assert np.isclose(np.std(xs), np.sqrt(geo_emitt_x*beta_x), rtol=1e-2, atol=0.0)  # Beam size
+    assert np.isclose(np.std(ys), np.sqrt(geo_emitt_y*beta_y), rtol=5e-2, atol=0.0)
+    assert np.isclose(np.std(Es), 0.02*3e9, rtol=0.005, atol=0.0)
+    assert np.isclose(np.std(zs), 50.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.beam_size_x(), np.sqrt(geo_emitt_x*beta_x), rtol=1e-3, atol=0.0)  # Beam size
+    assert np.isclose(beam.beam_size_y(), np.sqrt(geo_emitt_y*beta_y), rtol=5e-3, atol=0.0)
+    assert np.isclose(beam.divergence_x(), np.sqrt(geo_emitt_x/beta_x), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.divergence_y(), np.sqrt(geo_emitt_y/beta_y), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.energy_spread(), 0.02*3e9, rtol=0.01, atol=0.0)
+    assert np.isclose(beam.bunch_length(), 50.0e-6, rtol=0.005, atol=0.03)
+
+    assert np.isclose(beam.alpha_x(), alpha_x, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.alpha_y(), alpha_y, rtol=4e-2, atol=0.0)
+    assert np.isclose(beam.beta_x(), beta_x, rtol=3e-3, atol=0.0)
+    assert np.isclose(beam.beta_y(), beta_y, rtol=5e-3, atol=0.0)
+    assert np.isclose(beam.geom_emittance_x(), geo_emitt_x, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.geom_emittance_y(), geo_emitt_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), geo_emitt_x*beam.gamma(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), geo_emitt_y*beam.gamma(), rtol=1e-2, atol=0.0)
+
+
+@pytest.mark.beam
+def test_param_calcs_generate_symm_trace_space_xyz():
+    "Test the beam parameter calculations using a trace space generated with generate_symm_trace_space_xyz()."
+    
+    np.random.seed(42)
+
+    alpha_x = -0.239
+    alpha_y = -0.171
+    beta_x = 0.120                                                                    # [m]
+    beta_y = 0.120                                                                    # [m]
+    geo_emitt_x = 2.552865e-09                                                        # [m rad]
+    geo_emitt_y = 1.750833e-11                                                        # [m rad]
+    num_particles = 200011
+
+    # Generate trace space
+    xs, xps, ys, yps, zs, Es = generate_symm_trace_space_xyz(geo_emitt_x, beta_x, alpha_x, geo_emitt_y, beta_y, alpha_y, num_particles, bunch_length=50.0e-6, energy_spread=0.02*3e9, L=0)
+    Es += 3e9  # Add offset.
+
+    beam = Beam()
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+
+    # Examine the beam parameters
+    assert np.isclose(np.std(xs), np.sqrt(geo_emitt_x*beta_x), rtol=1e-2, atol=0.0)  # Beam size
+    assert np.isclose(np.std(ys), np.sqrt(geo_emitt_y*beta_y), rtol=1e-2, atol=0.0)
+    assert np.isclose(np.std(Es), 0.02*3e9, rtol=0.005, atol=0.0)
+    assert np.isclose(np.std(zs), 50.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.beam_size_x(), np.sqrt(geo_emitt_x*beta_x), rtol=1e-3, atol=0.0)  # Beam size
+    assert np.isclose(beam.beam_size_y(), np.sqrt(geo_emitt_y*beta_y), rtol=5e-3, atol=0.0)
+    assert np.isclose(beam.divergence_x(), np.sqrt(geo_emitt_x/beta_x), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.divergence_y(), np.sqrt(geo_emitt_y/beta_y), rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.energy_spread(), 0.02*3e9, rtol=0.005, atol=0.0)
+    assert np.isclose(beam.bunch_length(), 50.0e-6, rtol=0.005, atol=0.03)
+    assert np.isclose(beam.peak_current(), -beam.charge()/(np.sqrt(2*np.pi)*beam.bunch_length())*SI.c, rtol=0.0, atol=3e2)
+    assert np.isclose(beam.peak_density(), beam.charge()/(SI.e*np.sqrt(2*np.pi)**3*beam.beam_size_x()*beam.beam_size_y()*beam.bunch_length()), rtol=1e-8, atol=0.0)
+
+    assert np.isclose(beam.alpha_x(), alpha_x, rtol=3e-2, atol=0.0)
+    assert np.isclose(beam.alpha_y(), alpha_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.beta_x(), beta_x, rtol=3e-3, atol=0.0)
+    assert np.isclose(beam.beta_y(), beta_y, rtol=3e-3, atol=0.0)
+    assert np.isclose(beam.geom_emittance_x(), geo_emitt_x, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.geom_emittance_y(), geo_emitt_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), geo_emitt_x*beam.gamma(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), geo_emitt_y*beam.gamma(), rtol=1e-2, atol=0.0)
 
 
 ############# Tests for beam projections #############
@@ -552,7 +725,6 @@ def test_beam_alignment_angles():
     assert np.isclose(align_x_angle, start_x_angle, rtol=1e-5, atol=1e-13)
     assert np.isclose(align_y_angle, start_y_angle, rtol=1e-5, atol=1e-13)
     
-
 
 @pytest.mark.beam
 def test_add_pointing_tilts():
