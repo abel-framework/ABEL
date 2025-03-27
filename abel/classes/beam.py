@@ -241,11 +241,11 @@ class Beam():
         return np.sqrt(self.xs()**2 + self.ys()**2)
     
     def pxs(self):
-        return proper_velocity2momentum(self.uxs())
+        return proper_velocity2momentum(self.uxs(), m=self.particle_mass)
     def pys(self):
-        return proper_velocity2momentum(self.uys())
+        return proper_velocity2momentum(self.uys(), m=self.particle_mass)
     def pzs(self):
-        return proper_velocity2momentum(self.uzs())
+        return proper_velocity2momentum(self.uzs(), m=self.particle_mass)
     
     def xps(self):
         return self.uxs()/self.uzs()
