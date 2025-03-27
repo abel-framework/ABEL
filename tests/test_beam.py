@@ -571,7 +571,7 @@ def test_add_pointing_tilts():
     # Tilt the beam using its angular offset
     beam.add_pointing_tilts()
 
-    # Rotate the positions and proper velocities of all particles with written out formulas for comparison. Note the sign convention for y_angle.
+    # Rotate the positions of all particles with written out formulas for comparison. Note the sign convention for y_angle.
     rotated_xs, rotated_ys, rotated_zs = active_rotate_arrs(initial_beam.xs(), initial_beam.ys(), initial_beam.zs(), start_x_angle, -start_y_angle)
 
     # Examine the resulting beam
@@ -622,10 +622,6 @@ def test_xy_rotate_coord_sys1():
         assert np.isclose(beam.x_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=np.abs(beam.x_angle())*1e-3, atol=np.abs(beam.x_angle())*2e-3)
         assert np.isclose(beam.y_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
 
-        # print(nom_x_angle, beam.x_tilt_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset))
-        # assert np.isclose(beam.x_tilt_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=np.abs(beam.x_angle())*1e-3, atol=np.abs(beam.x_angle())*2e-3)
-        # assert np.isclose(beam.y_tilt_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
-
 
 @pytest.mark.beam
 def test_xy_rotate_coord_sys2():
@@ -662,9 +658,63 @@ def test_xy_rotate_coord_sys2():
         assert np.isclose(beam.x_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
         assert np.isclose(beam.y_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=np.abs(nom_y_angle)*1e-3, atol=np.abs(nom_y_angle)*2e-3)
 
-        # print(nom_y_angle, beam.y_tilt_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset))
-        # assert np.isclose(beam.y_tilt_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=np.abs(nom_y_angle)*1e-3, atol=np.abs(nom_y_angle)*2e-3)
-        # assert np.isclose(beam.x_tilt_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=1e-7, atol=1e-13)
+
+@pytest.mark.beam
+def test_xy_rotate_coord_sys3():
+    "Test adding creating a tilted beam and then align the z-axis to the drive beam propagation axis using passive transformation to rotate the frame of the beam."
+
+    np.random.seed(42)
+
+    start_x_angle = -2.82328e-08 # [rad], define an angle in the zx-plane.
+    start_y_angle = 7.040999e-09   # [rad], define an angle in the zy-plane.
+
+    # Create a source with angular offsets, but not tilted in space
+    source = setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=1615e-6, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=start_y_angle, enable_xy_jitter=False, enable_xpyp_jitter=False)
+
+    # Generate a beam
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)  # Has angular offsets, but not tilted in space
+
+    # Tilt the beam using its angular offset
+    beam.add_pointing_tilts()
+
+    # Rotate the positions of all particles with written out formulas for comparison. Note the sign convention for y_angle.
+    rotated_xs, rotated_ys, rotated_zs = active_rotate_arrs(initial_beam.xs(), initial_beam.ys(), initial_beam.zs(), start_x_angle, -start_y_angle)
+
+    # Examine the tilted beam
+    assert np.isclose(beam.x_angle(), start_x_angle, rtol=1e-3, atol=1e-11)
+    assert np.isclose(beam.y_angle(), start_y_angle, rtol=1e-3, atol=1e-11)
+    assert np.allclose(beam.uxs(), initial_beam.uxs(), rtol=1e-15, atol=0.0)  # The proper velocities should not change.
+    assert np.allclose(beam.uys(), initial_beam.uys(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uzs(), initial_beam.uzs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.xs(), rotated_xs, rtol=1e-8, atol=0.0)
+    assert np.allclose(beam.ys(), rotated_ys, rtol=1e-8, atol=0.0)
+    assert np.allclose(beam.zs(), rotated_zs, rtol=1e-8, atol=0.0)
+
+    # Calculate the angles that will be used to rotate the beams' frame
+    rotation_angle_x, rotation_angle_y = beam.beam_alignment_angles()
+    rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+    assert np.isclose(rotation_angle_x, start_x_angle, rtol=1e-10, atol=0.0)
+    assert np.isclose(rotation_angle_y, -start_y_angle, rtol=1e-10, atol=0.0)
+
+
+    # Use passive transformation to rotate the frame of the beam
+    beam.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
+
+    # Rotate the proper velocities of all particles with written out formulas for comparison. Note the sign convention for y_angle.
+    rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(initial_beam.uxs(), initial_beam.uys(), initial_beam.uzs(), rotation_angle_x, rotation_angle_y)
+
+    # Examine the aligned beam
+    assert beam.x_angle() < 1e-15  # The angular offsets should be very small
+    assert beam.y_angle() < 1e-15
+    assert np.allclose(beam.uxs(), rotated_uxs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), rotated_uys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uzs(), rotated_uzs, rtol=1e-15, atol=0.0)
+    # The position arrays should have been rotated back to when the beam only had angular offsets, but not tilted in space
+    assert np.allclose(beam.xs(), initial_beam.xs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.ys(), initial_beam.ys(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.zs(), initial_beam.zs(), rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.beam
@@ -680,38 +730,46 @@ def test_rotate_coord_sys_3D():
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
     old_beam = source.track()
     old_beam.add_pointing_tilts()  # Add an initial tilt in the zy-plane.
-    #old_beam = copy.deepcopy(beam)
 
     x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
     y_axis = np.array([0, 0, 1])
-    nom_x_angles = np.concatenate((-np.logspace(-9, np.log10(0.11), 10), np.logspace(-9, -1, 10)))  # [rad]
-    nom_y_angles = np.concatenate((-np.logspace(-9, np.log10(0.11), 10), np.logspace(-9, -1, 10)))  # [rad]
+    nom_x_angles = np.concatenate((-np.logspace(np.log10(0.11), -9, 10), np.logspace(-8.9, -1, 10)))  # [rad]
+    nom_y_angles = np.concatenate((-np.logspace(np.log10(0.09), -8.1, 10), np.logspace(-9, -0.97, 10)))  # [rad]
 
     for i in range(len(nom_x_angles)):
+        for j in range(len(nom_y_angles)):
 
-        beam = copy.deepcopy(old_beam)
+            beam = copy.deepcopy(old_beam)
 
-        nom_x_angle = nom_x_angles[i]
-        nom_y_angle = nom_y_angles[i]
-        beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, nom_y_angle, invert=False)
+            nom_x_angle = nom_x_angles[i]
+            nom_y_angle = nom_y_angles[j]
+            beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, nom_y_angle, invert=False)
 
-        # Roatate the positions and proper velocities of all particles with written out formulas for comparison
-        rotated_xs, rotated_ys, rotated_zs = passive_rotate_arrs(old_beam.xs(), old_beam.ys(), old_beam.zs(), nom_x_angle, nom_y_angle)
-        rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(old_beam.uxs(), old_beam.uys(), old_beam.uzs(), nom_x_angle, nom_y_angle)
-        rotated_ux_offset, rotated_uy_offset, rotated_uz_offset = passive_rotate_arrs(old_beam.ux_offset(), old_beam.uy_offset(), old_beam.uz_offset(), nom_x_angle, nom_y_angle)
+            # Roatate the positions and proper velocities of all particles with written out formulas for comparison
+            rotated_xs, rotated_ys, rotated_zs = passive_rotate_arrs(old_beam.xs(), old_beam.ys(), old_beam.zs(), nom_x_angle, nom_y_angle)
+            rotated_uxs, rotated_uys, rotated_uzs = passive_rotate_arrs(old_beam.uxs(), old_beam.uys(), old_beam.uzs(), nom_x_angle, nom_y_angle)
+            rotated_ux_offset, rotated_uy_offset, rotated_uz_offset = passive_rotate_arrs(old_beam.ux_offset(), old_beam.uy_offset(), old_beam.uz_offset(), nom_x_angle, nom_y_angle)
 
-        # Compare the rotated arrays
-        assert np.allclose(beam.zs(), rotated_zs, rtol=1e-7, atol=1e-13)
-        assert np.allclose(beam.xs(), rotated_xs, rtol=1e-7, atol=1e-13)
-        assert np.allclose(beam.ys(), rotated_ys, rtol=1e-7, atol=1e-13)
-        assert np.allclose(beam.uzs(), rotated_uzs, rtol=1e-7, atol=1e-13)
-        assert np.allclose(beam.uxs(), rotated_uxs, rtol=1e-7, atol=1e-13)
-        assert np.allclose(beam.uys(), rotated_uys, rtol=1e-7, atol=1e-13)
-        assert np.isclose(beam.x_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=np.abs(nom_x_angle)*1e-3, atol=np.abs(nom_x_angle)*2e-3)
-        assert np.isclose(beam.y_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=np.abs(nom_y_angle)*1e-3, atol=np.abs(nom_y_angle)*2e-3)
+            # Compare the rotated arrays
+            assert np.allclose(beam.zs(), rotated_zs, rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.xs(), rotated_xs, rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.ys(), rotated_ys, rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.uzs(), rotated_uzs, rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.uxs(), rotated_uxs, rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.uys(), rotated_uys, rtol=1e-7, atol=1e-13)
+            assert np.isclose(beam.x_angle(), np.arcsin(rotated_ux_offset/rotated_uz_offset), rtol=np.abs(nom_x_angle)*1e-3, atol=np.abs(nom_x_angle)*2e-3)
+            assert np.isclose(beam.y_angle(), np.arcsin(rotated_uy_offset/rotated_uz_offset), rtol=np.abs(nom_y_angle)*1e-3, atol=np.abs(nom_y_angle)*2e-3)
 
-    # nom_x_angle = random.uniform(-np.pi/2, np.pi/2)
-    # beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, 0.0, invert=False)  # Rotate beam 90 degrees around the y-axis.
-    # assert np.isclose(beam.x_tilt_angle(), nom_x_angle)
+            # Un-rotate
+            beam.rotate_coord_sys_3D(y_axis, nom_x_angle, x_axis, nom_y_angle, invert=True)
 
-    # TODO: test un-rotate
+            # Compare the rotated arrays
+            assert np.allclose(beam.zs(), old_beam.zs(), rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.xs(), old_beam.xs(), rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.ys(), old_beam.ys(), rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.uzs(), old_beam.uzs(), rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.uxs(), old_beam.uxs(), rtol=1e-7, atol=1e-13)
+            assert np.allclose(beam.uys(), old_beam.uys(), rtol=1e-7, atol=1e-13)
+            assert np.isclose(beam.x_angle(), old_beam.x_angle(), rtol=1e-7, atol=1e-13)
+            assert np.isclose(beam.y_angle(), old_beam.y_angle(), rtol=1e-7, atol=1e-13)
+
