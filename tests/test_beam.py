@@ -1101,12 +1101,67 @@ def test_charge_density_3D():
 # TODO: test Dirichlet_BC_system_matrix(), Ex_Ey_2D(), Ex_Ey()
 
 
+
+############# Tests of methods changing the beam #############
+@pytest.mark.beam
+def test_accelerate_nominal():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    energy_gain = 1e9  # 1 GeV energy gain
+    chirp = 0  # No chirp
+    initial_Es = beam.Es()
+        
+    beam.accelerate(energy_gain=energy_gain, chirp=chirp)
+    expected_Es = initial_Es + energy_gain
+
+    assert np.allclose(beam.Es(), expected_Es, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_accelerate_negative():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    energy_gain = -beam.energy()  # Energy decrease
+    chirp = 0  # No chirp
+
+    # Suppress warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+
+        try:
+            beam.accelerate(energy_gain=energy_gain, chirp=chirp)
+        except ValueError as err:
+            assert str(err) == 'uzs contains values that are too small.'
+
+
+@pytest.mark.beam
+def test_accelerate_chirp():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    energy_gain = 1e9  # 1 GeV energy gain
+    chirp = 1e8  # Energy chirp dE/dz
+    zs = beam.zs()
+    initial_Es = beam.Es()
+
+    expected_Es = energy_gain + initial_Es + np.sign(beam.qs()) * zs * chirp
+    beam.accelerate(energy_gain=energy_gain, chirp=chirp)
+
+    assert np.allclose(beam.Es(), expected_Es, rtol=1e-15, atol=0.0)
+
+
+
+
+
+
+
+
 ############# Tests of plotting methods #############
 @pytest.mark.beam
 def test_plot_current_profile():
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     beam = source.track()
     beam.plot_current_profile()
+    plt.close()
 
 
 @pytest.mark.beam
@@ -1114,6 +1169,7 @@ def test_plot_lps():
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     beam = source.track()
     beam.plot_lps()
+    plt.close()
 
 
 @pytest.mark.beam
@@ -1121,6 +1177,7 @@ def test_plot_trace_space_x():
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     beam = source.track()
     beam.plot_trace_space_x()
+    plt.close()
 
 
 @pytest.mark.beam
@@ -1128,6 +1185,7 @@ def test_plot_trace_space_y():
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     beam = source.track()
     beam.plot_trace_space_y()
+    plt.close()
 
 
 @pytest.mark.beam
@@ -1135,6 +1193,7 @@ def test_plot_transverse_profile():
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     beam = source.track()
     beam.plot_transverse_profile()
+    plt.close()
 
 
 # @pytest.mark.beam
