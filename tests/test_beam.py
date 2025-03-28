@@ -457,12 +457,13 @@ def test_scale_energy():
         assert str(err) == 'Es contains values that are too small.'
 
 
+
 ############# Tests on bunch pattern #############
+# TODO
+
 
 
 ############# Tests for beam statistics #############
-# Need tests for beam parameter calculations such as offsets, emittance, beta functions, peak current
-
 @pytest.mark.beam
 def test_param_calcs_generate_trace_space():
     "Test the beam parameter calculations using a trace space generated with generate_trace_space()."
@@ -628,9 +629,138 @@ def test_param_calcs_generate_symm_trace_space_xyz():
     assert np.isclose(beam.norm_emittance_y(), geo_emitt_y*beam.gamma(), rtol=1e-2, atol=0.0)
 
 
-############# Tests for beam projections #############
-# ...
 
+############# Tests for beam projections #############
+@pytest.mark.beam
+def test_current_profile():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=1.0e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+
+    dIdt, ts = beam.current_profile()
+    assert np.isclose(np.max(np.abs(dIdt)), beam.peak_current(), rtol=1e-15, atol=0.0)
+    assert np.isclose(SI.c*ts.mean(), beam.z_offset(), rtol=1e-10, atol=0.0)
+
+    Nbins = int(np.sqrt(len(beam)/2))
+    bins = np.linspace(min(beam.ts()), max(beam.ts()), Nbins)
+    dIdt, ts = beam.current_profile(bins=bins)
+    assert np.isclose(np.max(np.abs(dIdt)), beam.peak_current(), rtol=1e-15, atol=0.0)
+    assert len(dIdt) == Nbins - 1
+    assert len(ts) == Nbins - 1
+    assert np.isclose(SI.c*ts.mean(), beam.z_offset(), rtol=1e-10, atol=0.0)
+
+
+@pytest.mark.beam
+def test_longitudinal_num_density():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=1.0e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    dNdz, zs = beam.longitudinal_num_density()
+    assert np.isclose( np.sum( dNdz*np.diff(zs)[0] ), beam.total_particles(), rtol=1e-10, atol=0.0 )
+    assert np.isclose(zs.mean(), beam.z_offset(), rtol=1e-10, atol=0.0)
+
+
+@pytest.mark.beam
+def test_energy_spectrum():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    dQdE, Es = beam.energy_spectrum()
+    assert np.isclose( np.sum( dQdE*np.diff(Es)[0] ), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( Es.mean(), beam.energy(), rtol=1e-10, atol=0.0 )
+
+
+@pytest.mark.beam
+def test_rel_energy_spectrum():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    dQdE, rel_Es = beam.rel_energy_spectrum()
+    assert np.isclose( np.sum( dQdE*np.diff(rel_Es)[0] ), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( rel_Es.mean(), 0.0, rtol=0.0, atol=1e-10 )
+
+
+@pytest.mark.beam
+def test_transverse_profile_x():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=1.0e-6, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    dQdx, xs = beam.transverse_profile_x()
+    assert np.isclose( np.sum( dQdx*np.diff(xs)[0] ), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( xs.mean(), beam.x_offset(), rtol=1e-10, atol=0.0 )
+
+
+@pytest.mark.beam
+def test_transverse_profile_y():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=1.0e-6, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    dQdy, ys = beam.transverse_profile_y()
+    assert np.isclose( np.sum( dQdy*np.diff(ys)[0] ), beam.charge(), rtol=1e-8, atol=0.0 )
+    assert np.isclose( ys.mean(), beam.y_offset(), rtol=1e-10, atol=0.0 )
+
+
+@pytest.mark.beam
+def test_transverse_profile_xp():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=1.0e-6, y_angle=0.0)
+    beam = source.track()
+    dQdxp, xps = beam.transverse_profile_xp()
+    assert np.isclose( np.sum( dQdxp*np.diff(xps)[0] ), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( xps.mean(), beam.x_angle(), rtol=1e-10, atol=0.0 )
+
+
+@pytest.mark.beam
+def test_transverse_profile_yp():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=1.0e-6)
+    beam = source.track()
+    dQdyp, yps = beam.transverse_profile_yp()
+    assert np.isclose( np.sum( dQdyp*np.diff(yps)[0] ), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( yps.mean(), beam.y_angle(), rtol=1e-10, atol=0.0 )
+
+
+@pytest.mark.beam
+def test_phase_space_density():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=1.2e-6, y_angle=0.3e-6)
+    beam = source.track()
+    density, xps, yps = beam.phase_space_density(beam.xps, beam.yps, hbins=None, vbins=None)
+    density_1d = np.sum(density*np.diff(xps)[0], axis=1)
+    assert np.isclose( np.sum(density_1d*np.diff(yps)[0]), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( xps.mean(), beam.x_angle(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( yps.mean(), beam.y_angle(), rtol=1e-10, atol=0.0 )
+
+    Nbins = int(np.sqrt(len(beam)/2))
+    hbins = np.linspace(min(beam.xps()), max(beam.xps()), Nbins+1)
+    vbins = np.linspace(min(beam.yps()), max(beam.yps()), Nbins+2)
+    density, xps, yps = beam.phase_space_density(beam.xps, beam.yps, hbins, vbins)
+    density_1d = np.sum(density*np.diff(xps)[0], axis=1)
+    assert np.isclose( np.sum(density_1d*np.diff(yps)[0]), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( xps.mean(), beam.x_angle(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( yps.mean(), beam.y_angle(), rtol=1e-10, atol=0.0 )
+
+
+@pytest.mark.beam
+def test_density_lps():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=1.0e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    density, zs, Es = beam.density_lps(hbins=None, vbins=None)
+    density_1d = np.sum(density*np.diff(zs)[0], axis=1)
+    assert np.isclose( np.sum(density_1d*np.diff(Es)[0]), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( Es.mean(), beam.energy(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( zs.mean(), beam.z_offset(), rtol=1e-10, atol=0.0 )
+
+    Nbins = int(np.sqrt(len(beam)/2))
+    hbins = np.linspace(min(beam.zs()), max(beam.zs()), Nbins+1)
+    vbins = np.linspace(min(beam.Es()), max(beam.Es()), Nbins+2)
+    density, zs, Es = beam.density_lps(hbins, vbins)
+    density_1d = np.sum(density*np.diff(zs)[0], axis=1)
+    assert np.isclose( np.sum(density_1d*np.diff(Es)[0]), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( Es.mean(), beam.energy(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( zs.mean(), beam.z_offset(), rtol=1e-10, atol=0.0 )
+
+
+@pytest.mark.beam
+def test_density_transverse():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.2e-6, y_offset=3.3e-6, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    density, xs, ys = beam.density_transverse()
+    density_1d = np.sum(density*np.diff(xs)[0], axis=1)
+    assert np.isclose( np.sum(density_1d*np.diff(ys)[0]), beam.charge(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( xs.mean(), beam.x_offset(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( ys.mean(), beam.y_offset(), rtol=1e-10, atol=0.0 )
 
 
 
@@ -642,6 +772,7 @@ def active_rotate_arrs(x_comps, y_comps, z_comps, x_angle, y_angle):
     rotated_y_comps = -z_comps * np.cos(x_angle)*np.sin(y_angle) + x_comps * np.sin(x_angle)*np.sin(y_angle) + y_comps * np.cos(y_angle)
 
     return rotated_x_comps, rotated_y_comps, rotated_z_comps
+
 
 def passive_rotate_arrs(x_comps, y_comps, z_comps, x_angle, y_angle):
     "Passive rotation of ndarrays ``x_comps``, ``y_comps`` and ``z_comps`` containing the xyz-components of vectors such as position and proper velocity first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis."
@@ -945,3 +1076,27 @@ def test_rotate_coord_sys_3D():
             assert np.isclose(beam.x_angle(), old_beam.x_angle(), rtol=1e-7, atol=1e-13)
             assert np.isclose(beam.y_angle(), old_beam.y_angle(), rtol=1e-7, atol=1e-13)
 
+
+
+############# Tests of in-house beam field calculation methods #############
+@pytest.mark.beam
+def test_charge_density_3D():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=123.4e-6, x_offset=0.1e-6, y_offset=4.5e-6, x_angle=1.2e-6, y_angle=0.3e-6)
+    beam = source.track()
+    dQ_dzdxdy, zctrs, xctrs, yctrs, edges_z, edges_x, edges_y = beam.charge_density_3D(zbins=None, xbins=None, ybins=None)
+
+    # Calculate volume of each bin
+    dz = np.diff(edges_z)
+    dx = np.diff(edges_x)
+    dy = np.diff(edges_y)
+    bin_volumes = dz[:, None, None] * dx[None, :, None] * dy[None, None, :]  # The None indexing is used to add new axes to the differences arrays, allowing them to be broadcasted properly for division with counts. This ensures that each element of counts is divided by the corresponding bin volume (element-wise division).
+
+    assert np.isclose(np.sum(dQ_dzdxdy*bin_volumes), beam.charge(), rtol=1e-15, atol=0.0)
+    assert np.isclose( xctrs.mean(), beam.x_offset(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( yctrs.mean(), beam.y_offset(), rtol=1e-10, atol=0.0 )
+    assert np.isclose( zctrs.mean(), beam.z_offset(), rtol=1e-10, atol=0.0 )
+
+# TODO: test Dirichlet_BC_system_matrix(), Ex_Ey_2D(), Ex_Ey()
+
+
+############# Tests of plotting methods #############
