@@ -636,16 +636,18 @@ def test_current_profile():
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=1.0e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     beam = source.track()
 
-    dIdt, ts = beam.current_profile()
-    assert np.isclose(np.max(np.abs(dIdt)), beam.peak_current(), rtol=1e-15, atol=0.0)
+    dQdt, ts = beam.current_profile()
+    assert np.isclose(np.max(np.abs(dQdt)), beam.peak_current(), rtol=1e-15, atol=0.0)
+    assert np.isclose( np.sum( dQdt*np.diff(ts)[0] ), beam.charge(), rtol=1e-10, atol=0.0 )
     assert np.isclose(SI.c*ts.mean(), beam.z_offset(), rtol=1e-10, atol=0.0)
 
     Nbins = int(np.sqrt(len(beam)/2))
     bins = np.linspace(min(beam.ts()), max(beam.ts()), Nbins)
-    dIdt, ts = beam.current_profile(bins=bins)
-    assert np.isclose(np.max(np.abs(dIdt)), beam.peak_current(), rtol=1e-15, atol=0.0)
-    assert len(dIdt) == Nbins - 1
+    dQdt, ts = beam.current_profile(bins=bins)
+    assert np.isclose(np.max(np.abs(dQdt)), beam.peak_current(), rtol=1e-15, atol=0.0)
+    assert len(dQdt) == Nbins - 1
     assert len(ts) == Nbins - 1
+    assert np.isclose( np.sum( dQdt*np.diff(ts)[0] ), beam.charge(), rtol=1e-10, atol=0.0 )
     assert np.isclose(SI.c*ts.mean(), beam.z_offset(), rtol=1e-10, atol=0.0)
 
 
@@ -1100,3 +1102,43 @@ def test_charge_density_3D():
 
 
 ############# Tests of plotting methods #############
+@pytest.mark.beam
+def test_plot_current_profile():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    beam.plot_current_profile()
+
+
+@pytest.mark.beam
+def test_plot_lps():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    beam.plot_lps()
+
+
+@pytest.mark.beam
+def test_plot_trace_space_x():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    beam.plot_trace_space_x()
+
+
+@pytest.mark.beam
+def test_plot_trace_space_y():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    beam.plot_trace_space_y()
+
+
+@pytest.mark.beam
+def test_plot_transverse_profile():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    beam.plot_transverse_profile()
+
+
+# @pytest.mark.beam
+# def test_plot_bunch_pattern():
+#     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+#     beam = source.track()
+#     beam.plot_bunch_pattern()
