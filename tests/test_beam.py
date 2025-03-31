@@ -1300,14 +1300,103 @@ def test_scale_norm_emittance_y():
         assert str(err) == 'Normalised emittance cannot be negative.'
 
 
-# @pytest.mark.beam
-# def test_apply_betatron_damping():
-    
-    
+@pytest.mark.beam
+def test_apply_betatron_damping():
+
+    np.random.seed(42)
+
+    x_offset = 5.354e-6
+    y_offset = 0.1516e-6
+    ux_offset = 739215.7882185677
+    uy_offset = 1583681.8243787317
+    deltaE = 1.516e9
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=np.sqrt(3/4.516), energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
+
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+
+    # calculate beam (not beta) magnification
+    gammasBoosted = energy2gamma(abs(initial_beam.Es() + deltaE))
+    beta_mag = np.sqrt(initial_beam.gammas()/gammasBoosted)
+    assert np.isclose(beta_mag.mean(), np.sqrt(3/4.516), rtol=1e-15, atol=0.0)
+    mag = np.sqrt(beta_mag)
+
+    beam.apply_betatron_damping(deltaE, axis_defining_beam=beam)
+
+    # Examine beam
+    assert len(beam) == len(initial_beam)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge(), initial_beam.charge(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge_sign(), -1, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.total_energy(), initial_beam.total_energy(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.weightings(), initial_beam.weightings(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.energy(), initial_beam.energy(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.rel_energy_spread(), initial_beam.rel_energy_spread(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.z_offset(), initial_beam.z_offset(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.bunch_length(), initial_beam.bunch_length(), rtol=1e-15, atol=0.0)
+
+    assert np.isclose(beam.x_offset(), x_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.y_offset(), y_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beam_size_x(), initial_beam.beam_size_x()*mag.mean(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beam_size_y(), initial_beam.beam_size_y()*mag.mean(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=1e-12, atol=0.0)
+    assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.divergence_x(), initial_beam.divergence_x()/mag.mean(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.divergence_y(), initial_beam.divergence_y()/mag.mean(), rtol=1e-15, atol=0.0)
+
+    assert np.allclose(beam.xs(), (initial_beam.xs()-initial_beam.x_offset())*mag + initial_beam.x_offset(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.ys(), (initial_beam.ys()-initial_beam.y_offset())*mag + initial_beam.y_offset(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), (initial_beam.uxs()-initial_beam.ux_offset())/mag + initial_beam.ux_offset(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), (initial_beam.uys()-initial_beam.uy_offset())/mag + initial_beam.uy_offset(), rtol=1e-15, atol=0.0)
 
 
-# @pytest.mark.beam
+    # Test no energy change
+    deltaE = 0.0
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=1.0, energy=3e9, rel_energy_spread=0.01, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
+
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+
+    # calculate beam (not beta) magnification
+    gammasBoosted = energy2gamma(abs(initial_beam.Es() + deltaE))
+    beta_mag = np.sqrt(initial_beam.gammas()/gammasBoosted)
+    assert np.isclose(beta_mag.mean(), 1.0, rtol=1e-15, atol=0.0)
+    mag = np.sqrt(beta_mag)
+
+    beam.apply_betatron_damping(deltaE, axis_defining_beam=beam)
+
+    # Examine beam
+    assert len(beam) == len(initial_beam)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge(), initial_beam.charge(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.charge_sign(), -1, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.total_energy(), initial_beam.total_energy(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.weightings(), initial_beam.weightings(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.energy(), initial_beam.energy(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.rel_energy_spread(), initial_beam.rel_energy_spread(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.z_offset(), initial_beam.z_offset(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.bunch_length(), initial_beam.bunch_length(), rtol=1e-15, atol=0.0)
+
+    assert np.isclose(beam.x_offset(), x_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.y_offset(), y_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beam_size_x(), initial_beam.beam_size_x()*mag.mean(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beam_size_y(), initial_beam.beam_size_y()*mag.mean(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=1e-12, atol=0.0)
+    assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.divergence_x(), initial_beam.divergence_x()/mag.mean(), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.divergence_y(), initial_beam.divergence_y()/mag.mean(), rtol=1e-15, atol=0.0)
+
+    assert np.allclose(beam.xs(), (initial_beam.xs()-initial_beam.x_offset())*mag + initial_beam.x_offset(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.ys(), (initial_beam.ys()-initial_beam.y_offset())*mag + initial_beam.y_offset(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), (initial_beam.uxs()-initial_beam.ux_offset())/mag + initial_beam.ux_offset(), rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), (initial_beam.uys()-initial_beam.uy_offset())/mag + initial_beam.uy_offset(), rtol=1e-15, atol=0.0)
+    
+
+@pytest.mark.beam
 def test_magnify_beta_function():
+    "Tests for ``Beam.magnify_beta_function(beta_mag, axis_defining_beam=None)``, which magnifies beta functions (increases beam size, decreases divergence for beta_mag > 1.0)."
 
     np.random.seed(42)
 
@@ -1390,15 +1479,125 @@ def test_magnify_beta_function():
     assert np.allclose(beam.uys(), (initial_beam.uys()-initial_beam.uy_offset())/mag + initial_beam.uy_offset(), rtol=1e-15, atol=0.0)
 
 
+@pytest.mark.beam
+def test_transport():
 
-# @pytest.mark.beam
-# def test_transport():
-#     # TODO
+    x_offset = 0                                                                    # [m]
+    y_offset = 0                                                                    # [m]
+    x_angle = 0                                                                     # [rad]
+    y_angle = 0                                                                     # [rad]
+    L = 0                                                                           # [m]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+
+    beam.transport(L)
+    assert np.allclose(beam.xs(), initial_beam.xs()+L*initial_beam.xps())
+    assert np.allclose(beam.ys(), initial_beam.ys()+L*initial_beam.yps())
+
+    x_offset = 5.354e-6                                                             # [m]
+    y_offset = 0.1516e-6                                                            # [m]
+    x_angle = 6.6e-6                                                                # [rad]
+    y_angle = 0.42e-6                                                               # [rad]
+    L = 0.0                                                                         # [m]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.transport(L)
+    assert np.allclose(beam.xs(), initial_beam.xs()+L*initial_beam.xps())
+    assert np.allclose(beam.ys(), initial_beam.ys()+L*initial_beam.yps())
+
+    x_offset = 5.354e-6                                                             # [m]
+    y_offset = 0.1516e-6                                                            # [m]
+    x_angle = 6.6e-6                                                                # [rad]
+    y_angle = 0.42e-6                                                               # [rad]
+    L = 7.8                                                                         # [m]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.transport(L)
+    assert np.allclose(beam.xs(), initial_beam.xs()+L*initial_beam.xps())
+    assert np.allclose(beam.ys(), initial_beam.ys()+L*initial_beam.yps())
+
+    x_offset = -5.354e-6                                                            # [m]
+    y_offset = 0.1516e-6                                                            # [m]
+    x_angle = 6.6e-6                                                                # [rad]
+    y_angle = -0.42e-6                                                              # [rad]
+    L = 7.8                                                                         # [m]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.transport(L)
+    assert np.allclose(beam.xs(), initial_beam.xs()+L*initial_beam.xps())
+    assert np.allclose(beam.ys(), initial_beam.ys()+L*initial_beam.yps())
+
+    x_offset = -5.354e-6                                                            # [m]
+    y_offset = 0.1516e-6                                                            # [m]
+    x_angle = 6.6e-6                                                                # [rad]
+    y_angle = -0.42e-6                                                              # [rad]
+    L = -7.8                                                                        # [m]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.transport(L)
+    assert np.allclose(beam.xs(), initial_beam.xs()+L*initial_beam.xps())
+    assert np.allclose(beam.ys(), initial_beam.ys()+L*initial_beam.yps())
 
 
-# @pytest.mark.beam
-# def test_flip_transverse_phase_spaces():
-#     # TODO
+@pytest.mark.beam
+def test_flip_transverse_phase_spaces():
+
+    x_offset = 0                                                                    # [m]
+    y_offset = 0                                                                    # [m]
+    x_angle = 0                                                                     # [rad]
+    y_angle = 0                                                                     # [rad]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.flip_transverse_phase_spaces(flip_momenta=False, flip_positions=False)
+    assert np.allclose(beam.xs(), initial_beam.xs())
+    assert np.allclose(beam.ys(), initial_beam.ys())
+    assert np.allclose(beam.uxs(), initial_beam.uxs())
+    assert np.allclose(beam.uys(), initial_beam.uys())
+
+    x_offset = -5.354e-6                                                            # [m]
+    y_offset = 0.1516e-6                                                            # [m]
+    x_angle = 6.6e-6                                                                # [rad]
+    y_angle = -0.42e-6                                                              # [rad]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.flip_transverse_phase_spaces(flip_momenta=True, flip_positions=False)
+    assert np.allclose(beam.xs(), initial_beam.xs())
+    assert np.allclose(beam.ys(), initial_beam.ys())
+    assert np.allclose(beam.uxs(), -initial_beam.uxs())
+    assert np.allclose(beam.uys(), -initial_beam.uys())
+
+    x_offset = 5.354e-6                                                             # [m]
+    y_offset = -0.1516e-6                                                           # [m]
+    x_angle = -6.6e-6                                                               # [rad]
+    y_angle = -0.42e-6                                                              # [rad]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.flip_transverse_phase_spaces(flip_momenta=False, flip_positions=True)
+    assert np.allclose(beam.xs(), -initial_beam.xs())
+    assert np.allclose(beam.ys(), -initial_beam.ys())
+    assert np.allclose(beam.uxs(), initial_beam.uxs())
+    assert np.allclose(beam.uys(), initial_beam.uys())
+
+    x_offset = 5.354e-6                                                             # [m]
+    y_offset = 0.1516e-6                                                            # [m]
+    x_angle = 6.6e-6                                                                # [rad]
+    y_angle = 0.42e-6                                                               # [rad]
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=x_angle, y_angle=y_angle)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    beam.flip_transverse_phase_spaces(flip_momenta=True, flip_positions=True)
+    assert np.allclose(beam.xs(), -initial_beam.xs())
+    assert np.allclose(beam.ys(), -initial_beam.ys())
+    assert np.allclose(beam.uxs(), -initial_beam.uxs())
+    assert np.allclose(beam.uys(), -initial_beam.uys())
 
 
 @pytest.mark.beam
