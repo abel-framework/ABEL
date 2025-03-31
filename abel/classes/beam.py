@@ -1220,11 +1220,15 @@ class Beam():
         self.set_zs(zs_scaled)
 
     def scale_norm_emittance_x(self, norm_emit_nx):
+        if norm_emit_nx < 0:
+            raise ValueError('Normalised emittance cannot be negative.')
         scale_factor = norm_emit_nx/self.norm_emittance_x()
         self.set_xs(self.xs() * np.sqrt(scale_factor))
         self.set_uxs(self.uxs() * np.sqrt(scale_factor))
 
     def scale_norm_emittance_y(self, norm_emit_ny):
+        if norm_emit_ny < 0:
+            raise ValueError('Normalised emittance cannot be negative.')
         scale_factor = norm_emit_ny/self.norm_emittance_y()
         self.set_ys(self.ys() * np.sqrt(scale_factor))
         self.set_uys(self.uys() * np.sqrt(scale_factor))
@@ -1433,7 +1437,7 @@ class Beam():
     #     ax.set_xlabel('z (um)')
     #     ax.set_ylabel('Beam current (kA)')
         
-        
+
   
     ## SAVE AND LOAD BEAM
     
