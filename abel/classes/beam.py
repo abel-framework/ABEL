@@ -1234,13 +1234,13 @@ class Beam():
         self.set_uys(self.uys() * np.sqrt(scale_factor))
         
     # betatron damping (must be done before acceleration)
-    def apply_betatron_damping(self, deltaE):
+    def apply_betatron_damping(self, deltaE, axis_defining_beam=None):
         gammasBoosted = energy2gamma(abs(self.Es()+deltaE))
         betamag = np.sqrt(self.gammas()/gammasBoosted)
-        self.magnify_beta_function(betamag)
+        self.magnify_beta_function(betamag, axis_defining_beam)
         
     
-    # magnify beta function (increase beam size, decrease divergence)
+    # magnify beta function (increase beam size, decrease divergence for beta_mag > 1.0)
     def magnify_beta_function(self, beta_mag, axis_defining_beam=None):
         
         # calculate beam (not beta) magnification
@@ -1273,7 +1273,7 @@ class Beam():
         if flip_momenta:
             self.set_uxs(-self.uxs())
             self.set_uys(-self.uys())
-        elif flip_positions:
+        if flip_positions:
             self.set_xs(-self.xs())
             self.set_ys(-self.ys())
 
