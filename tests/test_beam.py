@@ -26,7 +26,7 @@ from abel.utilities.beam_physics import generate_trace_space
 import random
 
 
-def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0):
+def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, rel_energy_spread=0.02, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0):
     source = SourceBasic()
     source.bunch_length = bunch_length                                              # [m], rms.
     source.num_particles = 10000                                               
@@ -34,7 +34,7 @@ def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40
 
     # Energy parameters
     source.energy = energy                                                          # [eV]
-    source.rel_energy_spread = 0.02                                                 # Relative rms energy spread
+    source.rel_energy_spread = rel_energy_spread                                    # Relative rms energy spread
 
     # Emittances
     source.emit_nx, source.emit_ny = 15e-6, 0.1e-6                                  # [m rad]
@@ -1149,10 +1149,238 @@ def test_accelerate_chirp():
     assert np.allclose(beam.Es(), expected_Es, rtol=1e-15, atol=0.0)
 
 
+@pytest.mark.beam
+def test_compress_nominal():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+
+    R_56 = 0.5**2*SI.c**2*np.sqrt(beam.energy()/10e9)**3/(3*beam.energy()**2)
+    initial_zs = beam.zs()
+    initial_Es = beam.Es()
+    
+    expected_zs = initial_zs + (1 - initial_Es / beam.energy()) * R_56
+    beam.compress(R_56=R_56, nom_energy=beam.energy())
+    
+    assert np.allclose(beam.zs(), expected_zs, rtol=1e-15, atol=0.0)
 
 
+@pytest.mark.beam
+def test_compress_null():
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+
+    R_56 = 0  # No compression
+    initial_zs = beam.zs()
+    
+    beam.compress(R_56=R_56, nom_energy=beam.energy())
+    
+    # zs should remain unchanged
+    assert np.allclose(beam.zs(), initial_zs, rtol=1e-15, atol=0.0)
 
 
+@pytest.mark.beam
+def test_compress_uniform():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+
+    R_56 = 0.5**2*SI.c**2*np.sqrt(beam.energy()/10e9)**3/(3*beam.energy()**2)
+    uniform_energy = np.full(len(beam.Es()), beam.energy())
+    beam.set_Es(uniform_energy)
+    initial_zs = beam.zs()
+
+    beam.compress(R_56=R_56, nom_energy=beam.energy())
+    
+    assert np.allclose(beam.zs(), initial_zs, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_scale_to_length():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    
+    beam = source.track()
+    new_bunch_length = beam.bunch_length()/2
+    zs_scaled = beam.z_offset() + (beam.zs()-beam.z_offset())*new_bunch_length/beam.bunch_length()
+    beam.scale_to_length(bunch_length=new_bunch_length)
+    assert np.allclose(beam.zs(), zs_scaled, rtol=1e-15, atol=0.0)
+        
+    beam = source.track()
+    new_bunch_length = beam.bunch_length()*5.354
+    zs_scaled = beam.z_offset() + (beam.zs()-beam.z_offset())*new_bunch_length/beam.bunch_length()
+    beam.scale_to_length(bunch_length=new_bunch_length)
+    assert np.allclose(beam.zs(), zs_scaled, rtol=1e-15, atol=0.0)
+
+    beam = source.track()
+    new_bunch_length = beam.bunch_length()*0
+    beam.scale_to_length(bunch_length=new_bunch_length)
+    assert np.allclose(beam.zs(), beam.z_offset(), rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_scale_norm_emittance_x():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    
+    beam = source.track()
+    scale_factor = 15.16
+    expct_emit_nx = scale_factor * beam.norm_emittance_x()
+    expected_xs = beam.xs() * np.sqrt(scale_factor)
+    expected_uxs = beam.uxs() * np.sqrt(scale_factor)
+    beam.scale_norm_emittance_x(scale_factor*beam.norm_emittance_x())
+    assert np.allclose(beam.xs(), expected_xs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), expected_uxs, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), expct_emit_nx, rtol=1e-15, atol=0.0)
+
+    beam = source.track()
+    scale_factor = 0.5354
+    expct_emit_nx = scale_factor * beam.norm_emittance_x()
+    expected_xs = beam.xs() * np.sqrt(scale_factor)
+    expected_uxs = beam.uxs() * np.sqrt(scale_factor)
+    beam.scale_norm_emittance_x(scale_factor*beam.norm_emittance_x())
+    assert np.allclose(beam.xs(), expected_xs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), expected_uxs, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), expct_emit_nx, rtol=1e-15, atol=0.0)
+
+    beam = source.track()
+    scale_factor = 0.0
+    expct_emit_nx = scale_factor * beam.norm_emittance_x()
+    expected_xs = beam.xs() * np.sqrt(scale_factor)
+    expected_uxs = beam.uxs() * np.sqrt(scale_factor)
+    beam.scale_norm_emittance_x(scale_factor*beam.norm_emittance_x())
+    assert np.allclose(beam.xs(), expected_xs, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uxs(), expected_uxs, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), expct_emit_nx, rtol=1e-15, atol=0.0)
+
+    try:
+        beam.scale_norm_emittance_x(-8e-6)
+    except ValueError as err:
+        assert str(err) == 'Normalised emittance cannot be negative.'
+
+
+@pytest.mark.beam
+def test_scale_norm_emittance_y():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    
+    beam = source.track()
+    scale_factor = 15.16
+    expct_emit_ny = scale_factor * beam.norm_emittance_y()
+    expected_ys = beam.ys() * np.sqrt(scale_factor)
+    expected_uys = beam.uys() * np.sqrt(scale_factor)
+    beam.scale_norm_emittance_y(scale_factor*beam.norm_emittance_y())
+    assert np.allclose(beam.ys(), expected_ys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), expected_uys, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), expct_emit_ny, rtol=1e-13, atol=0.0)
+
+    beam = source.track()
+    scale_factor = 0.5354
+    expct_emit_ny = scale_factor * beam.norm_emittance_y()
+    expected_ys = beam.ys() * np.sqrt(scale_factor)
+    expected_uys = beam.uys() * np.sqrt(scale_factor)
+    beam.scale_norm_emittance_y(scale_factor*beam.norm_emittance_y())
+    assert np.allclose(beam.ys(), expected_ys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), expected_uys, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), expct_emit_ny, rtol=1e-15, atol=0.0)
+
+    beam = source.track()
+    scale_factor = 0.0
+    expct_emit_ny = scale_factor * beam.norm_emittance_y()
+    expected_ys = beam.ys() * np.sqrt(scale_factor)
+    expected_uys = beam.uys() * np.sqrt(scale_factor)
+    beam.scale_norm_emittance_y(scale_factor*beam.norm_emittance_y())
+    assert np.allclose(beam.ys(), expected_ys, rtol=1e-15, atol=0.0)
+    assert np.allclose(beam.uys(), expected_uys, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), expct_emit_ny, rtol=1e-15, atol=0.0)
+
+    try:
+        beam.scale_norm_emittance_y(-8e-6)
+    except ValueError as err:
+        assert str(err) == 'Normalised emittance cannot be negative.'
+
+
+# @pytest.mark.beam
+# def test_apply_betatron_damping():
+    
+    
+
+
+# @pytest.mark.beam
+# def test_magnify_beta_function():
+#     # TODO
+
+
+# @pytest.mark.beam
+# def test_transport():
+#     # TODO
+
+
+# @pytest.mark.beam
+# def test_flip_transverse_phase_spaces():
+#     # TODO
+
+
+@pytest.mark.beam
+def test_apply_betatron_motion_emitt_pres():
+    "Test of ``Beam.apply_betatron_motion()`` with no energy spread and radiation reaction so that the emittances are preserved."
+
+    np.random.seed(42)
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    deltaEs = np.full(len(beam.Es()), 1e9)  # Homogeneous energy gain
+
+    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=True)
+
+    assert np.allclose(Es_final.mean(), 4e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(np.std(Es_final), 1e-20, rtol=0.0, atol=1e-19)
+    assert np.allclose(np.std(Es_final)/Es_final.mean(), 1e-20, rtol=0.0, atol=1e-19)
+    assert np.allclose(beam.charge(), initial_beam.charge(), rtol=1e-10, atol=0.0)
+    assert np.allclose(beam.z_offset(), initial_beam.z_offset(), rtol=1e-10, atol=0.0)
+    assert np.allclose(beam.bunch_length(), initial_beam.bunch_length(), rtol=1e-10, atol=0.0)
+
+    assert np.allclose(Es_final.mean(), evol.energy[-1], rtol=1e-20, atol=0.0)
+    assert np.allclose(evol.energy_spread[-1], 1e-20, rtol=0.0, atol=1e-19)
+    assert np.allclose(beam.charge(), evol.charge[-1], rtol=1e-10, atol=0.0)
+    assert np.allclose(beam.norm_emittance_x(), evol.emit_nx[-1], rtol=0.0, atol=0.3e-5)
+    assert np.allclose(beam.norm_emittance_y(), evol.emit_ny[-1], rtol=0.0, atol=0.5e-5)
+    
+    # Emittance is preserved when the energy spread is 0 (homogenneoud energy gain) and radiation reaction disabled.
+    #assert np.isclose(beam.rel_energy_spread(), 1e-15, rtol=1e-10, atol=0.0) # Beam energies not updated after apply_betatron_motion(), so cannot check this.
+    assert np.allclose(beam.norm_emittance_x(), initial_beam.norm_emittance_x(), rtol=1e-8, atol=0.0)
+    assert np.allclose(beam.norm_emittance_y(), initial_beam.norm_emittance_y(), rtol=1e-8, atol=0.0)
+    assert np.allclose(evol.emit_nx[0], evol.emit_nx[-1], rtol=1e-8, atol=0.0)
+    assert np.allclose(evol.emit_ny[0], evol.emit_ny[-1], rtol=1e-8, atol=0.0)
+
+
+@pytest.mark.beam
+def test_apply_betatron_motion():
+    "Test of ``Beam.apply_betatron_motion()`` with energy spread and radiation reaction."
+
+    np.random.seed(42)
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.01, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+    deltaEs = np.full(len(beam.Es()), 1e9)  # Homogeneous energy gain
+
+    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=True, calc_evolution=True)
+
+    assert np.allclose(Es_final.mean(), 4e9, rtol=1e-6, atol=0.0)
+    assert np.allclose(np.std(Es_final), 0.01*3e9, rtol=5e-3, atol=0.0)
+    #assert np.allclose(np.std(Es_final)/Es_final.mean(), 1e-20, rtol=0.0, atol=1e-19)
+    assert np.allclose(beam.charge(), initial_beam.charge(), rtol=1e-10, atol=0.0)
+    assert np.allclose(beam.z_offset(), initial_beam.z_offset(), rtol=1e-10, atol=0.0)
+    assert np.allclose(beam.bunch_length(), initial_beam.bunch_length(), rtol=1e-10, atol=0.0)
+
+    assert np.allclose(Es_final.mean(), evol.energy[-1], rtol=1e-3, atol=0.0)
+    assert np.allclose(evol.energy_spread[-1], 0.01*3e9, rtol=5e-2, atol=0.0)
+    assert np.allclose(beam.charge(), evol.charge[-1], rtol=1e-10, atol=0.0)
+    assert np.allclose(beam.norm_emittance_x(), evol.emit_nx[-1], rtol=0.0, atol=0.3e-5)
+    assert np.allclose(beam.norm_emittance_y(), evol.emit_ny[-1], rtol=0.0, atol=0.5e-5)
+
+
+    #mag = np.sqrt(initial_beam.gamma()/energy2gamma(Es_final.mean()))  # Magnification factor
+    #assert np.allclose(beam.beta_x(), initial_beam.beta_x()*mag, rtol=1e-15, atol=0.0)
+    
 
 
 ############# Tests of plotting methods #############
