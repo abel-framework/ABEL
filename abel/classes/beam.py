@@ -266,7 +266,7 @@ class Beam():
         return self.zs()/SI.c
     
 
-    def comp_beams(beam1, beam2, comp_location=False, rtol=1e-05, atol=1e-08):
+    def comp_beams(beam1, beam2, comp_location=False, rtol=1e-15, atol=0.0):
         """
         Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within given tolerances.
 
@@ -279,10 +279,10 @@ class Beam():
             Flag for comparing the location of the beams. Default set to ``False``.
             
         rtol : float, optional
-            The relative tolerance parameter (see [1]_). Default set to 1e-5.
+            The relative tolerance parameter (see [1]_). Default set to 1e-15.
             
         rb_fit_obj : float, optional
-            The absolute tolerance parameter (see [1]_). Default set to 1e-8.
+            The absolute tolerance parameter (see [1]_). Default set to 0.0.
         
             
         Returns
