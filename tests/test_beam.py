@@ -1712,3 +1712,26 @@ def test_plot_transverse_profile():
 #     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
 #     beam = source.track()
 #     beam.plot_bunch_pattern()
+
+
+
+############# Tests of saving and loading #############
+@pytest.mark.beam
+def test_save_load():
+
+    import os
+    #from abel.classes.beam import comp_beams
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.01, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+
+    save_dir = 'tests' + os.sep + 'data' + os.sep + 'test_beam' + os.sep
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+    filename = save_dir + os.sep + 'beam_test_save.h5'
+
+    beam.save(filename=filename)
+    loaded_beam = Beam.load(filename=filename)
+
+    Beam.comp_beams(beam, loaded_beam, rtol=1e-15, atol=0.0)
+    shutil.rmtree(save_dir)
