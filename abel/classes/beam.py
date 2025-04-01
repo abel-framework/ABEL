@@ -75,7 +75,7 @@ class Beam():
         self.set_zs(zs)
 
         # minimum thresholds for energy, uz and pz
-        energy_thres = 100*particle_mass*SI.c**2/SI.e  # [eV], 100 * particle rest energy.
+        energy_thres = 10*particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=particle_mass)
         pz_thres = gamma2momentum(energy2gamma(energy_thres, unit='eV', m=particle_mass))
         
@@ -200,7 +200,7 @@ class Beam():
     def set_uys(self, uys):
         self.__phasespace[4,:] = uys
     def set_uzs(self, uzs):
-        energy_thres = 100*self.particle_mass*SI.c**2/SI.e  # [eV], 100 * particle rest energy.
+        energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
         if np.any(uzs < uz_thres):
             raise ValueError('uzs contains values that are too small.')
@@ -211,7 +211,7 @@ class Beam():
     def set_yps(self, yps):
         self.set_uys(yps*self.uzs())
     def set_Es(self, Es):
-        energy_thres = 100*self.particle_mass*SI.c**2/SI.e  # [eV], 100 * particle rest energy.
+        energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         if np.any(Es < energy_thres):
             raise ValueError('Es contains values that are too small.')
         self.set_uzs(energy2proper_velocity(Es))
