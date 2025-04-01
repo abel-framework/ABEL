@@ -22,9 +22,9 @@ class Beam():
     def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
 
         # check the inputs
-        if num_particles < 1:
-            raise ValueError('num_particles cannot be lower than 1.')
-        if num_bunches_in_train < 1:
+        if num_particles < 1 or not isinstance(num_particles, int):
+            raise ValueError('num_particles must be an integer larger than 1.')
+        if num_bunches_in_train < 1 or not isinstance(num_bunches_in_train, int):
             raise ValueError('num_bunches_in_train cannot be lower than 1.')
         if bunch_separation < 0.0:
             raise ValueError('bunch_separation cannot be negative.')
@@ -46,8 +46,8 @@ class Beam():
     
     # reset phase space
     def reset_phase_space(self, num_particles):
-        if num_particles < 1:
-            raise ValueError('num_particles cannot be lower than 1.')
+        if num_particles < 1 or not isinstance(num_particles, int):
+            raise ValueError('num_particles must be an integer larger than 1.')
         
         self.__phasespace = np.zeros((8, num_particles))
     
@@ -143,7 +143,10 @@ class Beam():
     
     # string operator (called when printing)
     def __str__(self):
-        return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC, {self.energy()/1e9:.2f} GeV"
+        if np.sum(self.weightings()) == 0.0:
+            return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC"
+        else:
+            return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC, {self.energy()/1e9:.2f} GeV"
         
         
     ## BUNCH PATTERN
