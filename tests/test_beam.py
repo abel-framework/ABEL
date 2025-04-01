@@ -129,7 +129,7 @@ def test_set_phase_space():
 
     energy_thres = 13*SI.m_e*SI.c**2/SI.e  # [eV], 13 * particle rest energy.
     uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
-    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e), size=num_particles)
 
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
@@ -409,7 +409,7 @@ def test_copy_particle_charge():
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e), size=num_particles)
     Q = -SI.e * 1.0e10
     beam1.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
@@ -419,7 +419,7 @@ def test_copy_particle_charge():
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e), size=num_particles)
     Q = -SI.e * 3.4e10
     ws = np.random.rand(num_particles)*Q/(-SI.e)
     beam2.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs, weightings=ws)
@@ -549,7 +549,7 @@ def test_transverse_vector():
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e), size=num_particles)
     Q = -SI.e * 1.0e10
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
@@ -574,7 +574,7 @@ def test_norm_transverse_vector():
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e), size=num_particles)
     Q = -SI.e * 1.0e10
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
@@ -765,6 +765,345 @@ def test_param_calcs_generate_symm_trace_space_xyz():
 
 
 @pytest.mark.beam
+def test_total_particles():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    total_particles = int(np.nansum(np.full(num_particles, Q/num_particles/-SI.e)))
+    assert beam.total_particles() == total_particles
+
+    # TODO: set some nans in beam
+
+
+@pytest.mark.beam
+def test_charge():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    charge = np.nansum(np.full(num_particles, Q/num_particles))
+    assert np.isclose(beam.charge(), charge, rtol=1e-15, atol=0.0)
+
+    # TODO: set some nans in beam
+
+
+@pytest.mark.beam
+def test_energy():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    Es = proper_velocity2energy(uzs, unit='eV', m=SI.m_e)
+    energy = weighted_mean(Es, beam.weightings(), clean=False) 
+    assert np.isclose(beam.energy(clean=False), energy, rtol=1e-15, atol=0.0)
+    energy = weighted_mean(Es, beam.weightings(), clean=True) 
+    assert np.isclose(beam.energy(clean=True), energy, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_gamma():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    gammas = proper_velocity2gamma(uzs)
+    gamma = weighted_mean(gammas, beam.weightings(), clean=False) 
+    assert np.isclose(beam.gamma(clean=False), gamma, rtol=1e-15, atol=0.0)
+    gamma = weighted_mean(gammas, beam.weightings(), clean=True) 
+    assert np.isclose(beam.gamma(clean=True), gamma, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_total_energy():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    total_energy = SI.e * np.nansum(beam.weightings()*beam.Es()) 
+    assert np.isclose(beam.total_energy(), total_energy, rtol=1e-15, atol=0.0)
+
+    # TODO: set some nans in beam
+
+
+@pytest.mark.beam
+def test_energy_spread():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    Es = proper_velocity2energy(uzs, unit='eV', m=SI.m_e)
+    energy_spread = weighted_std(Es, beam.weightings(), clean=False) 
+    assert np.isclose(beam.energy_spread(clean=False), energy_spread, rtol=1e-15, atol=0.0)
+    energy_spread = weighted_std(Es, beam.weightings(), clean=True) 
+    assert np.isclose(beam.energy_spread(clean=True), energy_spread, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_rel_energy_spread():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    Es = proper_velocity2energy(uzs, unit='eV', m=SI.m_e)
+    rel_energy_spread = weighted_std(Es, beam.weightings(), clean=False)/weighted_mean(Es, beam.weightings(), clean=False) 
+    assert np.isclose(beam.rel_energy_spread(clean=False), rel_energy_spread, rtol=1e-15, atol=0.0)
+    rel_energy_spread = weighted_std(Es, beam.weightings(), clean=True)/weighted_mean(Es, beam.weightings(), clean=True) 
+    assert np.isclose(beam.rel_energy_spread(clean=True), rel_energy_spread, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_xyz_offset():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    x_offset = weighted_mean(xs, beam.weightings(), clean=False)
+    y_offset = weighted_mean(ys, beam.weightings(), clean=False)
+    z_offset = weighted_mean(zs, beam.weightings(), clean=False)
+    assert np.isclose(beam.x_offset(clean=False), x_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.y_offset(clean=False), y_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.z_offset(clean=False), z_offset, rtol=1e-15, atol=0.0)
+    x_offset = weighted_mean(xs, beam.weightings(), clean=True)
+    y_offset = weighted_mean(ys, beam.weightings(), clean=True)
+    z_offset = weighted_mean(zs, beam.weightings(), clean=True)
+    assert np.isclose(beam.x_offset(clean=True), x_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.y_offset(clean=True), y_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.z_offset(clean=True), z_offset, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_xpyp_offset():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    xps = np.random.rand(num_particles)
+    yps = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uzs=uzs, xps=xps, yps=yps)
+
+    x_angle = weighted_mean(xps, beam.weightings(), clean=False)
+    y_angle = weighted_mean(yps, beam.weightings(), clean=False)
+    assert np.isclose(beam.x_angle(clean=False), x_angle, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.y_angle(clean=False), y_angle, rtol=1e-15, atol=0.0)
+    x_angle = weighted_mean(xps, beam.weightings(), clean=True)
+    y_angle = weighted_mean(yps, beam.weightings(), clean=True)
+    assert np.isclose(beam.x_angle(clean=True), x_angle, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.y_angle(clean=True), y_angle, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_uxuyuz_offset():
+    
+    num_particles = 4344
+    energy_thres = 1200*SI.m_e*SI.c**2/SI.e  # [eV], 1200 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.8e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    ux_offset = weighted_mean(uxs, beam.weightings(), clean=False)
+    uy_offset = weighted_mean(uys, beam.weightings(), clean=False)
+    uz_offset = weighted_mean(uzs, beam.weightings(), clean=False)
+    assert np.isclose(beam.ux_offset(clean=False), ux_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.uy_offset(clean=False), uy_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.uz_offset(clean=False), uz_offset, rtol=1e-15, atol=0.0)
+    ux_offset = weighted_mean(uxs, beam.weightings(), clean=True)
+    uy_offset = weighted_mean(uys, beam.weightings(), clean=True)
+    uz_offset = weighted_mean(uzs, beam.weightings(), clean=True)
+    assert np.isclose(beam.ux_offset(clean=True), ux_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.uy_offset(clean=True), uy_offset, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.uz_offset(clean=True), uz_offset, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_geom_emittance_xy():
+    num_particles = 4444
+    energy_thres = 1400*SI.m_e*SI.c**2/SI.e  # [eV], 1400 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    xps = np.random.rand(num_particles)
+    yps = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.4e10
+    beam.set_phase_space(Q, xs, ys, zs, uzs=uzs, xps=xps, yps=yps)
+
+    geom_emittance_x = np.sqrt(np.linalg.det(weighted_cov(xs, xps, beam.weightings(), clean=False)))
+    geom_emittance_y = np.sqrt(np.linalg.det(weighted_cov(ys, yps, beam.weightings(), clean=False)))
+    assert np.isclose(beam.geom_emittance_x(clean=False), geom_emittance_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.geom_emittance_y(clean=False), geom_emittance_y, rtol=1e-15, atol=0.0)
+
+    geom_emittance_x = np.sqrt(np.linalg.det(weighted_cov(xs, xps, beam.weightings(), clean=True)))
+    geom_emittance_y = np.sqrt(np.linalg.det(weighted_cov(ys, yps, beam.weightings(), clean=True)))
+    assert np.isclose(beam.geom_emittance_x(clean=True), geom_emittance_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.geom_emittance_y(clean=True), geom_emittance_y, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_norm_emittance_xy():
+    num_particles = 4444
+    energy_thres = 1400*SI.m_e*SI.c**2/SI.e  # [eV], 1400 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.4e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    norm_emittance_x = np.sqrt(np.linalg.det(weighted_cov(xs, uxs/SI.c, beam.weightings(), clean=False)))
+    norm_emittance_y = np.sqrt(np.linalg.det(weighted_cov(ys, uys/SI.c, beam.weightings(), clean=False)))
+    assert np.isclose(beam.norm_emittance_x(clean=False), norm_emittance_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(clean=False), norm_emittance_y, rtol=1e-15, atol=0.0)
+
+    norm_emittance_x = np.sqrt(np.linalg.det(weighted_cov(xs, uxs/SI.c, beam.weightings(), clean=True)))
+    norm_emittance_y = np.sqrt(np.linalg.det(weighted_cov(ys, uys/SI.c, beam.weightings(), clean=True)))
+    assert np.isclose(beam.norm_emittance_x(clean=True), norm_emittance_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(clean=True), norm_emittance_y, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_beta_xy():
+    num_particles = 4444
+    energy_thres = 1400*SI.m_e*SI.c**2/SI.e  # [eV], 1400 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.4e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    covx = weighted_cov(xs, beam.xps(), beam.weightings(), clean=False)
+    beta_x = covx[0,0]/np.sqrt(np.linalg.det(covx))
+    covy = weighted_cov(ys, beam.yps(), beam.weightings(), clean=False)
+    beta_y = covy[0,0]/np.sqrt(np.linalg.det(covy))
+    assert np.isclose(beam.beta_x(clean=False), beta_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beta_y(clean=False), beta_y, rtol=1e-15, atol=0.0)
+
+    covx = weighted_cov(xs, beam.xps(), beam.weightings(), clean=True)
+    beta_x = covx[0,0]/np.sqrt(np.linalg.det(covx))
+    covy = weighted_cov(ys, beam.yps(), beam.weightings(), clean=True)
+    beta_y = covy[0,0]/np.sqrt(np.linalg.det(covy))
+    assert np.isclose(beam.beta_x(clean=True), beta_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beta_y(clean=True), beta_y, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
 def test_gamma_xy():
     num_particles = 8989
     energy_thres = 11*SI.m_e*SI.c**2/SI.e  # [eV], 11 * particle rest energy.
@@ -776,23 +1115,102 @@ def test_gamma_xy():
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e), size=num_particles)
     Q = -SI.e * 1.0e10
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 
-    covx = weighted_cov(beam.xs(), beam.xps(), beam.weightings(), clean=False)
+    covx = weighted_cov(xs, beam.xps(), beam.weightings(), clean=False)
     gamma_x = covx[1,1]/np.sqrt(np.linalg.det(covx))
-    covy = weighted_cov(beam.ys(), beam.yps(), beam.weightings(), clean=False)
+    covy = weighted_cov(ys, beam.yps(), beam.weightings(), clean=False)
     gamma_y = covy[1,1]/np.sqrt(np.linalg.det(covy))
     assert np.isclose(beam.gamma_x(), gamma_x, rtol=1e-10, atol=0.0)
     assert np.isclose(beam.gamma_y(), gamma_y, rtol=1e-10, atol=0.0)
 
-    covx = weighted_cov(beam.xs(), beam.xps(), beam.weightings(), clean=True)
+    covx = weighted_cov(xs, beam.xps(), beam.weightings(), clean=True)
     gamma_x = covx[1,1]/np.sqrt(np.linalg.det(covx))
-    covy = weighted_cov(beam.ys(), beam.yps(), beam.weightings(), clean=True)
+    covy = weighted_cov(ys, beam.yps(), beam.weightings(), clean=True)
     gamma_y = covy[1,1]/np.sqrt(np.linalg.det(covy))
     assert np.isclose(beam.gamma_x(clean=True), gamma_x, rtol=1e-10, atol=0.0)
     assert np.isclose(beam.gamma_y(clean=True), gamma_y, rtol=1e-10, atol=0.0)
+
+
+@pytest.mark.beam
+def test_beam_size_xy():
+    
+    num_particles = 4444
+    energy_thres = 1400*SI.m_e*SI.c**2/SI.e  # [eV], 1400 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.4e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    beam_size_x = weighted_std(xs, beam.weightings(), clean=False)
+    beam_size_y = weighted_std(ys, beam.weightings(), clean=False)
+    assert np.isclose(beam.beam_size_x(clean=False), beam_size_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beam_size_y(clean=False), beam_size_y, rtol=1e-15, atol=0.0)
+
+    beam_size_x = weighted_std(xs, beam.weightings(), clean=True)
+    beam_size_y = weighted_std(ys, beam.weightings(), clean=True) 
+    assert np.isclose(beam.beam_size_x(clean=True), beam_size_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.beam_size_y(clean=True), beam_size_y, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_bunch_length():
+    num_particles = 4444
+    energy_thres = 1400*SI.m_e*SI.c**2/SI.e  # [eV], 1400 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e))
+    Q = -SI.e * 1.4e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    bunch_length = weighted_std(zs, beam.weightings(), clean=False)
+    assert np.isclose(beam.bunch_length(clean=False), bunch_length, rtol=1e-15, atol=0.0)
+
+    bunch_length = weighted_std(zs, beam.weightings(), clean=True)
+    assert np.isclose(beam.bunch_length(clean=True), bunch_length, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_divergence_xy():
+    
+    num_particles = 4444
+    energy_thres = 1400*SI.m_e*SI.c**2/SI.e  # [eV], 1400 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), size=num_particles)
+    Q = -SI.e * 1.4e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    divergence_x = weighted_std(beam.xps(), beam.weightings(), clean=False)
+    divergence_y = weighted_std(beam.yps(), beam.weightings(), clean=False)
+    assert np.isclose(beam.divergence_x(clean=False), divergence_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.divergence_y(clean=False), divergence_y, rtol=1e-15, atol=0.0)
+
+    divergence_x = weighted_std(beam.xps(), beam.weightings(), clean=True)
+    divergence_y = weighted_std(beam.yps(), beam.weightings(), clean=True)
+    assert np.isclose(beam.divergence_x(clean=True), divergence_x, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.divergence_y(clean=True), divergence_y, rtol=1e-15, atol=0.0)
 
 
 
