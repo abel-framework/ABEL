@@ -1616,7 +1616,6 @@ def test_rotate_coord_sys_3D():
     start_y_angle = 7.040999e-09   # [rad], define an angle in the zy-plane.
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=start_x_angle, y_angle=start_y_angle)
 
-    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0)
     old_beam = source.track()
     old_beam.add_pointing_tilts()  # Add an initial tilt in the zy-plane.
 
@@ -1661,6 +1660,32 @@ def test_rotate_coord_sys_3D():
             assert np.allclose(beam.uys(), old_beam.uys(), rtol=1e-7, atol=1e-13)
             assert np.isclose(beam.x_angle(), old_beam.x_angle(), rtol=1e-7, atol=1e-13)
             assert np.isclose(beam.y_angle(), old_beam.y_angle(), rtol=1e-7, atol=1e-13)
+
+    # Purpposedly trigger exceptions
+    with pytest.raises(ValueError):
+        beam = source.track()
+        axis1 = np.array([1, 1.1, 0])  # Axis as an non-unit vector.
+        axis2 = np.array([0, 1, 0])
+        axis3 = np.array([1, 0, 0])
+        beam.rotate_coord_sys_3D(axis1, angle1=nom_x_angle, axis2=axis2, angle2=nom_y_angle, axis3=axis3, angle3=0.0, invert=False)
+    with pytest.raises(ValueError):
+        beam = source.track()
+        axis1 = np.array([1, 0, 0])  # Axis as an non-unit vector.
+        axis2 = np.array([0, 0.45, 0])
+        axis3 = np.array([1, 0, 0])
+        beam.rotate_coord_sys_3D(axis1, angle1=nom_x_angle, axis2=axis2, angle2=nom_y_angle, axis3=axis3, angle3=0.0, invert=False)
+    with pytest.raises(ValueError):
+        beam = source.track()
+        axis1 = np.array([1, 0, 0])  # Axis as an non-unit vector.
+        axis2 = np.array([0, 1, 0])
+        axis3 = np.array([-0.1, 0, 0])
+        beam.rotate_coord_sys_3D(axis1, angle1=nom_x_angle, axis2=axis2, angle2=nom_y_angle, axis3=axis3, angle3=0.0, invert=False)
+    with pytest.raises(ValueError):
+        beam = source.track()
+        axis1 = np.array([1, 0, -3.14])  # Axis as an non-unit vector.
+        axis2 = np.array([0.3, 1, 0])
+        axis3 = np.array([-0.1, 0, 0])
+        beam.rotate_coord_sys_3D(axis1, angle1=nom_x_angle, axis2=axis2, angle2=nom_y_angle, axis3=axis3, angle3=0.0, invert=False)
 
 
 
