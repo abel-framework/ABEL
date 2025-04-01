@@ -2359,5 +2359,5 @@ def test_save_load():
     loaded_beam = Beam.load(filename=filename)
 
     Beam.comp_beams(beam, loaded_beam, comp_location=True, rtol=1e-15, atol=0.0)
-    Beam.comp_beams(beam, loaded_beam, comp_location=True)
+    Beam.comp_beam_params(beam, loaded_beam, comp_location=True)
     shutil.rmtree(save_dir)
