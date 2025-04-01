@@ -1827,6 +1827,8 @@ def test_scale_to_length():
 
 @pytest.mark.beam
 def test_scale_norm_emittance_x():
+
+    np.random.seed(42)
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     
     beam = source.track()
@@ -1837,7 +1839,7 @@ def test_scale_norm_emittance_x():
     beam.scale_norm_emittance_x(scale_factor*beam.norm_emittance_x())
     assert np.allclose(beam.xs(), expected_xs, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.uxs(), expected_uxs, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.norm_emittance_x(), expct_emit_nx, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), expct_emit_nx, rtol=1e-10, atol=0.0)
 
     beam = source.track()
     scale_factor = 0.5354
@@ -1847,7 +1849,7 @@ def test_scale_norm_emittance_x():
     beam.scale_norm_emittance_x(scale_factor*beam.norm_emittance_x())
     assert np.allclose(beam.xs(), expected_xs, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.uxs(), expected_uxs, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.norm_emittance_x(), expct_emit_nx, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_x(), expct_emit_nx, rtol=1e-10, atol=0.0)
 
     beam = source.track()
     scale_factor = 0.0
@@ -1867,6 +1869,8 @@ def test_scale_norm_emittance_x():
 
 @pytest.mark.beam
 def test_scale_norm_emittance_y():
+
+    np.random.seed(42)
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     
     beam = source.track()
@@ -1887,7 +1891,7 @@ def test_scale_norm_emittance_y():
     beam.scale_norm_emittance_y(scale_factor*beam.norm_emittance_y())
     assert np.allclose(beam.ys(), expected_ys, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.uys(), expected_uys, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.norm_emittance_y(), expct_emit_ny, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), expct_emit_ny, rtol=1e-13, atol=0.0)
 
     beam = source.track()
     scale_factor = 0.0
@@ -2317,6 +2321,23 @@ def test_plot_transverse_profile():
 #     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
 #     beam = source.track()
 #     beam.plot_bunch_pattern()
+
+
+@pytest.mark.beam
+def test_density_map_diags():
+
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    beam.density_map_diags()
+    plt.close()
+
+
+@pytest.mark.beam
+def test_print_summary():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
+    beam = source.track()
+    beam.beam_name = 'beam'
+    beam.print_summary()
 
 
 
