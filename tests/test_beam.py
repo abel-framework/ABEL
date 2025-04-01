@@ -508,6 +508,83 @@ def test_scale_energy():
         assert str(err) == 'Es contains values that are too small.'
 
 
+@pytest.mark.beam
+def test_rs():
+    beam = Beam()
+    num_particles = 4352
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs)
+
+    assert np.allclose(beam.rs(), np.sqrt(xs**2 + ys**2), rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_deltas():
+    beam = Beam()
+    num_particles = 4352
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    Es = np.random.normal(1e9, 0.02*1e9, num_particles)
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, Es=Es)
+
+    assert np.allclose(beam.deltas(), beam.pzs()/np.mean(beam.pzs())-1, rtol=1e-15, atol=0.0)
+    pz0 = np.mean(beam.pzs())*1.1
+    assert np.allclose(beam.deltas(pz0=pz0), beam.pzs()/pz0-1, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_transverse_vector():
+    num_particles = 8989
+    energy_thres = 11*SI.m_e*SI.c**2/SI.e  # [eV], 11 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    vector = np.zeros((4,len(beam))) 
+    vector[0,:] = beam.xs()
+    vector[1,:] = beam.xps()
+    vector[2,:] = beam.ys()
+    vector[3,:] = beam.yps()
+
+    assert np.allclose(beam.transverse_vector(), vector, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.beam
+def test_norm_transverse_vector():
+    num_particles = 8989
+    energy_thres = 11*SI.m_e*SI.c**2/SI.e  # [eV], 11 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    vector = np.zeros((4,len(beam))) 
+    vector[0,:] = beam.xs()
+    vector[1,:] = beam.uxs()/SI.c 
+    vector[2,:] = beam.ys()
+    vector[3,:] = beam.uys()/SI.c 
+
+    assert np.allclose(beam.norm_transverse_vector(), vector, rtol=1e-15, atol=0.0)
 
 
 
@@ -685,6 +762,37 @@ def test_param_calcs_generate_symm_trace_space_xyz():
     assert np.isclose(beam.geom_emittance_y(), geo_emitt_y, rtol=1e-2, atol=0.0)
     assert np.isclose(beam.norm_emittance_x(), geo_emitt_x*beam.gamma(), rtol=1e-2, atol=0.0)
     assert np.isclose(beam.norm_emittance_y(), geo_emitt_y*beam.gamma(), rtol=1e-2, atol=0.0)
+
+
+@pytest.mark.beam
+def test_gamma_xy():
+    num_particles = 8989
+    energy_thres = 11*SI.m_e*SI.c**2/SI.e  # [eV], 11 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    
+    beam = Beam()
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+    uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
+    Q = -SI.e * 1.0e10
+    beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
+
+    covx = weighted_cov(beam.xs(), beam.xps(), beam.weightings(), clean=False)
+    gamma_x = covx[1,1]/np.sqrt(np.linalg.det(covx))
+    covy = weighted_cov(beam.ys(), beam.yps(), beam.weightings(), clean=False)
+    gamma_y = covy[1,1]/np.sqrt(np.linalg.det(covy))
+    assert np.isclose(beam.gamma_x(), gamma_x, rtol=1e-10, atol=0.0)
+    assert np.isclose(beam.gamma_y(), gamma_y, rtol=1e-10, atol=0.0)
+
+    covx = weighted_cov(beam.xs(), beam.xps(), beam.weightings(), clean=True)
+    gamma_x = covx[1,1]/np.sqrt(np.linalg.det(covx))
+    covy = weighted_cov(beam.ys(), beam.yps(), beam.weightings(), clean=True)
+    gamma_y = covy[1,1]/np.sqrt(np.linalg.det(covy))
+    assert np.isclose(beam.gamma_x(clean=True), gamma_x, rtol=1e-10, atol=0.0)
+    assert np.isclose(beam.gamma_y(clean=True), gamma_y, rtol=1e-10, atol=0.0)
 
 
 
@@ -1786,5 +1894,6 @@ def test_save_load():
     beam.save(filename=filename)
     loaded_beam = Beam.load(filename=filename)
 
-    Beam.comp_beams(beam, loaded_beam, rtol=1e-15, atol=0.0)
+    Beam.comp_beams(beam, loaded_beam, comp_location=True, rtol=1e-15, atol=0.0)
+    Beam.comp_beams(beam, loaded_beam, comp_location=True)
     shutil.rmtree(save_dir)
