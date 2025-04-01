@@ -102,6 +102,18 @@ def test_initialization():
     assert beam.stage_number == 0
     assert beam.location == 0
 
+    # Purposedly trigger exceptions
+    with pytest.raises(ValueError):
+        beam = Beam(num_particles=-1)  # Should raise an error if attempted to initiate with negative number of particles.
+    with pytest.raises(ValueError):
+        beam = Beam(num_particles=1000.2)
+    with pytest.raises(ValueError):
+        beam = Beam(num_bunches_in_train=-1)
+    with pytest.raises(ValueError):
+        beam = Beam(num_bunches_in_train=1300.2)
+    with pytest.raises(ValueError):
+        beam = Beam(bunch_separation=-1)
+
 
 @pytest.mark.beam
 def test_set_phase_space():
@@ -115,7 +127,7 @@ def test_set_phase_space():
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
 
-    energy_thres = 1001*SI.m_e*SI.c**2/SI.e  # [eV], 1000 * particle rest energy.
+    energy_thres = 13*SI.m_e*SI.c**2/SI.e  # [eV], 13 * particle rest energy.
     uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
     uzs = random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e))
 
@@ -274,6 +286,12 @@ def test_reset_phase_space():
     assert beam._Beam__phasespace.shape == (8, 10)
     assert (beam._Beam__phasespace == 0).all()
 
+    # Purposedly trigger exceptions
+    with pytest.raises(ValueError):
+        beam.reset_phase_space(-11)  # Should raise an error if attempted to initiate with negative number of particles.
+    with pytest.raises(ValueError):
+        beam.reset_phase_space(10.001)
+
 
 @pytest.mark.beam
 def test_delitem():
@@ -351,21 +369,38 @@ def test_len():
     assert len(beam) == num_particles
 
 
-# @pytest.mark.beam TODO
-# def test_str():
-#     "Test the __str__ method for correct formatting of beam properties."
-#     beam = Beam()
-#     beam.reset_phase_space(5)
-#     string_repr = str(beam)
-#     assert "Beam:" in string_repr
-#     assert "5 macroparticles" in string_repr
+@pytest.mark.beam
+def test_str():
+    "Test the __str__ method for correct formatting of beam properties."
+
+    beam = Beam()
+    num_particles = 5
+    beam.reset_phase_space(num_particles)
+    beam_str = str(beam)
+    assert "Beam:" in beam_str
+    assert "0.00 nC" in beam_str
+    assert str(num_particles) + " macroparticles" in beam_str
+
+    num_particles = 5005
+    Es = np.random.normal(151.567e9, 0.02*151.567e9, num_particles)
+    qs = np.full(num_particles, -1.5e10*SI.e/num_particles)
+    beam = Beam()
+    beam.reset_phase_space(num_particles)
+    beam.particle_mass = SI.m_e
+    beam.set_qs(qs)
+    beam.set_Es(Es)
+    beam_str = str(beam)
+    assert "Beam:" in beam_str
+    assert "{:.2f}".format(-1.5e10*SI.e*1e9) in beam_str
+    assert str(num_particles) + " macroparticles" in beam_str
+    assert "{:.2f}".format(beam.energy()/1e9) + " GeV" in beam_str
 
 
 @pytest.mark.beam
 def test_copy_particle_charge():
 
     num_particles = 8051
-    energy_thres = 1001*SI.m_e*SI.c**2/SI.e  # [eV], 1000 * particle rest energy.
+    energy_thres = 11*SI.m_e*SI.c**2/SI.e  # [eV], 11 * particle rest energy.
     uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
     
     beam1 = Beam()
@@ -392,6 +427,22 @@ def test_copy_particle_charge():
 
     beam1.copy_particle_charge(beam2)
     assert (beam1._Beam__phasespace[6, :] == median_charge).all()  # Verify charge is copied correctly
+
+    # Purposedly trigger exceptions
+    with pytest.raises(ValueError):
+        beam1 = Beam()
+        beam2 = Beam()
+        beam1.copy_particle_charge(beam2)
+    with pytest.raises(ValueError):
+        beam1 = Beam()
+        beam2 = Beam()
+        beam2.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs, weightings=ws)
+        beam1.copy_particle_charge(beam2)
+    with pytest.raises(ValueError):
+        beam1 = Beam()
+        beam2 = Beam()
+        beam1.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs, weightings=ws)
+        beam1.copy_particle_charge(beam2)
 
 
 @pytest.mark.beam
@@ -455,6 +506,9 @@ def test_scale_energy():
         beam.scale_energy(0)
     except ValueError as err:
         assert str(err) == 'Es contains values that are too small.'
+
+
+
 
 
 
@@ -1720,7 +1774,6 @@ def test_plot_transverse_profile():
 def test_save_load():
 
     import os
-    #from abel.classes.beam import comp_beams
 
     source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, rel_energy_spread=0.01, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0)
     beam = source.track()
