@@ -644,6 +644,30 @@ def test_scale_energy():
 
 
 @pytest.mark.beam
+def test_remove_halo_particles():
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3e9, z_offset=0.0, x_offset=0.1516e-6, y_offset=-5.354e-6, x_angle=-1.3e-6, y_angle=0.7e-6)
+    beam = source.track()
+    initial_beam = copy.deepcopy(beam)
+
+    nsigma = 3
+    xfilter = np.abs(beam.xs()-beam.x_offset(clean=True)) > nsigma*beam.beam_size_x(clean=True)
+    xpfilter = np.abs(beam.xps()-beam.x_angle(clean=True)) > nsigma*beam.divergence_x(clean=True)
+    yfilter = np.abs(beam.ys()-beam.y_offset(clean=True)) > nsigma*beam.beam_size_y(clean=True)
+    ypfilter = np.abs(beam.yps()-beam.y_angle(clean=True)) > nsigma*beam.divergence_y(clean=True)
+    filter = np.logical_or(np.logical_or(xfilter, xpfilter), np.logical_or(yfilter, ypfilter))
+    count = np.count_nonzero(filter)  # Number of particles to be filtered away.
+    num_particles_left = len(beam) - count
+
+    beam.remove_halo_particles(nsigma=3)
+
+    assert len(beam) == num_particles_left
+    assert np.all( np.abs(beam.xs()-beam.x_offset(clean=True)) < nsigma*initial_beam.beam_size_x(clean=True) )
+    assert np.all( np.abs(beam.xps()-beam.x_angle(clean=True)) < nsigma*initial_beam.divergence_x(clean=True) )
+    assert np.all( np.abs(beam.ys()-beam.y_offset(clean=True)) < nsigma*initial_beam.beam_size_y(clean=True) )
+    assert np.all( np.abs(beam.yps()-beam.y_angle(clean=True)) < nsigma*initial_beam.divergence_y(clean=True) )
+
+
+@pytest.mark.beam
 def test_rs():
     beam = Beam()
     num_particles = 4352
