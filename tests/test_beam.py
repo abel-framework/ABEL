@@ -279,6 +279,141 @@ def test_set_phase_space4():
 
 
 @pytest.mark.beam
+def test_set_phase_space5():
+    "Verify that the phase space is set correctly."
+    
+    num_particles = 10042
+    Q = -SI.e * 1.0e10
+    xs = np.random.rand(num_particles)
+    ys = np.random.rand(num_particles)
+    zs = np.random.rand(num_particles)
+    uxs = np.random.rand(num_particles)
+    uys = np.random.rand(num_particles)
+
+    energy_thres = 13*SI.m_e*SI.c**2/SI.e  # [eV], 13 * particle rest energy.
+    uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=SI.m_e)
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(10e12, unit='eV', m=SI.m_e), size=num_particles)
+    pz_thres = gamma2momentum(energy2gamma(energy_thres, unit='eV', m=SI.m_e))
+    pzs = np.random.normal(pz_thres, 0.02*pz_thres, num_particles)
+    Es = np.random.normal(energy_thres, 0.02*energy_thres, num_particles)
+
+
+    ## Purposedly trigger exceptions
+    # Coordinates type and length
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, 3.14, ys, 1.0)
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, 1.0)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, np.random.rand(num_particles+1), ys, zs)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, np.random.rand(num_particles-1), zs)
+
+    # Momenta type and length
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs=2.9)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, np.random.rand(num_particles+1), uys, uzs)
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs, 15.16, uzs)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs, np.random.rand(num_particles-1), uzs)
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uz_thres)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs, uys, np.append(uzs, uz_thres))
+
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pxs=2.9)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pxs=np.random.rand(num_particles+1), pys=uys, pzs=pzs)
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pxs=uxs, pys=15.16, pzs=pzs)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pxs=uxs, pys=np.random.rand(num_particles-1), pzs=pzs)
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pxs=uxs, pys=uys, pzs=1.6e-18)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pxs=uxs, pys=uys, pzs=np.append(pzs, 1.6e-18))
+
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, xps=2.9)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, xps=np.random.rand(num_particles+1))
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, xps=uxs, yps=15.16)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, xps=uxs, yps=np.random.rand(num_particles-1), Es=Es)
+    with pytest.raises(TypeError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, xps=uxs, yps=uys, Es=100e9)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, xps=uxs, yps=uys, Es=np.append(Es, 10e9))
+
+    # Define proper velocity, momentum or angle in the same direction
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs=uxs, pxs=uxs)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs=uxs, xps=uxs)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pxs=uxs, xps=uxs)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uys=uys, pys=uys)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uys=uys, yps=uys)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pys=uys, yps=uys)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uzs=uys, pzs=pzs)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uzs=uzs, Es=Es)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pzs=pzs, Es=Es)
+    
+    # Set energies below the accepted threshold
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs=np.random.rand(num_particles))
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, pzs=pzs*0.01)
+    with pytest.raises(ValueError):
+        beam = Beam()
+        beam.set_phase_space(Q, xs, ys, zs, Es=np.random.rand(num_particles))
+    
+
+
+@pytest.mark.beam
 def test_reset_phase_space():
     "Test reset_phase_space to ensure it initializes an 8xN zero matrix for the specified number of particles."
     beam = Beam()
@@ -1174,7 +1309,7 @@ def test_bunch_length():
     zs = np.random.rand(num_particles)
     uxs = np.random.rand(num_particles)
     uys = np.random.rand(num_particles)
-    uzs = random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e))
+    uzs = np.random.uniform(uz_thres, energy2proper_velocity(energy_thres*1.01, unit='eV', m=SI.m_e), num_particles)
     Q = -SI.e * 1.4e10
     beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs)
 

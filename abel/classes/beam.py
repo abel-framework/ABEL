@@ -64,9 +64,127 @@ class Beam():
         
     # set phase space
     def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None, particle_mass=SI.m_e):
+        """
+        Set the phase space of the beam. All input arrays must have the same lengths.
+
+        Parameters
+        ----------
+        Q : [C], float
+            Total beam charge.
+
+        xs, ys, zs: [m], 1D ndarray
+            Coordinates for the macroparticles.
+            
+        uxs, uys, uzs: [m/s], 1D ndarray, optional
+            Proper velocities for the macroparticles. All uzs values must be above 10*particle rest energy/c/particle mass. Default set to ``None``.
+            
+        pxs, pys, pzs: [kg m/s], 1D ndarray, optional
+            Momenta for the macroparticles. All pzs values must be above 10*particle rest energy/c. Default set to ``None``.
         
-        # make empty phase space
+        xps, yps: [rad], 1D ndarray, optional
+            Angles dx/ds and dy/ds for the macroparticles. Default set to ``None``.
+
+        Es : [eV], 1D ndarray, optional
+            Energies for the macroparticles. All values must be above 10*particle rest energy. Default set to ``None``.
+
+        weightings : 1D ndarray, optional
+            Weights for the macroparticles. Default set to ``None``.
+
+        particle_mass : [kg], float, optional
+            Particle mass for a single real particle. Default set to ``SI.m_e``.
+        
+            
+        Returns
+        ----------
+        ``None``
+        """
+
+        # Check coordinate type and length
+        if not isinstance(xs, np.ndarray)  or not isinstance(ys, np.ndarray) or not isinstance(zs, np.ndarray):
+            raise TypeError('Incompatible input type.')
+        
         num_particles = len(xs)
+        if len(ys) != num_particles or len(zs) != num_particles:
+            raise ValueError('The input arrays must have the same lengths.')
+        
+        # Check proper velocity type and length
+        if uxs is not None:
+            if not isinstance(uxs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(uxs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if uys is not None:
+            if not isinstance(uys, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(uys) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if uzs is not None:
+            if not isinstance(uzs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(uzs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+            
+        # Check momentum type and length
+        if pxs is not None:
+            if not isinstance(pxs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(pxs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if pys is not None:
+            if not isinstance(pys, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(pys) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if pzs is not None:
+            if not isinstance(pzs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(pzs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+            
+        # Check angle type and length
+        if xps is not None:
+            if not isinstance(xps, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(xps) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if yps is not None:
+            if not isinstance(yps, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(yps) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+            
+        # Check energy type and length
+        if Es is not None:
+            if not isinstance(Es, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(Es) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        
+        # Prevent defining proper velocity, momentum or angle in the same direction
+        if uxs is not None and pxs is not None:
+            raise ValueError('Cannot define proper velocity and momentum in the same direction.')
+        if uxs is not None and xps is not None:
+            raise ValueError('Cannot define proper velocity and angle in the same direction.')
+        if pxs is not None and xps is not None:
+            raise ValueError('Cannot define momentum and angle in the same direction.')
+        if uys is not None and pys is not None:
+            raise ValueError('Cannot define proper velocity and momentum in the same direction.')
+        if uys is not None and yps is not None:
+            raise ValueError('Cannot define proper velocity and angle in the same direction.')
+        if pys is not None and yps is not None:
+            raise ValueError('Cannot define momentum and angle in the same direction.')
+        if uzs is not None and pzs is not None:
+            raise ValueError('Cannot define proper velocity and momentum in the same direction.')
+        if uzs is not None and Es is not None:
+            raise ValueError('Cannot set both uzs and Es.')
+        if pzs is not None and Es is not None:
+            raise ValueError('Cannot set both pzs and Es.')
+        
+        if particle_mass is not None and particle_mass < 0:
+            raise ValueError('Particle mass cannot be negative.')
+
+
+        # make empty phase space
         self.reset_phase_space(num_particles)
         
         # add positions
