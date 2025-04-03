@@ -505,237 +505,6 @@ class Beam():
         vector[3,:] = self.uys()/SI.c
         return vector
 
-    
-
-    ## BEAM STATISTICS
-
-    def total_particles(self):
-        return int(np.nansum(self.weightings()))
-    
-    def charge(self):
-        return np.nansum(self.qs())
-    
-    def abs_charge(self):
-        return abs(self.charge())
-    
-    def charge_sign(self):
-        if self.charge() == 0:
-            return 1.0
-        else:
-            return self.charge()/abs(self.charge())
-    
-    def energy(self, clean=False):
-        return weighted_mean(self.Es(), self.weightings(), clean)
-    
-    def gamma(self, clean=False):
-        return weighted_mean(self.gammas(), self.weightings(), clean)
-    
-    def total_energy(self):
-        return SI.e * np.nansum(self.weightings()*self.Es())
-    
-    def energy_spread(self, clean=False):
-        return weighted_std(self.Es(), self.weightings(), clean)
-    
-    def rel_energy_spread(self, clean=False):
-        return self.energy_spread(clean)/self.energy(clean)
-    
-    def z_offset(self, clean=False):
-        return weighted_mean(self.zs(), self.weightings(), clean)
-    
-    def bunch_length(self, clean=False):
-        return weighted_std(self.zs(), self.weightings(), clean)
-    
-    def x_offset(self, clean=False):
-        return weighted_mean(self.xs(), self.weightings(), clean)
-    
-    def beam_size_x(self, clean=False):
-        return weighted_std(self.xs(), self.weightings(), clean)
-
-    def y_offset(self, clean=False):
-        return weighted_mean(self.ys(), self.weightings(), clean)
-
-    def beam_size_y(self, clean=False):
-        return weighted_std(self.ys(), self.weightings(), clean)
-    
-    def x_angle(self, clean=False):
-        return weighted_mean(self.xps(), self.weightings(), clean)
-    
-    def divergence_x(self, clean=False):
-        return weighted_std(self.xps(), self.weightings(), clean)
-
-    def y_angle(self, clean=False):
-        return weighted_mean(self.yps(), self.weightings(), clean)
-    
-    def divergence_y(self, clean=False):
-        return weighted_std(self.yps(), self.weightings(), clean)
-    
-    def ux_offset(self, clean=False):
-        return weighted_mean(self.uxs(), self.weightings(), clean)
-    
-    def uy_offset(self, clean=False):
-        return weighted_mean(self.uys(), self.weightings(), clean)
-    
-    def uz_offset(self, clean=False):
-        return weighted_mean(self.uzs(), self.weightings(), clean)
-
-    
-    def geom_emittance_x(self, clean=False):
-        return np.sqrt(np.linalg.det(weighted_cov(self.xs(), self.xps(), self.weightings(), clean)))
-    
-    def geom_emittance_y(self, clean=False):
-        return np.sqrt(np.linalg.det(weighted_cov(self.ys(), self.yps(), self.weightings(), clean)))
-    
-    def norm_emittance_x(self, clean=False):
-        return np.sqrt(np.linalg.det(weighted_cov(self.xs(), self.uxs()/SI.c, self.weightings(), clean)))
-    
-    def norm_emittance_y(self, clean=False):
-        return np.sqrt(np.linalg.det(weighted_cov(self.ys(), self.uys()/SI.c, self.weightings(), clean)))
-    
-    def beta_x(self, clean=False):
-        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
-        return covx[0,0]/np.sqrt(np.linalg.det(covx))
-    
-    def beta_y(self, clean=False):
-        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
-        return covy[0,0]/np.sqrt(np.linalg.det(covy))
-    
-    def alpha_x(self, clean=False):
-        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
-        return -covx[1,0]/np.sqrt(np.linalg.det(covx))
-    
-    def alpha_y(self, clean=False):
-        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
-        return -covy[1,0]/np.sqrt(np.linalg.det(covy))
-    
-    def gamma_x(self, clean=False):
-        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
-        return covx[1,1]/np.sqrt(np.linalg.det(covx))
-    
-    def gamma_y(self, clean=False):
-        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
-        return covy[1,1]/np.sqrt(np.linalg.det(covy))
-
-    def intrinsic_emittance(self):
-        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
-        return np.sqrt(np.sqrt(np.linalg.det(covxy)))
-
-    def angular_momentum(self):
-        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
-        det_covxy_cross = np.linalg.det(covxy[2:4,0:2])
-        return np.sign(covxy[3,0]-covxy[2,1])*np.sqrt(np.abs(det_covxy_cross))
-
-    def eigen_emittance_max(self):
-        return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) + self.angular_momentum()
-
-    def eigen_emittance_min(self):
-        return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
-
-    def norm_amplitude_x(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
-            beta_x = beta_matched(plasma_density, self.energy())
-            alpha_x = 0
-        else:
-            covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
-            emgx = np.sqrt(np.linalg.det(covx))
-            beta_x = covx[0,0]/emgx
-            alpha_x = -covx[1,0]/emgx
-        return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
-        
-    def norm_amplitude_y(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
-            beta_y = beta_matched(plasma_density, self.energy())
-            alpha_y = 0
-        else:
-            covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
-            emgy = np.sqrt(np.linalg.det(covy))
-            beta_y = covy[0,0]/emgy
-            alpha_y = -covy[1,0]/emgy
-        return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
-        
-    def peak_density(self):  # TODO: this is only valid for Gaussian beams.
-        return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
-    
-    def peak_current(self):
-        Is, _ = self.current_profile()
-        return max(abs(Is))
-    
-
-    ## BEAM HALO CLEANING (EXTREME OUTLIERS)
-    def remove_halo_particles(self, nsigma=20):
-        xfilter = np.abs(self.xs()-self.x_offset(clean=True)) > nsigma*self.beam_size_x(clean=True)
-        xpfilter = np.abs(self.xps()-self.x_angle(clean=True)) > nsigma*self.divergence_x(clean=True)
-        yfilter = np.abs(self.ys()-self.y_offset(clean=True)) > nsigma*self.beam_size_y(clean=True)
-        ypfilter = np.abs(self.yps()-self.y_angle(clean=True)) > nsigma*self.divergence_y(clean=True)
-        filter = np.logical_or(np.logical_or(xfilter, xpfilter), np.logical_or(yfilter, ypfilter))
-        del self[filter]
-
-    
-    ## BEAM PROJECTIONS
-    
-    def projected_density(self, fcn, bins=None):
-        if bins is None:
-            Nbins = int(np.sqrt(len(self)/2))
-            bins = np.linspace(min(fcn()), max(fcn()), Nbins)
-        counts, edges = np.histogram(fcn(), weights=self.qs(), bins=bins)
-        ctrs = (edges[0:-1] + edges[1:])/2
-        proj = counts/np.diff(edges)
-        return proj, ctrs
-        
-    def current_profile(self, bins=None):
-        return self.projected_density(self.ts, bins=bins)
-    
-    def longitudinal_num_density(self, bins=None):
-        dQdz, zs = self.projected_density(self.zs, bins=bins)
-        dNdz = dQdz / SI.e / self.charge_sign()
-        return dNdz, zs
-    
-    def energy_spectrum(self, bins=None):
-        return self.projected_density(self.Es, bins=bins)
-    
-    def rel_energy_spectrum(self, nom_energy=None, bins=None):
-        if nom_energy is None:
-            nom_energy = self.energy()
-        return self.projected_density(lambda: self.Es()/nom_energy-1, bins=bins)
-    
-    def transverse_profile_x(self, bins=None):
-        return self.projected_density(self.xs, bins=bins)
-    
-    def transverse_profile_y(self, bins=None):
-        return self.projected_density(self.ys, bins=bins)
-
-    def transverse_profile_xp(self, bins=None):
-        return self.projected_density(self.xps, bins=bins)
-    
-    def transverse_profile_yp(self, bins=None):
-        return self.projected_density(self.yps, bins=bins)
-    
-    ## phase spaces
-    
-    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
-        self.remove_nans()
-        if hbins is None:
-            hbins = round(np.sqrt(len(self))/2)
-        if vbins is None:
-            vbins = round(np.sqrt(len(self))/2)
-        counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
-        hctrs = (hedges[0:-1] + hedges[1:])/2
-        vctrs = (vedges[0:-1] + vedges[1:])/2
-        density = (counts/np.diff(vedges)).T/np.diff(hedges)
-
-        #dx = np.diff(hedges)
-        #dy = np.diff(vedges)
-        #bin_areas = dx[:, None] * dy[None, :]
-        #density = counts/bin_areas
-        #print(np.sum(density*np.diff(vedges)*np.diff(hedges))/self.charge())
-        return density, hctrs, vctrs
-    
-    def density_lps(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
-    
-    def density_transverse(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)
-
-
 ## Rotate the coordinate system of the beam
     # ==================================================
     def rotate_coord_sys_3D(self, axis1, angle1, axis2=np.array([0, 1, 0]), angle2=0.0, axis3=np.array([1, 0, 0]), angle3=0.0, invert=False):
@@ -1022,10 +791,7 @@ class Beam():
         return np.arctan(slope)
 
     
-    # # ==================================================
-    # def y_tilt_angle(self, clean=False):
-    #     return np.arcsin(self.uy_offset(clean=clean)/self.uz_offset(clean=clean))
-    
+    # ==================================================
     def y_tilt_angle(self, z_cutoff=None):
         "Retrieve the tilt angle of the beam in the zy-plane. WARNING: becomes unreliable around > 1e-4 rad."
         if z_cutoff is None:
@@ -1036,7 +802,235 @@ class Beam():
         slope, _ = np.polyfit(z_centroids, y_centroids, 1)
         
         return np.arctan(slope)
+
+    ## BEAM STATISTICS
+
+    def total_particles(self):
+        return int(np.nansum(self.weightings()))
     
+    def charge(self):
+        return np.nansum(self.qs())
+    
+    def abs_charge(self):
+        return abs(self.charge())
+    
+    def charge_sign(self):
+        if self.charge() == 0:
+            return 1.0
+        else:
+            return self.charge()/abs(self.charge())
+    
+    def energy(self, clean=False):
+        return weighted_mean(self.Es(), self.weightings(), clean)
+    
+    def gamma(self, clean=False):
+        return weighted_mean(self.gammas(), self.weightings(), clean)
+    
+    def total_energy(self):
+        return SI.e * np.nansum(self.weightings()*self.Es())
+    
+    def energy_spread(self, clean=False):
+        return weighted_std(self.Es(), self.weightings(), clean)
+    
+    def rel_energy_spread(self, clean=False):
+        return self.energy_spread(clean)/self.energy(clean)
+    
+    def z_offset(self, clean=False):
+        return weighted_mean(self.zs(), self.weightings(), clean)
+    
+    def bunch_length(self, clean=False):
+        return weighted_std(self.zs(), self.weightings(), clean)
+    
+    def x_offset(self, clean=False):
+        return weighted_mean(self.xs(), self.weightings(), clean)
+    
+    def beam_size_x(self, clean=False):
+        return weighted_std(self.xs(), self.weightings(), clean)
+
+    def y_offset(self, clean=False):
+        return weighted_mean(self.ys(), self.weightings(), clean)
+
+    def beam_size_y(self, clean=False):
+        return weighted_std(self.ys(), self.weightings(), clean)
+    
+    def x_angle(self, clean=False):
+        return weighted_mean(self.xps(), self.weightings(), clean)
+    
+    def divergence_x(self, clean=False):
+        return weighted_std(self.xps(), self.weightings(), clean)
+
+    def y_angle(self, clean=False):
+        return weighted_mean(self.yps(), self.weightings(), clean)
+    
+    def divergence_y(self, clean=False):
+        return weighted_std(self.yps(), self.weightings(), clean)
+    
+    def ux_offset(self, clean=False):
+        return weighted_mean(self.uxs(), self.weightings(), clean)
+    
+    def uy_offset(self, clean=False):
+        return weighted_mean(self.uys(), self.weightings(), clean)
+    
+    def uz_offset(self, clean=False):
+        return weighted_mean(self.uzs(), self.weightings(), clean)
+
+    
+    def geom_emittance_x(self, clean=False):
+        return np.sqrt(np.linalg.det(weighted_cov(self.xs(), self.xps(), self.weightings(), clean)))
+    
+    def geom_emittance_y(self, clean=False):
+        return np.sqrt(np.linalg.det(weighted_cov(self.ys(), self.yps(), self.weightings(), clean)))
+    
+    def norm_emittance_x(self, clean=False):
+        return np.sqrt(np.linalg.det(weighted_cov(self.xs(), self.uxs()/SI.c, self.weightings(), clean)))
+    
+    def norm_emittance_y(self, clean=False):
+        return np.sqrt(np.linalg.det(weighted_cov(self.ys(), self.uys()/SI.c, self.weightings(), clean)))
+    
+    def beta_x(self, clean=False):
+        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
+        return covx[0,0]/np.sqrt(np.linalg.det(covx))
+    
+    def beta_y(self, clean=False):
+        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
+        return covy[0,0]/np.sqrt(np.linalg.det(covy))
+    
+    def alpha_x(self, clean=False):
+        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
+        return -covx[1,0]/np.sqrt(np.linalg.det(covx))
+    
+    def alpha_y(self, clean=False):
+        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
+        return -covy[1,0]/np.sqrt(np.linalg.det(covy))
+    
+    def gamma_x(self, clean=False):
+        covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
+        return covx[1,1]/np.sqrt(np.linalg.det(covx))
+    
+    def gamma_y(self, clean=False):
+        covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
+        return covy[1,1]/np.sqrt(np.linalg.det(covy))
+
+    def intrinsic_emittance(self):
+        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
+        return np.sqrt(np.sqrt(np.linalg.det(covxy)))
+
+    def angular_momentum(self):
+        covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
+        det_covxy_cross = np.linalg.det(covxy[2:4,0:2])
+        return np.sign(covxy[3,0]-covxy[2,1])*np.sqrt(np.abs(det_covxy_cross))
+
+    def eigen_emittance_max(self):
+        return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) + self.angular_momentum()
+
+    def eigen_emittance_min(self):
+        return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
+
+    def norm_amplitude_x(self, plasma_density=None, clean=False):
+        if plasma_density is not None:
+            beta_x = beta_matched(plasma_density, self.energy())
+            alpha_x = 0
+        else:
+            covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
+            emgx = np.sqrt(np.linalg.det(covx))
+            beta_x = covx[0,0]/emgx
+            alpha_x = -covx[1,0]/emgx
+        return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
+        
+    def norm_amplitude_y(self, plasma_density=None, clean=False):
+        if plasma_density is not None:
+            beta_y = beta_matched(plasma_density, self.energy())
+            alpha_y = 0
+        else:
+            covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
+            emgy = np.sqrt(np.linalg.det(covy))
+            beta_y = covy[0,0]/emgy
+            alpha_y = -covy[1,0]/emgy
+        return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
+        
+    def peak_density(self):  # TODO: this is only valid for Gaussian beams.
+        return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
+    
+    def peak_current(self):
+        Is, _ = self.current_profile()
+        return max(abs(Is))
+    
+
+    ## BEAM HALO CLEANING (EXTREME OUTLIERS)
+    def remove_halo_particles(self, nsigma=20):
+        xfilter = np.abs(self.xs()-self.x_offset(clean=True)) > nsigma*self.beam_size_x(clean=True)
+        xpfilter = np.abs(self.xps()-self.x_angle(clean=True)) > nsigma*self.divergence_x(clean=True)
+        yfilter = np.abs(self.ys()-self.y_offset(clean=True)) > nsigma*self.beam_size_y(clean=True)
+        ypfilter = np.abs(self.yps()-self.y_angle(clean=True)) > nsigma*self.divergence_y(clean=True)
+        filter = np.logical_or(np.logical_or(xfilter, xpfilter), np.logical_or(yfilter, ypfilter))
+        del self[filter]
+
+    
+    ## BEAM PROJECTIONS
+    
+    def projected_density(self, fcn, bins=None):
+        if bins is None:
+            Nbins = int(np.sqrt(len(self)/2))
+            bins = np.linspace(min(fcn()), max(fcn()), Nbins)
+        counts, edges = np.histogram(fcn(), weights=self.qs(), bins=bins)
+        ctrs = (edges[0:-1] + edges[1:])/2
+        proj = counts/np.diff(edges)
+        return proj, ctrs
+        
+    def current_profile(self, bins=None):
+        return self.projected_density(self.ts, bins=bins)
+    
+    def longitudinal_num_density(self, bins=None):
+        dQdz, zs = self.projected_density(self.zs, bins=bins)
+        dNdz = dQdz / SI.e / self.charge_sign()
+        return dNdz, zs
+    
+    def energy_spectrum(self, bins=None):
+        return self.projected_density(self.Es, bins=bins)
+    
+    def rel_energy_spectrum(self, nom_energy=None, bins=None):
+        if nom_energy is None:
+            nom_energy = self.energy()
+        return self.projected_density(lambda: self.Es()/nom_energy-1, bins=bins)
+    
+    def transverse_profile_x(self, bins=None):
+        return self.projected_density(self.xs, bins=bins)
+    
+    def transverse_profile_y(self, bins=None):
+        return self.projected_density(self.ys, bins=bins)
+
+    def transverse_profile_xp(self, bins=None):
+        return self.projected_density(self.xps, bins=bins)
+    
+    def transverse_profile_yp(self, bins=None):
+        return self.projected_density(self.yps, bins=bins)
+    
+    ## phase spaces
+    
+    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
+        self.remove_nans()
+        if hbins is None:
+            hbins = round(np.sqrt(len(self))/2)
+        if vbins is None:
+            vbins = round(np.sqrt(len(self))/2)
+        counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
+        hctrs = (hedges[0:-1] + hedges[1:])/2
+        vctrs = (vedges[0:-1] + vedges[1:])/2
+        density = (counts/np.diff(vedges)).T/np.diff(hedges)
+
+        #dx = np.diff(hedges)
+        #dy = np.diff(vedges)
+        #bin_areas = dx[:, None] * dy[None, :]
+        #density = counts/bin_areas
+        #print(np.sum(density*np.diff(vedges)*np.diff(hedges))/self.charge())
+        return density, hctrs, vctrs
+    
+    def density_lps(self, hbins=None, vbins=None):
+        return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
+    
+    def density_transverse(self, hbins=None, vbins=None):
+        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)
+
     
     # ==================================================
     # TODO: Currently does not reproduce the correct peak density for Gaussian beams unless the bin numbers are adjusted manually.
