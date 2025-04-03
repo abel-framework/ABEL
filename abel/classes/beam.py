@@ -1399,7 +1399,39 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False):
+        """
+        Evolve the beam by solving Hill's equation.
+
+        Parameters
+        ----------
+        L : [m] float
+            The beam propagation distance.
+
+        n0 : [m^-3] float
+            Plasme number density.
+
+        deltaEs : [m^-3] 1D float ndarray
+            Energy change for the macroparticles.
+
+        x0_driver, y0_driver : [m] float, optional
+            Initial transverse offsets of the drive beam. Defaults set to 0.
+        
+        radiation_reaction : bool
+            Flag for enabling ating radiation reaction.
+        
+        calc_evolution : bool
+            Flag for recording the beam parameter evolution. 
+
+
+        Returns
+        ----------
+        Es_final : [eV] 1D float ndarray
+            The final energies for all macroparticles.
+        
+        evol : SimpleNamespace object
+            only returns when ``calc_evolution=True``. Contains beam parameter evolution data.
+        """
         
         # remove particles with subzero and Nan energy
         neg_indices = self.Es() < 0
@@ -1418,7 +1450,7 @@ class Beam():
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
-        if calc_evolution:
+        if calc_evolution:  # TODO: This seems to be very clumsy. Consider re-writing.
                 
             # calculate evolution
             num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
