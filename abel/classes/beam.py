@@ -1591,6 +1591,167 @@ class Beam():
     #     ax.set_ylabel('Beam current (kA)')
         
 
+  
+    ## SAVE AND LOAD BEAM
+    
+    def filename(self, runnable, beam_name):
+        return runnable.shot_path() + "/" + beam_name + "_" + str(self.trackable_number).zfill(3) + "_{:012.6F}".format(self.location) + ".h5"
+    
+    
+    # save beam (to OpenPMD format)
+    def save(self, runnable=None, filename=None, beam_name="beam", series=None):
+        
+        if len(self) == 0:
+            return
+        
+        # make new file if not provided
+        if series is None:
+
+            # open a new file
+            if runnable is not None:
+                filename = self.filename(runnable, beam_name)
+            
+            # open a new file
+            series = io.Series(filename, io.Access.create)
+            
+        
+            # add metadata
+            series.author = "ABEL (the Adaptable Beginning-to-End Linac simulation framework)"
+            series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
+
+        # make step (only one)
+        index = 0
+        iteration = series.iterations[index]
+        
+        # add attributes
+        iteration.set_attribute("time", self.location/SI.c)
+        for key, value in self.__dict__.items():
+            if not "__phasespace" in key:
+                iteration.set_attribute(key, value)
+                
+        # make beam record
+        particles = iteration.particles[beam_name]
+       
+        # generate datasets
+        dset_z = io.Dataset(self.zs().dtype, extent=self.zs().shape)
+        dset_x = io.Dataset(self.xs().dtype, extent=self.xs().shape)
+        dset_y = io.Dataset(self.ys().dtype, extent=self.ys().shape)
+        dset_zoff = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_xoff = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_yoff = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_uz = io.Dataset(self.uzs().dtype, extent=self.uzs().shape)
+        dset_ux = io.Dataset(self.uxs().dtype, extent=self.uxs().shape)
+        dset_uy = io.Dataset(self.uys().dtype, extent=self.uys().shape)
+        dset_w = io.Dataset(self.weightings().dtype, extent=self.weightings().shape)
+        dset_id = io.Dataset(self.ids().dtype, extent=self.ids().shape)
+        dset_q = io.Dataset(np.dtype('float64'), extent=[1])
+        dset_m = io.Dataset(np.dtype('float64'), extent=[1])
+        
+        dset_n = io.Dataset(self.ids().dtype, extent=[1])
+        dset_f = io.Dataset(np.dtype('float64'), extent=[1])
+        
+        # prepare for writing
+        particles['position']['z'].reset_dataset(dset_z)
+        particles['position']['x'].reset_dataset(dset_x)
+        particles['position']['y'].reset_dataset(dset_y)
+        particles['positionOffset']['z'].reset_dataset(dset_zoff)
+        particles['positionOffset']['x'].reset_dataset(dset_xoff)
+        particles['positionOffset']['y'].reset_dataset(dset_yoff)
+        particles['momentum']['z'].reset_dataset(dset_uz)
+        particles['momentum']['x'].reset_dataset(dset_ux)
+        particles['momentum']['y'].reset_dataset(dset_uy)
+        particles['weighting'][io.Record_Component.SCALAR].reset_dataset(dset_w)
+        particles['id'][io.Record_Component.SCALAR].reset_dataset(dset_id)        
+        particles['charge'][io.Record_Component.SCALAR].reset_dataset(dset_q)
+        particles['mass'][io.Record_Component.SCALAR].reset_dataset(dset_m)
+        
+        # store data
+        particles['position']['z'].store_chunk(self.zs())
+        particles['position']['x'].store_chunk(self.xs())
+        particles['position']['y'].store_chunk(self.ys())
+        particles['positionOffset']['x'].make_constant(0.)
+        particles['positionOffset']['y'].make_constant(0.)
+        particles['positionOffset']['z'].make_constant(0.)
+        particles['momentum']['z'].store_chunk(self.uzs())
+        particles['momentum']['x'].store_chunk(self.uxs())
+        particles['momentum']['y'].store_chunk(self.uys())
+        particles['weighting'][io.Record_Component.SCALAR].store_chunk(self.weightings())
+        particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
+        particles['charge'][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
+        particles['mass'][io.Record_Component.SCALAR].make_constant(SI.m_e)
+        
+        # set SI units (scaling factor)
+        particles['momentum']['z'].unit_SI = SI.m_e
+        particles['momentum']['x'].unit_SI = SI.m_e
+        particles['momentum']['y'].unit_SI = SI.m_e
+        
+        # set dimensional units
+        particles['position'].unit_dimension = {io.Unit_Dimension.L: 1}
+        particles['positionOffset'].unit_dimension = {io.Unit_Dimension.L: 1}
+        particles['momentum'].unit_dimension = {io.Unit_Dimension.L: 1, io.Unit_Dimension.M: 1, io.Unit_Dimension.T: -1}
+        particles['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
+        particles['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
+        
+        # save data to file
+        series.flush()
+        
+        return series
+        
+        
+    # load beam (from OpenPMD format)
+    @classmethod
+    def load(_, filename, beam_name='beam'):
+        
+        # load file
+        series = io.Series(filename, io.Access.read_only)
+        
+        # find index (use last one)
+        *_, index = series.iterations
+        
+        # get particle data
+        particles = series.iterations[index].particles[beam_name]
+        
+        # get attributes
+        charge = particles["charge"][io.Record_Component.SCALAR].get_attribute("value")
+        mass = particles["mass"][io.Record_Component.SCALAR].get_attribute("value")
+        
+        # extract phase space
+        ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
+        weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
+        xs = particles['position']['x'].load_chunk()
+        ys = particles['position']['y'].load_chunk()
+        zs = particles['position']['z'].load_chunk()
+        pxs_unscaled = particles['momentum']['x'].load_chunk()
+        pys_unscaled = particles['momentum']['y'].load_chunk()
+        pzs_unscaled = particles['momentum']['z'].load_chunk()
+        series.flush()
+        
+        # apply SI scaling
+        pxs = pxs_unscaled * particles['momentum']['x'].unit_SI
+        pys = pys_unscaled * particles['momentum']['y'].unit_SI
+        pzs = pzs_unscaled * particles['momentum']['z'].unit_SI
+        
+        # make beam
+        beam = Beam()
+        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
+        
+        # add metadata to beam
+        try:
+            beam.trackable_number = series.iterations[index].get_attribute("trackable_number")
+            beam.stage_number = series.iterations[index].get_attribute("stage_number")
+            beam.location = series.iterations[index].get_attribute("location")
+            beam.num_bunches_in_train = series.iterations[index].get_attribute("num_bunches_in_train")
+            beam.bunch_separation = series.iterations[index].get_attribute("bunch_separation")
+        except:
+            beam.trackable_number = None
+            beam.stage_number = None
+            beam.location = None
+            beam.num_bunches_in_train = None
+            beam.bunch_separation = None
+        
+        return beam
+
+
     # ==================================================
     def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=None, ylab=None, clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
         
@@ -1810,7 +1971,7 @@ class Beam():
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
 
 
-    # ==================================================
+        # ==================================================
     def print_summary(self):
 
         print('---------------------------------------------------')
@@ -1842,163 +2003,3 @@ class Beam():
         print(f"rms beam length [um]:\t\t\t {self.bunch_length()*1e6 :.3f} \t\t")
         print(f"Peak current [kA]:\t\t\t {self.peak_current()/1e3 :.3f} \t\t")
         print('---------------------------------------------------')
-
-
-         ## SAVE AND LOAD BEAM
-    
-    def filename(self, runnable, beam_name):
-        return runnable.shot_path() + "/" + beam_name + "_" + str(self.trackable_number).zfill(3) + "_{:012.6F}".format(self.location) + ".h5"
-    
-    
-    # save beam (to OpenPMD format)
-    def save(self, runnable=None, filename=None, beam_name="beam", series=None):
-        
-        if len(self) == 0:
-            return
-        
-        # make new file if not provided
-        if series is None:
-
-            # open a new file
-            if runnable is not None:
-                filename = self.filename(runnable, beam_name)
-            
-            # open a new file
-            series = io.Series(filename, io.Access.create)
-            
-        
-            # add metadata
-            series.author = "ABEL (the Adaptable Beginning-to-End Linac simulation framework)"
-            series.date = datetime.now(timezone('CET')).strftime('%Y-%m-%d %H:%M:%S %z')
-
-        # make step (only one)
-        index = 0
-        iteration = series.iterations[index]
-        
-        # add attributes
-        iteration.set_attribute("time", self.location/SI.c)
-        for key, value in self.__dict__.items():
-            if not "__phasespace" in key:
-                iteration.set_attribute(key, value)
-                
-        # make beam record
-        particles = iteration.particles[beam_name]
-       
-        # generate datasets
-        dset_z = io.Dataset(self.zs().dtype, extent=self.zs().shape)
-        dset_x = io.Dataset(self.xs().dtype, extent=self.xs().shape)
-        dset_y = io.Dataset(self.ys().dtype, extent=self.ys().shape)
-        dset_zoff = io.Dataset(np.dtype('float64'), extent=[1])
-        dset_xoff = io.Dataset(np.dtype('float64'), extent=[1])
-        dset_yoff = io.Dataset(np.dtype('float64'), extent=[1])
-        dset_uz = io.Dataset(self.uzs().dtype, extent=self.uzs().shape)
-        dset_ux = io.Dataset(self.uxs().dtype, extent=self.uxs().shape)
-        dset_uy = io.Dataset(self.uys().dtype, extent=self.uys().shape)
-        dset_w = io.Dataset(self.weightings().dtype, extent=self.weightings().shape)
-        dset_id = io.Dataset(self.ids().dtype, extent=self.ids().shape)
-        dset_q = io.Dataset(np.dtype('float64'), extent=[1])
-        dset_m = io.Dataset(np.dtype('float64'), extent=[1])
-        
-        dset_n = io.Dataset(self.ids().dtype, extent=[1])
-        dset_f = io.Dataset(np.dtype('float64'), extent=[1])
-        
-        # prepare for writing
-        particles['position']['z'].reset_dataset(dset_z)
-        particles['position']['x'].reset_dataset(dset_x)
-        particles['position']['y'].reset_dataset(dset_y)
-        particles['positionOffset']['z'].reset_dataset(dset_zoff)
-        particles['positionOffset']['x'].reset_dataset(dset_xoff)
-        particles['positionOffset']['y'].reset_dataset(dset_yoff)
-        particles['momentum']['z'].reset_dataset(dset_uz)
-        particles['momentum']['x'].reset_dataset(dset_ux)
-        particles['momentum']['y'].reset_dataset(dset_uy)
-        particles['weighting'][io.Record_Component.SCALAR].reset_dataset(dset_w)
-        particles['id'][io.Record_Component.SCALAR].reset_dataset(dset_id)        
-        particles['charge'][io.Record_Component.SCALAR].reset_dataset(dset_q)
-        particles['mass'][io.Record_Component.SCALAR].reset_dataset(dset_m)
-        
-        # store data
-        particles['position']['z'].store_chunk(self.zs())
-        particles['position']['x'].store_chunk(self.xs())
-        particles['position']['y'].store_chunk(self.ys())
-        particles['positionOffset']['x'].make_constant(0.)
-        particles['positionOffset']['y'].make_constant(0.)
-        particles['positionOffset']['z'].make_constant(0.)
-        particles['momentum']['z'].store_chunk(self.uzs())
-        particles['momentum']['x'].store_chunk(self.uxs())
-        particles['momentum']['y'].store_chunk(self.uys())
-        particles['weighting'][io.Record_Component.SCALAR].store_chunk(self.weightings())
-        particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
-        particles['charge'][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
-        particles['mass'][io.Record_Component.SCALAR].make_constant(SI.m_e)
-        
-        # set SI units (scaling factor)
-        particles['momentum']['z'].unit_SI = SI.m_e
-        particles['momentum']['x'].unit_SI = SI.m_e
-        particles['momentum']['y'].unit_SI = SI.m_e
-        
-        # set dimensional units
-        particles['position'].unit_dimension = {io.Unit_Dimension.L: 1}
-        particles['positionOffset'].unit_dimension = {io.Unit_Dimension.L: 1}
-        particles['momentum'].unit_dimension = {io.Unit_Dimension.L: 1, io.Unit_Dimension.M: 1, io.Unit_Dimension.T: -1}
-        particles['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
-        particles['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
-        
-        # save data to file
-        series.flush()
-        
-        return series
-        
-        
-    # load beam (from OpenPMD format)
-    @classmethod
-    def load(_, filename, beam_name='beam'):
-        
-        # load file
-        series = io.Series(filename, io.Access.read_only)
-        
-        # find index (use last one)
-        *_, index = series.iterations
-        
-        # get particle data
-        particles = series.iterations[index].particles[beam_name]
-        
-        # get attributes
-        charge = particles["charge"][io.Record_Component.SCALAR].get_attribute("value")
-        mass = particles["mass"][io.Record_Component.SCALAR].get_attribute("value")
-        
-        # extract phase space
-        ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
-        weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
-        xs = particles['position']['x'].load_chunk()
-        ys = particles['position']['y'].load_chunk()
-        zs = particles['position']['z'].load_chunk()
-        pxs_unscaled = particles['momentum']['x'].load_chunk()
-        pys_unscaled = particles['momentum']['y'].load_chunk()
-        pzs_unscaled = particles['momentum']['z'].load_chunk()
-        series.flush()
-        
-        # apply SI scaling
-        pxs = pxs_unscaled * particles['momentum']['x'].unit_SI
-        pys = pys_unscaled * particles['momentum']['y'].unit_SI
-        pzs = pzs_unscaled * particles['momentum']['z'].unit_SI
-        
-        # make beam
-        beam = Beam()
-        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
-        
-        # add metadata to beam
-        try:
-            beam.trackable_number = series.iterations[index].get_attribute("trackable_number")
-            beam.stage_number = series.iterations[index].get_attribute("stage_number")
-            beam.location = series.iterations[index].get_attribute("location")
-            beam.num_bunches_in_train = series.iterations[index].get_attribute("num_bunches_in_train")
-            beam.bunch_separation = series.iterations[index].get_attribute("bunch_separation")
-        except:
-            beam.trackable_number = None
-            beam.stage_number = None
-            beam.location = None
-            beam.num_bunches_in_train = None
-            beam.bunch_separation = None
-        
-        return beam
