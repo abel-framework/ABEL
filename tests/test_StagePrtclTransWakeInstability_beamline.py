@@ -23,29 +23,31 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
+import matplotlib
+matplotlib.use('Agg')  # Use a backend that does not display figure to suppress plots.
 
 def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False):
     driver = SourceTrapezoid()
-    driver.current_head = 0.1e3                                                   # [A]
-    driver.bunch_length = 1050e-6                                                 # [m] This value is for trapezoid.
-    driver.z_offset = 1615e-6                                                     # [m]
+    driver.current_head = 0.1e3                                                     # [A]
+    driver.bunch_length = 1050e-6                                                   # [m] This value is for trapezoid.
+    driver.z_offset = 1615e-6                                                       # [m]
 
     driver.num_particles = 30000                                                 
-    driver.charge = 5.0e10 * -SI.e                                                # [C]
-    driver.energy = 4.9e9                                                         # [eV] 
-    driver.gaussian_blur = 50e-6                                                  # [m]
+    driver.charge = 5.0e10 * -SI.e                                                  # [C]
+    driver.energy = 4.9e9                                                           # [eV] 
+    driver.gaussian_blur = 50e-6                                                    # [m]
     driver.rel_energy_spread = 0.01                                              
 
-    driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
-    driver.beta_x, driver.beta_y = 0.5, 0.5                                       # [m]
+    driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                  # [m rad]
+    driver.beta_x, driver.beta_y = 0.5, 0.5                                         # [m]
 
     if enable_xy_jitter:
-        driver.jitter.x = 100e-9                                                  # [m], std
-        driver.jitter.y = 100e-9                                                  # [m], std
+        driver.jitter.x = 100e-9                                                    # [m], std
+        driver.jitter.y = 100e-9                                                    # [m], std
 
     if enable_xpyp_jitter:
-        driver.jitter.xp = 1.0e-6                                                 # [rad], std
-        driver.jitter.yp = 1.0e-6                                                 # [rad], std
+        driver.jitter.xp = 1.0e-6                                                   # [rad], std
+        driver.jitter.yp = 1.0e-6                                                   # [rad], std
 
     driver.symmetrize = True
 
@@ -54,24 +56,24 @@ def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=Fal
 
 def setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9):
     main = SourceBasic()
-    main.bunch_length = 40.0e-06                                                  # [m], rms. Standard value
+    main.bunch_length = 40.0e-06                                                    # [m], rms. Standard value
     main.num_particles = 10000                                               
-    main.charge = -e * 1.0e10                                                     # [C]
+    main.charge = -e * 1.0e10                                                       # [C]
 
     # Energy parameters
-    main.energy = energy                                                          # [eV], Default set to HALHF v2 second to last stage nominal input energy
-    main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
+    main.energy = energy                                                            # [eV], Default set to HALHF v2 second to last stage nominal input energy
+    main.rel_energy_spread = 0.02                                                   # Relative rms energy spread
 
     # Emittances
-    #main.emit_nx, main.emit_ny = 90.0e-6, 0.32e-6                                 # [m rad], budget value
-    main.emit_nx, main.emit_ny = 15e-6, 0.1e-6                                    # [m rad]
+    #main.emit_nx, main.emit_ny = 90.0e-6, 0.32e-6                                   # [m rad], budget value
+    main.emit_nx, main.emit_ny = 15e-6, 0.1e-6                                      # [m rad]
 
     # Beta functions
-    main.beta_x = beta_matched(plasma_density, main.energy) * ramp_beta_mag       # [m]
-    main.beta_y = main.beta_x                                                     # [m]
+    main.beta_x = beta_matched(plasma_density, main.energy) * ramp_beta_mag         # [m]
+    main.beta_y = main.beta_x                                                       # [m]
 
     # Offsets
-    main.z_offset = 0.00e-6                                                       # [m] # Standard value
+    main.z_offset = 0.00e-6                                                         # [m] # Standard value
 
     # Other
     main.symmetrize_6d = True
@@ -82,10 +84,10 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9):
 def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0):
     
     stage = StagePrtclTransWakeInstability()
-    stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
-    stage.nom_energy_gain = 7.8e9                                                 # [eV]
-    stage.length_flattop = 7.8                                                            # [m]
-    stage.plasma_density = plasma_density                                         # [m^-3]
+    stage.time_step_mod = 0.03                                                      # In units of betatron wavelengths/c.
+    stage.nom_energy_gain = 7.8e9                                                   # [eV]
+    stage.length_flattop = 7.8                                                      # [m]
+    stage.plasma_density = plasma_density                                           # [m^-3]
     stage.driver_source = driver_source
     stage.main_source = main_source
     stage.ramp_beta_mag = ramp_beta_mag
@@ -94,7 +96,7 @@ def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_sou
 
     stage.enable_ion_motion = enable_ion_motion
     stage.ion_charge_num = 1.0
-    ion_mass = 4.002602 * SI.physical_constants['atomic mass constant'][0]        # [kg], He mass
+    ion_mass = 4.002602 * SI.physical_constants['atomic mass constant'][0]          # [kg], He mass
     stage.ion_mass = ion_mass
     stage.num_z_cells_main = 51
     stage.num_y_cells_rft = 50
@@ -121,8 +123,8 @@ def setup_InterstageElegant(stage):
     interstage.enable_isr = True
     interstage.enable_csr = True
     interstage.beta0 = lambda energy: stage.matched_beta_function(energy)
-    interstage.dipole_length = lambda energy: 1 * np.sqrt(energy/10e9)           # [m(eV)], energy-dependent length
-    interstage.dipole_field = lambda energy: np.min([0.52, 40e9/energy])         # [T]
+    interstage.dipole_length = lambda energy: 1 * np.sqrt(energy/10e9)              # [m(eV)], energy-dependent length
+    interstage.dipole_field = lambda energy: np.min([0.52, 40e9/energy])            # [T]
 
     return interstage
 
@@ -134,7 +136,7 @@ def test_baseline_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
@@ -184,7 +186,7 @@ def test_ramped_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
@@ -240,7 +242,7 @@ def test_driverEvol_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
@@ -271,7 +273,7 @@ def test_driverEvol_ramped_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
@@ -306,7 +308,7 @@ def test_angular_jitter_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = True
@@ -337,7 +339,7 @@ def test_angular_jitter_ramped_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = True
@@ -372,7 +374,7 @@ def test_trInstability_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
@@ -384,7 +386,7 @@ def test_trInstability_linac():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    main_source.energy = 3.0                                                      # [eV], HALHF v2 start energy
+    main_source.energy = 3.0e9                                                      # [eV], HALHF v2 start energy
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageElegant(stage)
 
@@ -404,7 +406,7 @@ def test_jitter_trInstability_ramped_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
@@ -450,7 +452,7 @@ def test_driverEvol_jitter_trInstability_ramped_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
@@ -481,7 +483,7 @@ def test_ionMotion_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
@@ -512,7 +514,7 @@ def test_jitter_trInstability_ionMotion_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
@@ -543,7 +545,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
@@ -589,7 +591,7 @@ def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
     np.random.seed(42)
 
     num_stages = 2
-    plasma_density = 6.0e+20                                                      # [m^-3]
+    plasma_density = 6.0e+20                                                        # [m^-3]
     ramp_beta_mag = 5.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
