@@ -22,6 +22,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
+import os
 
 def check_beam_source_parameters(beam, source):
     assert np.allclose(beam.particle_mass, SI.m_e, rtol=1e-05, atol=1e-08)
@@ -183,7 +184,7 @@ def test_SourceCapsule2Beam():
 def test_SourceFromFile2Beam():
     "Check that ``SourceFromFile`` retuns returns the same ``Beam`` as the input ``Beam``."
 
-    beam_file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5'
+    beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
 
     source = SourceFromFile()
     source.file = beam_file
@@ -193,10 +194,10 @@ def test_SourceFromFile2Beam():
 
     # Trigger exception for when a file does not exist
     with pytest.raises(FileNotFoundError):
-        file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/blabla.h5'
+        file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'blabla.h5'
         source = SourceFromFile(file=file)
     with pytest.raises(FileNotFoundError):
-        file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/blabla.h5'
+        file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'blabla.h5'
         source = SourceFromFile()
         source.file = file
 
