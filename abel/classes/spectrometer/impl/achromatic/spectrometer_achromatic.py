@@ -64,7 +64,7 @@ class SpectrometerAchromatic(Spectrometer):
         Imaging energy. Default is None.
 
     disable_lens_nonlinearity : bool
-        Flag to disable lens nonlinearity. Default is `True`.
+        Flag to disable lens nonlinearity. Default is ``True``.
     """
 
     @abstractmethod
@@ -112,7 +112,7 @@ class SpectrometerAchromatic(Spectrometer):
             Imaging energy. Default is None.
 
         disable_lens_nonlinearity : bool
-            Flag to disable lens nonlinearity. Default is `True`.
+            Flag to disable lens nonlinearity. Default is ``True``.
         """
         self.length_drift_to_dipole = length_drift_to_dipole  # [m]
         self.field_dipole = field_dipole  # [T]
