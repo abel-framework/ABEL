@@ -191,4 +191,13 @@ def test_SourceFromFile2Beam():
     ref_beam = Beam.load(beam_file)
     Beam.comp_beams(beam, ref_beam)
 
+    # Trigger exception for when a file does not exist
+    with pytest.raises(FileNotFoundError):
+        file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/blabla.h5'
+        source = SourceFromFile(file=file)
+    with pytest.raises(FileNotFoundError):
+        file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/blabla.h5'
+        source = SourceFromFile()
+        source.file = file
+
 
