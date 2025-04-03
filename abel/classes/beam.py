@@ -5,7 +5,7 @@ from pytz import timezone
 from abel.CONFIG import CONFIG
 from types import SimpleNamespace
 import scipy.constants as SI
-from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
+from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2momentum
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
@@ -20,6 +20,14 @@ from matplotlib import pyplot as plt
 class Beam():
     
     def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+
+        # check the inputs
+        if num_particles < 1 or not isinstance(num_particles, int):
+            raise ValueError('num_particles must be an integer larger than 1.')
+        if num_bunches_in_train < 1 or not isinstance(num_bunches_in_train, int):
+            raise ValueError('num_bunches_in_train cannot be lower than 1.')
+        if bunch_separation < 0.0:
+            raise ValueError('bunch_separation cannot be negative.')
 
         # the phase space variable is private
         if phasespace is not None:
@@ -38,6 +46,9 @@ class Beam():
     
     # reset phase space
     def reset_phase_space(self, num_particles):
+        if num_particles < 1 or not isinstance(num_particles, int):
+            raise ValueError('num_particles must be an integer larger than 1.')
+        
         self.__phasespace = np.zeros((8, num_particles))
     
     # filter out macroparticles based on a mask (true means delete)
@@ -53,22 +64,154 @@ class Beam():
         
     # set phase space
     def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, weightings=None, particle_mass=SI.m_e):
+        """
+        Set the phase space of the beam. All input arrays must have the same lengths.
+
+        Parameters
+        ----------
+        Q : [C], float
+            Total beam charge.
+
+        xs, ys, zs: [m], 1D ndarray
+            Coordinates for the macroparticles.
+            
+        uxs, uys, uzs: [m/s], 1D ndarray, optional
+            Proper velocities for the macroparticles. All uzs values must be above 10*particle rest energy/c/particle mass. Default set to ``None``.
+            
+        pxs, pys, pzs: [kg m/s], 1D ndarray, optional
+            Momenta for the macroparticles. All pzs values must be above 10*particle rest energy/c. Default set to ``None``.
         
-        # make empty phase space
+        xps, yps: [rad], 1D ndarray, optional
+            Angles dx/ds and dy/ds for the macroparticles. Default set to ``None``.
+
+        Es : [eV], 1D ndarray, optional
+            Energies for the macroparticles. All values must be above 10*particle rest energy. Default set to ``None``.
+
+        weightings : 1D ndarray, optional
+            Weights for the macroparticles. Default set to ``None``.
+
+        particle_mass : [kg], float, optional
+            Particle mass for a single real particle. Default set to ``SI.m_e``.
+        
+            
+        Returns
+        ----------
+        ``None``
+        """
+
+        # Check coordinate type and length
+        if not isinstance(xs, np.ndarray)  or not isinstance(ys, np.ndarray) or not isinstance(zs, np.ndarray):
+            raise TypeError('Incompatible input type.')
+        
         num_particles = len(xs)
+        if len(ys) != num_particles or len(zs) != num_particles:
+            raise ValueError('The input arrays must have the same lengths.')
+        
+        # Check proper velocity type and length
+        if uxs is not None:
+            if not isinstance(uxs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(uxs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if uys is not None:
+            if not isinstance(uys, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(uys) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if uzs is not None:
+            if not isinstance(uzs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(uzs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+            
+        # Check momentum type and length
+        if pxs is not None:
+            if not isinstance(pxs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(pxs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if pys is not None:
+            if not isinstance(pys, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(pys) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if pzs is not None:
+            if not isinstance(pzs, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(pzs) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+            
+        # Check angle type and length
+        if xps is not None:
+            if not isinstance(xps, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(xps) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        if yps is not None:
+            if not isinstance(yps, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(yps) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+            
+        # Check energy type and length
+        if Es is not None:
+            if not isinstance(Es, np.ndarray):
+                raise TypeError('Incompatible input type.')
+            if len(Es) != num_particles:
+                raise ValueError('The input arrays must have the same lengths.')
+        
+        # Prevent defining proper velocity, momentum or angle in the same direction
+        if uxs is not None and pxs is not None:
+            raise ValueError('Cannot define proper velocity and momentum in the same direction.')
+        if uxs is not None and xps is not None:
+            raise ValueError('Cannot define proper velocity and angle in the same direction.')
+        if pxs is not None and xps is not None:
+            raise ValueError('Cannot define momentum and angle in the same direction.')
+        if uys is not None and pys is not None:
+            raise ValueError('Cannot define proper velocity and momentum in the same direction.')
+        if uys is not None and yps is not None:
+            raise ValueError('Cannot define proper velocity and angle in the same direction.')
+        if pys is not None and yps is not None:
+            raise ValueError('Cannot define momentum and angle in the same direction.')
+        if uzs is not None and pzs is not None:
+            raise ValueError('Cannot define proper velocity and momentum in the same direction.')
+        if uzs is not None and Es is not None:
+            raise ValueError('Cannot set both uzs and Es.')
+        if pzs is not None and Es is not None:
+            raise ValueError('Cannot set both pzs and Es.')
+        
+        if particle_mass is not None and particle_mass < 0:
+            raise ValueError('Particle mass cannot be negative.')
+
+
+        # make empty phase space
         self.reset_phase_space(num_particles)
         
         # add positions
         self.set_xs(xs)
         self.set_ys(ys)
         self.set_zs(zs)
+
+        # minimum thresholds for energy, uz and pz
+        energy_thres = 10*particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
+        uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=particle_mass)
+        pz_thres = gamma2momentum(energy2gamma(energy_thres, unit='eV', m=particle_mass))
         
         # add momenta
         if uzs is None:
+            
             if pzs is not None:
+                if np.any(pzs < pz_thres):
+                    raise ValueError('pzs contains values that are too small.')
                 uzs = momentum2proper_velocity(pzs)
+
             elif Es is not None:
+                if np.any(Es < energy_thres):
+                    raise ValueError('Es contains values that are too small.')
                 uzs = energy2proper_velocity(Es)
+        else:
+            if np.any(uzs < uz_thres):
+                raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
         if uxs is None:
@@ -118,7 +261,10 @@ class Beam():
     
     # string operator (called when printing)
     def __str__(self):
-        return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC, {self.energy()/1e9:.2f} GeV"
+        if np.sum(self.weightings()) == 0.0:
+            return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC"
+        else:
+            return f"Beam: {len(self)} macroparticles, {self.charge()*1e9:.2f} nC, {self.energy()/1e9:.2f} GeV"
         
         
     ## BUNCH PATTERN
@@ -175,6 +321,10 @@ class Beam():
     def set_uys(self, uys):
         self.__phasespace[4,:] = uys
     def set_uzs(self, uzs):
+        energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
+        uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
+        if np.any(uzs < uz_thres):
+            raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
     def set_xps(self, xps):
@@ -182,6 +332,9 @@ class Beam():
     def set_yps(self, yps):
         self.set_uys(yps*self.uzs())
     def set_Es(self, Es):
+        energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
+        if np.any(Es < energy_thres):
+            raise ValueError('Es contains values that are too small.')
         self.set_uzs(energy2proper_velocity(Es))
         
     def set_qs(self, qs):
@@ -194,6 +347,8 @@ class Beam():
     
     # copy another beam's macroparticle charge
     def copy_particle_charge(self, beam):
+        if beam.__phasespace is None or self.__phasespace is None:
+            raise ValueError('One of the beams is empty.')
         self.set_qs(np.median(beam.qs()))
 
     def scale_charge(self, Q):
@@ -207,11 +362,11 @@ class Beam():
         return np.sqrt(self.xs()**2 + self.ys()**2)
     
     def pxs(self):
-        return proper_velocity2momentum(self.uxs())
+        return proper_velocity2momentum(self.uxs(), m=self.particle_mass)
     def pys(self):
-        return proper_velocity2momentum(self.uys())
+        return proper_velocity2momentum(self.uys(), m=self.particle_mass)
     def pzs(self):
-        return proper_velocity2momentum(self.uzs())
+        return proper_velocity2momentum(self.uzs(), m=self.particle_mass)
     
     def xps(self):
         return self.uxs()/self.uzs()
@@ -232,7 +387,7 @@ class Beam():
         return self.zs()/SI.c
     
 
-    def comp_beams(beam1, beam2, comp_location=False, rtol=1e-05, atol=1e-08):
+    def comp_beams(beam1, beam2, comp_location=False, rtol=1e-15, atol=0.0):
         """
         Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within given tolerances.
 
@@ -245,10 +400,10 @@ class Beam():
             Flag for comparing the location of the beams. Default set to ``False``.
             
         rtol : float, optional
-            The relative tolerance parameter (see [1]_). Default set to 1e-5.
+            The relative tolerance parameter (see [1]_). Default set to 1e-15.
             
         rb_fit_obj : float, optional
-            The absolute tolerance parameter (see [1]_). Default set to 1e-8.
+            The absolute tolerance parameter (see [1]_). Default set to 0.0.
         
             
         Returns
@@ -324,7 +479,7 @@ class Beam():
         assert np.allclose(beam1.y_angle(), beam2.y_angle(), rtol=0.0, atol=3e-6)
         assert np.allclose(beam1.divergence_x(), beam2.divergence_x(), rtol=0.0, atol=0.2e-5)
         assert np.allclose(beam1.divergence_y(), beam2.divergence_y(), rtol=0.0, atol=0.5e-6)
-    
+
 
     # vector of transverse positions and angles: (x, x', y, y')
     def transverse_vector(self):
@@ -350,8 +505,7 @@ class Beam():
         vector[3,:] = self.uys()/SI.c
         return vector
 
-
-    ## Rotate the coordinate system of the beam
+## Rotate the coordinate system of the beam
     # ==================================================
     def rotate_coord_sys_3D(self, axis1, angle1, axis2=np.array([0, 1, 0]), angle2=0.0, axis3=np.array([1, 0, 0]), angle3=0.0, invert=False):
         """
@@ -510,11 +664,11 @@ class Beam():
         
         Parameters
         ----------
-         align_x_angle : [rad] float, optional
-            Beam coordinates with in the zx-plane are rotated with this angle. Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
+        align_x_angle : [rad] float, optional
+            Beam coordinates in the zx-plane are rotated with this angle. If ``None``, will align the beam using its angular offset.
         
         align_y_angle : [rad] float, optional
-            Beam coordinates with in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps(). Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
+            Beam coordinates in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of ``beam.yps()``. If ``None``, will align the beam using its angular offset.
         
             
         Returns
@@ -627,6 +781,7 @@ class Beam():
     
     # ==================================================
     def x_tilt_angle(self, z_cutoff=None):
+        "Retrieve the tilt angle of the beam in the zx-plane. WARNING: becomes unreliable around > 1e-4 rad."
         if z_cutoff is None:
             z_cutoff = 1.5 * self.bunch_length()
             
@@ -640,6 +795,7 @@ class Beam():
     
     # ==================================================
     def y_tilt_angle(self, z_cutoff=None):
+        "Retrieve the tilt angle of the beam in the zy-plane. WARNING: becomes unreliable around > 1e-4 rad."
         if z_cutoff is None:
             z_cutoff = 1.5 * self.bunch_length()
         y_centroids, z_centroids = self.slice_centroids(self.ys(), cut_off=z_cutoff, make_plot=False)
@@ -649,8 +805,6 @@ class Beam():
         
         return np.arctan(slope)
 
-
-    
     ## BEAM STATISTICS
 
     def total_particles(self):
@@ -724,6 +878,9 @@ class Beam():
     
     def uy_offset(self, clean=False):
         return weighted_mean(self.uys(), self.weightings(), clean)
+    
+    def uz_offset(self, clean=False):
+        return weighted_mean(self.uzs(), self.weightings(), clean)
 
     
     def geom_emittance_x(self, clean=False):
@@ -1174,7 +1331,7 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(6)
         fig.set_figheight(4)        
-        ax.plot(ts*SI.c*1e6, -dQdt/1e3)
+        ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
         ax.set_xlabel('z (um)')
         ax.set_ylabel('Beam current (kA)')
     
@@ -1234,17 +1391,18 @@ class Beam():
         cb.ax.set_ylabel('Charge density (pC/um^2)')
 
     
-    def plot_bunch_pattern(self):
+    # TODO: unfinished!
+    # def plot_bunch_pattern(self):
         
-        fig, ax = plt.subplots()
-        fig.set_figwidth(6)
-        fig.set_figheight(4)        
-        ax.plot(ts*SI.c*1e6, -dQdt/1e3)
-        ax.set_xlabel('z (um)')
-        ax.set_ylabel('Beam current (kA)')
+    #     fig, ax = plt.subplots()
+    #     fig.set_figwidth(6)
+    #     fig.set_figheight(4)
+    #     ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
+    #     ax.set_xlabel('z (um)')
+    #     ax.set_ylabel('Beam current (kA)')
         
-        
-    
+
+   
     ## CHANGE BEAM
     
     def accelerate(self, energy_gain=0, chirp=0, z_offset=0):
@@ -1267,23 +1425,27 @@ class Beam():
         self.set_zs(zs_scaled)
 
     def scale_norm_emittance_x(self, norm_emit_nx):
+        if norm_emit_nx < 0:
+            raise ValueError('Normalised emittance cannot be negative.')
         scale_factor = norm_emit_nx/self.norm_emittance_x()
         self.set_xs(self.xs() * np.sqrt(scale_factor))
         self.set_uxs(self.uxs() * np.sqrt(scale_factor))
 
     def scale_norm_emittance_y(self, norm_emit_ny):
+        if norm_emit_ny < 0:
+            raise ValueError('Normalised emittance cannot be negative.')
         scale_factor = norm_emit_ny/self.norm_emittance_y()
         self.set_ys(self.ys() * np.sqrt(scale_factor))
         self.set_uys(self.uys() * np.sqrt(scale_factor))
         
     # betatron damping (must be done before acceleration)
-    def apply_betatron_damping(self, deltaE):
+    def apply_betatron_damping(self, deltaE, axis_defining_beam=None):
         gammasBoosted = energy2gamma(abs(self.Es()+deltaE))
         betamag = np.sqrt(self.gammas()/gammasBoosted)
-        self.magnify_beta_function(betamag)
+        self.magnify_beta_function(betamag, axis_defining_beam)
         
     
-    # magnify beta function (increase beam size, decrease divergence)
+    # magnify beta function (increase beam size, decrease divergence for beta_mag > 1.0)
     def magnify_beta_function(self, beta_mag, axis_defining_beam=None):
         
         # calculate beam (not beta) magnification
@@ -1316,12 +1478,44 @@ class Beam():
         if flip_momenta:
             self.set_uxs(-self.uxs())
             self.set_uys(-self.uys())
-        elif flip_positions:
+        if flip_positions:
             self.set_xs(-self.xs())
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False, evolution_samples=None):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False):
+        """
+        Evolve the beam by solving Hill's equation.
+
+        Parameters
+        ----------
+        L : [m] float
+            The beam propagation distance.
+
+        n0 : [m^-3] float
+            Plasme number density.
+
+        deltaEs : [m^-3] 1D float ndarray
+            Energy change for the macroparticles.
+
+        x0_driver, y0_driver : [m] float, optional
+            Initial transverse offsets of the drive beam. Defaults set to 0.
+        
+        radiation_reaction : bool
+            Flag for enabling ating radiation reaction.
+        
+        calc_evolution : bool
+            Flag for recording the beam parameter evolution. 
+
+
+        Returns
+        ----------
+        Es_final : [eV] 1D float ndarray
+            The final energies for all macroparticles.
+        
+        evol : SimpleNamespace object
+            only returns when ``calc_evolution=True``. Contains beam parameter evolution data.
+        """
         
         # remove particles with subzero and Nan energy
         neg_indices = self.Es() < 0
@@ -1340,7 +1534,7 @@ class Beam():
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
-        if calc_evolution:
+        if calc_evolution:  # TODO: This seems to be very clumsy. Consider re-writing.
                 
             # calculate evolution
             num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
@@ -1817,5 +2011,3 @@ class Beam():
         print(f"rms beam length [um]:\t\t\t {self.bunch_length()*1e6 :.3f} \t\t")
         print(f"Peak current [kA]:\t\t\t {self.peak_current()/1e3 :.3f} \t\t")
         print('---------------------------------------------------')
-
-

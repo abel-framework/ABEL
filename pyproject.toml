@@ -55,4 +55,6 @@ markers = [
   "stageGeometry: Test stage geometry calculation functionality",
   "transverse_wake_instability_linac: Test linacs based on StagePrtclTransWakeInstability",
   "StagePrtclTransWakeInstability: Tests on StagePrtclTransWakeInstability",
+  "sources: Test the various Source subclasses generate beams with desired properties",
+  "beam: Tests for the Beam class",
 ]
