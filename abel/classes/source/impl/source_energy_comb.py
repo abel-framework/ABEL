@@ -1,3 +1,25 @@
+"""
+Module: source_energy_comb
+
+This module defines the `SourceEnergyComb` class, which is a subclass
+of `Source`. It provides methods to initialize the source and track
+the beam with comb-like energy distributions.
+
+Classes
+-------
+`SourceEnergyComb` : `Source`
+    A source class for creating comb-like energy distributions.
+
+Imports
+-------
+import time
+import numpy as np
+import scipy.constants as SI
+from abel import Source, Beam
+from abel.utilities.beam_physics import generate_trace_space_xy, generate_symm_trace_space_xyz
+from abel.utilities.relativity import energy2gamma
+"""
+
 import time
 import numpy as np
 import scipy.constants as SI
@@ -9,45 +31,45 @@ class SourceEnergyComb(Source):
     """
     A source class that extends the functionality of `SourceBasic` by distributing
     particle energies within a given list of energies. This is useful for creating
-    comb-like energy distributions for resolution estimates.
+comb-like energy distributions for resolution estimates.
 
     Parameters
     ----------
-    length : float, optional
-        Length of the source [m]. Default is 0.
+    length : [m] float, optional
+        Length of the source. Default is 0.
 
     num_particles : int, optional
         Number of particles in the beam. Default is 1000.
 
-    energy : float, optional
-        Central energy of the beam [eV]. Default is None.
+    energy : [eV] float, optional
+        Central energy of the beam. Default is ``None``.
 
-    charge : float, optional
-        Total charge of the beam [C]. Default is 0.
+    charge : [C] float, optional
+        Total charge of the beam. Default is 0.
 
     rel_energy_spread : float, optional
-        Relative energy spread (fraction). Default is None.
+        Relative energy spread (fraction). Default is ``None``.
 
-    energy_spread : float, optional
-        Absolute energy spread [eV]. Default is None.
+    energy_spread : [eV] float, optional
+        Absolute energy spread. Default is ``None``.
 
-    bunch_length : float, optional
-        RMS bunch length [m]. Default is None.
+    bunch_length : [m] float, optional
+        RMS bunch length. Default is ``None``.
 
-    z_offset : float, optional
-        Longitudinal offset of the beam [m]. Default is 0.
+    z_offset : [m] float, optional
+        Longitudinal offset of the beam. Default is 0.
 
-    x_offset, y_offset : float, optional
-        Transverse offsets of the beam [m]. Default is 0.
+    x_offset, y_offset : [m] float, optional
+        Transverse offsets of the beam. Default is 0.
 
-    x_angle, y_angle : float, optional
-        Transverse angles of the beam [rad]. Default is 0.
+    x_angle, y_angle : [rad] float, optional
+        Transverse angles of the beam. Default is 0.
 
-    emit_nx, emit_ny : float, optional
-        Normalized emittances in x and y [m rad]. Default is 0.
+    emit_nx, emit_ny : [m rad] float, optional
+        Normalized emittances in x and y. Default is 0.
 
-    beta_x, beta_y : float, optional
-        Beta functions in x and y [m]. Default is None.
+    beta_x, beta_y : [m] float, optional
+        Beta functions in x and y. Default is ``None``.
 
     alpha_x, alpha_y : float, optional
         Alpha functions in x and y. Default is 0.
@@ -58,8 +80,8 @@ class SourceEnergyComb(Source):
     wallplug_efficiency : float, optional
         Efficiency of the source. Default is 1.
 
-    accel_gradient : float, optional
-        Acceleration gradient [V/m]. Default is None.
+    accel_gradient : [V/m] float, optional
+        Acceleration gradient. Default is ``None``.
 
     symmetrize : bool, optional
         Whether to symmetrize the transverse phase space. Default is False.
@@ -67,11 +89,11 @@ class SourceEnergyComb(Source):
     symmetrize_6d : bool, optional
         Whether to symmetrize the full 6D phase space. Default is False.
 
-    z_cutoff : float, optional
-        Longitudinal cutoff for filtering particles [m]. Default is None.
+    z_cutoff : [m] float, optional
+        Longitudinal cutoff for filtering particles. Default is ``None``.
 
     energy_comb_delta : float, optional
-        Relative energy step size for creating comb-like energy distributions. Default is None.
+        Relative energy step size for creating comb-like energy distributions. Default is ``None``.
     """
 
     def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, symmetrize_6d=False, z_cutoff=None, energy_comb_delta=None):
@@ -109,14 +131,14 @@ class SourceEnergyComb(Source):
 
         Parameters
         ----------
-        _ : None, optional
-            Placeholder parameter. Default is None.
+        _ : ``None``, optional
+            Placeholder parameter. Default is ``None``.
 
         savedepth : int, optional
             Depth of saved tracking data. Default is 0.
 
         runnable : object, optional
-            Runnable object for tracking. Default is None.
+            Runnable object for tracking. Default is ``None``.
 
         verbose : bool, optional
             Whether to print verbose output. Default is False.
@@ -194,7 +216,7 @@ class SourceEnergyComb(Source):
 
         Returns
         -------
-        None
+        ``None``
         """
 
         # takes in the beam and uses the attribute self.energy_comb_delta

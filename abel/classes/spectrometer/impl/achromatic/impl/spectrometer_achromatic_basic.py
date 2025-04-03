@@ -7,7 +7,7 @@ the spectrometer and track the beam.
 
 Classes
 -------
-SpectrometerAchromaticBasic : SpectrometerAchromatic
+`SpectrometerAchromaticBasic` : `SpectrometerAchromatic`
     A basic implementation of an achromatic spectrometer.
 
 Imports
@@ -27,35 +27,35 @@ class SpectrometerAchromaticBasic(SpectrometerAchromatic):
 
     Parameters
     ----------
-    length_drift_to_dipole : float, optional
-        Length of the drift space to the dipole magnet [m]. Default is 0.2.
+    length_drift_to_dipole : [m] float, optional
+        Length of the drift space to the dipole magnet. Default is 0.2.
 
-    field_dipole : float, optional
-        Magnetic field strength of the dipole magnet [T]. Negative values
+    field_dipole : [T] float, optional
+        Magnetic field strength of the dipole magnet. Negative values
         bend the beam downwards. Default is -0.85.
 
-    length_dipole : float, optional
-        Length of the dipole magnet [m]. Default is 0.15.
+    length_dipole : [m] float, optional
+        Length of the dipole magnet. Default is 0.15.
 
-    length_drift_dipole_to_lens : float, optional
-        Length of the drift space from the dipole magnet to the lens [m].
+    length_drift_dipole_to_lens : [m] float, optional
+        Length of the drift space from the dipole magnet to the lens.
         Default is 0.15.
 
-    length_plasma_lens : float, optional
-        Length of the plasma lens [m]. Default is 20E-3.
+    length_plasma_lens : [m] float, optional
+        Length of the plasma lens. Default is 20E-3.
 
-    radius_plasma_lens : float, optional
-        Radius of the plasma lens [m]. Default is 1E-3.
+    radius_plasma_lens : [m] float, optional
+        Radius of the plasma lens. Default is 1E-3.
 
-    length_drift_lens_to_screen : float, optional
-        Length of the drift space from the lens to the screen [m]. Default
+    length_drift_lens_to_screen : [m] float, optional
+        Length of the drift space from the lens to the screen. Default
         is 0.4.
 
-    imaging_energy : float or None, optional
-        Imaging energy [eV]. Default is None.
+    imaging_energy : [eV] float or None, optional
+        Imaging energy. Default is None.
 
     disable_lens_nonlinearity : bool, optional
-        Flag to disable lens nonlinearity. Default is True.
+        Flag to disable lens nonlinearity. Default is `True`.
     """
 
     def __init__(self,
@@ -74,36 +74,36 @@ class SpectrometerAchromaticBasic(SpectrometerAchromatic):
 
         Parameters
         ----------
-        length_drift_to_dipole : float, optional
-            Length of the drift space to the dipole magnet [m]. Default is
+        length_drift_to_dipole : [m] float, optional
+            Length of the drift space to the dipole magnet. Default is
             0.2.
 
-        field_dipole : float, optional
-            Magnetic field strength of the dipole magnet [T]. Negative
+        field_dipole : [T] float, optional
+            Magnetic field strength of the dipole magnet. Negative
             values bend the beam downwards. Default is -0.85.
 
-        length_dipole : float, optional
-            Length of the dipole magnet [m]. Default is 0.15.
+        length_dipole : [m] float, optional
+            Length of the dipole magnet. Default is 0.15.
 
-        length_drift_dipole_to_lens : float, optional
-            Length of the drift space from the dipole magnet to the lens
-            [m]. Default is 0.15.
+        length_drift_dipole_to_lens : [m] float, optional
+            Length of the drift space from the dipole magnet to the lens.
+            Default is 0.15.
 
-        length_plasma_lens : float, optional
-            Length of the plasma lens [m]. Default is 20E-3.
+        length_plasma_lens : [m] float, optional
+            Length of the plasma lens. Default is 20E-3.
 
-        radius_plasma_lens : float, optional
-            Radius of the plasma lens [m]. Default is 1E-3.
+        radius_plasma_lens : [m] float, optional
+            Radius of the plasma lens. Default is 1E-3.
 
-        length_drift_lens_to_screen : float, optional
-            Length of the drift space from the lens to the screen [m].
+        length_drift_lens_to_screen : [m] float, optional
+            Length of the drift space from the lens to the screen.
             Default is 0.4.
 
-        imaging_energy : float or None, optional
-            Imaging energy [eV]. Default is None.
+        imaging_energy : [eV] float or None, optional
+            Imaging energy. Default is None.
 
         disable_lens_nonlinearity : bool, optional
-            Flag to disable lens nonlinearity. Default is True.
+            Flag to disable lens nonlinearity. Default is `True`.
         """
 
         super().__init__(length_drift_to_dipole=length_drift_to_dipole,
@@ -122,21 +122,21 @@ class SpectrometerAchromaticBasic(SpectrometerAchromatic):
 
         Parameters
         ----------
-        beam0 : Beam
+        beam0 : `Beam` object
             The initial beam to be tracked.
 
         savedepth : int, optional
             The depth at which to save the beam state. Default is 0.
 
         runnable : callable, optional
-            A callable to be run during tracking. Default is None.
+            A callable to be run during tracking. Default is ``None``.
 
         verbose : bool, optional
-            Whether to print verbose output. Default is False.
+            Whether to print verbose output. Default is `False`.
 
         Returns
         -------
-        Beam
+        `Beam` object
             The tracked beam object.
         """
 
@@ -249,8 +249,8 @@ class SpectrometerAchromaticBasic(SpectrometerAchromatic):
 
         Parameters
         ----------
-        energy : float
-            The energy of the particle beam [eV].
+        energy : [eV] float
+            The energy of the particle beam.
 
         Returns
         -------
@@ -275,16 +275,16 @@ class SpectrometerAchromaticBasic(SpectrometerAchromatic):
 
         Parameters
         ----------
-        energy : float, optional
-            The energy of the particle beam [eV]. Either `energy` or
+        energy : [eV] float, optional
+            The energy of the particle beam. Either `energy` or
             `bend_angle` must be provided.
 
-        bend_angle : float, optional
-            Bending angle of the dipole [rad]. Either `bend_angle` or
+        bend_angle : [rad] float, optional
+            Bending angle of the dipole. Either `bend_angle` or
             `energy` must be provided.
 
-        length : float, optional
-            The distance to use for the calculation [m]. If not provided,
+        length : [m] float, optional
+            The distance to use for the calculation. If not provided,
             it defaults to the distance from the center of the dipole to
             the screen.
 
