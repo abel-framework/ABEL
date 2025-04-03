@@ -86,7 +86,7 @@ class StageBasic(Stage):
                 
 
         # ========== Betatron oscillations ==========
-        deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)
+        deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
         if self.calc_evolution:
             _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), calc_evolution=self.calc_evolution)
             self.evolution.beam = evol
