@@ -54,8 +54,10 @@ def proper_velocity2gamma(u):
     return np.sign(u) * np.sqrt(1+(u/SI.c)**2)
 
 # convert proper velocity to momentum [kg m/s]
-def proper_velocity2momentum(u):
-    return gamma2momentum(proper_velocity2gamma(u))
+# def proper_velocity2momentum(u):
+#     return gamma2momentum(proper_velocity2gamma(u))
+def proper_velocity2momentum(u, m=SI.m_e):
+    return m*u
 
 # convert proper velocity to energy
 def proper_velocity2energy(u, unit=defaultUnitE, m=SI.m_e):
