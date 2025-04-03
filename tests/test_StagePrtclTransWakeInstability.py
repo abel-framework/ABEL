@@ -146,15 +146,15 @@ def test_beam_between_ramps():
     Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
 
     # Between a main stage and downramp
-    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True)
-    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True)
+    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-14, atol=0.0)
+    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the output beam matches the out beam for the downramp
     final_beam = linac[0].get_beam(-1)
     Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
 
     # Assert that the propagation length of the output beam matches the total length of the stage
-    assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length)
+    assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
@@ -185,11 +185,11 @@ def test_stage_length_gradient_energyGain():
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
-    assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9)
-    assert np.allclose(stage.nom_energy_gain, 7.8e9)
-    assert np.allclose(stage.length_flattop, 7.8)
-    assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9)
-    assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop)
+    assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.length_flattop, 7.8, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
     stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, run_tests=False)
 
@@ -197,11 +197,11 @@ def test_stage_length_gradient_energyGain():
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
-    assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9)
-    assert np.allclose(stage.nom_energy_gain, 7.8e9)
-    assert np.allclose(stage.length_flattop, 7.8)
-    assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9)
-    assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop)
+    assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.length_flattop, 7.8, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
@@ -232,8 +232,8 @@ def test_driver_unrotation():
     _, driver = stage.track(main_source.track())
     driver0 = stage.drive_beam
 
-    assert np.allclose(driver0.x_angle(), driver.x_angle())
-    assert np.allclose(driver0.y_angle(), driver.y_angle())
+    assert np.allclose(driver0.x_angle(), driver.x_angle(), rtol=1e-15, atol=0.0)
+    assert np.allclose(driver0.y_angle(), driver.y_angle(), rtol=1e-15, atol=0.0)
    
 
 # TODO: Test on bubble radius tracing
