@@ -1,12 +1,27 @@
 from abel import Source, Beam
+import os
 
 class SourceFromFile(Source):
     
     def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, file=None, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0):
+
+        if file is not None and not os.path.exists(file):
+            raise FileNotFoundError(f"Error: The file '{file}' was not found.")
         
-        self.file = file
+        self._file = file
 
         super().__init__(length, charge, energy, accel_gradient, wallplug_efficiency, x_offset, y_offset, x_angle, y_angle, waist_shift_x, waist_shift_y)
+
+    
+    @property
+    def file(self) -> str | None:
+        return self._file
+    @file.setter
+    def file(self, file_path : str):
+        if file_path is not None and not os.path.exists(file_path):
+            raise FileNotFoundError(f"Error: The file '{file_path}' was not found.")
+        else:
+            self._file = file_path
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
