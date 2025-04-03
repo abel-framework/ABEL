@@ -1313,6 +1313,85 @@ class Beam():
           
         
     
+    ## PLOTTING
+    def plot_current_profile(self):
+        dQdt, ts = self.current_profile()
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(6)
+        fig.set_figheight(4)        
+        ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('Beam current (kA)')
+    
+    def plot_lps(self):
+        dQdzdE, zs, Es = self.density_lps()
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+            
+        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('E (GeV)')
+        ax.set_title('Longitudinal phase space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
+        
+    def plot_trace_space_x(self):
+        dQdxdxp, xs, xps = self.phase_space_density(self.xs, self.xps)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        ax.set_xlabel('x (um)')
+        ax.set_ylabel('x'' (mrad)')
+        ax.set_title('Horizontal trace space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
+        
+    def plot_trace_space_y(self):
+        dQdydyp, ys, yps = self.phase_space_density(self.ys, self.yps)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        ax.set_xlabel('y (um)')
+        ax.set_ylabel('y'' (mrad)')
+        ax.set_title('Vertical trace space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
+
+    def plot_transverse_profile(self):
+        dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)
+        p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
+        #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
+        #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
+        ax.set_xlabel('x (um)')
+        ax.set_ylabel('y (um)')
+        ax.set_title('Transverse profile')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um^2)')
+
+    
+    # TODO: unfinished!
+    # def plot_bunch_pattern(self):
+        
+    #     fig, ax = plt.subplots()
+    #     fig.set_figwidth(6)
+    #     fig.set_figheight(4)
+    #     ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
+    #     ax.set_xlabel('z (um)')
+    #     ax.set_ylabel('Beam current (kA)')
+        
+
+   
     ## CHANGE BEAM
     
     def accelerate(self, energy_gain=0, chirp=0, z_offset=0):
@@ -1505,86 +1584,6 @@ class Beam():
         else:
             return Es_final
         
-
-    
-     ## PLOTTING
-    def plot_current_profile(self):
-        dQdt, ts = self.current_profile()
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(6)
-        fig.set_figheight(4)        
-        ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
-        ax.set_xlabel('z (um)')
-        ax.set_ylabel('Beam current (kA)')
-    
-    def plot_lps(self):
-        dQdzdE, zs, Es = self.density_lps()
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-            
-        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('z (um)')
-        ax.set_ylabel('E (GeV)')
-        ax.set_title('Longitudinal phase space')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
-        
-    def plot_trace_space_x(self):
-        dQdxdxp, xs, xps = self.phase_space_density(self.xs, self.xps)
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('x'' (mrad)')
-        ax.set_title('Horizontal trace space')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
-        
-    def plot_trace_space_y(self):
-        dQdydyp, ys, yps = self.phase_space_density(self.ys, self.yps)
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('y (um)')
-        ax.set_ylabel('y'' (mrad)')
-        ax.set_title('Vertical trace space')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
-
-    def plot_transverse_profile(self):
-        dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys)
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)
-        p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
-        #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
-        #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('y (um)')
-        ax.set_title('Transverse profile')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um^2)')
-
-    
-    # TODO: unfinished!
-    # def plot_bunch_pattern(self):
-        
-    #     fig, ax = plt.subplots()
-    #     fig.set_figwidth(6)
-    #     fig.set_figheight(4)
-    #     ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
-    #     ax.set_xlabel('z (um)')
-    #     ax.set_ylabel('Beam current (kA)')
-        
-
   
     ## SAVE AND LOAD BEAM
     
