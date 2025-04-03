@@ -69,28 +69,28 @@ class Beam():
 
         Parameters
         ----------
-        Q : [C], float
+        Q : [C] float
             Total beam charge.
 
-        xs, ys, zs: [m], 1D ndarray
+        xs, ys, zs : [m] 1D ndarray
             Coordinates for the macroparticles.
             
-        uxs, uys, uzs: [m/s], 1D ndarray, optional
+        uxs, uys, uzs : [m/s] 1D ndarray, optional
             Proper velocities for the macroparticles. All uzs values must be above 10*particle rest energy/c/particle mass. Default set to ``None``.
             
-        pxs, pys, pzs: [kg m/s], 1D ndarray, optional
+        pxs, pys, pzs : [kg m/s] 1D ndarray, optional
             Momenta for the macroparticles. All pzs values must be above 10*particle rest energy/c. Default set to ``None``.
         
-        xps, yps: [rad], 1D ndarray, optional
+        xps, yps : [rad] 1D ndarray, optional
             Angles dx/ds and dy/ds for the macroparticles. Default set to ``None``.
 
-        Es : [eV], 1D ndarray, optional
+        Es : [eV] 1D ndarray, optional
             Energies for the macroparticles. All values must be above 10*particle rest energy. Default set to ``None``.
 
         weightings : 1D ndarray, optional
             Weights for the macroparticles. Default set to ``None``.
 
-        particle_mass : [kg], float, optional
+        particle_mass : [kg] float, optional
             Particle mass for a single real particle. Default set to ``SI.m_e``.
         
             
@@ -396,7 +396,7 @@ class Beam():
         beam1, beam2 : ABEL ``Beam`` object
             Beams to be compared
 
-        comp_location: bool, optional
+        comp_location : bool, optional
             Flag for comparing the location of the beams. Default set to ``False``.
             
         rtol : float, optional
