@@ -51,4 +51,5 @@ addopts = [
 markers = [
   "core: Test core functionality",
   "stageGeometry: Test stage geometry calculation functionality",
+  "spin: test spin and polarization functionality"
 ]
