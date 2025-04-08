@@ -52,4 +52,6 @@ markers = [
   "core: Test core functionality",
   "stageGeometry: Test stage geometry calculation functionality",
   "spin: test spin and polarization functionality"
+  "sources: Test the various Source subclasses generate beams with desired properties",
+  "beam: Tests for the Beam class",
 ]
