@@ -5,6 +5,7 @@ from pytz import timezone
 from abel.CONFIG import CONFIG
 from types import SimpleNamespace
 import scipy.constants as SI
+from scipy.optimize import fsolve
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2proper_velocity
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
@@ -16,6 +17,7 @@ from scipy.spatial.transform import Rotation as Rot
 import copy
 
 from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 class Beam():
     
@@ -730,7 +732,7 @@ class Beam():
         "Checks if any spin norms are close to zero."
         s_norm = np.sqrt(self.sxs()**2 + self.sys()**2 + self.szs()**2)
         return not np.any(s_norm < 1e-8) 
-
+        
     def set_spin_unpolarized(self):
         "Sets the spin of the beam to be unpolarized."
         phi = np.random.uniform(0, 2*np.pi, len(self))
@@ -756,6 +758,50 @@ class Beam():
         self.set_sxs(np.zeros(len(self)))
         self.set_sys(np.zeros(len(self)))
         self.set_szs(np.ones(len(self))*np.sign(sign))
+
+    def make_random_spins(self, s_m, seed=42):
+        """
+        Generates a random distribution of points on the surface of a sphere of radius 1, with the mean along z is 
+        's_m'.
+        For s_m=0, points are uniformly distributed on the surface of the sphere.
+    
+        Parameters
+        ----------
+        s_m: float
+            Mean value of z-projection of the generated spins.
+
+        seed: int, optional
+            Seed to initialize the random number generator (defalt is 42).
+            
+
+        References
+        ----------
+        .. [1] Michael J. Quin, Kristjan Poder 
+        {https://github.com/fbpic/fbpic/blob/dev/fbpic/particles/spin/spin_tracker.py#L276}
+        """
+        np.random.seed(seed)
+        self.alpha = None
+
+        if abs(s_m) == 1:
+            self.set_spin_polarized_z(np.sign(s_m))
+            return
+        elif s_m == 0:
+            szs = np.random.uniform(-1,1, len(self))
+        else:
+            if self.alpha is None:
+                sol = fsolve(lambda alpha: 1. / alpha - 1. / np.tanh(alpha) - s_m, 0.5)
+                self.alpha = sol[0]
+            u = np.random.uniform(0, 1, len(self))
+            szs = - 1 / self.alpha * np.log(np.exp(self.alpha) * (1 - u) + np.exp(-self.alpha) * u)
+
+        phi = np.random.uniform(0, 2*np.pi, len(self))
+        sin_theta = np.sqrt(1 - szs**2)
+        sxs = sin_theta * np.cos(phi)
+        sys = sin_theta * np.sin(phi)
+        
+        self.set_sxs(sxs)
+        self.set_sys(sys)
+        self.set_szs(szs)
 
     def renormalize_spin(self):
         "Renormalizing the spin vectors."
@@ -785,6 +831,7 @@ class Beam():
     def spin_polarization(self):
         return np.sqrt(np.sum(self.spin_polarization_vector()**2))
 
+
     def plot_spins(self, num_bins=None):
         if num_bins is None:
             num_bins = int(min(np.round(np.sqrt(len(self)/2)), 100))
@@ -805,12 +852,33 @@ class Beam():
         axs[2].set_xlim(-1,1)
         axs[2].set_xlabel(r'$s_z$')
 
+    def plot_spins_2D(self):
+        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+        
+        hb1 = axs[0].hexbin(self.sxs(), self.sys(), gridsize=50, cmap='RdPu', mincnt=1)
+        axs[0].set_xlabel(r'$s_x$')
+        axs[0].set_ylabel(r'$s_y$')
+        plt.colorbar(hb1, ax=axs[0], label='Counts')
 
+        hb2 = axs[1].hexbin(self.sxs(), self.szs(), gridsize=50, cmap='RdPu', mincnt=1)
+        axs[1].set_xlabel(r'$s_x$')
+        axs[1].set_ylabel(r'$s_z$')
+        plt.colorbar(hb2, ax=axs[1], label='Counts')
 
+        hb3 = axs[2].hexbin(self.sys(), self.szs(), gridsize=50, cmap='RdPu', mincnt=1)
+        axs[2].set_xlabel(r'$s_y$')
+        axs[2].set_ylabel(r'$s_z$')
+        plt.colorbar(hb3, ax=axs[2], label='Counts')
 
-
-
-
+        
+    def plot_spins_3D(self):
+        fig = plt.figure(figsize=(12,4))
+        axs = fig.add_subplot(111, projection='3d')
+        axs.scatter(self.sxs(), self.sys(), self.szs(), alpha=0.2, s=1)
+        axs.set_xlabel(r'$s_x$')
+        axs.set_ylabel(r'$s_y$')
+        axs.set_zlabel(r'$s_z$')
+    
     
     ## BEAM HALO CLEANING (EXTREME OUTLIERS)
     def remove_halo_particles(self, nsigma=20):
@@ -1512,6 +1580,10 @@ class Beam():
         particles['momentum'].unit_dimension = {io.Unit_Dimension.L: 1, io.Unit_Dimension.M: 1, io.Unit_Dimension.T: -1}
         particles['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
         particles['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
+        
+        particles['spin']['z'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
+        particles['spin']['x'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
+        particles['spin']['y'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
         
         # save data to file
         series.flush()
