@@ -1416,6 +1416,26 @@ class Beam():
         del self[Es < 0]
         
     def compress(self, R_56, nom_energy):
+        """
+        Compress the beam longitudinally by applying longitudinal dispersion.
+        The compression is applied by changing the z-coordinates by
+
+        z = z0 + (1-E/nom_energy) * R_56.
+
+
+        Parameters
+        ----------
+        R_56 : float
+            R_56 used to determine the beam compression.
+
+        nom_energy : [eV] float
+            Nominal energy used to determine the beam compression.
+
+
+        Returns
+        ----------
+        ``None``
+        """
         zs = self.zs() + (1-self.Es()/nom_energy) * R_56
         self.set_zs(zs)
         
