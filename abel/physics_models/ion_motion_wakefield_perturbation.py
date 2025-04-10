@@ -459,8 +459,9 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
 ###################################################
 def ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driver_Exs_3d, driver_Eys_3d):
     """
-    Calculates the ion wakefield perturbation to the otherwise linear background focusing kp*E0*r/2 by integrating the beam electric fields along z.
+    Calculates the ion wakefield perturbation to the otherwise linear background focusing kp*E0*r/2 by integrating the beam electric fields along z. The method is based on C. Benedetti's model [1]_.
 
+    
     Parameters
     ----------
     ion_motion_config : ``IonMotionConfig`` object
@@ -472,10 +473,16 @@ def ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driv
     driver_Exs_3d, driver_Eys_3d : [V/m] 3D float ndarray
         Contains the drive beam E-field component where the first, second and third dimensions correspond to positions along x, y and z.
         
+
     Returns
     ----------
     wakefield_perturbations : [V/m] 3D float ndarray
-        Contains the ion wakefield perturbation where the first, second and third dimensions correspond to positions along x, y and z. 
+        Contains the ion wakefield perturbation where the first, second and third dimensions correspond to positions along x, y and z.
+
+        
+    References
+    ----------
+    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, "Emittance preservation in plasma-based accelerators with ion motion," Phys. Rev. Accel. Beams. 20, 111301 (2017);. https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
     """
 
     # Get parameters

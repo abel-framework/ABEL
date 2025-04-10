@@ -35,10 +35,56 @@ from abel import Beam
 
 
 class StagePrtclTransWakeInstability(Stage):
+    """
+    TODO: Short description
+    None of lines in the docstring text should exceed this length ..........
+
+        
+    Attributes
+    ----------
+    nom_energy_gain : [eV] float
+        The total energy gain of the stage and its ramps.
+    
+    nom_accel_gradient : [eV/m] float
+        The effective nominal acceleration gradient for the stage and its ramps.
+
+    length : [m] float
+        The total length of the stage and its ramps.
+
+    nom_energy_gain_flattop : [eV] float
+        The total energy gain of the stage.
+
+    nom_accel_gradient_flattop : [eV/m] float
+        The nominal acceleration gradient for the stage.
+
+    length : [m] float
+        The total length of the stage.
+    
+    ...
+
+    main_source : ``Source`` object
+        Main beam source.
+
+    ...
+
+
+    Methods
+    -------
+    __init__(...)
+        Class constructor...
+
+    track(beam_incoming, savedepth=0, runnable=None, verbose=False)
+        Tracks the particles through the stage.
+
+    ...
+    """
 
     # ==================================================
     def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, time_step_mod=0.05, show_prog_bar=None, run_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
+        TODO: Short description
+        None of lines in the docstring text should exceed this length ..........
+
         Parameters
         ----------
         ...
@@ -61,22 +107,30 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma density.
 
         time_step_mod : [beta_wave_length/c] float, optional
-            Determines the time step of the instability tracking in units of beta_wave_length/c.
+            Determines the time step of the instability tracking in units of 
+            beta_wave_length/c.
             
         #Ez_fit_obj : [V/m] interpolation object
-            1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
+            1D interpolation object of longitudinal E-field fitted to axial 
+            E-field using a selection of zs along the main beam. Used to 
+            determine the value of the longitudinal E-field for all beam zs.
 
         #Ez_roi : [V/m] 1D ndarray
-            Longitudinal E-field in the region of interest fitted to a selection of zs along the main beam (main beam head to tail).
+            Longitudinal E-field in the region of interest fitted to a selection 
+            of zs along the main beam (main beam head to tail).
 
         #rb_fit_obj : [m] interpolation object
-            1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
+            1D interpolation object of plasma bubble radius fitted to axial 
+            bubble radius using a selection of zs along the main beam. Used to 
+            determine the value of the bubble radius for all beam zs.
         
         #bubble_radius_roi : [m] 1D ndarray
-            The bubble radius in the region of interest fitted to a selection of zs along the main beam.
+            The bubble radius in the region of interest fitted to a selection of 
+            zs along the main beam.
 
         ramp_beta_mag : float, optional
-            Used for demagnifying and magnifying beams passing through entrance and exit plasma ramps. Default value: 5.0.
+            Used for demagnifying and magnifying beams passing through entrance 
+            and exit plasma ramps. Default value: 5.0.
 
         enable_radiation_reaction : bool, optional
             Flag for enabling radiation reactions. Defaults to ``True``.
@@ -84,15 +138,23 @@ class StagePrtclTransWakeInstability(Stage):
         ...
 
         probe_evol_period : int, optional
-            Set to larger than 0 to determine the probing period for beam evolution diagnostics. This is given in units of time steps, so that e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd time step. Default value: 0.
+            Set to larger than 0 to determine the probing period for beam 
+            evolution diagnostics. This is given in units of time steps, so that 
+            e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd 
+            time step. Default value: 0.
 
         ...
 
         ion_wkfld_update_period : int, optional
-            Determines the ion wakefield perturbation update period. This is given in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will update the ion wakefield perturbation every 3rd time step. Default value: 1
+            Determines the ion wakefield perturbation update period. This is 
+            given in units of time steps, so that e.g. 
+            ``ion_wkfld_update_period=3`` will update the ion wakefield 
+            perturbation every 3rd time step. Default value: 1.
         
         drive_beam_update_period : int, optional
-            Set to larger than 0 to activate driver evolution and determine the drive beam update period. Default value: 0.
+            Set to larger than 0 to activate driver evolution and determine 
+            the drive beam update period. Default value: 0.
+
         """
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
