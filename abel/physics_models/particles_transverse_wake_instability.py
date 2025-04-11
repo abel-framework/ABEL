@@ -697,6 +697,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         if enable_driver_evolution:
             if time_step_count % drive_beam_update_period == 0:  # It is time to update drive_beam.
                 push_driver(drive_beam, trans_wake_config.wake_t_fields, drive_beam_update_period*time_step, pusher='boris')
+                
                 if time_step_count % (drive_beam_update_period * 5) == 0:  # It is time to clean drive_beam.
                     #drive_beam = wake_t_remove_halo_particles(drive_beam, nsigma=20)
 
@@ -810,7 +811,7 @@ def save_beam(main_beam, file_path, stage_num, time_step, num_time_steps):
         
     Returns
     ----------
-    N/A
+    ``None``
     """
     
     main_beam.save(filename=file_path + 'main_beam_' + str(stage_num).zfill(3) + '_' + str(time_step).zfill(len(str(int(num_time_steps)))) + '.h5')
@@ -833,7 +834,7 @@ def save_time_step(arrays, file_path):
         
     Returns
     ----------
-    N/A
+    ``None``
     """
     
     # Headers for the columns
