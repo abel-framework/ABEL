@@ -634,7 +634,6 @@ class StagePrtclTransWakeInstability(Stage):
         beam_outgoing.trackable_number = beam_incoming.trackable_number
         beam_outgoing.stage_number = beam_incoming.stage_number
         beam_outgoing.location = beam_incoming.location
-            
 
         # Return the beam (and optionally the driver)
         if self._return_tracked_driver:
@@ -1003,7 +1002,8 @@ class StagePrtclTransWakeInstability(Stage):
             R_blowout = self.estm_R_blowout
 
         # Apply corrections until there are no more elements in bubble_radius > R_blowout
-        while bubble_radius.max() > R_blowout:
+        n_tries = 0
+        while bubble_radius.max() > R_blowout and n_tries < 10:
         
             mask = self.mask_bubble_radius_spikes(bubble_radius, plasma_z_coord)
             num_rm_elements = np.sum(~mask)  # Number of elements to remove
@@ -1016,6 +1016,8 @@ class StagePrtclTransWakeInstability(Stage):
             # Use interpolation to replace the deleted points
             f_interp = interp1d(plasma_z_coord[mask], bubble_radius[mask], kind='slinear', fill_value="extrapolate") 
             bubble_radius = f_interp(plasma_z_coord)  # Cleaned bubble radius
+
+            n_tries += 1
         
         return bubble_radius
 
@@ -1255,6 +1257,14 @@ class StagePrtclTransWakeInstability(Stage):
             self.__n = self.plasma_density * np.random.normal(loc = 1, scale = self.reljitter.plasma_density)
         return self.__n
         
+
+    # ==================================================
+    def reduce_file_size(self):
+        "Delete attributes to reduce space in the pickled file."
+        del self.drive_beam
+        del self.upramp
+        del self.downramp
+
 
     # ==================================================
     # Overloads the plot_wakefield method in the Stage class.
