@@ -14,15 +14,15 @@ class PlasmaLinac(Linac):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
-        self.source = source  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self.rf_injector = rf_injector  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.source = source
+        self.rf_injector = rf_injector
         self.driver_complex = driver_complex
-        self.stage = stage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self.interstage = interstage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self.bds = bds  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables(). TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables(). TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self.last_interstage = last_interstage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.stage = stage
+        self.interstage = interstage
+        self.bds = bds
+        self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
+        self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
+        self.last_interstage = last_interstage
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
 
@@ -168,6 +168,20 @@ class PlasmaLinac(Linac):
         
         # set the bunch train pattern etc.
         super().assemble_trackables()
+
+
+    def trim_attr_reduce_pickle_size(self):
+        "Delete attributes to reduce space in the pickled file."
+
+        del self.source
+        del self.rf_injector
+        del self.driver_complex
+        del self.stage
+        del self.interstage
+        del self.bds
+        del self._first_stage
+        del self._last_stage
+        del self.last_interstage
 
     
     # survey object
