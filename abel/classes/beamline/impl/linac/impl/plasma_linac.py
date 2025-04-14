@@ -14,15 +14,15 @@ class PlasmaLinac(Linac):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
-        #self.source = source
-        self.rf_injector = rf_injector
+        self.source = source  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.rf_injector = rf_injector  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
         self.driver_complex = driver_complex
-        self.stage = stage
-        self.interstage = interstage
-        self.bds = bds
-        self.first_stage = first_stage
-        self.last_stage = last_stage
-        self.last_interstage = last_interstage
+        self.stage = stage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.interstage = interstage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.bds = bds  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.first_stage = first_stage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.last_stage = last_stage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self.last_interstage = last_interstage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
 
@@ -79,7 +79,7 @@ class PlasmaLinac(Linac):
         
         # declare list of trackables, stages and interstages
         self.trackables = []
-        self.stages = []
+        stages = []
         self.interstages = []
         
         # add source
@@ -119,14 +119,14 @@ class PlasmaLinac(Linac):
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 
-                stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                 
                 # reassign the same driver complex
                 if self.driver_complex is not None:
                     stage_instance.driver_source = self.driver_complex
                 
                 self.trackables.append(stage_instance)
-                self.stages.append(stage_instance)
+                stages.append(stage_instance)
                 
                 # add interstages
                 if (self.interstage is not None) and (i < self.num_stages-1):
@@ -136,19 +136,14 @@ class PlasmaLinac(Linac):
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
-                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                     
                     if self.alternate_interstage_polarity:
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
                         
                     self.trackables.append(interstage_instance)
                     self.interstages.append(interstage_instance)
-            
-            # populate first/last stage properties
-            if self.first_stage is None:
-                self.first_stage = self.stages[0]
-            if self.last_stage is None:
-                self.last_stage = self.stages[-1]
+                    
         
         # add beam delivery system
         if self.bds is not None:
@@ -184,6 +179,36 @@ class PlasmaLinac(Linac):
             return objs, (self.driver_complex.survey_object(), 1)
         else:
             return objs
+    
+
+    from typing import List
+    @property
+    def stages(self) -> List[Stage]:
+        "Returns a list of all ``Stage`` objects in ``self.trackables``."
+
+        stages = []
+
+        for element in self.trackables:
+            if isinstance(element, Stage):
+                stages.append(element)
+        return stages
+    
+
+    # @property
+    # def first_stage(self) -> Stage:
+    #     "Returns the first ``Stage`` object in ``self.trackables``."
+
+    #     stages = self.stages
+    #     return stages[0]
+    
+
+    # @property
+    # def last_stage(self) -> Stage:
+    #     "Returns the last ``Stage`` object in ``self.trackables``."
+
+    #     stages = self.stages
+    #     return stages[-1]
+    
     
     ## ENERGY CONSIDERATIONS
     
