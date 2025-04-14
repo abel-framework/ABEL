@@ -209,6 +209,13 @@ class PlasmaLinac(Linac):
                 return element
         return None
     
+    @first_stage.setter
+    def first_stage(self, stage):
+        "Sets self._first_stage, but only if self.trackables is not already assembled."
+        if self.trackables is not None and isinstance(self.first_stage, Stage):
+            raise ValueError('First stage already set.')
+        self._first_stage = stage
+    
 
     @property
     def last_stage(self) -> Stage:
@@ -221,6 +228,13 @@ class PlasmaLinac(Linac):
             if isinstance(element, Stage):
                 return element
         return None
+    
+    @last_stage.setter
+    def last_stage(self, stage):
+        "Sets self._last_stage, but only if self.trackables is not already assembled."
+        if self.trackables is not None and isinstance(self.last_stage, Stage):
+            raise ValueError('Last stage already set.')
+        self._last_stage = stage
     
     
     
