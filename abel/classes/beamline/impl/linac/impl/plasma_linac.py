@@ -7,6 +7,7 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib import ticker as mticker
 import inspect
+from typing import List
 
 class PlasmaLinac(Linac):
     
@@ -22,7 +23,7 @@ class PlasmaLinac(Linac):
         self.bds = bds
         self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
-        self.last_interstage = last_interstage
+        self._last_interstage = last_interstage
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
 
@@ -80,7 +81,6 @@ class PlasmaLinac(Linac):
         # declare list of trackables, stages and interstages
         self.trackables = []
         stages = []
-        self.interstages = []
         
         # add source
         assert(isinstance(self.source, Source))
@@ -103,8 +103,8 @@ class PlasmaLinac(Linac):
                 assert(isinstance(self._last_stage, Stage))
             if self.interstage is not None:
                 assert(isinstance(self.interstage, Interstage))
-            if self.last_interstage is not None:
-                assert(isinstance(self.last_interstage, Interstage))
+            if self._last_interstage is not None:
+                assert(isinstance(self._last_interstage, Interstage))
             
             # instantiate many stages
             for i in range(self.num_stages):
@@ -131,8 +131,8 @@ class PlasmaLinac(Linac):
                 # add interstages
                 if (self.interstage is not None) and (i < self.num_stages-1):
                     
-                    if i == self.num_stages-2 and self.last_interstage is not None:
-                        interstage_instance = self.last_interstage
+                    if i == self.num_stages-2 and self._last_interstage is not None:
+                        interstage_instance = self._last_interstage
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
@@ -142,7 +142,6 @@ class PlasmaLinac(Linac):
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
                         
                     self.trackables.append(interstage_instance)
-                    self.interstages.append(interstage_instance)
 
         
         # add beam delivery system
@@ -169,23 +168,8 @@ class PlasmaLinac(Linac):
         # set the bunch train pattern etc.
         super().assemble_trackables()
 
-
-    def trim_attr_reduce_pickle_size(self):
-        "Delete attributes to reduce space in the pickled file."
-
-        del self.source
-        del self.rf_injector
-        del self.driver_complex
-        del self.stage
-        del self.interstage
-        del self.bds
-        del self._first_stage
-        del self._last_stage
-        del self.last_interstage
-
     
     # survey object
-        
     def survey_object(self):
         "Survey objects for the plasma linac (adds the driver complex)"
         objs = super().survey_object()
@@ -195,7 +179,6 @@ class PlasmaLinac(Linac):
             return objs
     
 
-    from typing import List
     @property
     def stages(self) -> List[Stage]:
         "Returns a list of all ``Stage`` objects in ``self.trackables``."
@@ -226,6 +209,7 @@ class PlasmaLinac(Linac):
     @first_stage.setter
     def first_stage(self, stage):
         "Sets self._first_stage, but only if self.trackables is not already assembled."
+
         if self.trackables is not None and isinstance(self.first_stage, Stage):
             raise ValueError('First stage already set.')
         self._first_stage = stage
@@ -246,9 +230,62 @@ class PlasmaLinac(Linac):
     @last_stage.setter
     def last_stage(self, stage):
         "Sets self._last_stage, but only if self.trackables is not already assembled."
+
         if self.trackables is not None and isinstance(self.last_stage, Stage):
             raise ValueError('Last stage already set.')
         self._last_stage = stage
+
+
+    @property
+    def interstages(self) -> List[Interstage]:
+        "Returns a list of all ``Interstage`` objects in ``self.trackables``."
+
+        interstages = []
+
+        if self.trackables is None:
+            raise ValueError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
+
+        for element in self.trackables:
+            if isinstance(element, Interstage):
+                interstages.append(element)
+        return interstages
+    
+
+    @property
+    def last_interstage(self) -> Interstage:
+        "Returns the last ``Interstage`` object in ``self.trackables``."
+
+        if self.trackables is None:
+            raise ValueError('The PlasmaLinac object has not yet been assembled.')
+
+        for element in reversed(self.trackables):
+            if isinstance(element, Interstage):
+                return element
+        return None
+    
+
+    @last_interstage.setter
+    def last_interstage(self, interstage):
+        "Sets self._last_interstage, but only if self.trackables is not already assembled."
+
+        if self.trackables is not None and isinstance(self.last_interstage, Interstage):
+            raise ValueError('Last interstage already set.')
+        self._last_interstage = interstage
+
+
+    def trim_attr_reduce_pickle_size(self):
+        "Delete attributes to reduce space in the pickled file."
+
+        # The below attributes are all saved in self.trackables:
+        del self.source
+        del self.rf_injector
+        del self.driver_complex
+        del self.stage
+        del self.interstage
+        del self.bds
+        del self._first_stage
+        del self._last_stage
+        del self._last_interstage
     
     
     
