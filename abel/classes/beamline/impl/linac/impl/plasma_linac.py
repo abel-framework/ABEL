@@ -20,8 +20,8 @@ class PlasmaLinac(Linac):
         self.stage = stage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
         self.interstage = interstage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
         self.bds = bds  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self.first_stage = first_stage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
-        self.last_stage = last_stage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables(). TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
+        self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables(). TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
         self.last_interstage = last_interstage  # TODO: Can be removed after running PlasmaLinac.assemble_trackables(), as it will be saved in PlasmaLinac.trackables?
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
@@ -97,10 +97,10 @@ class PlasmaLinac(Linac):
             
             # check types
             assert(isinstance(self.stage, Stage))
-            if self.first_stage is not None:
-                assert(isinstance(self.first_stage, Stage))
-            if self.last_stage is not None:
-                assert(isinstance(self.last_stage, Stage))
+            if self._first_stage is not None:
+                assert(isinstance(self._first_stage, Stage))
+            if self._last_stage is not None:
+                assert(isinstance(self._last_stage, Stage))
             if self.interstage is not None:
                 assert(isinstance(self.interstage, Interstage))
             if self.last_interstage is not None:
@@ -110,10 +110,10 @@ class PlasmaLinac(Linac):
             for i in range(self.num_stages):
                 
                 # add stages
-                if i == 0 and self.first_stage is not None:
-                    stage_instance = self.first_stage
-                elif i == (self.num_stages-1) and self.last_stage is not None:
-                    stage_instance = self.last_stage
+                if i == 0 and self._first_stage is not None:
+                    stage_instance = self._first_stage
+                elif i == (self.num_stages-1) and self._last_stage is not None:
+                    stage_instance = self._last_stage
                 elif i == 0:
                     stage_instance = self.stage
                 else:
@@ -143,7 +143,7 @@ class PlasmaLinac(Linac):
                         
                     self.trackables.append(interstage_instance)
                     self.interstages.append(interstage_instance)
-                    
+
         
         # add beam delivery system
         if self.bds is not None:
@@ -188,26 +188,40 @@ class PlasmaLinac(Linac):
 
         stages = []
 
+        if self.trackables is None:
+            raise ValueError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
+
         for element in self.trackables:
             if isinstance(element, Stage):
                 stages.append(element)
         return stages
     
 
-    # @property
-    # def first_stage(self) -> Stage:
-    #     "Returns the first ``Stage`` object in ``self.trackables``."
+    @property
+    def first_stage(self) -> Stage:
+        "Returns the first ``Stage`` object in ``self.trackables``."
 
-    #     stages = self.stages
-    #     return stages[0]
+        if self.trackables is None:
+            raise ValueError('The PlasmaLinac object has not yet been assembled.')
+
+        for element in self.trackables:
+            if isinstance(element, Stage):
+                return element
+        return None
     
 
-    # @property
-    # def last_stage(self) -> Stage:
-    #     "Returns the last ``Stage`` object in ``self.trackables``."
+    @property
+    def last_stage(self) -> Stage:
+        "Returns the last ``Stage`` object in ``self.trackables``."
 
-    #     stages = self.stages
-    #     return stages[-1]
+        if self.trackables is None:
+            raise ValueError('The PlasmaLinac object has not yet been assembled.')
+
+        for element in reversed(self.trackables):
+            if isinstance(element, Stage):
+                return element
+        return None
+    
     
     
     ## ENERGY CONSIDERATIONS
