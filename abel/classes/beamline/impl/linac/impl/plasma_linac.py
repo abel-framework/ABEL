@@ -288,60 +288,9 @@ class PlasmaLinac(Linac):
             raise ValueError('Last interstage already set.')
         self._last_interstage = interstage
 
-    
-    # @property
-    # def source(self) -> Source:
-    #     "Returns the ``Source`` object in ``self.trackables``."
-
-    #     if self.trackables is None:
-    #         raise ValueError('The PlasmaLinac object has not yet been assembled.')
-
-    #     for element in self.trackables:
-    #         if isinstance(element, Source):
-    #             return element
-    #     return None
-    
-
-    # @source.setter
-    # def source(self, source_instance :  Source):
-    #     "Sets self._source, but only if self.trackables is not already assembled."
-
-    #     if self.trackables is not None and isinstance(self.source, Source):
-    #         raise ValueError('Source already set.')
-    #     self._source = source_instance
-
-
-    # @property
-    # def rf_injector(self) -> RFAccelerator:
-    #     "Returns the RFAccelerator object in ``self.trackables``."
-
-    #     if self.trackables is None:
-    #         raise ValueError('The PlasmaLinac object has not yet been assembled.')
-
-    #     for element in self.trackables:
-    #         if isinstance(element, RFAccelerator):
-    #             return element
-    #     return None
-    
-
-    # @rf_injector.setter
-    # def rf_injector(self, rf_injector_instace : RFAccelerator):
-    #     "Sets self._rf_injector, but only if self.trackables is not already assembled."
-
-    #     if self.trackables is not None and isinstance(self.rf_injector, RFAccelerator):
-    #         raise ValueError('RF-injector already set.')
-    #     self._rf_injector = rf_injector_instace
-
 
     def trim_attr_reduce_pickle_size(self):
         "Delete attributes to reduce space in the pickled file."
-        # The below attributes are all saved in self.trackables: TODO: make propoerty methods for accessing all of these attributes through self.trackables.
-        #del self._source
-        #del self._rf_injector
-        #del self._driver_complex
-        #del self.stage
-        #del self.interstage
-        #del self.bds
         self._first_stage = None
         self._last_stage = None
         self._last_interstage = None
