@@ -23,7 +23,7 @@ class PlasmaLinac(Linac):
         self.bds = bds
         self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
-        self._last_interstage = last_interstage
+        self._last_interstage = last_interstage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
 
@@ -97,23 +97,36 @@ class PlasmaLinac(Linac):
             
             # check types
             assert(isinstance(self.stage, Stage))
+
             if self._first_stage is not None:
                 assert(isinstance(self._first_stage, Stage))
+                first_stage = self._first_stage
+            else:  # Get first_stage from self.trackables
+                first_stage = self.first_stage
+
             if self._last_stage is not None:
                 assert(isinstance(self._last_stage, Stage))
+                last_stage = self._last_stage
+            else:  # Get last_stage from self.trackables
+                last_stage = self.last_stage
+
             if self.interstage is not None:
                 assert(isinstance(self.interstage, Interstage))
+
             if self._last_interstage is not None:
                 assert(isinstance(self._last_interstage, Interstage))
+                last_interstage = self._last_interstage
+            else:  # Get last_interstage from self.trackables
+                last_interstage = self.last_interstage
             
             # instantiate many stages
             for i in range(self.num_stages):
                 
                 # add stages
-                if i == 0 and self._first_stage is not None:
-                    stage_instance = self._first_stage
-                elif i == (self.num_stages-1) and self._last_stage is not None:
-                    stage_instance = self._last_stage
+                if i == 0 and first_stage is not None:
+                    stage_instance = first_stage
+                elif i == (self.num_stages-1) and last_stage is not None:
+                    stage_instance = last_stage
                 elif i == 0:
                     stage_instance = self.stage
                 else:
@@ -131,8 +144,8 @@ class PlasmaLinac(Linac):
                 # add interstages
                 if (self.interstage is not None) and (i < self.num_stages-1):
                     
-                    if i == self.num_stages-2 and self._last_interstage is not None:
-                        interstage_instance = self._last_interstage
+                    if i == self.num_stages-2 and last_interstage is not None:
+                        interstage_instance = last_interstage
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
@@ -167,6 +180,9 @@ class PlasmaLinac(Linac):
         
         # set the bunch train pattern etc.
         super().assemble_trackables()
+
+        # Delete attributes that are now stored in self.trackables
+        self.trim_attr_reduce_pickle_size()
 
     
     # survey object
@@ -272,20 +288,63 @@ class PlasmaLinac(Linac):
             raise ValueError('Last interstage already set.')
         self._last_interstage = interstage
 
+    
+    # @property
+    # def source(self) -> Source:
+    #     "Returns the ``Source`` object in ``self.trackables``."
+
+    #     if self.trackables is None:
+    #         raise ValueError('The PlasmaLinac object has not yet been assembled.')
+
+    #     for element in self.trackables:
+    #         if isinstance(element, Source):
+    #             return element
+    #     return None
+    
+
+    # @source.setter
+    # def source(self, source_instance :  Source):
+    #     "Sets self._source, but only if self.trackables is not already assembled."
+
+    #     if self.trackables is not None and isinstance(self.source, Source):
+    #         raise ValueError('Source already set.')
+    #     self._source = source_instance
+
+
+    # @property
+    # def rf_injector(self) -> RFAccelerator:
+    #     "Returns the RFAccelerator object in ``self.trackables``."
+
+    #     if self.trackables is None:
+    #         raise ValueError('The PlasmaLinac object has not yet been assembled.')
+
+    #     for element in self.trackables:
+    #         if isinstance(element, RFAccelerator):
+    #             return element
+    #     return None
+    
+
+    # @rf_injector.setter
+    # def rf_injector(self, rf_injector_instace : RFAccelerator):
+    #     "Sets self._rf_injector, but only if self.trackables is not already assembled."
+
+    #     if self.trackables is not None and isinstance(self.rf_injector, RFAccelerator):
+    #         raise ValueError('RF-injector already set.')
+    #     self._rf_injector = rf_injector_instace
+
 
     def trim_attr_reduce_pickle_size(self):
         "Delete attributes to reduce space in the pickled file."
-
-        # The below attributes are all saved in self.trackables:
-        del self.source
-        del self.rf_injector
-        del self.driver_complex
-        del self.stage
-        del self.interstage
-        del self.bds
-        del self._first_stage
-        del self._last_stage
-        del self._last_interstage
+        # The below attributes are all saved in self.trackables: TODO: make propoerty methods for accessing all of these attributes through self.trackables.
+        #del self._source
+        #del self._rf_injector
+        #del self._driver_complex
+        #del self.stage
+        #del self.interstage
+        #del self.bds
+        self._first_stage = None
+        self._last_stage = None
+        self._last_interstage = None
     
     
     
