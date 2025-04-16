@@ -1,7 +1,7 @@
 from abel import Beam, Linac, Source, DriverComplex, RFAccelerator, Stage, Interstage, BeamDeliverySystem, CONFIG
+from abel.classes.beamline.beamline import NotAssembledError
 import scipy.constants as SI
 import copy, os
-from datetime import datetime
 from matplotlib import pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
@@ -181,7 +181,7 @@ class PlasmaLinac(Linac):
         # set the bunch train pattern etc.
         super().assemble_trackables()
 
-        # Delete attributes that are now stored in self.trackables
+        # Clear attributes that are now stored in self.trackables
         self.trim_attr_reduce_pickle_size()
 
     
@@ -202,7 +202,7 @@ class PlasmaLinac(Linac):
         stages = []
 
         if self.trackables is None:
-            raise ValueError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
 
         for element in self.trackables:
             if isinstance(element, Stage):
@@ -215,7 +215,7 @@ class PlasmaLinac(Linac):
         "Returns the first ``Stage`` object in ``self.trackables``."
 
         if self.trackables is None:
-            raise ValueError('The PlasmaLinac object has not yet been assembled.')
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled.')
 
         for element in self.trackables:
             if isinstance(element, Stage):
@@ -236,7 +236,7 @@ class PlasmaLinac(Linac):
         "Returns the last ``Stage`` object in ``self.trackables``."
 
         if self.trackables is None:
-            raise ValueError('The PlasmaLinac object has not yet been assembled.')
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled.')
 
         for element in reversed(self.trackables):
             if isinstance(element, Stage):
@@ -259,7 +259,7 @@ class PlasmaLinac(Linac):
         interstages = []
 
         if self.trackables is None:
-            raise ValueError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
 
         for element in self.trackables:
             if isinstance(element, Interstage):
@@ -272,7 +272,7 @@ class PlasmaLinac(Linac):
         "Returns the last ``Interstage`` object in ``self.trackables``."
 
         if self.trackables is None:
-            raise ValueError('The PlasmaLinac object has not yet been assembled.')
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled.')
 
         for element in reversed(self.trackables):
             if isinstance(element, Interstage):
@@ -1365,5 +1365,3 @@ class PlasmaLinac(Linac):
         plt.close()
 
         return filename
-
-        
