@@ -1227,6 +1227,6 @@ class VariablesOverspecifiedError(Exception):
 class VariablesOutOfRangeError(Exception):
     "Exception class to throw when calculated or set variables are out of allowed range."
 class StageError(Exception):
-    "Exception class for Stege to throw in other cases."
+    "Exception class for ``Stage`` to throw in other cases."
 
     
