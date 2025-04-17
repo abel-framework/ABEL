@@ -9,12 +9,13 @@ SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1, depletion_efficiency=0.75):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
         self.transformer_ratio = transformer_ratio
         self.depletion_efficiency = depletion_efficiency
+        self.calc_evolution = calc_evolution
         
     
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
@@ -86,7 +87,12 @@ class StageBasic(Stage):
                 
 
         # ========== Betatron oscillations ==========
-        beam.apply_betatron_motion(self.length_flattop, self.plasma_density, self.nom_energy_gain_flattop, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+        deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
+        if self.calc_evolution:
+            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), calc_evolution=self.calc_evolution)
+            self.evolution.beam = evol
+        else:
+            beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
 
 
         # ========== Accelerate beam with homogeneous energy gain ==========

@@ -182,4 +182,9 @@ class Beamline(Trackable, Runnable, CostModeled):
                 os.makedirs(plot_path)
             filename = plot_path + 'survey' + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+
+
+class NotAssembledError(Exception):
+    "Exception class for ``Beanline`` to throw if ``self.trackables`` have not been assembled."
+    pass
         
