@@ -623,6 +623,9 @@ class StagePrtclTransWakeInstability(Stage):
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.run_tests:
             if self.parent is None:
+                # The original drive beam before roation and ramps
+                self.driver_incoming = self.drive_beam
+
                 # The outgoing beams for the main stage need to be recorded before potential rotation for correct comparison with its ramps.
                 self.beam_out = beam
                 self.driver_out = driver

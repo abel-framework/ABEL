@@ -230,7 +230,7 @@ def test_driver_unrotation():
 
     stage.nom_energy = 369.6e9                                                    # [eV], HALHF v2 last stage nominal input energy
     _, driver = stage.track(main_source.track())
-    driver0 = stage.drive_beam
+    driver0 = stage.driver_incoming
 
     assert np.allclose(driver0.x_angle(), driver.x_angle(), rtol=1e-15, atol=0.0)
     assert np.allclose(driver0.y_angle(), driver.y_angle(), rtol=1e-15, atol=0.0)
