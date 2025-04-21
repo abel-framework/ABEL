@@ -129,6 +129,8 @@ class PrtclTransWakeEvolution:
         self.driver.beta_y = np.empty(data_length)
         self.driver.emit_nx = np.empty(data_length)
         self.driver.emit_ny = np.empty(data_length)
+        self.driver.emit_nx_clean = np.empty(data_length)
+        self.driver.emit_ny_clean = np.empty(data_length)
         self.driver.num_particles = np.empty(data_length)
         self.driver.charge = np.empty(data_length)
         self.driver.plasma_density = np.empty(data_length)  # [m^-3]
@@ -190,9 +192,11 @@ class PrtclTransWakeEvolution:
 
             driver_uzs = (energy2proper_velocity(driver_energies))
             driver_uxs = driver_xps * driver_uzs
-            self.driver.emit_nx[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.x, driver_uxs/SI.c, weightings, clean)))
+            self.driver.emit_nx[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.x, driver_uxs/SI.c, weightings, False)))
+            self.driver.emit_nx_clean[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.x, driver_uxs/SI.c, weightings, True)))
             driver_uys = driver_yps * driver_uzs
-            self.driver.emit_ny[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.y, driver_uys/SI.c, weightings, clean)))
+            self.driver.emit_ny[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.y, driver_uys/SI.c, weightings, False)))
+            self.driver.emit_ny_clean[self.index] = np.sqrt(np.linalg.det(weighted_cov(driver.y, driver_uys/SI.c, weightings, True)))
             
             self.driver.num_particles[self.index] = len(driver_pzs)
             self.driver.charge[self.index] = driver.q_species * np.nansum(weightings)  #TODO: should also clean this
@@ -213,8 +217,10 @@ class PrtclTransWakeEvolution:
             self.driver.divergence_y[self.index] = driver.divergence_y(clean=clean)
             self.driver.beta_x[self.index] = driver.beta_x(clean=clean)
             self.driver.beta_y[self.index] = driver.beta_y(clean=clean)
-            self.driver.emit_nx[self.index] = driver.norm_emittance_x(clean=clean)
-            self.driver.emit_ny[self.index] = driver.norm_emittance_y(clean=clean)
+            self.driver.emit_nx[self.index] = driver.norm_emittance_x(clean=False)
+            self.driver.emit_nx_clean[self.index] = driver.norm_emittance_x(clean=True)
+            self.driver.emit_ny[self.index] = driver.norm_emittance_y(clean=False)
+            self.driver.emit_ny_clean[self.index] = driver.norm_emittance_y(clean=True)
             self.driver.num_particles[self.index] = len(driver)
             self.driver.charge[self.index] = driver.charge()
 
