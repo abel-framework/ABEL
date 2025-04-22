@@ -249,10 +249,12 @@ class StagePrtclTransWakeInstability(Stage):
         self.show_prog_bar = verbose
 
         # Extract quantities
+        if self.length_flattop is None:
+            raise ValueError('length_flattop is not defined.')
         plasma_density = self.plasma_density
-        stage_length = self.length
+        stage_length = self.length_flattop  # TODO: Remove with the "if self.parallel_track_2D is True: " part
         #gamma0 = beam_incoming.gamma()
-        time_step_mod = self.time_step_mod
+        time_step_mod = self.time_step_mod  # TODO: Remove with the "if self.parallel_track_2D is True: " part
 
         particle_mass = beam_incoming.particle_mass
         self.stage_number = beam_incoming.stage_number
@@ -592,8 +594,8 @@ class StagePrtclTransWakeInstability(Stage):
                 beam_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
                 
                 # Add drifts to the beam
-                x_drift = self.length * np.tan(driver_x_angle)
-                y_drift = self.length * np.tan(driver_y_angle)
+                x_drift = self.length_flattop * np.tan(driver_x_angle)
+                y_drift = self.length_flattop * np.tan(driver_y_angle)
                 xs = beam_outgoing.xs()
                 ys = beam_outgoing.ys()
                 beam_outgoing.set_xs(xs + x_drift)
@@ -1714,7 +1716,7 @@ class StagePrtclTransWakeInstability(Stage):
         fig.set_figheight(12)
         plt.subplots_adjust(hspace=0.05)  # Reduce the space between subplots
 
-        axs[0,0].plot(np.array([0.0, self.length]), np.array([energies[0], nom_energy])/1e9, ':', color=col0, label='Nominal value')
+        axs[0,0].plot(np.array([0.0, self.length_flattop]), np.array([energies[0], nom_energy])/1e9, ':', color=col0, label='Nominal value')
         axs[0,0].plot(prop_length, energies/1e9, color=col1)
         #axs[0,0].plot(prop_length, np.ones_like(prop_length)*nom_energy/1e9, ':', color=col0)
         #axs[0,0].set_xlabel(long_label)
