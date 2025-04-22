@@ -196,6 +196,8 @@ class StagePrtclTransWakeInstability(Stage):
         self.main_num_profile = None
         self.z_slices = None
         self.main_slices_edges = None
+        self.driver_num_profile = None
+        self.driver_z_slices = None
 
         # Beam evolution diagnostics
         if isinstance(probe_evol_period, int) == False:
@@ -261,7 +263,7 @@ class StagePrtclTransWakeInstability(Stage):
             driver_incoming = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
             driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
-            self.drive_beam = driver_incoming                    ######################
+            #self.drive_beam = driver_incoming                    ######################
         
 
         # ========== Rotate the coordinate system of the beams ==========
@@ -394,7 +396,7 @@ class StagePrtclTransWakeInstability(Stage):
         zs_rho = info_rho.z
         
         # Cut out axial Ez over the ROI
-        Ez, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
+        Ez_roi, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
         
         # Extract the plasma bubble radius
         self.zs_bubble_radius_axial = zs_rho
@@ -416,14 +418,18 @@ class StagePrtclTransWakeInstability(Stage):
         self.Ez_fit_obj = Ez_fit
         self.rb_fit_obj = rb_fit
         
-        self.Ez_roi = Ez
+        self.Ez_roi = Ez_roi
         #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
         #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
         self.bubble_radius_roi = bubble_radius_roi
         self.bubble_radius_axial = bubble_radius_wakeT
+
+        driver_num_profile, driver_z_slices = self.longitudinal_number_distribution(beam=drive_beam_ramped)
+        self.driver_num_profile = driver_num_profile
+        self.driver_z_slices = driver_z_slices
         
         # Make plots for control if necessary
-        #self.plot_Ez_rb_cut(z_slices, main_num_profile, zs_Ez_wakeT, Ez_axis_wakeT, Ez, zs_rho, bubble_radius_wakeT, bubble_radius_roi, zlab=r'$z$ [$\mathrm{\mu}$m]')
+        #self.plot_Ez_rb_cut()
 
         
         # ========== Instability tracking ==========
@@ -624,7 +630,7 @@ class StagePrtclTransWakeInstability(Stage):
         if self.run_tests:
             if self.parent is None:
                 # The original drive beam before roation and ramps
-                self.driver_incoming = self.drive_beam
+                self.driver_incoming = driver_incoming
 
                 # The outgoing beams for the main stage need to be recorded before potential rotation for correct comparison with its ramps.
                 self.beam_out = beam
@@ -668,8 +674,8 @@ class StagePrtclTransWakeInstability(Stage):
         self.initial.plasma.density.extent = metadata_rho0.imshow_extent  # array([z_min, z_max, x_min, x_max])
 
         # ========== Save initial drive beam and main beam ==========
-        self.initial.driver.instance = copy.deepcopy(driver0)
-        self.initial.beam.instance = copy.deepcopy(beam0)
+        #self.initial.driver.instance = copy.deepcopy(driver0)
+        #self.initial.beam.instance = copy.deepcopy(beam0)
 
         # ========== Calculate and save initial beam particle density ==========
         zs_beams = np.append(driver0.zs(), beam0.zs())
@@ -719,8 +725,8 @@ class StagePrtclTransWakeInstability(Stage):
         self.final.plasma.density.extent = metadata_rho.imshow_extent  # array([z_min, z_max, x_min, x_max])
 
         # ========== Save final drive beam and main beam ==========
-        self.final.driver.instance = copy.deepcopy(driver)
-        self.final.beam.instance = copy.deepcopy(beam)
+        #self.final.driver.instance = copy.deepcopy(driver)
+        #self.final.beam.instance = copy.deepcopy(beam)
 
         # ========== Calculate and save final beam particle density ==========
         zs_beams = np.append(driver.zs(), beam.zs())
@@ -1607,32 +1613,20 @@ class StagePrtclTransWakeInstability(Stage):
 
 
     # ==================================================
-    def plot_Ez_rb_cut(self, z_slices=None, main_num_profile=None, zs_Ez=None, Ez=None, Ez_cut=None, zs_rho=None, bubble_radius=None, zlab=r'$z$ [$\mathrm{\mu}$m]'):
+    def plot_Ez_rb_cut(self):
 
-        if z_slices is None:
-            z_slices = self.z_slices
-        if main_num_profile is None:
-            main_num_profile = self.main_num_profile
-        if zs_Ez is None:
-            zs_Ez = self.initial.plasma.wakefield.onaxis.zs
-        if Ez is None:
-            Ez = self.initial.plasma.wakefield.onaxis.Ezs
-        if Ez_cut is None:
-            zs = self.initial.beam.instance.zs()
-            indices = np.argsort(zs)
-            zs_sorted = zs[indices]
-            Ez_cut = self.Ez_fit_obj(zs_sorted)
-            bubble_radius_cut = self.rb_fit_obj(zs_sorted)
-        if zs_rho is None:
-            zs_rho = self.zs_bubble_radius_axial
-        if bubble_radius is None:
-            bubble_radius = self.bubble_radius_axial
-        if self.initial.driver.instance is None:
-            drive_beam = self.driver_source.track()
-        else:
-            drive_beam = self.initial.driver.instance
-        driver_num_profile, driver_z_slices = self.longitudinal_number_distribution(beam=drive_beam)
-        
+        z_slices = self.z_slices
+        main_num_profile = self.main_num_profile
+        zs_Ez = self.initial.plasma.wakefield.onaxis.zs
+        Ez = self.initial.plasma.wakefield.onaxis.Ezs
+        zs_rho = self.zs_bubble_radius_axial
+        Ez_cut = self.Ez_roi
+        bubble_radius = self.bubble_radius_axial
+        bubble_radius_cut = self.bubble_radius_roi
+        driver_num_profile = self.driver_num_profile
+        driver_z_slices = self.driver_z_slices
+
+        zlab=r'$z$ [$\mathrm{\mu}$m]'
         
         # Set up a figure with axes
         fig_wakeT_cut, axs_wakeT_cut = plt.subplots(nrows=1, ncols=2, layout='constrained', figsize=(10, 4))
@@ -1647,7 +1641,7 @@ class StagePrtclTransWakeInstability(Stage):
         axs_wakeT_cut[0].set_ylabel('Beam number profiles $N(z)$')
         ax_Ez_cut_wakeT2 = axs_wakeT_cut[0].twinx()
         ax_Ez_cut_wakeT2.plot(zs_Ez*1e6, Ez/1e9, label='Full $E_z$')
-        ax_Ez_cut_wakeT2.plot(zs_sorted*1e6, Ez_cut/1e9, 'r', label='Cut-out $E_z$')
+        ax_Ez_cut_wakeT2.plot(z_slices*1e6, Ez_cut/1e9, 'r', label='Cut-out $E_z$')
         ax_Ez_cut_wakeT2.set_ylabel('$E_z$ [GV/m]')
         ax_Ez_cut_wakeT2.legend(loc='lower right')
         
@@ -1660,11 +1654,11 @@ class StagePrtclTransWakeInstability(Stage):
         axs_wakeT_cut[1].set_ylabel('Beam number profiles $N(z)$')
         ax_rb_cut_wakeT2 = axs_wakeT_cut[1].twinx()
         ax_rb_cut_wakeT2.plot(zs_rho*1e6, bubble_radius*1e6, label=r'Full $r_\mathrm{b}$')
-        ax_rb_cut_wakeT2.plot(zs_sorted*1e6, bubble_radius_cut*1e6, 'r', label=r'Cut-out $r_\mathrm{b}$')
+        ax_rb_cut_wakeT2.plot(z_slices*1e6, bubble_radius_cut*1e6, 'r', label=r'Cut-out $r_\mathrm{b}$')
         ax_rb_cut_wakeT2.set_ylabel(r'Bubble radius [$\mathrm{\mu}$m]')
         ax_rb_cut_wakeT2.legend(loc='upper right')
         fig_wakeT_cut.suptitle('Initial step')
-        
+
 
     # ==================================================
     def plot_flattop_evolution(self, beam='beam'):
