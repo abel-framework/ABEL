@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, particle_mass=SI.m_e):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -38,6 +38,8 @@ class Beam():
         # bunch pattern information
         self.num_bunches_in_train = num_bunches_in_train
         self.bunch_separation = bunch_separation # [s]
+        
+        self.particle_mass = particle_mass
         
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
