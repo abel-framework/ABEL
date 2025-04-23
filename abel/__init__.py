@@ -56,8 +56,9 @@ from .classes.stage.impl.stage_particle_transverse_wake_instability import *
 from .classes.interstage.impl.interstage_null import *
 from .classes.interstage.impl.interstage_basic import *
 from .classes.interstage.impl.interstage_elegant import *
-from .classes.interstage.impl.interstage_ocelot import *
+#from .classes.interstage.impl.interstage_ocelot import *
 from .classes.interstage.impl.interstage_impactx import InterstageImpactX
+from .classes.interstage.impl.interstage_quads_impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import *
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import *
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
