@@ -1,40 +1,58 @@
 from abel.classes.interstage.interstage import Interstage
 import numpy as np
-from abel.apis.impactx.impactx_api import run_impactx
+from scipy import optimize as optim
+from abel.apis.impactx.impactx_api import run_impactx, run_envelope_impactx
 import contextlib, os
 from types import SimpleNamespace
 from matplotlib import pyplot as plt
 import scipy.constants as SI
 
-class InterstageImpactX(Interstage):
+class InterstageQuadsImpactX(Interstage):
     
-    def __init__(self, nom_energy=None, dipole_length=None, dipole_field=None, beta0=None, R56=0):
+    def __init__(self, nom_energy=None, dipole_length=None, dipole_field=None, beta0=None):
         
         super().__init__(nom_energy=nom_energy, dipole_length=dipole_length, dipole_field=dipole_field, beta0=beta0)
-        
-        self.R56 = R56
-
-        self.enable_nonlinearity = True
-        self.enable_sextupole = True
-        self.enable_chicane = False
         
         self.enable_space_charge = False
         self.enable_csr = False
         self.enable_isr = False
         
-        self.L2_by_L1 = 1
-        self.B2_by_B1 = np.sqrt(2)
-        
         self.keep_data = False
+        
+        self._quad_strength1 = None
+        self._quad_strength2 = None
+        self.B2_by_B1 = -0.89785923
+        self.L2_by_L1 = 0.25
 
         self.evolution = SimpleNamespace()
 
+    @property
+    def quad_strength1(self) -> float:
+        if self._quad_strength1 is None:
+            return -4.34019779/self.dipole_length**2
+        else:
+            return self._quad_strength1
+    @quad_strength1.setter
+    def quad_strength1(self, val):
+        self._quad_strength1 = val
+
+    @property
+    def quad_strength2(self) -> float:
+        if self._quad_strength2 is None:
+            return 5.77312688/self.dipole_length**2
+        else:
+            return self._quad_strength2
+    @quad_strength2.setter
+    def quad_strength2(self, val):
+        self._quad_strength2 = val
+        
     
      # lattice length
     def get_length(self):
-        return self.dipole_length*(2+2*self.L2_by_L1)
+        return self.dipole_length*(2+2.4)
 
-    def get_lattice(self):
+    
+    def get_lattice(self, kq1=None, kq2=None, B2=None, half_lattice=False, exact=True):
 
         import impactx
         
@@ -43,65 +61,112 @@ class InterstageImpactX(Interstage):
         
         L1 = self.dipole_length
         B1 = self.dipole_field
-        L2 = self.L2_by_L1*L1
+        L2 = L1*self.L2_by_L1
 
+        if kq1 is None:
+            kq1 = self.quad_strength1
+        if kq2 is None:
+            kq2 = self.quad_strength2
+        if B2 is None:
+            B2 = self.dipole_field*self.B2_by_B1
+            
         E0 = self.nom_energy
         gamma0 = E0*SI.e/(SI.m_e*SI.c**2);
         v0 = SI.c*np.sqrt(1-1/gamma0**2);
         p0 = SI.m_e*gamma0*v0;
 
+        # number of slices per ds in the element
+        ns = 25
+        
         # define dipole
-        Dx = L1**2*B1*SI.e/(2*p0)
-        phi = B1*L1*SI.e/p0
-        ns = 25  # number of slices per ds in the element
-        bend = impactx.elements.ExactSbend(name="dipole", ds=L1, phi=np.rad2deg(phi), B=B1, nslice=ns)
-        
-        # define plasma lens
-        f0 = L1*L2/(L1+L2)
-        dtaper = int(self.enable_nonlinearity)*1/Dx
-        pl = impactx.elements.TaperedPL(k=1/f0, taper=dtaper, name="plasmalens")
-
-        B2 = int(self.enable_chicane)*self.B2_by_B1*B1
-        if abs(B2) > 0:
-            phi2 = B2*(L2/2)*(SI.e/p0)
-            chicane1 = impactx.elements.ExactSbend(name="chicane1", ds=L2/2, phi=np.rad2deg(phi2), B=B2, nslice=ns)
+        dipole_radcurv1 = p0/(B1*SI.e)
+        if exact:
+            bend1 = impactx.elements.ExactSbend(name="dipole1", ds=L1, B=B1, phi=np.rad2deg(L1/dipole_radcurv1), nslice=ns)
         else:
-            chicane1 = impactx.elements.ExactDrift(name="chicane1", ds=L2/2, nslice=ns)
+            bend1 = impactx.elements.Sbend(name="dipole1", ds=L1, rc=dipole_radcurv1, nslice=ns)
 
-        B3 = -B2 - B1*(L1/L2)*(1-L1/L2)
-        if abs(B3) > 0:
-            phi3 = B3*(L2/2)*(SI.e/p0)
-            chicane2 = impactx.elements.ExactSbend(name="chicane2", ds=L2/2, phi=np.rad2deg(phi3), B=B3, nslice=ns)
+        # define first quad
+        Lq = L1*0.4;
+        if exact:
+            quad1 = impactx.elements.ExactQuad(name="quad1", ds=Lq, k=kq1, nslice=ns)
         else:
-            chicane2 = impactx.elements.ExactDrift(name="chicane2", ds=L2/2, nslice=ns)
-    
-        Dx_mid = Dx*(1/4)*(1 + 3*L2/L1 + 2*(B2*L2**2)/(B1*L1**2))
-        DDxp_mid = (2*B1*L1*SI.e/p0)*((3/4)*(L1/L2 + 1) - 1)*(2.0-int(self.enable_nonlinearity))
-        m_sext = int(self.enable_sextupole)*2*DDxp_mid/Dx_mid**2
-        sextupole = impactx.elements.Multipole(multipole=3, K_normal=m_sext, K_skew=0, name="sextupole")
-        
-        # add beam diagnostics
-        #monitor = impactx.elements.BeamMonitor("monitor", backend="h5")
+            quad1 = impactx.elements.Quad(name="quad1", ds=Lq, k=kq1, nslice=ns)
 
+        # define drift
+        dipole_radcurv2 = p0/(B2*SI.e)
+        if exact:
+            bend2 = impactx.elements.ExactSbend(name="dipole2", ds=L2, B=B2, phi=np.rad2deg(L2/dipole_radcurv2), nslice=ns)
+        else:
+            bend2 = impactx.elements.Sbend(name="dipole2", ds=L2, rc=dipole_radcurv2, nslice=ns)
+        
+        # define second quad
+        if exact:
+            half_quad2 = impactx.elements.ExactQuad(name="quad2", ds=Lq/2, k=kq2, nslice=ns)
+        else:
+            half_quad2 = impactx.elements.Quad(name="quad2", ds=Lq/2, k=kq2, nslice=ns)
+
+        if exact:
+            drift = impactx.elements.ExactDrift(name="drift", ds=L1*0.001, nslice=2)
+        else:
+            drift = impactx.elements.Drift(name="drift", ds=L1*0.001, nslice=2)
+        
         # specify the lattice sequence
-        #lattice.append(monitor)
-        lattice.append(bend)
-        #lattice.append(monitor)
-        lattice.append(pl)
-        #lattice.append(monitor)
-        lattice.extend([chicane1, chicane2]) #lattice.extend([chicane1, monitor, chicane2])
-        #lattice.append(monitor)
-        lattice.append(sextupole)
-        #lattice.append(monitor)
-        lattice.extend([chicane2, chicane1]) #lattice.extend([chicane2, monitor, chicane1])
-        #lattice.append(monitor)
-        lattice.append(pl)
-        #lattice.append(monitor)
-        lattice.append(bend)
-        #lattice.append(monitor)
+        lattice.append(bend1)
+        lattice.append(quad1)
+        lattice.append(bend2)
+        lattice.append(half_quad2)
+        lattice.append(drift)
+        if not half_lattice:
+            lattice.append(drift)
+            lattice.append(half_quad2)
+            lattice.append(bend2)
+            lattice.append(quad1) 
+            lattice.append(bend1)
         
         return lattice
 
+
+    def match_lattice(self, runnable=None):
+
+        from impactx import twiss, distribution
+        
+        # define the matching merit function
+        def match_fcn(params):
+            lattice = self.get_lattice(kq1=params[0], kq2=params[1], B2=params[2], half_lattice=True, exact=False)
+    
+            # make particle distribution
+            distr = distribution.KVdist(
+                **twiss(
+                    beta_x=self.beta0, alpha_x=0.0, emitt_x=1.0e-6,
+                    beta_y=self.beta0, alpha_y=0.0, emitt_y=1.0e-6,
+                    beta_t=0.5, alpha_t=0.0, emitt_t=1.0e-12,
+                )
+            )
+            
+            # envelope tracking using ImpactX
+            evol = run_envelope_impactx(lattice, distr, nom_energy=self.nom_energy, runnable=runnable, verbose=False)
+
+            # extract Twiss parameters and first order dispersions
+            last_index = len(evol.location)
+            ds = evol.location[last_index-1]-evol.location[last_index-2]
+            beta_estimate = self.dipole_length**2/self.beta0
+            dispersion_estimate = self.dipole_length**2*self.dipole_field*SI.c/(self.nom_energy)
+            alpha_x = -0.5*(evol.beta_x[last_index-1]-evol.beta_x[last_index-2])/ds / beta_estimate
+            alpha_y = -0.5*(evol.beta_y[last_index-1]-evol.beta_y[last_index-2])/ds / beta_estimate
+            dispersion_prime_x = (evol.dispersion_x[last_index-1]-evol.dispersion_x[last_index-2])/ds / dispersion_estimate
+            
+            merit = alpha_x**2 + alpha_y**2 + dispersion_prime_x**2
+            return merit
+
+        # perform fit
+        guess = [self.quad_strength1, self.quad_strength2, self.dipole_field*self.B2_by_B1]
+        fit_params = optim.minimize(match_fcn, guess, options={'eps': 1e-4})
+        
+        # set the match
+        self.quad_strength1 = fit_params.x[0]
+        self.quad_strength2 = fit_params.x[1]
+        self.B2_by_B1 = fit_params.x[2]/self.dipole_field
+        
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
@@ -248,7 +313,7 @@ class InterstageImpactX(Interstage):
         # plot dispersion
         axs[2,1].plot(evol.location, evol.dispersion_y*1e3, color=col2)  
         axs[2,1].plot(evol.location, evol.dispersion_x*1e3, color=col1)
-        axs[2,1].plot(evol.location, evol.second_order_dispersion_x*1e3, ':', color=col1)
+        #axs[2,1].plot(evol.location, evol.second_order_dispersion_x*1e3, ':', color=col1)
         axs[2,1].set_ylabel('First-order dispersion [mm]')
         axs[2,1].set_xlabel(long_label)
         axs[2,1].set_xlim(long_limits)

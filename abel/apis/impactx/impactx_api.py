@@ -34,9 +34,13 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     sim.csr = csr
     if csr:
         sim.csr_bins = 150
+    sim.isr = isr
     if isr:
-        raise Exception('ISR not yet implemented')
-        #sim.isr = isr
+        if nom_energy is not None and nom_energy > 1e12:
+            sim.isr_order = 3
+        else:
+            sim.isr_order = 1
+    
     
     # convert to ImpactX particle container
     _, sim = beam2particle_container(beam0, sim=sim, verbose=verbose)
@@ -74,6 +78,77 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
         shutil.rmtree(runfolder)
 
     return beam, evol
+
+
+def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, space_charge="2D", runnable=None, keep_data=False, verbose=False):
+
+    # create a new directory
+    original_folder = os.getcwd()
+    if runnable is not None:
+        runfolder = CONFIG.temp_path + str(uuid.uuid4())
+    else:
+        runfolder = 'impactx_sims'
+    if not os.path.exists(runfolder):
+        os.makedirs(runfolder)
+    os.chdir(runfolder)
+
+    # add before the simulation setup
+    pp_prof = amr.ParmParse("tiny_profiler")
+    pp_prof.add("enabled", int(verbose))
+    
+    # set AMReX verbosity
+    initialize_amrex(verbose)
+
+    # make simulation object
+    sim = ImpactX()
+
+    # set ImpactX verbosity
+    sim.verbose = int(verbose)
+    
+    # enable diagnostics
+    sim.diagnostics = True
+    sim.slice_step_diagnostics = True
+
+    # set numerical parameters and IO control
+    sim.particle_shape = 2  # B-spline order
+
+    sim.space_charge = space_charge
+    
+    # domain decomposition & space charge mesh
+    sim.init_grids()
+
+    # reference particle
+    ref = sim.particle_container().ref_particle()
+    ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6)
+
+    # initialize the envelope
+    sim.init_envelope(ref, distr, peak_current)
+
+    # assign the lattice
+    sim.lattice.extend(lattice)
+    
+    # run simulation
+    sim.verbose = int(verbose)
+    if verbose:
+        sim.track_envelope()
+    else:
+        eval('sim.track_envelope()')
+    
+    # clean shutdown
+    sim.finalize()
+    finalize_amrex()
+
+    # extract evolution
+    evol = extract_evolution('');
+    
+    # change back to original directory
+    os.chdir(original_folder)
+
+    # delete run folder
+    if not keep_data:
+        shutil.rmtree(runfolder)
+
+    return evol
 
 
 def initialize_impactx_sim(verbose=False):
@@ -142,7 +217,7 @@ def extract_evolution(path='', second_order=False):
     evol.x = diags["x_mean"]
     evol.y = diags["y_mean"]
     evol.z = diags["t_mean"]
-    evol.energy = gamma2energy(diags["pt_mean"] + ref["pz"])
+    evol.energy = gamma2energy(-ref["pt"]*(1-diags["pt_mean"]))#ref["pt"])#gamma2energy(diags["pt_mean"]-ref["pt"])
     evol.charge = diags["charge_C"]
     evol.dispersion_x = diags["dispersion_x"]
     evol.dispersion_y = diags["dispersion_y"]
@@ -196,7 +271,7 @@ def particle_container2beam(particle_container):
     
     beam.set_uxs(ref.pz*(array[:,4])*SI.c)
     beam.set_uys(ref.pz*(array[:,5])*SI.c)
-    beam.set_uzs(ref.pz*(1+array[:,6])*SI.c)
+    beam.set_uzs(ref.pz*(1-array[:,6])*SI.c)
     
     q_particle = array[0,7]*(SI.m_e*SI.c**2/SI.e)*SI.e
     beam.set_qs(array[:,8]*q_particle)
