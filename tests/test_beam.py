@@ -2236,8 +2236,8 @@ def test_magnify_beta_function():
     assert np.isclose(beam.y_offset(), y_offset, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_x(), initial_beam.beam_size_x()*mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_y(), initial_beam.beam_size_y()*mag, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=0, atol=1e-15)
+    assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=0, atol=1e-15)
     assert np.isclose(beam.divergence_x(), initial_beam.divergence_x()/mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_y(), initial_beam.divergence_y()/mag, rtol=1e-15, atol=0.0)
 
