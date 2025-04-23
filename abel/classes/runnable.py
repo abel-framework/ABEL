@@ -511,6 +511,25 @@ class Runnable(ABC):
     
     ## SAVE TO FILE
     
+    def get_function_data(self, fcn):
+        
+        # extract values
+        val_mean = np.empty(self.num_steps)
+        val_std = np.empty(self.num_steps)
+        for step in range(self.num_steps):
+            
+            # get values for this step
+            val_output = np.empty(self.num_shots_per_step)
+            for shot_in_step in range(self.num_shots_per_step):
+                val_output[shot_in_step] = fcn(self[step,shot_in_step])
+                
+            # get step mean and error
+            val_mean[step] = np.mean(val_output)
+            val_std[step] = np.std(val_output)
+
+        # write data
+        return self.vals, val_mean, val_std
+    
     def save_function_data(self, fcn, filename=None):
         
         # extract values
