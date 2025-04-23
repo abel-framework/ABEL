@@ -22,10 +22,6 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
         os.makedirs(runfolder)
     os.chdir(runfolder)
 
-    # add before the simulation setup
-    pp_prof = amr.ParmParse("tiny_profiler")
-    pp_prof.add("enabled", int(verbose))
-    
     # make simulation
     sim = initialize_impactx_sim(verbose=verbose)
     
@@ -40,7 +36,6 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
             sim.isr_order = 3
         else:
             sim.isr_order = 1
-    
     
     # convert to ImpactX particle container
     _, sim = beam2particle_container(beam0, sim=sim, verbose=verbose)
@@ -59,11 +54,10 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     beam = particle_container2beam(sim.particle_container())
 
     # clean shutdown
-    sim.finalize()
-    finalize_amrex()
+    finalize_impactx_sim(sim, verbose=verbose)
 
     # extract evolution
-    evol = extract_evolution('');
+    evol = extract_evolution();
 
     # copy meta data from input beam (will be iterated by super)
     beam.trackable_number = beam0.trackable_number
@@ -92,31 +86,12 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
         os.makedirs(runfolder)
     os.chdir(runfolder)
 
-    # add before the simulation setup
-    pp_prof = amr.ParmParse("tiny_profiler")
-    pp_prof.add("enabled", int(verbose))
-    
-    # set AMReX verbosity
-    initialize_amrex(verbose)
+    # make simulation
+    sim = initialize_impactx_sim(verbose=verbose)
 
-    # make simulation object
-    sim = ImpactX()
-
-    # set ImpactX verbosity
-    sim.verbose = int(verbose)
-    
-    # enable diagnostics
-    sim.diagnostics = True
-    sim.slice_step_diagnostics = True
-
-    # set numerical parameters and IO control
-    sim.particle_shape = 2  # B-spline order
-
+    # physics flags
     sim.space_charge = space_charge
     
-    # domain decomposition & space charge mesh
-    sim.init_grids()
-
     # reference particle
     ref = sim.particle_container().ref_particle()
     ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6)
@@ -135,11 +110,10 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
         eval('sim.track_envelope()')
     
     # clean shutdown
-    sim.finalize()
-    finalize_amrex()
+    finalize_impactx_sim(sim, verbose=verbose)
 
     # extract evolution
-    evol = extract_evolution('');
+    evol = extract_evolution();
     
     # change back to original directory
     os.chdir(original_folder)
@@ -153,8 +127,16 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
 
 def initialize_impactx_sim(verbose=False):
     
+    # add before the simulation setup
+    pp_prof = amr.ParmParse("tiny_profiler")
+    pp_prof.add("enabled", int(verbose))
+    
     # set AMReX verbosity
-    initialize_amrex(verbose)
+    if not amr.initialized():
+        if verbose:
+            amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
+        else:
+            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
 
     # make simulation object
     sim = ImpactX()
@@ -175,16 +157,13 @@ def initialize_impactx_sim(verbose=False):
     return sim
 
 
-# initialize AMReX
-def initialize_amrex(verbose=False):
-    if not amr.initialized():
-        if verbose:
-            amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
-        else:
-            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
+def finalize_impactx_sim(sim, verbose=False):
 
-
-def finalize_amrex(verbose=False):
+    # finalize and delete the simulation
+    sim.finalize()
+    del sim
+    
+    # finalize AMReX
     if amr.initialized():
         if verbose:
             amr.finalize()

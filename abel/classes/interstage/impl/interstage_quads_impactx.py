@@ -128,6 +128,9 @@ class InterstageQuadsImpactX(Interstage):
 
     def match_lattice(self, runnable=None):
 
+        # ensure that the incoming beta function is set before matching
+        assert self.beta0 is not None
+        
         from impactx import twiss, distribution
         
         # define the matching merit function
