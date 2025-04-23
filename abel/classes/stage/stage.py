@@ -117,16 +117,16 @@ class Stage(Trackable, CostModeled):
     
         Parameters
         ----------
-        ramp_plasma_density: [m^-3] float, optional
+        ramp_plasma_density : [m^-3] float, optional
             Plasma density for the ramp.
 
-        ramp_length: [m] float, optional
+        ramp_length : [m] float, optional
             Length of the ramp.
     
             
         Returns
         ----------
-        stage_copy: Stage object
+        stage_copy : ``Stage`` object
             A modified deep copy of the original stage.
         """
 
@@ -160,8 +160,8 @@ class Stage(Trackable, CostModeled):
             
         # Everything else now unset, can set this safely.
         # Will also trigger reset/recalc if needed
-        stage_copy.length = ramp_length 
-        
+        stage_copy.length_flattop = None
+        stage_copy.length = ramp_length
         stage_copy.plasma_density = ramp_plasma_density
          
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
@@ -274,7 +274,7 @@ class Stage(Trackable, CostModeled):
             if self.upramp.plasma_density is None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-             # perform tracking
+            # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
             beam.stage_number -= 1
@@ -500,7 +500,7 @@ class Stage(Trackable, CostModeled):
         "Accelerating gradient of the plasma flattop [eV/m], or None if not set/calculateable"
         return self._nom_accel_gradient_flattop_calc
     @nom_accel_gradient_flattop.setter
-    def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
+    def nom_accel_gradient_flattop(self, nom_accel_gradient_flattop : float):
         if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
             raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
         
@@ -1227,11 +1227,11 @@ class Stage(Trackable, CostModeled):
         
 
 class VariablesOverspecifiedError(Exception):
-    "Exception class to throw when trying to set too many overlapping variables"
+    "Exception class to throw when trying to set too many overlapping variables."
     pass
 class VariablesOutOfRangeError(Exception):
     "Exception class to throw when calculated or set variables are out of allowed range."
 class StageError(Exception):
-    "Exception class for Stege to throw in other cases"
+    "Exception class for ``Stage`` to throw in other cases."
 
     
