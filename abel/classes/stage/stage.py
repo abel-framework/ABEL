@@ -172,9 +172,9 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def _prepare_ramps(self):
         "Set ramp lengths and nominal energy gains if the ramps exist (both upramp and downramp lengths have to be set up before track_upramp())."
-        if self.nom_energy is None:
+        #if self.nom_energy is None:
             #Should be set in linac.track()
-            raise StageError('Stage nominal energy is None.')
+            #raise StageError('Stage nominal energy is None.')
 
         if self.upramp is not None:
             if self.upramp.nom_energy_gain is None:
@@ -288,7 +288,7 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     # downramp to be tracked after the main tracking
-    def track_downramp(self, beam0, driver0):
+    def track_downramp(self, beam0, driver0=None):
         if self.downramp is not None:
 
             # set driver

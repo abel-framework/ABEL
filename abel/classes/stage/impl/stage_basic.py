@@ -20,7 +20,10 @@ class StageBasic(Stage):
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
         
         # get the driver
-        driver_incoming = self.driver_source.track()
+        if self.driver_source is not None:
+            driver_incoming = self.driver_source.track()
+        else:
+            driver_incoming = None
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
@@ -38,7 +41,8 @@ class StageBasic(Stage):
             driver0 = copy.deepcopy(driver_incoming)
             if self.ramp_beta_mag is not None:
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)   
+                if driver_incoming is not None:
+                    driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)   
                 
         # apply plasma-density up ramp (demagnify beta function)
         beam = copy.deepcopy(beam0)
@@ -91,7 +95,10 @@ class StageBasic(Stage):
             _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), calc_evolution=self.calc_evolution)
             self.evolution.beam = evol
         else:
-            beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+            if driver0 is not None:
+                beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset())
+            else:
+                beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs)
 
 
         # ========== Accelerate beam with homogeneous energy gain ==========
@@ -133,7 +140,8 @@ class StageBasic(Stage):
             driver_outgoing = copy.deepcopy(driver)
             if self.ramp_beta_mag is not None:
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+                if driver_outgoing is not None:
+                    driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
 
         # return the beam (and optionally the driver)

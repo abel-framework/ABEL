@@ -79,12 +79,12 @@ class Experiment(Beamline):
         ax[0].set_ylim(min(yedges * 1e3), max(yedges * 1e3))
         
         # calculate energy axis (E = E0*Dy/y)
-        Dy_img = self.spectrometer.get_dispersion(energy=self.spectrometer.img_energy)
-        E_times_Dy = self.spectrometer.img_energy*Dy_img
+        Dy_img = self.spectrometer.get_dispersion(energy=self.spectrometer.imaging_energy_x)
+        E_times_Dy = self.spectrometer.imaging_energy_x*Dy_img
         
         # add imaging energies
-        y_img = -E_times_Dy/self.spectrometer.img_energy
-        y_img_y = -E_times_Dy/self.spectrometer.img_energy_y
+        y_img = -E_times_Dy/self.spectrometer.imaging_energy_y
+        y_img_y = -E_times_Dy/self.spectrometer.imaging_energy_y
         ax[0].axhline(y_img*1e3, color = 'black', linestyle = '--', linewidth = 1, label = 'Imaging energy x (GeV)')
         ax[0].axhline(y_img_y*1e3, color = 'black', linestyle = ':', linewidth = 1, label = 'Imaging energy y (GeV)')
         

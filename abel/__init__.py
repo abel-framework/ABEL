@@ -36,6 +36,7 @@ from .classes.beamline.impl.linac.impl.conventional_linac import ConventionalLin
 from .classes.beamline.impl.experiment.experiment import Experiment
 from .classes.beamline.impl.experiment.impl.experiment_pwfa import ExperimentPWFA
 from .classes.beamline.impl.experiment.impl.experiment_apl import ExperimentAPL
+from .classes.beamline.impl.experiment.impl.experiment_flashforward import ExperimentFLASHForward
 
 from .classes.collider.collider import Collider
 
