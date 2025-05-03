@@ -43,13 +43,11 @@ Ben Chen, 5 July 2023, University of Oslo
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
 from abel.utilities.other import find_closest_value_in_arr
 from abel.utilities.relativity import energy2gamma
 from tqdm import tqdm
 import time
-
 from abel.utilities.plasma_physics import k_p
 
 
@@ -158,6 +156,7 @@ def transverse_wake_instability_slices(plasma_density, E_z, bubble_radius, num_p
 
         # Check whether beam comes into contact with plasma bubble boundary
         if np.any(np.abs(x_slices) - bubble_radius >= 0):
+            import matplotlib.pyplot as plt
             print('$s=$' f'{format(prop_length, ".2f")}' ' m')
             plt.figure()
             plt.plot(s_slices, x_slices*1e6, 'r', label='Transverse offset') 

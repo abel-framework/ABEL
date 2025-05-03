@@ -1,6 +1,5 @@
 from abc import abstractmethod
-from matplotlib import patches
-from abel import Trackable
+from abel.classes.trackable import Trackable
 
 class Spectrometer(Trackable):
     
@@ -16,6 +15,7 @@ class Spectrometer(Trackable):
         pass
     
     def survey_object(self):
+        from matplotlib import patches
         rect = patches.Rectangle((0, -0.05), self.get_length(), 0.1)
         rect.set_facecolor = 'k'
         return rect

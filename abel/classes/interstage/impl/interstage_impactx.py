@@ -1,9 +1,7 @@
 from abel.classes.interstage.interstage import Interstage
 import numpy as np
-from abel.apis.impactx.impactx_api import run_impactx
 import contextlib, os
 from types import SimpleNamespace
-from matplotlib import pyplot as plt
 import scipy.constants as SI
 
 class InterstageImpactX(Interstage):
@@ -104,6 +102,8 @@ class InterstageImpactX(Interstage):
 
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+
+        from abel.apis.impactx.impactx_api import run_impactx
         
         # get lattice
         lattice = self.get_lattice()
@@ -118,6 +118,8 @@ class InterstageImpactX(Interstage):
 
     
     def plot_layout(self):
+
+        from matplotlib import pyplot as plt
         
         L1 = float(self.dipole_length)
         B1 = float(self.dipole_field)
@@ -186,6 +188,8 @@ class InterstageImpactX(Interstage):
     
     def plot_evolution(self):
 
+        from matplotlib import pyplot as plt
+        
         evol = self.evolution
         
         # prepare plot

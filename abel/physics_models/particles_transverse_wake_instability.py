@@ -38,14 +38,10 @@ Ben Chen, 5 October 2023, University of Oslo
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
 
 from tqdm import tqdm
-import time
-from joblib import Parallel, delayed  # Parallel tracking
-from joblib_progress import joblib_progress
-import csv, os
+import time, csv, os
 #from types import SimpleNamespace
 
 from abel.classes.beam import *  # TODO: no need to import everything.

@@ -1,5 +1,4 @@
 import os
-import abel.utilities.colors as cmaps
 
 class CONFIG:
 
@@ -95,6 +94,7 @@ class CONFIG:
             cls.partition_name_small = cfdata['cluster']['partition_name_small']
 
         # ABEL plot defaults
+        import abel.utilities.colors as cmaps
         cls.plot_fullwidth_default = cfdata['defaults']['plot_fullwidth_default']
         cls.plot_width_default     = cfdata['defaults']['plot_width_default']
         cls.default_cmap           = cmaps.get_cmap_by_name(cfdata['defaults']['default_cmap'])

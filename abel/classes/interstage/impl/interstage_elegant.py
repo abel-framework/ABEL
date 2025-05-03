@@ -2,15 +2,14 @@ import uuid, os, scipy, shutil, subprocess, csv
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker as mticker
-from matplotlib.patches import Rectangle
-from functools import partial
-from matplotlib.animation import FuncAnimation
 from functools import partial
 import scipy.constants as SI
 from string import Template
 from types import SimpleNamespace
-import abel
-from abel import CONFIG, Interstage, Beam
+#import abel
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
+from abel.classes.interstage.interstage import Interstage
 from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
 from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion
 
@@ -880,7 +879,8 @@ class InterstageElegant(Interstage):
             axs[2,1].yaxis.set_label_position('right')
         
             return cax
-        
+
+        from matplotlib.animation import FuncAnimation
         animation = FuncAnimation(fig, partial(frameFcn, file_list=files), frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
@@ -1025,7 +1025,8 @@ class InterstageElegant(Interstage):
             axs[2,1].yaxis.set_label_position('right')
         
             return cax
-        
+
+        from matplotlib.animation import FuncAnimation
         animation = FuncAnimation(fig, partial(frameFcn, file_list=files), frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
@@ -1184,6 +1185,7 @@ class InterstageElegant(Interstage):
             return cax
         
         # make all frames
+        from matplotlib.animation import FuncAnimation
         animation = FuncAnimation(fig, partial(frameFcn, file_list=files), frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
@@ -1339,6 +1341,7 @@ class InterstageElegant(Interstage):
             return cax
 
         # make all frames
+        from matplotlib.animation import FuncAnimation
         animation = FuncAnimation(fig, partial(frameFcn, file_list=files), frames=range(len(files)), repeat=False, interval=100)
         
 
@@ -1489,7 +1492,7 @@ class InterstageElegant(Interstage):
     def plot_rectangle(self, xpos, length, ypos=0.25, height=0.5, color='blue', ax=None):
         if ax is None:
             ax = plt.gca()
-    
+        from matplotlib.patches import Rectangle
         rectangle = Rectangle((xpos, ypos), length, height, color=color, alpha=0.5)
         ax.add_patch(rectangle)
         return rectangle

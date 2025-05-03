@@ -5,8 +5,8 @@ from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.source.source import Source
 from abel.classes.spectrometer.spectrometer import Spectrometer
 import numpy as np
-from matplotlib import pyplot as plt
 import warnings
+from matplotlib import pyplot as plt
 
 class Experiment(Beamline):
     

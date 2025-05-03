@@ -1,15 +1,11 @@
-from abel import Stage, CONFIG
-from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_write_jobscript
+from abel.CONFIG import CONFIG
+from abel.classes.stage.stage import Stage
 from abel.utilities.plasma_physics import *
 from abel.utilities.relativity import energy2gamma
 import scipy.constants as SI
-import scipy.stats as spstats
-from matplotlib import pyplot as plt
 import numpy as np
 import os, shutil, uuid, copy
-from openpmd_viewer import OpenPMDTimeSeries
 from abel.utilities.plasma_physics import k_p
-from matplotlib.colors import LogNorm
 from types import SimpleNamespace
 
 try:
@@ -58,6 +54,8 @@ class StageHipace(Stage):
         
 
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
+
+        from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_write_jobscript
         
         ## PREPARE TEMPORARY FOLDER
         
@@ -302,6 +300,7 @@ class StageHipace(Stage):
                     Es = np.linspace(np.min(evol.energy[step]-5*evol.energy_spread[step]), np.max(evol.energy[step]+5*evol.energy_spread[step]), 500)
                     dQ_dE = np.zeros_like(Es)
                     for i in range(len(evol.slices.charge[step,:])):
+                        import scipy.stats as spstats
                         dQ_dE_slice = spstats.norm.pdf(Es, loc=evol.slices.energy[step,i], scale=evol.slices.energy_spread[step,i])
                         Q_slice = np.trapz(dQ_dE_slice, x=Es)
                         if abs(Q_slice) > 0:
@@ -343,6 +342,8 @@ class StageHipace(Stage):
         
         
     def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
+
+        from openpmd_viewer import OpenPMDTimeSeries
         
         # prepare to read simulation data
         source_path = tmpfolder + 'diags/hdf5/'
@@ -385,6 +386,8 @@ class StageHipace(Stage):
 
         
     def __extract_transverse(self, path):
+
+        from openpmd_viewer import OpenPMDTimeSeries
         
         # prepare to read simulation data
         ts = OpenPMDTimeSeries(path)
@@ -438,6 +441,9 @@ class StageHipace(Stage):
 
         
     def __extract_witness(self, path):
+
+        from openpmd_viewer import OpenPMDTimeSeries
+        
         ts = OpenPMDTimeSeries(path)
 
         # get x and z coordinates of beam
@@ -450,6 +456,9 @@ class StageHipace(Stage):
 
         
     def __extract_final_driver(self, path):
+
+        from openpmd_viewer import OpenPMDTimeSeries
+        
         ts = OpenPMDTimeSeries(path)
         # get x and z coordinates of final driver beam
         x_f, z_f = ts.get_particle(species='driver', iteration=self.num_steps, var_list=['x', 'z']) 
@@ -457,6 +466,9 @@ class StageHipace(Stage):
 
         
     def __extract_amplitude_evol(self, path):
+
+        from openpmd_viewer import OpenPMDTimeSeries
+        
         ts = OpenPMDTimeSeries(path)
         # array for amplitudes and phase_advances per output
         amplitudes = np.zeros(1+int(self.num_steps/self.output))
@@ -514,6 +526,9 @@ class StageHipace(Stage):
         return advs, amplitudes
     
     def __extract_focusing(self, path):
+
+        from openpmd_viewer import OpenPMDTimeSeries
+        
         # prepare to read simulation data
         ts = OpenPMDTimeSeries(path)
 
@@ -553,6 +568,8 @@ class StageHipace(Stage):
 
     def plot_transverse(self, beam=None):
 
+        from matplotlib import pyplot as plt
+        
         # extract wakefield if not already existing
         if (self.__initial_transverse is None) or (self.__final_transverse is None):
             return

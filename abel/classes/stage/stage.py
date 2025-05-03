@@ -1,17 +1,13 @@
 from abc import abstractmethod
-from matplotlib import patches
-from abel import Trackable, CONFIG
+from abel.classes.trackable import Trackable
+from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
 from abel.classes.source.impl.source_capsule import SourceCapsule
-from abel.utilities.plasma_physics import beta_matched
 import numpy as np
 import copy
 import scipy.constants as SI
-from matplotlib import pyplot as plt
 from types import SimpleNamespace
-from matplotlib.colors import LogNorm
-from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
-
+from abel.utilities.plasma_physics import beta_matched
 from typing import Self
 
 class Stage(Trackable, CostModeled):
@@ -893,6 +889,8 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def plot_evolution(self, bunch='beam'):
+
+        from matplotlib import pyplot as plt
         
         # select bunch
         if bunch == 'beam':
@@ -1030,6 +1028,8 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================  
     def plot_wakefield(self):
+
+        from matplotlib import pyplot as plt
         
         # extract wakefield if not already existing
         if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
@@ -1111,6 +1111,9 @@ class Stage(Trackable, CostModeled):
         --------
           None
         """
+
+        from matplotlib import pyplot as plt
+        from matplotlib.colors import LogNorm
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):

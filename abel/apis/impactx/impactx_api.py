@@ -1,14 +1,10 @@
 import numpy as np
-from abel import CONFIG
+from abel.CONFIG import CONFIG
 import abel.apis.impactx.transformation_utilities as pycoord
-import amrex.space3d as amr
 import uuid, os, shutil
-from abel.classes.beam import Beam 
-from impactx import ImpactX, Config, elements
+from abel.classes.beam import Beam
 import scipy.constants as SI
 from types import SimpleNamespace
-from abel.utilities.relativity import gamma2energy
-import openpmd_api as io
 
 def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, space_charge=False, csr=False, isr=False, verbose=False):
 
@@ -126,6 +122,9 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
 
 
 def initialize_impactx_sim(verbose=False):
+
+    import amrex.space3d as amr
+    from impactx import ImpactX
     
     # add before the simulation setup
     pp_prof = amr.ParmParse("tiny_profiler")
@@ -159,6 +158,8 @@ def initialize_impactx_sim(verbose=False):
 
 def finalize_impactx_sim(sim, verbose=False):
 
+    import amrex.space3d as amr
+    
     # finalize and delete the simulation
     sim.finalize()
     del sim
@@ -173,8 +174,10 @@ def finalize_impactx_sim(sim, verbose=False):
 
 def extract_evolution(path='', second_order=False):
     
-    # read CSV file
+    from abel.utilities.relativity import gamma2energy
     import pandas as pd
+
+    # read CSV file
     try:
         ref = pd.read_csv(path+"diags/ref_particle.0.0", delimiter=r"\s+")
         diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0.0", delimiter=r"\s+")
@@ -202,6 +205,8 @@ def extract_evolution(path='', second_order=False):
     evol.dispersion_y = diags["dispersion_y"]
 
     if second_order:
+
+        import openpmd_api as io
         
         # load OpenPMD series
         series = io.Series(path+"diags/openPMD/monitor.h5", io.Access.read_only)
@@ -262,6 +267,9 @@ def particle_container2beam(particle_container):
     
 # convert from ABEL beam to ImpactX particle container
 def beam2particle_container(beam, sim=None, verbose=False):
+
+    import amrex.space3d as amr
+    from impactx import Config
     
     # make simulation object if not already existing
     if sim is None:
