@@ -52,6 +52,7 @@ from .classes.stage.impl.stage_wake_t import *
 from .classes.stage.impl.stage_quasistatic_2d import *
 from .classes.stage.impl.stage_slice_transverse_wake_instability import *
 from .classes.stage.impl.stage_particle_transverse_wake_instability import *
+from .classes.stage.impl.stage_spin import StageSpin
 from .classes.interstage.impl.interstage_null import *
 from .classes.interstage.impl.interstage_basic import *
 from .classes.interstage.impl.interstage_elegant import *
