@@ -65,7 +65,7 @@ class Beam():
         del self[np.isnan(self).any(axis=1)]
         
     # set phase space
-    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, sxs=None, sys=None, szs=None, weightings=None, particle_mass=SI.m_e):
+    def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, spxs=None, spys=None, spzs=None, weightings=None, particle_mass=SI.m_e):
         """
         Set the phase space of the beam. All input arrays must have the same lengths.
 
@@ -241,17 +241,17 @@ class Beam():
         self.__phasespace[7,:] = np.arange(num_particles)
         
         # add spins
-        if sxs is None:
-            sxs = np.zeros(num_particles)
-        self.__phasespace[8,:] = sxs
+        if spxs is None:
+            spxs = np.zeros(num_particles)
+        self.__phasespace[8,:] = spxs
         
-        if sys is None:
-            sys = np.zeros(num_particles)
-        self.__phasespace[9,:] = sys
+        if spys is None:
+            spys = np.zeros(num_particles)
+        self.__phasespace[9,:] = spys
         
-        if szs is None:
-            szs = np.zeros(num_particles)
-        self.__phasespace[10,:] = szs
+        if spzs is None:
+            spzs = np.zeros(num_particles)
+        self.__phasespace[10,:] = spzs
 
         # single particle mass [kg]
         self.particle_mass = particle_mass
@@ -324,11 +324,11 @@ class Beam():
         return self.__phasespace[6,:]
     def ids(self):
         return self.__phasespace[7,:]
-    def sxs(self):
+    def spxs(self):
         return self.__phasespace[8,:]
-    def sys(self):
+    def spys(self):
         return self.__phasespace[9,:]
-    def szs(self):
+    def spzs(self):
         return self.__phasespace[10,:]
     
     # set phase space variables
@@ -363,12 +363,12 @@ class Beam():
         self.__phasespace[6,:] = qs
     def set_ids(self, ids):
         self.__phasespace[7,:] = ids
-    def set_sxs(self, sxs):
-        self.__phasespace[8,:] = sxs
-    def set_sys(self, sys):
-        self.__phasespace[9,:] = sys
-    def set_szs(self, szs):
-        self.__phasespace[10,:] = szs
+    def set_spxs(self, spxs):
+        self.__phasespace[8,:] = spxs
+    def set_spys(self, spys):
+        self.__phasespace[9,:] = spys
+    def set_spzs(self, spzs):
+        self.__phasespace[10,:] = spzs
         
     def weightings(self):
         return self.__phasespace[6,:]/(self.charge_sign()*SI.e)
@@ -986,44 +986,44 @@ class Beam():
     ## SPIN STATISTICS
     def spin_check(self):
         "Checks if any spin norms are close to zero."
-        s_norm = np.sqrt(self.sxs()**2 + self.sys()**2 + self.szs()**2)
+        s_norm = np.sqrt(self.spxs()**2 + self.spys()**2 + self.spzs()**2)
         return not np.any(s_norm < 1e-8) 
         
     def set_spin_unpolarized(self):
         "Sets the spin of the beam to be unpolarized."
         phi = np.random.uniform(0, 2*np.pi, len(self))
         theta = np.arccos(1-2*np.random.uniform(0, 1, len(self)))
-        sxs = np.sin(theta)*np.cos(phi)
-        sys = np.sin(theta)*np.sin(phi)
-        szs = np.cos(theta)
-        self.set_sxs(sxs)
-        self.set_sys(sys)
-        self.set_szs(szs)
+        spxs = np.sin(theta)*np.cos(phi)
+        spys = np.sin(theta)*np.sin(phi)
+        spzs = np.cos(theta)
+        self.set_spxs(spxs)
+        self.set_spys(spys)
+        self.set_spzs(spzs)
 
     def set_spin_polarized_x(self, sign=1):
-        self.set_sxs(np.ones(len(self))*np.sign(sign))
-        self.set_sys(np.zeros(len(self)))
-        self.set_szs(np.zeros(len(self)))
+        self.set_spxs(np.ones(len(self))*np.sign(sign))
+        self.set_spys(np.zeros(len(self)))
+        self.set_spzs(np.zeros(len(self)))
         
     def set_spin_polarized_y(self, sign=1):
-        self.set_sxs(np.zeros(len(self)))
-        self.set_sys(np.ones(len(self))*np.sign(sign))
-        self.set_szs(np.zeros(len(self)))
+        self.set_spxs(np.zeros(len(self)))
+        self.set_spys(np.ones(len(self))*np.sign(sign))
+        self.set_spzs(np.zeros(len(self)))
         
     def set_spin_polarized_z(self, sign=1):
-        self.set_sxs(np.zeros(len(self)))
-        self.set_sys(np.zeros(len(self)))
-        self.set_szs(np.ones(len(self))*np.sign(sign))
+        self.set_spxs(np.zeros(len(self)))
+        self.set_spys(np.zeros(len(self)))
+        self.set_spzs(np.ones(len(self))*np.sign(sign))
 
-    def make_random_spins(self, s_m, seed=42):
+    def make_random_spins(self, mean_z_spin_proj, seed=42):
         """
         Generates a random distribution of points on the surface of a sphere of radius 1, with the mean along z is 
-        's_m'.
-        For s_m=0, points are uniformly distributed on the surface of the sphere.
+        ``mean_z_spin_proj``.
+        For mean_z_spin_proj=0, points are uniformly distributed on the surface of the sphere.
     
         Parameters
         ----------
-        s_m: float
+        mean_z_spin_proj: float
             Mean value of z-projection of the generated spins.
 
         seed: int, optional
@@ -1038,48 +1038,48 @@ class Beam():
         np.random.seed(seed)
         self.alpha = None
 
-        if abs(s_m) == 1:
-            self.set_spin_polarized_z(np.sign(s_m))
+        if abs(mean_z_spin_proj) == 1:
+            self.set_spin_polarized_z(np.sign(mean_z_spin_proj))
             return
-        elif s_m == 0:
-            szs = np.random.uniform(-1,1, len(self))
+        elif mean_z_spin_proj == 0:
+            spzs = np.random.uniform(-1,1, len(self))
         else:
             if self.alpha is None:
-                sol = fsolve(lambda alpha: 1. / alpha - 1. / np.tanh(alpha) - s_m, 0.5)
+                sol = fsolve(lambda alpha: 1. / alpha - 1. / np.tanh(alpha) - mean_z_spin_proj, 0.5)
                 self.alpha = sol[0]
             u = np.random.uniform(0, 1, len(self))
-            szs = - 1 / self.alpha * np.log(np.exp(self.alpha) * (1 - u) + np.exp(-self.alpha) * u)
+            spzs = - 1 / self.alpha * np.log(np.exp(self.alpha) * (1 - u) + np.exp(-self.alpha) * u)
 
         phi = np.random.uniform(0, 2*np.pi, len(self))
-        sin_theta = np.sqrt(1 - szs**2)
-        sxs = sin_theta * np.cos(phi)
-        sys = sin_theta * np.sin(phi)
+        sin_theta = np.sqrt(1 - spzs**2)
+        spxs = sin_theta * np.cos(phi)
+        spys = sin_theta * np.sin(phi)
         
-        self.set_sxs(sxs)
-        self.set_sys(sys)
-        self.set_szs(szs)
+        self.set_spxs(spxs)
+        self.set_spys(spys)
+        self.set_spzs(spzs)
 
     def renormalize_spin(self):
         "Renormalizing the spin vectors."
-        sxs = self.sxs()
-        sys = self.sys()
-        szs = self.szs()
-        s_norm = np.sqrt(sxs**2 + sys**2 + szs**2)
+        spxs = self.spxs()
+        spys = self.spys()
+        spzs = self.spzs()
+        s_norm = np.sqrt(spxs**2 + spys**2 + spzs**2)
         if not np.any(s_norm < 1e-8):
-            self.set_sxs(sxs/s_norm)
-            self.set_sys(sys/s_norm)
-            self.set_szs(szs/s_norm)
+            self.set_spxs(spxs/s_norm)
+            self.set_spys(spys/s_norm)
+            self.set_spzs(spzs/s_norm)
         else:
             raise ValueError("One of the spins have length zero, can not renormalize")
 
     def spin_polarization_x(self):
-        return np.mean(self.sxs())
+        return np.mean(self.spxs())
 
     def spin_polarization_y(self):
-        return np.mean(self.sys())
+        return np.mean(self.spys())
 
     def spin_polarization_z(self):
-        return np.mean(self.szs())
+        return np.mean(self.spzs())
 
     def spin_polarization_vector(self):
         return np.array([self.spin_polarization_x(), self.spin_polarization_y(), self.spin_polarization_z()])
@@ -1095,33 +1095,33 @@ class Beam():
         fig, axs = plt.subplots(1,3)
         fig.set_figwidth(12)
         fig.set_figheight(4) 
-        axs[0].hist(self.sxs(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
+        axs[0].hist(self.spxs(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
         axs[0].set_xlim(-1,1)
         axs[0].set_xlabel(r'$s_x$')
         axs[0].set_ylabel('Count')
 
-        axs[1].hist(self.sys(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
+        axs[1].hist(self.spys(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
         axs[1].set_xlim(-1,1)
         axs[1].set_xlabel(r'$s_y$')
 
-        axs[2].hist(self.szs(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
+        axs[2].hist(self.spzs(), bins=np.linspace(-1,1,num_bins+1), range=[-1,1])
         axs[2].set_xlim(-1,1)
         axs[2].set_xlabel(r'$s_z$')
 
     def plot_spins_2D(self):
         fig, axs = plt.subplots(1, 3, figsize=(12, 4))
         
-        hb1 = axs[0].hexbin(self.sxs(), self.sys(), gridsize=50, cmap='RdPu', mincnt=1)
+        hb1 = axs[0].hexbin(self.spxs(), self.spys(), gridsize=50, cmap=CONFIG.default_cmap, mincnt=1)
         axs[0].set_xlabel(r'$s_x$')
         axs[0].set_ylabel(r'$s_y$')
         plt.colorbar(hb1, ax=axs[0], label='Counts')
 
-        hb2 = axs[1].hexbin(self.sxs(), self.szs(), gridsize=50, cmap='RdPu', mincnt=1)
+        hb2 = axs[1].hexbin(self.spxs(), self.spzs(), gridsize=50, cmap=CONFIG.default_cmap, mincnt=1)
         axs[1].set_xlabel(r'$s_x$')
         axs[1].set_ylabel(r'$s_z$')
         plt.colorbar(hb2, ax=axs[1], label='Counts')
 
-        hb3 = axs[2].hexbin(self.sys(), self.szs(), gridsize=50, cmap='RdPu', mincnt=1)
+        hb3 = axs[2].hexbin(self.spys(), self.spzs(), gridsize=50, cmap=CONFIG.default_cmap, mincnt=1)
         axs[2].set_xlabel(r'$s_y$')
         axs[2].set_ylabel(r'$s_z$')
         plt.colorbar(hb3, ax=axs[2], label='Counts')
@@ -1130,7 +1130,7 @@ class Beam():
     def plot_spins_3D(self):
         fig = plt.figure(figsize=(12,4))
         axs = fig.add_subplot(111, projection='3d')
-        axs.scatter(self.sxs(), self.sys(), self.szs(), alpha=0.2, s=1)
+        axs.scatter(self.spxs(), self.spys(), self.spzs(), alpha=0.2, s=1)
         axs.set_xlabel(r'$s_x$')
         axs.set_ylabel(r'$s_y$')
         axs.set_zlabel(r'$s_z$')
@@ -1819,9 +1819,9 @@ class Beam():
         dset_id = io.Dataset(self.ids().dtype, extent=self.ids().shape)
         dset_q = io.Dataset(np.dtype('float64'), extent=[1])
         dset_m = io.Dataset(np.dtype('float64'), extent=[1])
-        dset_sz = io.Dataset(self.szs().dtype, extent=self.szs().shape)
-        dset_sx = io.Dataset(self.sxs().dtype, extent=self.sxs().shape)
-        dset_sy = io.Dataset(self.sys().dtype, extent=self.sys().shape)
+        dset_sz = io.Dataset(self.spzs().dtype, extent=self.spzs().shape)
+        dset_sx = io.Dataset(self.spxs().dtype, extent=self.spxs().shape)
+        dset_sy = io.Dataset(self.spys().dtype, extent=self.spys().shape)
         
         dset_n = io.Dataset(self.ids().dtype, extent=[1])
         dset_f = io.Dataset(np.dtype('float64'), extent=[1])
@@ -1858,9 +1858,9 @@ class Beam():
         particles['id'][io.Record_Component.SCALAR].store_chunk(self.ids())
         particles['charge'][io.Record_Component.SCALAR].make_constant(self.charge_sign()*SI.e)
         particles['mass'][io.Record_Component.SCALAR].make_constant(SI.m_e)
-        particles['spin']['z'].store_chunk(self.szs())
-        particles['spin']['x'].store_chunk(self.sxs())
-        particles['spin']['y'].store_chunk(self.sys())
+        particles['spin']['z'].store_chunk(self.spzs())
+        particles['spin']['x'].store_chunk(self.spxs())
+        particles['spin']['y'].store_chunk(self.spys())
         
         # set SI units (scaling factor)
         particles['momentum']['z'].unit_SI = SI.m_e
@@ -1874,9 +1874,9 @@ class Beam():
         particles['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
         particles['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
         
-        particles['spin']['z'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
-        particles['spin']['x'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
-        particles['spin']['y'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
+        #particles['spin']['z'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
+        #particles['spin']['x'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
+        #particles['spin']['y'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
         
         # save data to file
         series.flush()
@@ -1910,9 +1910,9 @@ class Beam():
         pxs_unscaled = particles['momentum']['x'].load_chunk()
         pys_unscaled = particles['momentum']['y'].load_chunk()
         pzs_unscaled = particles['momentum']['z'].load_chunk()
-        sxs = particles['spin']['x'].load_chunk()
-        sys = particles['spin']['y'].load_chunk()
-        szs = particles['spin']['z'].load_chunk()
+        spxs = particles['spin']['x'].load_chunk()
+        spys = particles['spin']['y'].load_chunk()
+        spzs = particles['spin']['z'].load_chunk()
         series.flush()
         
         # apply SI scaling
@@ -1922,7 +1922,7 @@ class Beam():
         
         # make beam
         beam = Beam()
-        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, sxs=sxs, sys=sys, szs=szs, weightings=weightings)
+        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, spxs=spxs, spys=spys, spzs=spzs, weightings=weightings)
         
         # add metadata to beam
         try:
