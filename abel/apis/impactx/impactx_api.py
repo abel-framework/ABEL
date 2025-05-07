@@ -1,8 +1,6 @@
 import numpy as np
 from abel.CONFIG import CONFIG
-import abel.apis.impactx.transformation_utilities as pycoord
 import uuid, os, shutil
-from abel.classes.beam import Beam
 import scipy.constants as SI
 from types import SimpleNamespace
 
@@ -243,6 +241,8 @@ def extract_evolution(path='', second_order=False):
 # convert from ImpactX particle container to ABEL beam
 def particle_container2beam(particle_container):
 
+    from abel.classes.beam import Beam
+    
     beam = Beam()
     beam.reset_phase_space(int(particle_container.total_number_of_particles()))
     
@@ -270,6 +270,7 @@ def beam2particle_container(beam, sim=None, verbose=False):
 
     import amrex.space3d as amr
     from impactx import Config
+    import abel.apis.impactx.transformation_utilities as pycoord
     
     # make simulation object if not already existing
     if sim is None:

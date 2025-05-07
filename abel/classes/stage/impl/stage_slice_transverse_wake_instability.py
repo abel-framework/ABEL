@@ -38,8 +38,6 @@ from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
 from abel.utilities.relativity import energy2gamma
 from abel.utilities.statistics import prct_clean, prct_clean2d
 from abel.utilities.other import find_closest_value_in_arr
-#from scipy.stats import linregress
-import concurrent.futures  # Parallel execution
 
 from types import SimpleNamespace
 from abel.CONFIG import CONFIG
@@ -47,7 +45,6 @@ from abel.classes.beam import Beam
 from abel.classes.stage.stage import Stage
 from abel.classes.stage.impl.stage_wake_t import StageWakeT
 import warnings, copy, os
-import pickle
 
 
 class StageSlicesTransWakeInstability(Stage):
@@ -228,6 +225,7 @@ class StageSlicesTransWakeInstability(Stage):
         #_, y_slices_table, yp_slices_table, _ = transverse_wake_instability(plasma_density, Ez, bubble_radius, main_num_profile, y_slices_start, yp_slices_start, energy_slices_start, stage_length, s_slices_start, xi_slices)
 
         # Parallel execution
+        import concurrent.futures  # Parallel execution
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future1 = executor.submit(transverse_wake_instability_slices, plasma_density, Ez, bubble_radius, main_num_profile, x_slices_start, xp_slices_start, energy_slices_start, stage_length, s_slices_start, xi_slices)
             future2 = executor.submit(transverse_wake_instability_slices, plasma_density, Ez, bubble_radius, main_num_profile, y_slices_start, yp_slices_start, energy_slices_start, stage_length, s_slices_start, xi_slices)
@@ -877,6 +875,7 @@ class StageSlicesTransWakeInstability(Stage):
     # ==================================================
     # Save the object to a file, obsolete
     def save(self, save_dir, filename='stage.pkl'):
+        import pickle
         path = save_dir + filename
         with open(path, 'wb') as f:
             pickle.dump(self, f)
@@ -885,6 +884,7 @@ class StageSlicesTransWakeInstability(Stage):
     # ==================================================
     # Load an object from a file, obsolete
     def load(self, diag_dir, filename='stage.pkl'):
+        import pickle
         path = diag_dir + filename
         with open(path, 'rb') as f:
             object = pickle.load(f)

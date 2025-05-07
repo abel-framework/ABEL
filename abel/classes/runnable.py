@@ -467,6 +467,8 @@ class Runnable(ABC):
 
         from matplotlib import pyplot as plt
         import abel.utilities.colors as cmaps
+        from matplotlib import colors
+        from matplotlib import cm
         
         # extract values
         valx_mean, valx_std = self.extract_function(xfcn)

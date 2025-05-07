@@ -1,8 +1,5 @@
-# suppress numba warnings from Ocelot
-#import warnings
-#from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-#warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-#warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+import numpy as np
+import scipy.constants as SI
 
 # import configuration class
 from .CONFIG import CONFIG
@@ -75,3 +72,7 @@ from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
 
 from abel.classes.collider.preset.halhf_v1 import HALHFv1
 from abel.classes.collider.preset.halhf_v2 import HALHFv2
+from abel.classes.collider.preset.pwfa_collider import PWFACollider
+from abel.classes.collider.preset.c3 import C3
+from abel.classes.collider.preset.clic import CLIC
+from abel.classes.collider.preset.ilc import ILC

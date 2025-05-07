@@ -5,7 +5,7 @@ from abel.classes.trackable import Trackable
 from abel.classes.runnable import Runnable
 from abel.classes.cost_modeled import CostModeled
 import scipy.constants as SI
-import copy, os
+import copy
 import numpy as np
 
 class Beamline(Trackable, Runnable, CostModeled):
@@ -100,6 +100,7 @@ class Beamline(Trackable, Runnable, CostModeled):
     def plot_survey(self, save_fig=False):
 
         from matplotlib import pyplot as plt
+        import os
         
         # setup figure
         fig, ax = plt.subplots()

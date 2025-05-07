@@ -8,7 +8,7 @@ Ben Chen, 12 June 2024, University of Oslo
 
 import numpy as np
 import scipy.constants as SI
-import copy, os, time, warnings
+import copy, os, warnings
 
 from abel.classes.beam import Beam
 from abel.utilities.plasma_physics import k_p

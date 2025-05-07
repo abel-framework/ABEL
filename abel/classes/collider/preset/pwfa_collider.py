@@ -1,6 +1,17 @@
-from abel import *
+from abel.classes.collider.collider import Collider
 import scipy.constants as SI
 import numpy as np
+from abel.classes.source.impl.source_basic import SourceBasic
+from abel.classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
+from abel.classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
+from abel.classes.beamline.impl.driver_complex import DriverComplex
+from abel.classes.turnaround.impl.turnaround_basic import TurnaroundBasic
+from abel.classes.stage.impl.stage_basic import StageBasic
+from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
+from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
+from abel.classes.ip.impl.ip_basic import InteractionPointBasic
+import copy
 
 class PWFACollider(Collider):
 
@@ -32,7 +43,7 @@ class PWFACollider(Collider):
 
     # pre-assembly of the collider subsystems
     def assemble_trackables(self):
-
+        
         driver_separation = self.driver_separation_num_buckets/self.driver_linac_rf_frequency
         colliding_bunch_separation = self.pwfa_num_stages*driver_separation
         driver_energy = (self.com_energy/2)/(self.pwfa_transformer_ratio*self.pwfa_num_stages)

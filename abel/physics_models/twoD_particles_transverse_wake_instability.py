@@ -40,8 +40,8 @@ Ben Chen, 7 October 2023, University of Oslo
 """
 
 import numpy as np
-from scipy.constants import c, e, m_e, epsilon_0 as eps0
-from abel.classes.beam import *
+from scipy.constants import c, e, m_e, epsilon_0 as eps0 # TODO: replace with "import scipy.constants as SI" for consistency
+from abel.classes.beam import Beam
 from abel.utilities.relativity import energy2gamma
 from abel.utilities.plasma_physics import k_p
 from tqdm import tqdm

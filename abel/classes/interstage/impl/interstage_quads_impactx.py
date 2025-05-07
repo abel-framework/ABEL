@@ -1,6 +1,6 @@
 from abel.classes.interstage.interstage import Interstage
 import numpy as np
-import contextlib, os
+import os
 from types import SimpleNamespace
 
 import scipy.constants as SI

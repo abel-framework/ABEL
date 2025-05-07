@@ -43,11 +43,10 @@ Ben Chen, 5 July 2023, University of Oslo
 """
 
 import numpy as np
-from scipy.constants import c, e, m_e, epsilon_0 as eps0
+from scipy.constants import c, e, m_e, epsilon_0 as eps0 # TODO: replace with "import scipy.constants as SI" for consistency
 from abel.utilities.other import find_closest_value_in_arr
 from abel.utilities.relativity import energy2gamma
 from tqdm import tqdm
-import time
 from abel.utilities.plasma_physics import k_p
 
 

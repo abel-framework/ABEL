@@ -1,4 +1,4 @@
-import uuid, os, scipy, shutil, subprocess, csv
+import uuid, os, shutil, subprocess, csv
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker as mticker
@@ -6,7 +6,6 @@ from functools import partial
 import scipy.constants as SI
 from string import Template
 from types import SimpleNamespace
-#import abel
 from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.interstage.interstage import Interstage
@@ -267,6 +266,8 @@ class InterstageElegant(Interstage):
         
     # match the beta function, first- and second-order dispersions
     def match(self, make_plot=False):
+
+        from scipy.optimize import minimize
         
         # define half lattice
         ls_half, _, _, _, _ = self.__half_lattice()
@@ -283,7 +284,7 @@ class InterstageElegant(Interstage):
             return alpha**2
         
         # match the beta function
-        result_beta = scipy.optimize.minimize(minfun_beta, self.g_max, tol=1e-20)
+        result_beta = minimize(minfun_beta, self.g_max, tol=1e-20)
         g_lens = result_beta.x[0]
         
         # minimizer function for first-order dispersion (central dispersion prime is zero)
@@ -293,7 +294,7 @@ class InterstageElegant(Interstage):
         
         # match the first-order dispersion
         Bdip3_guess = -Bdip2;
-        result_Dx = scipy.optimize.minimize(minfun_Dx, Bdip3_guess, tol=1e-20)
+        result_Dx = minimize(minfun_Dx, Bdip3_guess, tol=1e-20)
         Bdip3 = result_Dx.x[0]
         
         # calculate the required transverse-taper gradient
@@ -310,7 +311,7 @@ class InterstageElegant(Interstage):
         
         # match the second-order dispersion
         m_guess = 4*tau_lens/self.__eval_sextupole_length()
-        result_DDx = scipy.optimize.minimize(minfun_DDx, m_guess, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
+        result_DDx = minimize(minfun_DDx, m_guess, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
         m_sext = result_DDx.x[0]
         
         # plot results

@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.constants as SI
-import os
 
 # Calculate acceleration and change in gamma
 def oscillator2d(t, x, A, B, C, D):
@@ -23,6 +22,7 @@ def evolve_betatron_motion(x0, ux0, y0, uy0, L, gamma, dgamma_ds, kp, enable_rr 
     from joblib import Parallel, delayed
     from scipy.integrate import solve_ivp
     import multiprocessing
+    import os
 
     num_cores = multiprocessing.cpu_count()
     os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
