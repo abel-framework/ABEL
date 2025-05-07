@@ -1,5 +1,4 @@
 import scipy.constants as SI
-import copy
 import numpy as np
 from abel.classes.combiner_ring.combiner_ring import CombinerRing
 
@@ -14,6 +13,8 @@ class CombinerRingBasic(CombinerRing):
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
+        import copy
+        
         # outgoing bunch separation (compressed)
         self.bunch_separation = beam0.bunch_separation/self.compression_factor
         self.num_bunches_in_train = beam0.num_bunches_in_train

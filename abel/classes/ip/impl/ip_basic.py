@@ -1,6 +1,4 @@
-import numpy as np
-import scipy.constants as SI
-from abel import InteractionPoint, Event
+from abel.classes.ip.ip import InteractionPoint
 
 class InteractionPointBasic(InteractionPoint):
 
@@ -9,6 +7,10 @@ class InteractionPointBasic(InteractionPoint):
     
     # perform a simple interaction (geometric lumosity)
     def interact(self, beam1, beam2):
+
+        import numpy as np
+        import scipy.constants as SI
+        from abel.classes.event import Event
         
         # create event
         event = Event(beam1, beam2)

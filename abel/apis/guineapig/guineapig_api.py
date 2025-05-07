@@ -1,6 +1,7 @@
-import time, os, uuid, shlex, subprocess, csv
+import os, uuid, subprocess, csv
 import numpy as np
-from abel import CONFIG, Event
+from abel.CONFIG import CONFIG
+from abel.classes.event import Event
 
 def guineapig_run(inputfile, beam1, beam2):
     

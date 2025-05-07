@@ -1,9 +1,6 @@
-from abel import Spectrometer
+from abel.classes.spectrometer.spectrometer import Spectrometer
 import numpy as np
 import scipy.constants as SI
-import scipy
-from abel.apis.ocelot.ocelot_api import ocelot_particle_array2beam, beam2ocelot_particle_array
-from matplotlib import pyplot as plt
 
 
 class SpectrometerFacetOcelot(Spectrometer):
@@ -78,6 +75,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         
         # import OCELOT
         from  ocelot import lattice_transfer_map
+        from scipy.optimize import minimize
         
         # TODO: check if the object plane is set correctly
         
@@ -117,6 +115,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         
         # import OCELOT
         from ocelot import track, twiss, get_envelope, Navigator
+        from abel.apis.ocelot.ocelot_api import ocelot_particle_array2beam, beam2ocelot_particle_array
         
         # set imaging
         self.set_imaging()

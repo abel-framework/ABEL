@@ -1,10 +1,9 @@
-from abel import Beam
 import scipy.constants as SI
-import numpy as np
-import wake_t
 
 # convert from WakeT particle bunch to ABEL beam
 def wake_t_bunch2beam(bunch):
+
+    from abel.classes.beam import Beam
     
     # extract phase space (with charge)
     phasespace = bunch.get_6D_matrix_with_charge()
@@ -27,6 +26,8 @@ def wake_t_bunch2beam(bunch):
 # convert from ABEL beam to WakeT particle bunch
 def beam2wake_t_bunch(beam, name='beam'):
     
+    import wake_t
+
     # convert the beam
     bunch = wake_t.ParticleBunch(beam.weightings(),
                                  beam.xs(),

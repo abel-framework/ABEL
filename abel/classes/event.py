@@ -1,9 +1,6 @@
 import numpy as np
-import openpmd_api as io
-from datetime import datetime
-from pytz import timezone
 import scipy.constants as SI
-from abel import Beam
+from abel.classes.beam import Beam
 
 class Event():
     
@@ -40,6 +37,10 @@ class Event():
     
     # save event (to OpenPMD format)
     def save(self, runnable):
+
+        from datetime import datetime
+        from pytz import timezone
+        import openpmd_api as io
         
         # open a new file
         series = io.Series(self.filename(runnable), io.Access.create)
@@ -67,6 +68,8 @@ class Event():
     # load event (from OpenPMD format)
     @classmethod
     def load(_, filename, load_beams=True):
+
+        import openpmd_api as io
         
         # create event
         event = Event()

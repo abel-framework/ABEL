@@ -1,7 +1,6 @@
 import scipy.constants as SI
-from abel import Interstage
+from abel.classes.interstage.interstage import Interstage
 import numpy as np
-import matplotlib.pyplot as plt
 
 class InterstageBasic(Interstage):
     

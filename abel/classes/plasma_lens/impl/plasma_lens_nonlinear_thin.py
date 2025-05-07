@@ -1,5 +1,4 @@
-from abel import PlasmaLens
-from matplotlib import patches
+from abel.classes.plasma_lens.plasma_lens import PlasmaLens
 import numpy as np
 import scipy.constants as SI
 

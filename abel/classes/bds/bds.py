@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from matplotlib import patches
 import numpy as np
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
@@ -21,9 +20,8 @@ class BeamDeliverySystem(Trackable, CostModeled):
         pass
     
     def survey_object(self):
-        #rect = patches.Rectangle((0, -0.1), self.get_length(), 0.2)
-        #rect.set_facecolor = 'r'
-        #return rect
+        
+        from matplotlib import patches
         
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)

@@ -3,7 +3,8 @@ import numpy as np
 import scipy.constants as SI
 from string import Template
 from pathlib import Path
-from abel import CONFIG, Beam
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
 from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 

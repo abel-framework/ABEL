@@ -1,15 +1,11 @@
-from abel import Stage, CONFIG
-from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_write_jobscript
+from abel.CONFIG import CONFIG
+from abel.classes.stage.stage import Stage
 from abel.utilities.plasma_physics import *
 from abel.utilities.relativity import energy2gamma
 import scipy.constants as SI
-import scipy.stats as spstats
-from matplotlib import pyplot as plt
 import numpy as np
 import os, shutil, uuid, copy
-from openpmd_viewer import OpenPMDTimeSeries
 from abel.utilities.plasma_physics import k_p
-from matplotlib.colors import LogNorm
 from types import SimpleNamespace
 
 try:
@@ -47,6 +43,8 @@ class StageHipace(Stage):
         
 
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
+
+        from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_write_jobscript
         
         ## PREPARE TEMPORARY FOLDER
         
@@ -291,6 +289,7 @@ class StageHipace(Stage):
                     Es = np.linspace(np.min(evol.energy[step]-5*evol.energy_spread[step]), np.max(evol.energy[step]+5*evol.energy_spread[step]), 500)
                     dQ_dE = np.zeros_like(Es)
                     for i in range(len(evol.slices.charge[step,:])):
+                        import scipy.stats as spstats
                         dQ_dE_slice = spstats.norm.pdf(Es, loc=evol.slices.energy[step,i], scale=evol.slices.energy_spread[step,i])
                         Q_slice = np.trapz(dQ_dE_slice, x=Es)
                         if abs(Q_slice) > 0:
@@ -332,6 +331,8 @@ class StageHipace(Stage):
         
         
     def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
+
+        from openpmd_viewer import OpenPMDTimeSeries
         
         # prepare to read simulation data
         source_path = tmpfolder + 'diags/hdf5/'
@@ -372,7 +373,6 @@ class StageHipace(Stage):
             destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number)
             shutil.move(source_path, destination_path)
 
-    
     def get_plasma_density(self, locations=None):
         if self.plasma_density_from_file is not None:
             density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
@@ -395,5 +395,3 @@ class StageHipace(Stage):
             ss = density_table[:,0]
             self.length = ss.max()-ss.min()
         return super().get_length()
-    
-    
