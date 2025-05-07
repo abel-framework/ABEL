@@ -42,6 +42,7 @@ from .classes.collider.collider import Collider
 from .classes.source.impl.source_basic import *
 from .classes.source.impl.source_trapezoid import SourceTrapezoid
 from .classes.source.impl.source_combiner import *
+from .classes.source.impl.source_energy_comb import *
 from .classes.source.impl.source_from_file import *
 from .classes.source.impl.source_flattop import *
 from .classes.source.impl.source_capsule import *
@@ -74,6 +75,8 @@ from .classes.bds.impl.bds_basic import *
 from .classes.bds.impl.bds_fbt import *
 from .classes.spectrometer.impl.spectrometer_facet_ocelot import *
 from .classes.spectrometer.impl.spectrometer_basic_clear import *
+from .classes.spectrometer.impl.achromatic.spectrometer_achromatic import SpectrometerAchromatic
+from .classes.spectrometer.impl.achromatic.impl.spectrometer_achromatic_basic import SpectrometerAchromaticBasic
 from .classes.ip.impl.ip_basic import *
 from .classes.ip.impl.ip_guineapig import *
 

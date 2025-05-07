@@ -1366,7 +1366,7 @@ class Beam():
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/mrad)')
 
-    def plot_transverse_profile(self):
+    def plot_transverse_profile(self, xlims=(None, None), ylims=(None, None), title=''):
         dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys)
 
         fig, ax = plt.subplots()
@@ -1381,6 +1381,9 @@ class Beam():
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um^2)')
 
+        ax.set_xlim(xlims)
+        ax.set_ylim(ylims)
+        ax.set_title(title)
     
     # TODO: unfinished!
     # def plot_bunch_pattern(self):
