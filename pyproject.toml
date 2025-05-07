@@ -21,7 +21,7 @@ dependencies = [
    "PyQt6",
    "pyqtgraph",
    "Wake-T",
-   #"ocelot@git+https://github.com/ocelot-collab/ocelot.git",
+   "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
    "ax-platform",
    "CLICopti",
    "RF-Track",
