@@ -87,7 +87,7 @@ class RFAcceleratorCLICopti(RFAccelerator):
         import CLICopti
         
         # make database
-        cellbase = os.path.join(CONFIG.software_path, 'clicopti/cellBase/TD_12GHz_v1.dat') # TODO: fix this
+        cellbase = CLICopti.CellBase.celldatabase_TD_12GHz_v2
         database = CLICopti.CellBase.CellBase_linearInterpolation_freqScaling(cellbase, ("a_n","d_n"), self.rf_frequency/1e9)
 
         # make structure
