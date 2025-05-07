@@ -7,13 +7,9 @@ class InterstageBasic(Interstage):
     
     def __init__(self, nom_energy=None, length=None, dipole_length=None, dipole_field=None, beta0=None, R56=None, phase_advance=1.5*np.pi):
         
-        super().__init__()
+        super().__init__(nom_energy=nom_energy, dipole_length=dipole_length, dipole_field=dipole_field, beta0=beta0)
         
-        self.nom_energy = nom_energy
         self.length = length
-        self.dipole_length = dipole_length
-        self.dipole_field = dipole_field
-        self.beta0 = beta0
         self.phase_advance = phase_advance
         self.R56 = R56
     
