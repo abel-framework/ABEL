@@ -122,7 +122,7 @@ class Beamline(Trackable, Runnable, CostModeled):
         # extract secondary objects
         second_objs = None
         connect_to = None
-        if len(objs)==2 and isinstance(objs[1], tuple):
+        if isinstance(objs, tuple) and len(objs)==2 and isinstance(objs[1], tuple):
             second_objs = objs[1][0]
             connect_to = objs[1][1]
             objs = objs[0]
