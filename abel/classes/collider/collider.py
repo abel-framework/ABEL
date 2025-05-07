@@ -8,8 +8,6 @@ from abel.CONFIG import CONFIG
 from matplotlib import pyplot as plt
 import numpy as np
 import os, copy
-from matplotlib import lines
-from datetime import datetime
 from types import SimpleNamespace
 
 class Collider(Runnable, CostModeled):
@@ -565,8 +563,9 @@ class Collider(Runnable, CostModeled):
 
     ## SCAN PLOTS
 
-    # TODO: delete data option
-    def plot_cost_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True):
+    def plot_cost_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=True, overwrite=True):
+
+        from datetime import datetime
         
         # set default scan name
         if scan_name is None:
@@ -813,6 +812,8 @@ class Collider(Runnable, CostModeled):
     
     # plot the luminosity distribution
     def plot_luminosity(self, per_power=False):
+
+        from matplotlib import lines
         
         if per_power:
             norm = 1e4 * self.energy_usage()/1e6 # [100 J]

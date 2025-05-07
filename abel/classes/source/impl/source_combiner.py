@@ -1,5 +1,4 @@
-from abel import Source
-import numpy as np
+from abel.classes.source.source import Source
 
 class SourceCombiner(Source):
     

@@ -1,5 +1,4 @@
 from abel.classes.source.source import Source
-import copy
 
 class SourceCapsule(Source):
     """
@@ -14,6 +13,8 @@ class SourceCapsule(Source):
 
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
+
+        import copy
         
         # return the saved beam
         beam = copy.deepcopy(self.beam)

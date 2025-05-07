@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from matplotlib import patches
 from abel.classes.beamline.beamline import Beamline
 from abel.classes.source.source import Source
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator

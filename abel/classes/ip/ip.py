@@ -1,5 +1,7 @@
 from abc import abstractmethod
-from abel import Runnable, Event, Beam
+from abel.classes.runnable import Runnable
+from abel.classes.event import Event
+from abel.classes.beam import Beam
 from abel.classes.cost_modeled import CostModeled
 import os, shutil
 import numpy as np

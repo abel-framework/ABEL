@@ -1,14 +1,19 @@
-from abel import Beam, Linac, Source, DriverComplex, RFAccelerator, Stage, Interstage, BeamDeliverySystem, CONFIG
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
+from abel.classes.source.source import Source
+from abel.classes.stage.stage import Stage
+from abel.classes.interstage.interstage import Interstage
+from abel.classes.bds.bds import BeamDeliverySystem
+from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
+from abel.classes.beamline.impl.linac.linac import Linac
+from abel.classes.beamline.impl.driver_complex import DriverComplex
 from abel.classes.cost_modeled import CostModeled
 from abel.classes.beamline.beamline import NotAssembledError
 import scipy.constants as SI
 import copy, os
-from matplotlib import pyplot as plt
 import numpy as np
-from matplotlib.animation import FuncAnimation
-from matplotlib import ticker as mticker
-import inspect
 from typing import List
+from matplotlib import pyplot as plt
 
 class PlasmaLinac(Linac):
     
@@ -442,6 +447,8 @@ class PlasmaLinac(Linac):
     
     # apply function to all beam files
     def evolution_fcn(self, fcns, shot=None, clean=False):
+
+        import inspect
         
         # declare data structure
         num_outputs = self.num_outputs()
@@ -740,6 +747,9 @@ class PlasmaLinac(Linac):
     # animate the longitudinal phase space
     def animate_lps(self, rel_energy_window=0.06):
         
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
+        
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
         fig.set_figwidth(CONFIG.plot_width_default*0.8)
@@ -873,6 +883,9 @@ class PlasmaLinac(Linac):
 
     # animate the horizontal phase space
     def animate_phasespace_x(self):
+        
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
         
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
@@ -1012,6 +1025,9 @@ class PlasmaLinac(Linac):
     # animate the vertical phase space
     def animate_phasespace_y(self):
         
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
+        
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
         fig.set_figwidth(CONFIG.plot_width_default*0.8)
@@ -1149,6 +1165,9 @@ class PlasmaLinac(Linac):
     # animate the horizontal sideview (top view)
     def animate_sideview_x(self):
         
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
+        
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
         fig.set_figwidth(CONFIG.plot_width_default*0.8)
@@ -1283,6 +1302,9 @@ class PlasmaLinac(Linac):
     
     # animate the vertical sideview
     def animate_sideview_y(self):
+        
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
         
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})

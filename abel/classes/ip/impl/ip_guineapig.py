@@ -1,10 +1,4 @@
-import uuid, os
-import numpy as np
-import scipy.constants as SI
-from string import Template
-import abel
-from abel import InteractionPoint, CONFIG
-from abel.apis.guineapig.guineapig_api import guineapig_run
+from abel.classes.ip.ip import InteractionPoint
 
 class InteractionPointGuineaPig(InteractionPoint):
     
@@ -16,6 +10,14 @@ class InteractionPointGuineaPig(InteractionPoint):
     # perform GUINEA-PIG simulation
     def interact(self, beam1, beam2, load_beams=False):
 
+        import uuid, os
+        import numpy as np
+        import scipy.constants as SI
+        from abel.CONFIG import CONFIG
+        from abel.apis.guineapig.guineapig_api import guineapig_run
+        import abel
+        from string import Template
+        
         nsigma_cut = 5
         
         # make inputs

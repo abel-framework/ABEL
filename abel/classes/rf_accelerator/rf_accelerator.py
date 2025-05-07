@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
 from abc import abstractmethod
-from matplotlib import patches
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
-
 import numpy as np
-from matplotlib import pyplot as plt
 
 class RFAccelerator(Trackable, CostModeled):
     """
@@ -278,8 +275,6 @@ class RFAccelerator(Trackable, CostModeled):
         return self.length
 
     def survey_object(self):
-        #return patches.Rectangle((0, -1), self.get_length(), 2)
-
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
         y_points = np.linspace(0, 0, npoints)

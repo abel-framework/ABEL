@@ -5,8 +5,6 @@ from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.source.source import Source
 from abel.classes.spectrometer.spectrometer import Spectrometer
 import numpy as np
-from matplotlib import pyplot as plt
-import warnings
 
 class Experiment(Beamline):
     
@@ -52,6 +50,9 @@ class Experiment(Beamline):
     # density plots
     def plot_spectrometer_screen(self, xlims=None, ylims=None, E_calib = False, diverg = None, plot_m12 = False, savefig = None):
         
+        from matplotlib import pyplot as plt
+        import warnings
+
         # load phase space
         beam = self.final_beam
 

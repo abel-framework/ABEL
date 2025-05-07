@@ -1,8 +1,6 @@
 import numpy as np
 import scipy.constants as SI
-from abel import Source, Beam
-from abel.utilities.beam_physics import generate_trace_space_xy
-from abel.utilities.relativity import energy2gamma
+from abel.classes.source.source import Source
 
 class SourceFlatTop(Source):
     
@@ -26,6 +24,10 @@ class SourceFlatTop(Source):
 
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
+
+        from abel.classes.beam import Beam
+        from abel.utilities.beam_physics import generate_trace_space_xy
+        from abel.utilities.relativity import energy2gamma
         
         # make empty beam
         beam = Beam()

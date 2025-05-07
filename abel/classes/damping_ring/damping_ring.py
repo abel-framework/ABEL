@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from matplotlib import patches
 import numpy as np
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
@@ -49,9 +48,9 @@ class DampingRing(Trackable, CostModeled):
         pass
     
     def survey_object(self):
-        #return patches.Circle((0, self.get_circumference()/(2*np.pi)), self.get_circumference()/(2*np.pi)) # make into semicircle or droplet shape
-
+        
         thetas = np.linspace(0, 3*np.pi, 200)
+
         radius = self.get_circumference()/(2*np.pi)
         x_points = radius*np.sin(thetas)
         y_points = -radius*(1-np.cos(thetas))

@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from abel import Beamline
+from abel.classes.beamline.beamline import Beamline
 
 class Linac(Beamline):
     

@@ -1,5 +1,12 @@
-from abel import *
+from abel.classes.collider.collider import Collider
+from abel.classes.source.impl.source_basic import SourceBasic
+from abel.classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
+from abel.classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
+from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
+from abel.classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
+from abel.classes.ip.impl.ip_basic import InteractionPointBasic
 import copy
+import numpy as np
 
 class C3(Collider):
 

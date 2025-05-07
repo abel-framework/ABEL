@@ -1,19 +1,9 @@
 from abc import ABC, abstractmethod
-from abel import CONFIG, Beam
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
 import os, shutil, time, sys, csv
 from datetime import datetime
-from joblib import Parallel, delayed
-from joblib_progress import joblib_progress
-import joblib.parallel
-import collections
 import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib import colors
-from matplotlib import cm
-import dill as pickle
-import functools
-import inspect
-import abel.utilities.colors as cmaps
 
 class Runnable(ABC):
     
@@ -55,6 +45,9 @@ class Runnable(ABC):
     # scan function
     def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
 
+        from joblib import Parallel, delayed
+        from joblib_progress import joblib_progress
+        
         # define run name (generate if not given)
         if run_name is None:
             self.run_name = "scan_" + datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -150,11 +143,13 @@ class Runnable(ABC):
     
     # save object to file
     def save(self):
+        import dill as pickle
         with open(self.object_path(), 'wb') as savefile:
             pickle.dump(self, savefile)
             
     # load object from file
     def load(self, shot=None):
+        import dill as pickle
         with open(self.object_path(shot), 'rb') as loadfile:
             try:
                 obj = pickle.load(loadfile)
@@ -265,6 +260,7 @@ class Runnable(ABC):
 
     # Get nested attribute
     def get_nested_attr(self, attr, *args):
+        import functools
         def _getattr(obj, attr):
             return getattr(obj, attr, *args)
         return functools.reduce(_getattr, [self] + attr.split('.'))
@@ -365,6 +361,8 @@ class Runnable(ABC):
     # plot value of beam parameters across a scan
     def plot_function(self, fcns, label=None, scale=1, xscale='linear', yscale='linear', legend=None):
 
+        from matplotlib import pyplot as plt
+        
         if not isinstance(fcns, list):
             fcns = [fcns]
         
@@ -426,6 +424,8 @@ class Runnable(ABC):
     
     def plot_waterfall(self, proj_fcn, label=None, scale=1, index=-1):
 
+        from matplotlib import pyplot as plt
+        
         # determine size of projection
         _, ctrs_initial = proj_fcn(self.get_beam(shot=0, index=index))
         _, ctrs_final = proj_fcn(self.get_beam(shot=-1, index=index))
@@ -473,6 +473,11 @@ class Runnable(ABC):
     ## PLOT CORRELATIONS
     
     def plot_correlation(self, xfcn, yfcn, xlabel=None, ylabel=None, xscaling=1, yscaling=1, xscale='linear', yscale='linear', equal_axes=False):
+
+        from matplotlib import pyplot as plt
+        import abel.utilities.colors as cmaps
+        from matplotlib import colors
+        from matplotlib import cm
         
         # extract values
         valx_mean, valx_std = self.extract_function(xfcn)
