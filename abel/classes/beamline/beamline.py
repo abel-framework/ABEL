@@ -45,8 +45,7 @@ class Beamline(Trackable, Runnable, CostModeled):
         # perform element-wise tracking
         for trackable in self.trackables:
             beam = trackable.track(beam, savedepth-1, runnable, verbose)
-
-        beam
+        
         return beam
 
     
