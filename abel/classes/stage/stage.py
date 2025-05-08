@@ -822,6 +822,8 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_efficiency(self, beam0, driver0, beam, driver):
+        if driver0 is None or driver is None:
+            return
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
         Etot0_driver = driver0.total_energy()
@@ -833,19 +835,55 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
-        
-        dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
-        num_sigmas = 6
-        z_min = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        z_max = driver0.z_offset() + num_sigmas * driver0.bunch_length()
-        tbins = np.arange(z_min, z_max, dz)/SI.c
-        
-        Is0, ts0 = (driver0 + beam0).current_profile(bins=tbins)
-        self.initial.beam.current.zs = ts0*SI.c
-        self.initial.beam.current.Is = Is0
 
+        # find limits and step size
+        num_sigmas = 6
+        if beam0 is not None:
+            z_min = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+            dz_beam = beam0.bunch_length(clean=True)/np.sqrt(len(beam0))
+        else:
+            z_min = driver0.z_offset() - num_sigmas * driver0.bunch_length()
+        
+        if driver0 is not None:
+            z_max = driver0.z_offset() + num_sigmas * driver0.bunch_length()
+            dz_driver = driver0.bunch_length(clean=True)/np.sqrt(len(driver0))
+        else:
+            z_max = beam0.z_offset() + num_sigmas * beam0.bunch_length()
+
+        # combine beams
+        if beam0 is not None and driver0 is not None:
+            beams0 = driver0 + beam0
+            dz = 40*np.mean([dz_beam, dz_driver])
+        elif beam0 is not None and driver0 is None:
+            beams0 = beam0
+            dz = 40*dz_beam
+        elif beam0 is None and driver0 is not None:
+            beams0 = driver0
+            dz = 40*dz_driver
+        else:
+            beams0 = None
+            dz = z_max-z_min
+
+        # make bins
+        tbins = np.arange(z_min, z_max, dz)/SI.c
+
+        # initial current
+        if beams0 is not None:
+            Is0, ts0 = beams0.current_profile(bins=tbins)
+            self.initial.beam.current.zs = ts0*SI.c
+            self.initial.beam.current.Is = Is0
+
+        # final current
         if beam is not None and driver is not None:
-            Is, ts = (driver + beam).current_profile(bins=tbins)
+            beams = driver + beam
+        elif beam is not None and driver is None:
+            beams = beam
+        elif beam is None and driver is not None:
+            beams = driver
+        else:
+            beams = None
+        if beams is not None:
+            Is, ts = beams.current_profile(bins=tbins)
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
 
@@ -1070,7 +1108,7 @@ class Stage(Trackable, CostModeled):
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
-        if self.driver_source.energy is not None:
+        if self.driver_source is not None and self.driver_source.energy is not None:
             Ez_driver_max = self.driver_source.energy/self.get_length()
             axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
         if has_final:

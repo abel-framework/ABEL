@@ -28,6 +28,8 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     # driver-only mode
     if driver_only:
         beam_components = 'driver'
+    elif filename_driver is None:
+        beam_components = 'beam'
     else:
         beam_components = 'driver beam'
     
@@ -135,12 +137,18 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     
     # when finished, load the beam and driver
     filename = os.path.join(runfolder, "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps)))
-    
+
+    # attempt to load the beam
     try:
         beam = Beam.load(filename, beam_name='beam')
     except:
         beam = None
-    driver = Beam.load(filename, beam_name='driver')
+
+    # attempt to load the driver
+    try:
+        driver = Beam.load(filename, beam_name='driver')
+    except:
+        driver = None
     
     return beam, driver
 
