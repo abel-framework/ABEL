@@ -5,7 +5,7 @@ from abel.classes.beam import Beam
 class Event():
     
     # empty beam
-    def __init__(self, input_beam1=None, input_beam2=None):
+    def __init__(self, input_beam1=None, input_beam2=None, shot=0):
         
         # save beams
         self.input_beam1 = input_beam1
@@ -15,11 +15,18 @@ class Event():
         self.luminosity_full = None
         self.luminosity_geom = None
         self.luminosity_peak = None
+        self.upsilon_max = None
+        self.num_pairs = None
+        self.num_photon1 = None
+        self.num_photon2 = None
+        self.energy_loss1 = None
+        self.energy_loss2 = None
     
     
     # calculate center of mass energy
     def center_of_mass_energy(self):
         return np.sqrt(4*self.input_beam1.energy()*self.input_beam2.energy())
+
     
     # luminosities
     def geometric_luminosity(self):
@@ -30,20 +37,39 @@ class Event():
     
     def peak_luminosity(self):
         return self.luminosity_peak
+
+    def maximum_upsilon(self):
+        return self.upsilon_max
+
+    def num_coherent_pairs(self):
+        return self.num_pairs
+        
+    def num_photons_beam1(self):
+        return self.num_photon1
+
+    def num_photons_beam2(self):
+        return self.num_photon2
+
+    def energy_loss_per_particle_beam1(self):
+        return self.energy_loss1
+
+    def energy_loss_per_particle_beam2(self):
+        return self.energy_loss2
+
     
     # filename generator
-    def filename(self, runnable):
-        return runnable.shot_path() + 'event.h5'
+    def filename(self, runnable, shot1=None, shot2=None):
+        return runnable.shot_path(shot1, shot2) + 'event.h5'
     
     # save event (to OpenPMD format)
-    def save(self, runnable):
+    def save(self, runnable, shot1=None, shot2=None):
 
         from datetime import datetime
         from pytz import timezone
         import openpmd_api as io
         
         # open a new file
-        series = io.Series(self.filename(runnable), io.Access.create)
+        series = io.Series(self.filename(runnable, shot1, shot2), io.Access.create)
         
         # add metadata
         series.author = "ABEL (the Adaptable Beginning-to-End Linac simulation framework)"
@@ -84,6 +110,12 @@ class Event():
         event.luminosity_full = series.iterations[0].get_attribute("luminosity_full")
         event.luminosity_geom = series.iterations[0].get_attribute("luminosity_geom")
         event.luminosity_peak = series.iterations[0].get_attribute("luminosity_peak")
+        event.upsilon_max = series.iterations[0].get_attribute("upsilon_max")
+        event.num_pairs = series.iterations[0].get_attribute("num_pairs")
+        event.num_photon1 = series.iterations[0].get_attribute("num_photon1")
+        event.num_photon2 = series.iterations[0].get_attribute("num_photon2")
+        event.energy_loss1 = series.iterations[0].get_attribute("energy_loss1")
+        event.energy_loss2 = series.iterations[0].get_attribute("energy_loss2")
         
         return event
         

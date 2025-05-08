@@ -7,6 +7,7 @@ from abel.classes.bds.bds import BeamDeliverySystem
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.beamline.impl.driver_complex import DriverComplex
+from abel.classes.cost_modeled import CostModeled
 from abel.classes.beamline.beamline import NotAssembledError
 import scipy.constants as SI
 import copy, os
@@ -123,6 +124,14 @@ class PlasmaLinac(Linac):
                 last_interstage = self._last_interstage
             else:  # Get last_interstage from self.trackables
                 last_interstage = self.last_interstage
+            
+            # stage rep rate
+            if self.stage.bunch_separation is None:
+                self.stage.bunch_separation = self.bunch_separation
+            if self.stage.num_bunches_in_train is None:
+                self.stage.num_bunches_in_train = self.num_bunches_in_train
+            if self.stage.rep_rate_trains is None:
+                self.stage.rep_rate_trains = self.rep_rate_trains
             
             # instantiate many stages
             for i in range(self.num_stages):
@@ -385,6 +394,23 @@ class PlasmaLinac(Linac):
             interstage_costs += interstage.get_cost()
         breakdown.append(('Interstages', interstage_costs))
 
+        # driver dumps
+        if self.stage.dumped_power() is not None:
+            driver_dump_power = 0
+            for stage in self.stages:
+                driver_dump_power += stage.dumped_power()
+            driver_dump_costs = driver_dump_power * CostModeled.cost_per_power_beam_dump
+            breakdown.append((f'Driver dumps ({self.num_stages}x, {driver_dump_power/1e6:.0f} MW total)', driver_dump_costs))
+
+        # cost of the driver delay chicanes
+        length_driver_delay_chicane = 0
+        for stage in self.stages:
+            length_driver_delay_chicane += stage.get_length()
+        for interstage in self.interstages:
+            length_driver_delay_chicane += interstage.get_length()
+        driver_delay_chicanes_costs = 2 * length_driver_delay_chicane * CostModeled.cost_per_length_driver_delay_chicane
+        breakdown.append(('Driver delay chicanes (left+right)', driver_delay_chicanes_costs))
+
         # cost of the BDS
         if self.bds is not None:
             breakdown.append(self.bds.get_cost_breakdown())
@@ -394,6 +420,28 @@ class PlasmaLinac(Linac):
 
         return (self.name, breakdown)
 
+    
+    def get_cost_breakdown_civil_construction(self):
+        breakdown = []
+        cost_plasma_stages = 0
+        num_plasma_stages = 0
+        cost_interstages = 0
+        num_interstages = 0
+        for trackable in self.trackables:
+            if isinstance(trackable, Stage):
+                cost_plasma_stages += trackable.get_cost_civil_construction(tunnel_diameter=8.0)
+                num_plasma_stages += 1
+            elif isinstance(trackable, Interstage):
+                cost_interstages += trackable.get_cost_civil_construction(tunnel_diameter=8.0)
+                num_interstages += 1
+            elif isinstance(trackable, BeamDeliverySystem):
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+            else:
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+        breakdown.append((f'Plasma stages ({num_plasma_stages}x, widened 3x)', cost_plasma_stages))
+        breakdown.append((f'Interstages ({num_interstages}x, widened 3x)', cost_interstages))
+        return ('Civil construction', breakdown)
+        
     
     ## PLOT EVOLUTION
     

@@ -22,12 +22,6 @@ class Beamline(Trackable, Runnable, CostModeled):
     @abstractmethod
     def assemble_trackables(self):
         
-        # set bunch pattern for all trackables
-        #for trackable in self.trackables:
-        #    trackable.num_bunches_in_train = self.num_bunches_in_train
-        #    trackable.bunch_separation = self.bunch_separation
-        #    trackable.rep_rate_trains = self.rep_rate_trains
-        
         # apply the bunch pattern to all trackables
         for i in range(len(self.trackables)):
             if self.bunch_separation is not None:
@@ -66,6 +60,10 @@ class Beamline(Trackable, Runnable, CostModeled):
             return self.energy_usage() * self.get_rep_rate_average()
         else:
             return None
+
+    @abstractmethod
+    def get_nom_beam_power(self):
+        pass
     
     ## LENGTH
     
@@ -82,7 +80,10 @@ class Beamline(Trackable, Runnable, CostModeled):
     ## COST
 
     def get_cost_breakdown_civil_construction(self):
-        return ('Civil construction', self.get_length() * CostModeled.cost_per_length_tunnel)
+        breakdown = []
+        for trackable in self.trackables:
+            breakdown.append((trackable.name, trackable.get_cost_civil_construction()))
+        return ('Civil construction', breakdown)
 
     
     ## SURVEY

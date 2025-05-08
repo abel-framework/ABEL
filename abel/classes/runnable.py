@@ -58,6 +58,10 @@ class Runnable(ABC):
         self.verbose = verbose
         self.savedepth = savedepth
         
+        if self.overwrite:
+            self.clear_run_data()
+            self.overwrite = False
+            
         # default verbosity
         if self.verbose is None:
             self.verbose = not parallel
@@ -109,7 +113,6 @@ class Runnable(ABC):
         
         # return final beam from first shot
         self.__dict__.update(self.load(shot=shots_to_perform[0]).__dict__)
-        #return self.final_beam
 
     
     # run simulation
@@ -120,14 +123,9 @@ class Runnable(ABC):
             self.run_name = 'run_' + datetime.now().strftime('%Y%m%d_%H%M%S')
         else:
             self.run_name = run_name
-
-        if overwrite:
-            self.clear_run_data()
-            overwrite = False
-            
+        
         # perform a scan with only one step
         self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
-        #return beam
     
     
 
@@ -361,24 +359,35 @@ class Runnable(ABC):
     ## PLOT FUNCTIONS
 
     # plot value of beam parameters across a scan
-    def plot_function(self, fcn, label=None, scale=1, xscale='linear', yscale='linear'):
+    def plot_function(self, fcns, label=None, scale=1, xscale='linear', yscale='linear', legend=None):
 
         from matplotlib import pyplot as plt
         
-        # extract values
-        val_mean, val_std = self.extract_function(fcn)
+        if not isinstance(fcns, list):
+            fcns = [fcns]
         
-        if not hasattr(self, 'scale'):
-            self.scale = 1
-        if not hasattr(self, 'label'):
-            self.label = ''
-            
+        if not isinstance(legend, list):
+            legend = [legend]
+    
         # plot evolution
         fig, ax = plt.subplots(1)
         fig.set_figwidth(CONFIG.plot_width_default)
         fig.set_figheight(CONFIG.plot_width_default*0.6)
         
-        ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5)
+        for i, fcn in enumerate(fcns):
+            
+            # extract values
+            val_mean, val_std = self.extract_function(fcn)
+            
+            if not hasattr(self, 'scale'):
+                self.scale = 1
+            if not hasattr(self, 'label'):
+                self.label = ''
+            
+            ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend[i])
+            if legend[i] is not None:
+                ax.legend()
+            
         ax.set_xlabel(self.label)
         ax.set_ylabel(label)
         ax.set_xscale(xscale)

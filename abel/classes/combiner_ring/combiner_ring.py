@@ -5,10 +5,10 @@ from abel.classes.cost_modeled import CostModeled
 
 class CombinerRing(Trackable, CostModeled):
     
-    default_exit_angle = np.pi
+    default_exit_angle = 0*np.pi
     
     @abstractmethod
-    def __init__(self, nom_energy=None, compression_factor=None, bunch_separation_incoming=None, exit_angle=default_exit_angle):
+    def __init__(self, nom_energy=None, compression_factor=None, bunch_separation_incoming=None, exit_angle=default_exit_angle, num_rings=1):
 
         super().__init__()
         
@@ -16,6 +16,8 @@ class CombinerRing(Trackable, CostModeled):
         self.compression_factor = compression_factor
         self.bunch_separation_incoming = bunch_separation_incoming
         self.exit_angle = exit_angle
+
+        self.num_rings = num_rings
 
         self.start_with_quarter_circle = False
 
@@ -25,10 +27,9 @@ class CombinerRing(Trackable, CostModeled):
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         return super().track(beam, savedepth, runnable, verbose)
-
-    @abstractmethod 
+    
     def get_length(self):
-        pass
+        return self.get_circumference()
 
     @abstractmethod 
     def get_bend_radius(self):
@@ -47,7 +48,10 @@ class CombinerRing(Trackable, CostModeled):
         return self.bunch_separation
     
     def get_cost_breakdown(self):
-        return (self.name, self.get_circumference() * CostModeled.cost_per_length_turnaround)
+        breakdown = []
+        breakdown.append((f'{self.num_rings} rings ({self.get_circumference()/1e3:.1f} km each)', self.num_rings * self.get_circumference() * CostModeled.cost_per_length_combiner_ring))
+        breakdown.append(('RF kickers', (self.num_rings*2+2)*CostModeled.cost_per_rfkicker_combiner_ring))
+        return (self.name, breakdown)
     
     def energy_usage(self):
         return 0.0

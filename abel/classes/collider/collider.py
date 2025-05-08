@@ -20,8 +20,10 @@ class Collider(Runnable, CostModeled):
         self.ip = ip
         self.com_energy = com_energy
         self.energy_asymmetry = energy_asymmetry
-        
-        self.target_integrated_luminosity = 2e46 # [m^-2] or 1/ab # C3 assumes 2/ab @ 250 GeV and 4/ab at 550 GeV
+
+        self.target_integrated_luminosity = None
+        self.target_integrated_luminosity_250GeV = 2e46 # [m^-2] or 1/ab # C3 assumes 2/ab @ 250 GeV and 4/ab at 550 GeV
+        self.target_integrated_luminosity_550GeV = 4e46 # [m^-2] or 1/ab # C3 assumes 2/ab @ 250 GeV and 4/ab at 550 GeV
 
         # cost overheads
         self.overheads = SimpleNamespace()
@@ -40,7 +42,7 @@ class Collider(Runnable, CostModeled):
         self.uptime_percentage = 0.7
 
         # emissions
-        self.emissions_per_tunnel_length = 6.38 # [ton CO2e/m] from 6.38 kton/km (CLIC estimate)
+        self.emissions_per_tunnel_length = 6.38*1.73 # [ton CO2e/m] from 6.38 kton/km (CLIC estimate) plus additional structures
         self.emissions_per_energy_usage = 20/(1e9*3600) # [ton CO2e/J] from 20 ton/GWh
         self.cost_carbon_tax_per_emissions = 800 # [ILCU per ton CO2e] 800 from European Investment Bank estimate for 2050
 
@@ -49,10 +51,8 @@ class Collider(Runnable, CostModeled):
         s = f"Collider: {self.com_energy/1e9:.0f} GeV c.o.m. ({self.com_energy/2/self.energy_asymmetry/1e9:.0f} + {self.com_energy/2*self.energy_asymmetry/1e9:.0f} GeV)"
         try:
             s += f", {self.wallplug_power()/1e6:.0f} MW"
-        except:
-            pass
-        try:
             s += f", {self.get_cost()/1e9:.1f} BILCU"
+            s += f", {self.length_end_to_end()/1e3:.1f} km"
         except:
             pass
 
@@ -60,6 +60,14 @@ class Collider(Runnable, CostModeled):
     
      # assemble the trackables
     def assemble_trackables(self):
+        
+        if self.target_integrated_luminosity is None:
+            if self.com_energy == 250e9:
+                self.target_integrated_luminosity = self.target_integrated_luminosity_250GeV
+            elif self.com_energy == 250e9:
+                self.target_integrated_luminosity = self.target_integrated_luminosity_550GeV
+            else:
+                self.target_integrated_luminosity = self.target_integrated_luminosity_250GeV + (self.target_integrated_luminosity_550GeV- self.target_integrated_luminosity_250GeV)/(550e9-250e9)*(self.com_energy-250e9)
         
         # check element classes, then assign
         if hasattr(self, 'linac') and self.linac1 is None:
@@ -126,26 +134,49 @@ class Collider(Runnable, CostModeled):
         return self.linac1.wallplug_power() + self.linac2.wallplug_power() + self.power_overhead()
         
     
+    def get_event(self, load_beams=False):
+        return Event.load(self.ip.shot_path(shot1=self.linac1.shot, shot2=self.linac2.shot) + 'event.h5', load_beams=False)
+        
     # full luminosity per crossing [m^-2]
     def full_luminosity_per_crossing(self):
-        files = self.ip.run_data()
-        num_events = len(files)
-        lumi_full = np.empty(num_events)
-        for i in range(num_events):
-            event = Event.load(files[i], load_beams=False)
-            lumi_full[i] = event.full_luminosity()
-        return np.median(lumi_full)
+        return self.get_event().full_luminosity()
     
     # peak luminosity per crossing [m^-2]
     def peak_luminosity_per_crossing(self):
-        files = self.ip.run_data()
-        num_events = len(files)
-        lumi_peak = np.empty(num_events)
-        for i in range(num_events):
-            event = Event.load(files[i], load_beams=False)
-            lumi_peak[i] = event.peak_luminosity()
-        return np.median(lumi_peak)
+        return self.get_event().peak_luminosity()
+
+    # peak luminosity per crossing [m^-2]
+    def geometric_luminosity_per_crossing(self):
+        return self.get_event().geometric_luminosity()
+
+    # enhancement factor (from pinching etc.)
+    def enhancement_factor(self):
+        event = self.get_event()
+        return event.full_luminosity()/event.geometric_luminosity()
+
+    # maximum upsilon parameter (fraction of Schwinger field)
+    def maximum_upsilon(self):
+        return self.get_event().maximum_upsilon()
+
+    # number of coherent pairs produced
+    def num_coherent_pairs(self):
+        return self.get_event().num_coherent_pairs()
+
+    # number of synchrotron photons produced
+    def num_photons_beam1(self):
+        return self.get_event().num_photons_beam1()
+    def num_photons_beam2(self):
+        return self.get_event().num_photons_beam2()
+
+    # energy lost per particle through synchrotron radiation
+    def energy_loss_per_particle_beam1(self):
+        return self.get_event().energy_loss_per_particle_beam1()
+    def energy_loss_per_particle_beam2(self):
+        return self.get_event().energy_loss_per_particle_beam2()
         
+    
+
+
     # full luminosity per power [m^-2/J]
     def full_luminosity_per_power(self):
         return self.full_luminosity_per_crossing() / self.energy_usage()
@@ -154,13 +185,93 @@ class Collider(Runnable, CostModeled):
     def peak_luminosity_per_power(self):
         return self.peak_luminosity_per_crossing() / self.energy_usage()
 
+    def full_luminosity(self):
+        return self.full_luminosity_per_crossing() * self.collision_rate()
+        
     def peak_luminosity(self):
-        return self.peak_luminosity_per_power() * self.wallplug_power()
+        return self.peak_luminosity_per_crossing() * self.collision_rate()
     
     # integrated energy usage (to reach target integrated luminosity)
     def integrated_energy_usage(self):
         return self.target_integrated_luminosity / self.peak_luminosity_per_power()
-       
+
+    def collision_rate(self):
+        return self.linac1.rep_rate_average
+        
+    def length_end_to_end(self, return_arm_lengths=False):
+
+        x_mins = [0,0]
+        x_maxs = [0,0]
+        
+        for i, linac in enumerate([self.linac1, self.linac2]):
+
+            x = 0
+            y = 0
+            angle = (i+1) * np.pi
+            
+            # get and iterate through objects
+            objs = linac.survey_object()
+            
+            # extract secondary objects
+            second_objs = None
+            connect_to = None
+            if len(objs)==2 and isinstance(objs[1], tuple):
+                second_objs = objs[1][0]
+                connect_to = objs[1][1]
+                objs = objs[0]
+    
+            objs.reverse()
+            for j, obj in enumerate(objs):
+    
+                xs0, ys0, final_angle, label, color = obj
+                xs0 -= xs0[-1]
+                ys0 -= ys0[-1]
+                angle = angle + final_angle
+                
+                xs = x + xs0*np.cos(angle) + ys0*np.sin(angle)
+                ys = y - xs0*np.sin(angle) + ys0*np.cos(angle)
+
+                # add secondary objects
+                if connect_to == len(objs)-j-1:
+                    x2 = x
+                    y2 = y
+                    angle2 = angle
+                    
+                    # get and iterate through objects
+                    second_objs.reverse()
+                    for second_obj in second_objs:
+            
+                        xs0_2, ys0_2, final_angle2, label, color = second_obj
+                        
+                        xs0_2 -= xs0_2[-1]
+                        ys0_2 -= ys0_2[-1]
+                        angle2 = angle2 + final_angle2
+            
+                        xs2 = x2 + xs0_2*np.cos(angle2) + ys0_2*np.sin(angle2)
+                        ys2 = y2 - xs0_2*np.sin(angle2) + ys0_2*np.cos(angle2)
+                        
+                        x2 = xs2[0]
+                        y2 = ys2[0]
+
+                        x_mins[i] = min(x_mins[i], np.min(x2))
+                        x_maxs[i] = max(x_maxs[i], np.max(x2))
+                        
+                x = xs[0]
+                y = ys[0]
+
+                x_mins[i] = min(x_mins[i], np.min(xs))
+                x_maxs[i] = max(x_maxs[i], np.max(xs))
+        
+        x_min = min(x_mins)
+        x_max = max(x_maxs)
+
+        if return_arm_lengths:
+            return abs(x_max-x_min), -x_min, x_max
+        else:
+            return abs(x_max-x_min)
+                
+
+        
     # total length of linacs (TODO: add driver production length)
     def total_tunnel_length(self):
         Ltot = 0
@@ -190,27 +301,45 @@ class Collider(Runnable, CostModeled):
     def energy_cost(self):
         "Integrated cost of energy [ILC units]"
         return self.integrated_energy_usage() * CostModeled.cost_per_energy
-        
+
     def construction_cost(self):
-        "Cost of construction [ILC units]"
+        return self.construction_cost_bare() + self.construction_cost_infrastructure_and_services() + self.construction_cost_controls_protection_and_safety()
+        
+    def construction_cost_bare(self):
+        "Cost of construction, before services etc. [ILC units]"
         return self.linac1.get_cost() + self.linac2.get_cost() + self.ip.get_cost()
+    
+    def construction_cost_infrastructure_and_services(self):
+        "Cost of infrastructure and services [ILC units]"
+        return self.construction_cost_bare() * CostModeled.cost_factor_infrastructure_and_services
+
+    def construction_cost_controls_protection_and_safety(self):
+        "Cost of machine control, protection and safety systems [ILC units]"
+        return self.construction_cost_bare() * CostModeled.cost_factor_controls_protection_and_safety
+        
+    
     
     # construction overhead costs
     def overhead_cost(self):
-        return self.overhead_cost_design_and_development() + self.overhead_cost_controls_and_cabling() + self.overhead_cost_installation_and_commissioning() + self.overhead_cost_management_inspection()
+        #return self.overhead_cost_design_and_development() + self.overhead_cost_controls_and_cabling() + self.overhead_cost_installation_and_commissioning() + self.overhead_cost_management_inspection()
+        return self.overhead_cost_design_and_development() + self.overhead_cost_management_inspection()
     def overhead_cost_design_and_development(self):
         return self.construction_cost() * self.overheads.design_and_development
-    def overhead_cost_controls_and_cabling(self):
-        return self.construction_cost() * self.overheads.controls_and_cabling
-    def overhead_cost_installation_and_commissioning(self):
-        return self.construction_cost() * self.overheads.installation_and_commissioning
+    #def overhead_cost_controls_and_cabling(self):
+    #    return self.construction_cost() * self.overheads.controls_and_cabling
+    #def overhead_cost_installation_and_commissioning(self):
+    #    return self.construction_cost() * self.overheads.installation_and_commissioning
     def overhead_cost_management_inspection(self):
         return self.construction_cost() * self.overheads.management_inspection
-    
-    def total_project_cost(self):
-        "Total project cost / ITF cost (US accounting) [ILC units]"
+
+    def cost_snowmass_itf_accounting(self):
+        "Total project cost (Snowmass ITF accounting) [ILC units]"
         return self.construction_cost() + self.overhead_cost()
 
+    def cost_eu_accounting(self):
+        "Project cost (EU accounting) [ILC units]"
+        return self.construction_cost()
+        
     # required labor force for maintenance (FTEs/year)
     def maintenance_labor(self):
         return self.maintenance_labor_per_construction_cost * self.construction_cost()
@@ -235,13 +364,22 @@ class Collider(Runnable, CostModeled):
         breakdown.append(self.linac1.get_cost_breakdown())
         breakdown.append(self.linac2.get_cost_breakdown())
         breakdown.append(self.ip.get_cost_breakdown())
+        breakdown.append(('Experimental area', CostModeled.cost_per_experimental_area))
+        breakdown_post = []
+        breakdown_post.append((f'{self.linac1.name} beamline', 300*np.sqrt(self.linac1.nom_energy/500e9)*CostModeled.cost_per_length_bds))
+        breakdown_post.append((f'{self.linac2.name} beamline', 300*np.sqrt(self.linac2.nom_energy/500e9)*CostModeled.cost_per_length_bds))
+        breakdown_post.append((f'{self.linac1.name} dump', self.linac1.get_nom_beam_power()*CostModeled.cost_per_power_beam_dump))
+        breakdown_post.append((f'{self.linac2.name} dump', self.linac2.get_nom_beam_power()*CostModeled.cost_per_power_beam_dump))
+        breakdown.append(('Post-collision beamlines', breakdown_post))
+        breakdown.append(('Infrastructure & services', self.construction_cost_infrastructure_and_services()))
+        breakdown.append(('Controls, protection & safety', self.construction_cost_controls_protection_and_safety()))
         return ('Construction', breakdown)
         
     def get_cost_breakdown_overheads(self):
         breakdown = []
         breakdown.append(('Design/development', self.overhead_cost_design_and_development()))
-        breakdown.append(('Constrols/cabling', self.overhead_cost_controls_and_cabling()))
-        breakdown.append(('Installation/commissioning', self.overhead_cost_installation_and_commissioning()))
+        #breakdown.append(('Constrols/cabling', self.overhead_cost_controls_and_cabling()))
+        #breakdown.append(('Installation/commissioning', self.overhead_cost_installation_and_commissioning()))
         breakdown.append(('Management/inspection', self.overhead_cost_management_inspection()))
         return ('Overheads', breakdown)
     
@@ -256,7 +394,7 @@ class Collider(Runnable, CostModeled):
     
     # total cost of construction and running
     def full_programme_cost(self, include_carbon_tax=True):
-        fpc = self.total_project_cost() + self.energy_cost() + self.maintenance_cost()
+        fpc = self.construction_cost() + self.overhead_cost() + self.energy_cost() + self.maintenance_cost()
         if include_carbon_tax:
             fpc += self.carbon_tax_cost()
         return fpc
@@ -286,20 +424,28 @@ class Collider(Runnable, CostModeled):
         self.shot = shot
         self.step = self.steps[shot]
         shot_in_step = np.mod(self.shot, self.num_shots_per_step)
-        
-        # apply scan function if it exists
-        if self.scan_fcn is not None:
-            vals_all = np.repeat(self.vals,self.num_shots_per_step)
-            self.scan_fcn(self, vals_all[shot])
-        
+
         # check if object exists
         if not self.overwrite and os.path.exists(self.object_path(shot)):
             print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
-            
         else:
-    
+            
+            # apply scan function if it exists (before assembly)
+            vals_all = np.repeat(self.vals,self.num_shots_per_step)
+            applied_fnc_before_assembly = False
+            try:
+                if self.scan_fcn is not None:
+                    self.scan_fcn(self, vals_all[shot])
+                    applied_fnc_before_assembly = True
+            except:
+                pass
+            
             # instantiate the trackables
             self.assemble_trackables()
+
+            # apply scan function if it exists (if it wasn't done before assembly)
+            if not applied_fnc_before_assembly and self.scan_fcn is not None:
+                self.scan_fcn(self, vals_all[shot])
             
             # clear the shot folder
             self.clear_run_data(shot)
@@ -311,17 +457,17 @@ class Collider(Runnable, CostModeled):
             # run first linac arm
             if self.verbose:
                 print(">> LINAC #1")
-            self.linac1.scan(self.run_name + "/linac1", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=self.shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            self.linac1.scan(self.run_name + "/linac1", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
             
             # run second linac arm
             if self.verbose:
                 print(">> LINAC #2")
-            self.linac2.scan(self.run_name + "/linac2", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=self.shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            self.linac2.scan(self.run_name + "/linac2", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
             
             # simulate collisions
             if self.verbose:
                 print(">> INTERACTION POINT")
-            event = self.ip.run(self.linac1, self.linac2, self.run_name + "/ip", all_by_all=True, overwrite=False, step_filter=self.step, verbose=self.verbose)
+            event = self.ip.run(self.linac1, self.linac2, self.run_name + "/ip", all_by_all=False, overwrite=self.overwrite, step_filter=self.step, verbose=self.verbose)
             
             # save object to file
             self.save()
@@ -417,12 +563,9 @@ class Collider(Runnable, CostModeled):
 
     ## SCAN PLOTS
 
-    def plot_cost_variation_for_parameter(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=True, overwrite=True):
+    def plot_cost_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=True, overwrite=True):
 
         from datetime import datetime
-        
-        # make copy of the object
-        scan_self = copy.deepcopy(self)
         
         # set default scan name
         if scan_name is None:
@@ -443,51 +586,220 @@ class Collider(Runnable, CostModeled):
             scan_vals = np.logspace(np.log10(lower), np.log10(upper), num_steps)
         elif xscale == 'linear':
             scan_vals = np.linspace(lower, upper, num_steps)
-        
-        # perform scan
-        scan_self.scan(scan_name, 
-           lambda obj, val: obj.set_attr(param, val) or obj, 
-           scan_vals,
-           label=label, scale=scale,
-           num_shots_per_step=num_shots_per_step,
-           parallel=parallel, overwrite=overwrite, verbose=False);
 
-        # extract values
-        full_programme_cost, _ = scan_self.extract_function(Collider.full_programme_cost)
-        construction_cost, _ = scan_self.extract_function(Collider.construction_cost)
-        overhead_cost, _ = scan_self.extract_function(Collider.overhead_cost)
-        energy_cost, _ = scan_self.extract_function(Collider.energy_cost)
-        maintenance_cost, _ = scan_self.extract_function(Collider.maintenance_cost)
-        carbon_tax_cost, _ = scan_self.extract_function(Collider.carbon_tax_cost)
+        full_programme_cost = np.zeros(num_steps)
+        itf_cost = np.zeros(num_steps)
+        eu_cost = np.zeros(num_steps)
+        construction_cost = np.zeros(num_steps)
+        construction_cost_infrastructure = np.zeros(num_steps)
+        construction_cost_cps = np.zeros(num_steps)
+        construction_cost_linac1 = np.zeros(num_steps)
+        construction_cost_linac2 = np.zeros(num_steps)
+        overhead_cost = np.zeros(num_steps)
+        energy_cost = np.zeros(num_steps)
+        maintenance_cost = np.zeros(num_steps)
+        carbon_tax_cost = np.zeros(num_steps)
+        for i in range(num_steps):
+            scan_self = copy.deepcopy(self)
+            scan_self.set_attr(param, scan_vals[i])
+            scan_self.run(scan_name, num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
+
+            # extract values (TODO: allow for more shots per step)
+            full_programme_cost[i] = scan_self.full_programme_cost()
+            itf_cost[i] = scan_self.cost_snowmass_itf_accounting()
+            eu_cost[i] = scan_self.cost_eu_accounting()
+            
+            construction_cost[i] = scan_self.construction_cost()
+            construction_cost_infrastructure[i] = scan_self.construction_cost_infrastructure_and_services()
+            construction_cost_cps[i] = scan_self.construction_cost_controls_protection_and_safety()
+            construction_cost_linac1[i] = scan_self.linac1.get_cost()
+            construction_cost_linac2[i] = scan_self.linac2.get_cost()
+            
+            overhead_cost[i] = scan_self.overhead_cost()
+            energy_cost[i] = scan_self.energy_cost()
+            maintenance_cost[i] = scan_self.maintenance_cost()
+            carbon_tax_cost[i] = scan_self.carbon_tax_cost()
+            
+        construction_cost_ip = construction_cost - construction_cost_linac1 - construction_cost_linac2 - construction_cost_infrastructure - construction_cost_cps
         
         # plot cost breakdown
         fig, ax = plt.subplots(1)
         fig.set_figwidth(CONFIG.plot_width_default)
         fig.set_figheight(CONFIG.plot_width_default*0.6)
 
-        cumul_cost = construction_cost
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.zeros_like(scan_vals))), label='Construction cost')
+        cumul_cost = construction_cost_ip
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.zeros_like(scan_vals))), 'steelblue', label='Construction (IP)')
+        
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += construction_cost_linac1
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'skyblue', label=f'Construction ({scan_self.linac1.name})')
+        
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += construction_cost_linac2
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'lightblue', label=f'Construction ({scan_self.linac2.name})')
+
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += construction_cost_infrastructure
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'lightskyblue', label='Infrastructure & services')
+
+        cumul_cost_last = copy.deepcopy(cumul_cost)
+        cumul_cost += construction_cost_cps
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'deepskyblue', label='Controls, protection & safety')
+        
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += overhead_cost
         ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Overhead cost')
+        
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += energy_cost
         ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Energy cost')
+        
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += maintenance_cost
         ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Maintenance cost')
+        
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += carbon_tax_cost
         ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Carbon tax')
+
+        ax.plot(scan_vals/scale, eu_cost/1e9, ls='--', color='k', label='Cost (EU accounting)')
+        ax.plot(scan_vals/scale, itf_cost/1e9, ls=':', color='k', label='Cost (Snowmass ITF accounting)')
         ax.plot(scan_vals/scale, full_programme_cost/1e9, ls='-', color='k', label='Full programme cost')
+        
         
         ax.set_xlabel(label)
         ax.set_ylabel('Collider cost (BILCU)')
         ax.set_xscale(xscale)
         ax.set_yscale('linear')
         ax.set_xlim(lower/scale, upper/scale)
-        ax.set_ylim(0, 1.1*max(full_programme_cost/1e9))
-        ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.1*max(full_programme_cost/1e9)], ls=':', color='gray')
+        ax.set_ylim(0, 1.25*max(full_programme_cost/1e9))
+        ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.25*max(full_programme_cost/1e9)], ls=':', color='gray')
+        plt.legend(reverse=True)
+
+        return scan_self
+
+    # TODO: delete data option
+    def plot_length_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True):
+        
+        # set default scan name
+        if scan_name is None:
+            scan_name = 'param_scan_' + param + '_' + datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # set default upper and lower bounds
+        if lower is None:
+            lower = self.get_nested_attr(param)*0.7
+        if upper is None:
+            upper = self.get_nested_attr(param)*1.3
+
+        # default label
+        if label is None:
+            label = param
+
+        # set values based on type of scale
+        if xscale == 'log':
+            scan_vals = np.logspace(np.log10(lower), np.log10(upper), num_steps)
+        elif xscale == 'linear':
+            scan_vals = np.linspace(lower, upper, num_steps)
+
+        length_end_to_end = np.zeros(num_steps)
+        length_linac1 = np.zeros(num_steps)
+        length_linac2 = np.zeros(num_steps)
+        for i in range(num_steps):
+            scan_self = copy.deepcopy(self)
+            scan_self.set_attr(param, scan_vals[i])
+            scan_self.run(scan_name, num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
+
+            # extract values (TODO: allow for more shots per step)
+            length_end_to_end[i], length_linac2[i], length_linac1[i] = scan_self.length_end_to_end(return_arm_lengths=True)
+            
+        # plot cost breakdown
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.6)
+
+        cumul_length = length_linac2
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_length/1e3, np.zeros_like(scan_vals))), label=scan_self.linac2.name)
+        
+        cumul_length_last = copy.deepcopy(cumul_length)
+        cumul_length += length_linac1
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_length/1e3, np.flip(cumul_length_last/1e3))), label=scan_self.linac1.name)
+        
+        ax.plot(scan_vals/scale, length_end_to_end/1e3, ls='-', color='k', label='End-to-end')
+        
+        ax.set_xlabel(label)
+        ax.set_ylabel('Collider length (km)')
+        ax.set_xscale(xscale)
+        ax.set_yscale('linear')
+        ax.set_xlim(lower/scale, upper/scale)
+        ax.set_ylim(0, 1.1*max(length_end_to_end/1e3))
+        ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.1*max(length_end_to_end/1e3)], ls=':', color='gray')
+        plt.legend(reverse=True)
+
+        return scan_self
+
+    # TODO: delete data option
+    def plot_power_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True):
+        
+        # set default scan name
+        if scan_name is None:
+            scan_name = 'param_scan_' + param + '_' + datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # set default upper and lower bounds
+        if lower is None:
+            lower = self.get_nested_attr(param)*0.7
+        if upper is None:
+            upper = self.get_nested_attr(param)*1.3
+
+        # default label
+        if label is None:
+            label = param
+
+        # set values based on type of scale
+        if xscale == 'log':
+            scan_vals = np.logspace(np.log10(lower), np.log10(upper), num_steps)
+        elif xscale == 'linear':
+            scan_vals = np.linspace(lower, upper, num_steps)
+
+        power_overhead = np.zeros(num_steps)
+        power_linac1 = np.zeros(num_steps)
+        power_linac2 = np.zeros(num_steps)
+        for i in range(num_steps):
+            scan_self = copy.deepcopy(self)
+            scan_self.set_attr(param, scan_vals[i])
+            scan_self.run(scan_name, num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
+
+            # extract values (TODO: allow for more shots per step)
+            power_linac1[i] = scan_self.linac1.wallplug_power()
+            power_linac2[i] = scan_self.linac2.wallplug_power()
+            power_overhead[i] = scan_self.power_overhead()
+
+        power_total = power_overhead + power_linac1 + power_linac2
+        
+        # plot cost breakdown
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.6)
+
+        cumul_power = power_linac2
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_power/1e6, np.zeros_like(scan_vals))), label=scan_self.linac2.name)
+        
+        cumul_power_last = copy.deepcopy(cumul_power)
+        cumul_power += power_linac1
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_power/1e6, np.flip(cumul_power_last/1e6))), label=scan_self.linac1.name)
+
+        cumul_power_last = copy.deepcopy(cumul_power)
+        cumul_power += power_overhead
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_power/1e6, np.flip(cumul_power_last/1e6))), label='Overhead')
+        
+        ax.plot(scan_vals/scale, power_total/1e6, ls='-', color='k', label='Total')
+        
+        ax.set_xlabel(label)
+        ax.set_ylabel('Collider power (MW)')
+        ax.set_xscale(xscale)
+        ax.set_yscale('linear')
+        ax.set_xlim(lower/scale, upper/scale)
+        ax.set_ylim(0, 1.1*max(power_total/1e6))
+        ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.1*max(power_total/1e6)], ls=':', color='gray')
         plt.legend(reverse=True)
 
         return scan_self

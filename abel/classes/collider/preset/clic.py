@@ -6,6 +6,7 @@ from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from abel.classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
 from abel.classes.ip.impl.ip_basic import InteractionPointBasic
 import copy
+import scipy.constants as SI
 
 class CLIC(Collider):
 

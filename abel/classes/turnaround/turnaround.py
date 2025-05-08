@@ -14,6 +14,9 @@ class Turnaround(Trackable, CostModeled):
         self.use_semi_circle = use_semi_circle
         self.start_with_semi_circle = start_with_semi_circle
 
+        self.use_tunnel = False
+        self.use_cutandcover = True
+
     
     @abstractmethod   
     def track(self, beam, savedepth=0, runnable=None, verbose=False):

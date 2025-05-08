@@ -148,4 +148,3 @@ class CONFIG:
                 print(f'CONFIG.{d} = "{att}"')
             else:
                 print(f'CONFIG.{d} = {att}')
-
