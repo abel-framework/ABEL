@@ -67,9 +67,9 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
     def get_dispersion(self, energy=None):
         if energy is None:
             energy = self.imaging_energy_x
-        gamma0x = energy*SI.e/(SI.m_e*SI.c**2);
-        p0x = SI.m_e*gamma0x*SI.c*np.sqrt(1-1/gamma0x**2);
-        Bdip = self.current2field_dipole(self.current_dipole)
+        gamma0x = energy*SI.e/(SI.m_e*SI.c**2)
+        p0x = SI.m_e*gamma0x*SI.c*np.sqrt(1-1/gamma0x**2)
+        Bdip = self.current2field_dipole(self.current_dipole, self.B_dipole)
         phi = Bdip*self.length_dipole*SI.e/p0x
         return (self.s_LEMS-self.s_dipoleLEMS)*phi
         
