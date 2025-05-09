@@ -1,6 +1,5 @@
 from abc import abstractmethod
-from matplotlib import patches
-from abel import Trackable
+from abel.classes.trackable import Trackable
 import numpy as np
 
 class PlasmaLens(Trackable):
@@ -31,5 +30,6 @@ class PlasmaLens(Trackable):
         return self.length
 
     def survey_object(self):
+        from matplotlib import patches
         return patches.Rectangle((0, -1), self.get_length(), 2)
     

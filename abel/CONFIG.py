@@ -1,6 +1,4 @@
 import os
-import abel.utilities.colors as cmaps
-import matplotlib.pyplot as plt
 
 class CONFIG:
 
@@ -76,15 +74,18 @@ class CONFIG:
             cls.project_name = 'project_465001379' # SPARTA project (C. A. Lindstrøm)
             cls.partition_name_standard = 'standard-g'
             cls.partition_name_small = 'small-g'
+            cls.partition_name_devel = 'dev-g'
         elif cls.cluster_name == 'betzy':
             cls.project_name = 'your_project_number_here'
             #cls.project_name = 'nn11003k'
             cls.partition_name_standard = ''
             cls.partition_name_small = ''
+            cls.partition_name_devel = ''
         elif cls.cluster_name == 'LOCAL':
             cls.project_name = ''
             cls.partition_name_standard = ''
             cls.partition_name_small = ''
+            cls.partition_name_devel = ''
         else:
             raise ValueError("cluster_name in CONFIG must be one of the valid options, got '"+cls.cluster_name+"'")
         #Optional overrides
@@ -94,8 +95,11 @@ class CONFIG:
             cls.partition_name_standard = cfdata['cluster']['partition_name_standard']
         if 'partition_name_small' in cfdata['cluster']:
             cls.partition_name_small = cfdata['cluster']['partition_name_small']
+        if 'partition_name_devel' in cfdata['cluster']:
+            cls.partition_name_devel = cfdata['cluster']['partition_name_devel']
 
         # ABEL plot defaults
+        import abel.utilities.colors as cmaps
         cls.plot_fullwidth_default = cfdata['defaults']['plot_fullwidth_default']
         cls.plot_width_default     = cfdata['defaults']['plot_width_default']
         cls.default_cmap           = cmaps.get_cmap_by_name(cfdata['defaults']['default_cmap'])
@@ -144,4 +148,3 @@ class CONFIG:
                 print(f'CONFIG.{d} = "{att}"')
             else:
                 print(f'CONFIG.{d} = {att}')
-

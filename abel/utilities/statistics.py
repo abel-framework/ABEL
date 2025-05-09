@@ -20,14 +20,20 @@ def prct_clean2d(xs, ys, enable=True, cut_percentile=5):
     return x[mask], y[mask]
 
 def weighted_mean(values, weights, clean=False, cut_percentile=5):
-    mask = clean_mask(values, enable=clean, cut_percentile=5)
+    if np.sum(weights) == 0.0:
+        raise ZeroDivisionError("Weights sum to zero, can't be normalized.")
+    mask = clean_mask(values, enable=clean, cut_percentile=cut_percentile)
     return np.average(values[mask], weights=weights[mask])
 
 def weighted_std(values, weights, clean=False, cut_percentile=5):
-    mask = clean_mask(values, enable=clean, cut_percentile=5)
+    if np.sum(weights) == 0.0:
+        raise ZeroDivisionError("Weights sum to zero, can't be normalized.")
+    mask = clean_mask(values, enable=clean, cut_percentile=cut_percentile)
     return np.sqrt(np.cov(values[mask], aweights=weights[mask]))
 
 def weighted_cov(xs, ys, weights, clean=False, cut_percentile=5):
+    if np.sum(weights) == 0.0:
+        raise ZeroDivisionError("Weights sum to zero, can't be normalized.")
     mask_x = clean_mask(xs, enable=clean, cut_percentile=cut_percentile/2)
     mask_y = clean_mask(ys, enable=clean, cut_percentile=cut_percentile/2)
     mask = np.logical_and(mask_x, mask_y)

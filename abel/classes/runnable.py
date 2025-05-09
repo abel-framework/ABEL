@@ -1,19 +1,9 @@
 from abc import ABC, abstractmethod
-from abel import CONFIG, Beam
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
 import os, shutil, time, sys, csv
 from datetime import datetime
-from joblib import Parallel, delayed
-from joblib_progress import joblib_progress
-import joblib.parallel
-import collections
 import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib import colors
-from matplotlib import cm
-import dill as pickle
-import functools
-import inspect
-import abel.utilities.colors as cmaps
 
 class Runnable(ABC):
     
@@ -55,6 +45,9 @@ class Runnable(ABC):
     # scan function
     def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
 
+        from joblib import Parallel, delayed
+        from joblib_progress import joblib_progress
+        
         # define run name (generate if not given)
         if run_name is None:
             self.run_name = "scan_" + datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -65,6 +58,10 @@ class Runnable(ABC):
         self.verbose = verbose
         self.savedepth = savedepth
         
+        if self.overwrite:
+            self.clear_run_data()
+            self.overwrite = False
+            
         # default verbosity
         if self.verbose is None:
             self.verbose = not parallel
@@ -116,7 +113,6 @@ class Runnable(ABC):
         
         # return final beam from first shot
         self.__dict__.update(self.load(shot=shots_to_perform[0]).__dict__)
-        #return self.final_beam
 
     
     # run simulation
@@ -127,14 +123,9 @@ class Runnable(ABC):
             self.run_name = 'run_' + datetime.now().strftime('%Y%m%d_%H%M%S')
         else:
             self.run_name = run_name
-
-        if overwrite:
-            self.clear_run_data()
-            overwrite = False
-            
+        
         # perform a scan with only one step
         self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
-        #return beam
     
     
 
@@ -152,11 +143,13 @@ class Runnable(ABC):
     
     # save object to file
     def save(self):
+        import dill as pickle
         with open(self.object_path(), 'wb') as savefile:
             pickle.dump(self, savefile)
             
     # load object from file
     def load(self, shot=None):
+        import dill as pickle
         with open(self.object_path(shot), 'rb') as loadfile:
             try:
                 obj = pickle.load(loadfile)
@@ -267,6 +260,7 @@ class Runnable(ABC):
 
     # Get nested attribute
     def get_nested_attr(self, attr, *args):
+        import functools
         def _getattr(obj, attr):
             return getattr(obj, attr, *args)
         return functools.reduce(_getattr, [self] + attr.split('.'))
@@ -365,22 +359,35 @@ class Runnable(ABC):
     ## PLOT FUNCTIONS
 
     # plot value of beam parameters across a scan
-    def plot_function(self, fcn, label=None, scale=1, xscale='linear', yscale='linear'):
+    def plot_function(self, fcns, label=None, scale=1, xscale='linear', yscale='linear', legend=None):
+
+        from matplotlib import pyplot as plt
         
-        # extract values
-        val_mean, val_std = self.extract_function(fcn)
+        if not isinstance(fcns, list):
+            fcns = [fcns]
         
-        if not hasattr(self, 'scale'):
-            self.scale = 1
-        if not hasattr(self, 'label'):
-            self.label = ''
-            
+        if not isinstance(legend, list):
+            legend = [legend]
+    
         # plot evolution
         fig, ax = plt.subplots(1)
         fig.set_figwidth(CONFIG.plot_width_default)
         fig.set_figheight(CONFIG.plot_width_default*0.6)
         
-        ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5)
+        for i, fcn in enumerate(fcns):
+            
+            # extract values
+            val_mean, val_std = self.extract_function(fcn)
+            
+            if not hasattr(self, 'scale'):
+                self.scale = 1
+            if not hasattr(self, 'label'):
+                self.label = ''
+            
+            ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend[i])
+            if legend[i] is not None:
+                ax.legend()
+            
         ax.set_xlabel(self.label)
         ax.set_ylabel(label)
         ax.set_xscale(xscale)
@@ -417,6 +424,8 @@ class Runnable(ABC):
     
     def plot_waterfall(self, proj_fcn, label=None, scale=1, index=-1):
 
+        from matplotlib import pyplot as plt
+        
         # determine size of projection
         _, ctrs_initial = proj_fcn(self.get_beam(shot=0, index=index))
         _, ctrs_final = proj_fcn(self.get_beam(shot=-1, index=index))
@@ -464,6 +473,11 @@ class Runnable(ABC):
     ## PLOT CORRELATIONS
     
     def plot_correlation(self, xfcn, yfcn, xlabel=None, ylabel=None, xscaling=1, yscaling=1, xscale='linear', yscale='linear', equal_axes=False):
+
+        from matplotlib import pyplot as plt
+        import abel.utilities.colors as cmaps
+        from matplotlib import colors
+        from matplotlib import cm
         
         # extract values
         valx_mean, valx_std = self.extract_function(xfcn)
@@ -511,41 +525,11 @@ class Runnable(ABC):
     
     ## SAVE TO FILE
     
-    def get_function_data(self, fcn):
-        
-        # extract values
-        val_mean = np.empty(self.num_steps)
-        val_std = np.empty(self.num_steps)
-        for step in range(self.num_steps):
-            
-            # get values for this step
-            val_output = np.empty(self.num_shots_per_step)
-            for shot_in_step in range(self.num_shots_per_step):
-                val_output[shot_in_step] = fcn(self[step,shot_in_step])
-                
-            # get step mean and error
-            val_mean[step] = np.mean(val_output)
-            val_std[step] = np.std(val_output)
-
-        # write data
-        return self.vals, val_mean, val_std
-    
     def save_function_data(self, fcn, filename=None):
-        
-        # extract values
-        val_mean = np.empty(self.num_steps)
-        val_std = np.empty(self.num_steps)
-        for step in range(self.num_steps):
-            
-            # get values for this step
-            val_output = np.empty(self.num_shots_per_step)
-            for shot_in_step in range(self.num_shots_per_step):
-                val_output[shot_in_step] = fcn(self[step,shot_in_step])
-                
-            # get step mean and error
-            val_mean[step] = np.mean(val_output)
-            val_std[step] = np.std(val_output)
 
+        # extract mean and std values
+        val_mean, val_std = self.extract_function(fcn)
+        
         # default filename
         if filename is None:
             filename = 'output_' + self.run_name + '_' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.csv'

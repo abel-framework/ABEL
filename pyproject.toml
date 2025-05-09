@@ -23,7 +23,7 @@ dependencies = [
    "Wake-T",
    "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
    "ax-platform",
-   "CLICopti",
+   "CLICopti >= 2.2",
    "RF-Track",
    "impactx-noacc"
 ]
@@ -52,4 +52,6 @@ addopts = [
 markers = [
   "core: Test core functionality",
   "stageGeometry: Test stage geometry calculation functionality",
+  "sources: Test the various Source subclasses generate beams with desired properties",
+  "beam: Tests for the Beam class",
 ]

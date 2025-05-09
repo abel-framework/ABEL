@@ -1,9 +1,6 @@
 import scipy.constants as SI
 import numpy as np
-from abel import Interstage
-#import ocelot
-#import ocelot.gui.accelerator as ocelot_gui
-from abel.apis.ocelot.ocelot_api import ocelot_particle_array2beam, beam2ocelot_particle_array
+from abel.classes.interstage.interstage import Interstage
 
 class InterstageOcelot(Interstage):
     
@@ -18,6 +15,7 @@ class InterstageOcelot(Interstage):
         
         # import OCELOT
         import ocelot
+        from abel.apis.ocelot.ocelot_api import ocelot_particle_array2beam, beam2ocelot_particle_array
         
         # convert beam to Ocelot particle array
         p_array0 = beam2ocelot_particle_array(beam0)

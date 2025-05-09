@@ -1,12 +1,19 @@
-from abel import Beam, Linac, Source, DriverComplex, RFAccelerator, Stage, Interstage, BeamDeliverySystem, CONFIG
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
+from abel.classes.source.source import Source
+from abel.classes.stage.stage import Stage
+from abel.classes.interstage.interstage import Interstage
+from abel.classes.bds.bds import BeamDeliverySystem
+from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
+from abel.classes.beamline.impl.linac.linac import Linac
+from abel.classes.beamline.impl.driver_complex import DriverComplex
+from abel.classes.cost_modeled import CostModeled
+from abel.classes.beamline.beamline import NotAssembledError
 import scipy.constants as SI
 import copy, os
-from datetime import datetime
-from matplotlib import pyplot as plt
 import numpy as np
-from matplotlib.animation import FuncAnimation
-from matplotlib import ticker as mticker
-import inspect
+from typing import List
+from matplotlib import pyplot as plt
 
 class PlasmaLinac(Linac):
     
@@ -14,15 +21,15 @@ class PlasmaLinac(Linac):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
-        #self.source = source
+        self.source = source
         self.rf_injector = rf_injector
         self.driver_complex = driver_complex
         self.stage = stage
         self.interstage = interstage
         self.bds = bds
-        self.first_stage = first_stage
-        self.last_stage = last_stage
-        self.last_interstage = last_interstage
+        self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
+        self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
+        self._last_interstage = last_interstage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self.num_stages = num_stages
         self.alternate_interstage_polarity = alternate_interstage_polarity
 
@@ -79,8 +86,7 @@ class PlasmaLinac(Linac):
         
         # declare list of trackables, stages and interstages
         self.trackables = []
-        self.stages = []
-        self.interstages = []
+        stages = []
         
         # add source
         assert(isinstance(self.source, Source))
@@ -97,58 +103,73 @@ class PlasmaLinac(Linac):
             
             # check types
             assert(isinstance(self.stage, Stage))
-            if self.first_stage is not None:
-                assert(isinstance(self.first_stage, Stage))
-            if self.last_stage is not None:
-                assert(isinstance(self.last_stage, Stage))
+
+            if self._first_stage is not None:
+                assert(isinstance(self._first_stage, Stage))
+                first_stage = self._first_stage
+            else:  # Get first_stage from self.trackables
+                first_stage = self.first_stage
+
+            if self._last_stage is not None:
+                assert(isinstance(self._last_stage, Stage))
+                last_stage = self._last_stage
+            else:  # Get last_stage from self.trackables
+                last_stage = self.last_stage
+
             if self.interstage is not None:
                 assert(isinstance(self.interstage, Interstage))
-            if self.last_interstage is not None:
-                assert(isinstance(self.last_interstage, Interstage))
+
+            if self._last_interstage is not None:
+                assert(isinstance(self._last_interstage, Interstage))
+                last_interstage = self._last_interstage
+            else:  # Get last_interstage from self.trackables
+                last_interstage = self.last_interstage
+            
+            # stage rep rate
+            if self.stage.bunch_separation is None:
+                self.stage.bunch_separation = self.bunch_separation
+            if self.stage.num_bunches_in_train is None:
+                self.stage.num_bunches_in_train = self.num_bunches_in_train
+            if self.stage.rep_rate_trains is None:
+                self.stage.rep_rate_trains = self.rep_rate_trains
             
             # instantiate many stages
             for i in range(self.num_stages):
                 
                 # add stages
-                if i == 0 and self.first_stage is not None:
-                    stage_instance = self.first_stage
-                elif i == (self.num_stages-1) and self.last_stage is not None:
-                    stage_instance = self.last_stage
+                if i == 0 and first_stage is not None:
+                    stage_instance = first_stage
+                elif i == (self.num_stages-1) and last_stage is not None:
+                    stage_instance = last_stage
                 elif i == 0:
                     stage_instance = self.stage
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 
-                stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                 
                 # reassign the same driver complex
                 if self.driver_complex is not None:
                     stage_instance.driver_source = self.driver_complex
                 
                 self.trackables.append(stage_instance)
-                self.stages.append(stage_instance)
+                stages.append(stage_instance)
                 
                 # add interstages
                 if (self.interstage is not None) and (i < self.num_stages-1):
                     
-                    if i == self.num_stages-2 and self.last_interstage is not None:
-                        interstage_instance = self.last_interstage
+                    if i == self.num_stages-2 and last_interstage is not None:
+                        interstage_instance = last_interstage
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
-                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages[:(i+1)]])
+                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                     
                     if self.alternate_interstage_polarity:
                         interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
                         
                     self.trackables.append(interstage_instance)
-                    self.interstages.append(interstage_instance)
-            
-            # populate first/last stage properties
-            if self.first_stage is None:
-                self.first_stage = self.stages[0]
-            if self.last_stage is None:
-                self.last_stage = self.stages[-1]
+
         
         # add beam delivery system
         if self.bds is not None:
@@ -174,9 +195,11 @@ class PlasmaLinac(Linac):
         # set the bunch train pattern etc.
         super().assemble_trackables()
 
+        # Clear attributes that are now stored in self.trackables
+        self.trim_attr_reduce_pickle_size()
+
     
     # survey object
-        
     def survey_object(self):
         "Survey objects for the plasma linac (adds the driver complex)"
         objs = super().survey_object()
@@ -184,6 +207,109 @@ class PlasmaLinac(Linac):
             return objs, (self.driver_complex.survey_object(), 1)
         else:
             return objs
+    
+
+    @property
+    def stages(self) -> List[Stage]:
+        "Returns a list of all ``Stage`` objects in ``self.trackables``."
+
+        stages = []
+
+        if self.trackables is None:
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
+
+        for element in self.trackables:
+            if isinstance(element, Stage):
+                stages.append(element)
+        return stages
+    
+
+    @property
+    def first_stage(self) -> Stage:
+        "Returns the first ``Stage`` object in ``self.trackables``."
+
+        if self.trackables is None:
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled.')
+
+        for element in self.trackables:
+            if isinstance(element, Stage):
+                return element
+        return None
+    
+    @first_stage.setter
+    def first_stage(self, stage):
+        "Sets self._first_stage, but only if self.trackables is not already assembled."
+
+        if self.trackables is not None and isinstance(self.first_stage, Stage):
+            raise ValueError('First stage already set.')
+        self._first_stage = stage
+    
+
+    @property
+    def last_stage(self) -> Stage:
+        "Returns the last ``Stage`` object in ``self.trackables``."
+
+        if self.trackables is None:
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled.')
+
+        for element in reversed(self.trackables):
+            if isinstance(element, Stage):
+                return element
+        return None
+    
+    @last_stage.setter
+    def last_stage(self, stage):
+        "Sets self._last_stage, but only if self.trackables is not already assembled."
+
+        if self.trackables is not None and isinstance(self.last_stage, Stage):
+            raise ValueError('Last stage already set.')
+        self._last_stage = stage
+
+
+    @property
+    def interstages(self) -> List[Interstage]:
+        "Returns a list of all ``Interstage`` objects in ``self.trackables``."
+
+        interstages = []
+
+        if self.trackables is None:
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled. Execute PlasmaLinac.assemble_trackables().')
+
+        for element in self.trackables:
+            if isinstance(element, Interstage):
+                interstages.append(element)
+        return interstages
+    
+
+    @property
+    def last_interstage(self) -> Interstage:
+        "Returns the last ``Interstage`` object in ``self.trackables``."
+
+        if self.trackables is None:
+            raise NotAssembledError('The PlasmaLinac object has not yet been assembled.')
+
+        for element in reversed(self.trackables):
+            if isinstance(element, Interstage):
+                return element
+        return None
+    
+
+    @last_interstage.setter
+    def last_interstage(self, interstage):
+        "Sets self._last_interstage, but only if self.trackables is not already assembled."
+
+        if self.trackables is not None and isinstance(self.last_interstage, Interstage):
+            raise ValueError('Last interstage already set.')
+        self._last_interstage = interstage
+
+
+    def trim_attr_reduce_pickle_size(self):
+        "Delete attributes to reduce space in the pickled file."
+        self._first_stage = None
+        self._last_stage = None
+        self._last_interstage = None
+    
+    
     
     ## ENERGY CONSIDERATIONS
     
@@ -268,6 +394,23 @@ class PlasmaLinac(Linac):
             interstage_costs += interstage.get_cost()
         breakdown.append(('Interstages', interstage_costs))
 
+        # driver dumps
+        if self.stage.dumped_power() is not None:
+            driver_dump_power = 0
+            for stage in self.stages:
+                driver_dump_power += stage.dumped_power()
+            driver_dump_costs = driver_dump_power * CostModeled.cost_per_power_beam_dump
+            breakdown.append((f'Driver dumps ({self.num_stages}x, {driver_dump_power/1e6:.0f} MW total)', driver_dump_costs))
+
+        # cost of the driver delay chicanes
+        length_driver_delay_chicane = 0
+        for stage in self.stages:
+            length_driver_delay_chicane += stage.get_length()
+        for interstage in self.interstages:
+            length_driver_delay_chicane += interstage.get_length()
+        driver_delay_chicanes_costs = 2 * length_driver_delay_chicane * CostModeled.cost_per_length_driver_delay_chicane
+        breakdown.append(('Driver delay chicanes (left+right)', driver_delay_chicanes_costs))
+
         # cost of the BDS
         if self.bds is not None:
             breakdown.append(self.bds.get_cost_breakdown())
@@ -278,10 +421,34 @@ class PlasmaLinac(Linac):
         return (self.name, breakdown)
 
     
+    def get_cost_breakdown_civil_construction(self):
+        breakdown = []
+        cost_plasma_stages = 0
+        num_plasma_stages = 0
+        cost_interstages = 0
+        num_interstages = 0
+        for trackable in self.trackables:
+            if isinstance(trackable, Stage):
+                cost_plasma_stages += trackable.get_cost_civil_construction(tunnel_diameter=8.0)
+                num_plasma_stages += 1
+            elif isinstance(trackable, Interstage):
+                cost_interstages += trackable.get_cost_civil_construction(tunnel_diameter=8.0)
+                num_interstages += 1
+            elif isinstance(trackable, BeamDeliverySystem):
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+            else:
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+        breakdown.append((f'Plasma stages ({num_plasma_stages}x, widened 3x)', cost_plasma_stages))
+        breakdown.append((f'Interstages ({num_interstages}x, widened 3x)', cost_interstages))
+        return ('Civil construction', breakdown)
+        
+    
     ## PLOT EVOLUTION
     
     # apply function to all beam files
     def evolution_fcn(self, fcns, shot=None, clean=False):
+
+        import inspect
         
         # declare data structure
         num_outputs = self.num_outputs()
@@ -587,6 +754,9 @@ class PlasmaLinac(Linac):
     # animate the longitudinal phase space
     def animate_lps(self, rel_energy_window=0.06, file_name=None):
         
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
+        
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
         fig.set_figwidth(CONFIG.plot_width_default*0.8)
@@ -723,6 +893,9 @@ class PlasmaLinac(Linac):
 
     # animate the horizontal phase space
     def animate_phasespace_x(self):
+        
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
         
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
@@ -862,6 +1035,9 @@ class PlasmaLinac(Linac):
     # animate the vertical phase space
     def animate_phasespace_y(self):
         
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
+        
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
         fig.set_figwidth(CONFIG.plot_width_default*0.8)
@@ -999,6 +1175,9 @@ class PlasmaLinac(Linac):
     # animate the horizontal sideview (top view)
     def animate_sideview_x(self):
         
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
+        
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
         fig.set_figwidth(CONFIG.plot_width_default*0.8)
@@ -1134,6 +1313,9 @@ class PlasmaLinac(Linac):
     # animate the vertical sideview
     def animate_sideview_y(self):
         
+        from matplotlib.animation import FuncAnimation
+        from matplotlib import ticker as mticker
+        
         # set up figure
         fig, axs = plt.subplots(3, 2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [1, 2, 1]})
         fig.set_figwidth(CONFIG.plot_width_default*0.8)
@@ -1263,5 +1445,3 @@ class PlasmaLinac(Linac):
         plt.close()
 
         return filename
-
-        

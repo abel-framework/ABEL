@@ -3,12 +3,13 @@ import numpy as np
 import scipy.constants as SI
 from string import Template
 from pathlib import Path
-from abel import CONFIG, Beam
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
 from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0, external_focusing_longitudinal=0, filename_test_particle='empty.h5'):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=False, external_focusing_longitudinal=0, filename_test_particle='empty.h5'):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -61,18 +62,36 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         external_focusing_longitudinal_comment = ''
     else:
         external_focusing_longitudinal_comment = '#' 
+    # mesh refinement (level 1)
+    res_mr0 = box_size_xy/num_cell_xy
+    box_size_xy_mr1 = 0.9/k_p(plasma_density)
+    ref_ratio_xy = 2**np.ceil(np.log2(box_size_xy/box_size_xy_mr1))
+    num_cell_xy_mr1 = 2**np.round(np.log2((num_cell_xy+1)/2))-1
+    
+    if not mesh_refinement:
+        mesh_refinement_maxlevel = 0
+        mesh_refinement_comment = '#'
+    else:
+        mesh_refinement_maxlevel = 1
+        mesh_refinement_comment = ''
     
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
               'num_cell_y': int(num_cell_xy), 
               'num_cell_z': int(num_cell_z),
               'plasma_density': plasma_density,
-              'grid_low_x': -box_size/2,
-              'grid_high_x': box_size/2,
-              'grid_low_y': -box_size/2,
-              'grid_high_y': box_size/2,
+              'grid_low_x': -box_size_xy/2,
+              'grid_high_x': box_size_xy/2,
+              'grid_low_y': -box_size_xy/2,
+              'grid_high_y': box_size_xy/2,
               'grid_low_z': min(box_range_z),
               'grid_high_z': max(box_range_z),
+              'mesh_refinement_maxlevel': int(mesh_refinement_maxlevel),
+              'num_cell_x_mr1': int(num_cell_xy_mr1), 
+              'num_cell_y_mr1': int(num_cell_xy_mr1),
+              'ref_ratio_x': int(ref_ratio_xy), 
+              'ref_ratio_y': int(ref_ratio_xy),
+              'mesh_refinement_comment': mesh_refinement_comment,
               'time_step': time_step,
               'max_step': int(num_steps),
               'output_period': output_period,
@@ -102,8 +121,11 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     filename_job_script_template = os.path.join(os.path.dirname(__file__), 'job_script_template')
     
     # set the partition based on the number of nodes and tasks
-    if num_nodes == 1 and num_tasks_per_node < 8:
+    # based on LUMI (see https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/partitions/)
+    if num_nodes <= 4 and num_tasks_per_node <= 8:
         partition_name = CONFIG.partition_name_small
+    elif num_nodes <= 32 and num_tasks_per_node <= 8:
+        partition_name = CONFIG.partition_name_devel
     else:
         partition_name = CONFIG.partition_name_standard
     
@@ -219,56 +241,64 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
         pbar = tqdm(total=int(num_steps), desc=desc, unit=' steps', leave=True, file=sys.stdout, colour='green')
     
     # progress loop
+    fail_counter = 0
     while True:
-        
-        # get the run queue
-        cmd = 'squeue --job ' + str(jobid)
-        output = subprocess.check_output(cmd, shell=True)
-        lines = str(output).split('\\n')
-        clean_line = " ".join(lines[1].split())
-        keywords = clean_line.split()
-        
-        # extract progress
-        if len(keywords) > 1:
-            status = keywords[4]
-            time_spent = keywords[5]
-            if status == 'PD': # starting
-                if not quiet:
-                    pbar.set_description('>> Starting HiPACE++ (job ' + str(jobid) + ')')
-                    pbar.update(0)
-            
-            elif status == 'R': # running
-                if not quiet:
-                    pbar.set_description('>>> Running HiPACE++ (job ' + str(jobid) + ')')
-                    
-                # read progress from output file
-                outputfile = os.path.join(runfolder,'hipace-' + str(jobid) + '.out')
-                if os.path.exists(outputfile) and not quiet:
-                    with open(outputfile, 'rb') as f:
-                        try:  # catch OSError in case of a one line file 
-                            f.seek(-2, os.SEEK_END)
-                            while f.read(1) != b'\n':
-                                f.seek(-2, os.SEEK_CUR)
-                        except OSError:
-                            f.seek(0)
-                        last_line = f.readline().decode()
-                    stepnum, position = 0, 0
-                    split_line = last_line.split(' step ', 1)
-                    if len(split_line) > 1:
-                        split_line2 = split_line[1].split(' at time = ', 1)
-                        stepnum = int(split_line2[0])
-                        position = float(split_line2[1].split(' with dt = ', 1)[0])*SI.c
-                    pbar.update(int(stepnum-pbar.n))
-                
-            elif status == 'CG': # closing
-                if not quiet:
-                    pbar.set_description('>> Finished HiPACE++ (job ' + str(jobid) + ')')
-                    pbar.update(int(num_steps-pbar.n))
-                    pbar.close()
-                break
-        else:
-            break
 
+        try:
+            # get the run queue
+            cmd = 'squeue --job ' + str(jobid)
+            output = subprocess.check_output(cmd, shell=True)
+            lines = str(output).split('\\n')
+            clean_line = " ".join(lines[1].split())
+            keywords = clean_line.split()
+
+            fail_counter = 0
+            
+            # extract progress
+            if len(keywords) > 1:
+                status = keywords[4]
+                time_spent = keywords[5]
+                if status == 'PD': # starting
+                    if not quiet:
+                        pbar.set_description('>> Starting HiPACE++ (job ' + str(jobid) + ')')
+                        pbar.update(0)
+                
+                elif status == 'R': # running
+                    if not quiet:
+                        pbar.set_description('>>> Running HiPACE++ (job ' + str(jobid) + ')')
+                        
+                    # read progress from output file
+                    outputfile = os.path.join(runfolder,'hipace-' + str(jobid) + '.out')
+                    if os.path.exists(outputfile) and not quiet:
+                        with open(outputfile, 'rb') as f:
+                            try:  # catch OSError in case of a one line file 
+                                f.seek(-2, os.SEEK_END)
+                                while f.read(1) != b'\n':
+                                    f.seek(-2, os.SEEK_CUR)
+                            except OSError:
+                                f.seek(0)
+                            last_line = f.readline().decode()
+                        stepnum, position = 0, 0
+                        split_line = last_line.split(' step ', 1)
+                        if len(split_line) > 1:
+                            split_line2 = split_line[1].split(' at time = ', 1)
+                            stepnum = int(split_line2[0])
+                            position = float(split_line2[1].split(' with dt = ', 1)[0])*SI.c
+                        pbar.update(int(stepnum-pbar.n))
+                    
+                elif status == 'CG': # closing
+                    if not quiet:
+                        pbar.set_description('>> Finished HiPACE++ (job ' + str(jobid) + ')')
+                        pbar.update(int(num_steps-pbar.n))
+                        pbar.close()
+                    break
+            else:
+                break
+        except:
+            fail_counter += 1
+            if fail_counter > 5:
+                break
+        
         # wait for some time
         wait_time = 3 # [s]
         time.sleep(wait_time)
