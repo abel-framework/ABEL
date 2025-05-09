@@ -2178,11 +2178,11 @@ def test_magnify_beta_function():
 
     x_offset = 5.354e-6
     y_offset = 0.1516e-6
-    ux_offset = 0.0
+    ux_offset = 1.0e-15
     uy_offset = 1583681.8243787317
     beta_mag = 5.0  # Magnify
 
-    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset, y_angle=uy_offset/energy2proper_velocity(3e9))
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
     beam = source.track()
     initial_beam = copy.deepcopy(beam)
 
@@ -2207,7 +2207,7 @@ def test_magnify_beta_function():
     assert np.isclose(beam.y_offset(), y_offset, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_x(), initial_beam.beam_size_x()*mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_y(), initial_beam.beam_size_y()*mag, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_angle(), initial_beam.x_angle(), rtol=0, atol=1e-15)
     assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_x(), initial_beam.divergence_x()/mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_y(), initial_beam.divergence_y()/mag, rtol=1e-15, atol=0.0)
@@ -2219,7 +2219,7 @@ def test_magnify_beta_function():
 
 
     beta_mag = 1/beta_mag  # De-magnify
-    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset, y_angle=uy_offset/energy2proper_velocity(3e9))
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
     beam = source.track()
     initial_beam = copy.deepcopy(beam)
 
