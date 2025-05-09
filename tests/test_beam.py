@@ -22,15 +22,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
-from abel.utilities.beam_physics import generate_trace_space
+from abel.utilities.beam_physics import generate_trace_space, generate_trace_space_xy, generate_symm_trace_space_xyz
+from abel.utilities.plasma_physics import beta_matched
+from abel.utilities.relativity import energy2proper_velocity, energy2gamma, gamma2momentum, proper_velocity2gamma, proper_velocity2energy
+from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 import random
+import scipy.constants as SI
+import numpy as np
+import copy, shutil
+from matplotlib import pyplot as plt
+import warnings
 
 
 def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, rel_energy_spread=0.02, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0):
     source = SourceBasic()
     source.bunch_length = bunch_length                                              # [m], rms.
     source.num_particles = 10000                                               
-    source.charge = -e * 1.0e10                                                     # [C]
+    source.charge = -SI.e * 1.0e10                                                     # [C]
 
     # Energy parameters
     source.energy = energy                                                          # [eV]
@@ -774,7 +782,7 @@ def test_param_calcs_generate_trace_space():
     Es = np.random.normal(loc=3e9, scale=0.02*3e9, size=10011)
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert np.isclose(np.std(xs), np.sqrt(geo_emitt_x*beta_x), rtol=1e-2, atol=0.0)  # Beam size
@@ -818,7 +826,7 @@ def test_param_calcs_generate_trace_space_xy():
     Es = np.random.normal(loc=3e9, scale=0.02*3e9, size=num_particles)
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert len(beam) == num_particles
@@ -852,7 +860,7 @@ def test_param_calcs_generate_trace_space_xy():
     Es = np.tile(Es, num_tiling)
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert len(beam) == num_particles
@@ -896,7 +904,7 @@ def test_param_calcs_generate_symm_trace_space_xyz():
     Es += 3e9  # Add offset.
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert len(beam) == num_particles
@@ -2236,8 +2244,8 @@ def test_magnify_beta_function():
     assert np.isclose(beam.y_offset(), y_offset, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_x(), initial_beam.beam_size_x()*mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_y(), initial_beam.beam_size_y()*mag, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=0, atol=1e-15)
+    assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=0, atol=1e-15)
     assert np.isclose(beam.divergence_x(), initial_beam.divergence_x()/mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_y(), initial_beam.divergence_y()/mag, rtol=1e-15, atol=0.0)
 

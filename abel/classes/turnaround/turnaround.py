@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from matplotlib import patches
 import numpy as np
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
@@ -14,6 +13,9 @@ class Turnaround(Trackable, CostModeled):
         self.nom_energy = nom_energy
         self.use_semi_circle = use_semi_circle
         self.start_with_semi_circle = start_with_semi_circle
+
+        self.use_tunnel = False
+        self.use_cutandcover = True
 
     
     @abstractmethod   

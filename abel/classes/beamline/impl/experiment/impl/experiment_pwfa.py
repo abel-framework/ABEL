@@ -1,10 +1,8 @@
-from abel import CONFIG, Experiment, Source, BeamDeliverySystem, Stage, Spectrometer
-from matplotlib import pyplot as plt
+from abel.classes.beamline.impl.experiment.experiment import Experiment
+from abel.classes.stage.stage import Stage
 import numpy as np
-import warnings
-from abel.utilities.plasma_physics import wave_breaking_field, k_p, beta_matched
+from abel.utilities.plasma_physics import wave_breaking_field, beta_matched
 import scipy.constants as SI
-from scipy.stats import linregress
 
 
 class ExperimentPWFA(Experiment):
@@ -52,6 +50,9 @@ class ExperimentPWFA(Experiment):
     
     # plot instability evolution
     def plot_instability(self):
+
+        from matplotlib import pyplot as plt
+        
         # Frst compute initial and final point on plot from ABEL
         # Get betatron advance
         phase_advance = self.betatron_phase_advance()
@@ -86,6 +87,10 @@ class ExperimentPWFA(Experiment):
         return field
         
     def spectrometer_energy_cal(self, xlims=None, ylims=None, plot_figure = False):
+
+        from matplotlib import pyplot as plt
+        from scipy.stats import linregress
+        
         shots = range(self.num_shots)
         y_mean = np.zeros(len(shots))
         Bs = np.zeros(len(shots))

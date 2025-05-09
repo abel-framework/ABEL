@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from matplotlib import patches
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
 from types import SimpleNamespace

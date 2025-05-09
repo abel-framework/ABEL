@@ -1,17 +1,13 @@
 from abc import abstractmethod
-from matplotlib import patches
-from abel import Trackable, CONFIG
+from abel.classes.trackable import Trackable
+from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
 from abel.classes.source.impl.source_capsule import SourceCapsule
-from abel.utilities.plasma_physics import beta_matched
 import numpy as np
 import copy
 import scipy.constants as SI
-from matplotlib import pyplot as plt
 from types import SimpleNamespace
-from matplotlib.colors import LogNorm
-from abel.utilities.plasma_physics import wave_breaking_field, blowout_radius, beta_matched
-
+from abel.utilities.plasma_physics import beta_matched
 from typing import Self
 
 class Stage(Trackable, CostModeled):
@@ -44,6 +40,7 @@ class Stage(Trackable, CostModeled):
         self.evolution.driver.slices = SimpleNamespace()
         
         self.efficiency = SimpleNamespace()
+        self.efficiency.dumped_power = None
         
         self.initial = SimpleNamespace()
         self.initial.driver = SimpleNamespace()
@@ -116,16 +113,16 @@ class Stage(Trackable, CostModeled):
     
         Parameters
         ----------
-        ramp_plasma_density: [m^-3] float, optional
+        ramp_plasma_density : [m^-3] float, optional
             Plasma density for the ramp.
 
-        ramp_length: [m] float, optional
+        ramp_length : [m] float, optional
             Length of the ramp.
     
             
         Returns
         ----------
-        stage_copy: Stage object
+        stage_copy : ``Stage`` object
             A modified deep copy of the original stage.
         """
 
@@ -159,8 +156,8 @@ class Stage(Trackable, CostModeled):
             
         # Everything else now unset, can set this safely.
         # Will also trigger reset/recalc if needed
-        stage_copy.length = ramp_length 
-        
+        stage_copy.length_flattop = None
+        stage_copy.length = ramp_length
         stage_copy.plasma_density = ramp_plasma_density
          
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
@@ -273,7 +270,7 @@ class Stage(Trackable, CostModeled):
             if self.upramp.plasma_density is None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-             # perform tracking
+            # perform tracking
             self.upramp._return_tracked_driver = True
             beam, driver = self.upramp.track(beam0)
             beam.stage_number -= 1
@@ -499,7 +496,7 @@ class Stage(Trackable, CostModeled):
         "Accelerating gradient of the plasma flattop [eV/m], or None if not set/calculateable"
         return self._nom_accel_gradient_flattop_calc
     @nom_accel_gradient_flattop.setter
-    def nom_accel_gradient_flattop(self,nom_accel_gradient_flattop : float):
+    def nom_accel_gradient_flattop(self, nom_accel_gradient_flattop : float):
         if self._nom_accel_gradient_flattop_calc is not None and self._nom_accel_gradient_flattop is None:
             raise VariablesOverspecifiedError("nom_accel_gradient_flattop is already known/calculatable, cannot set")
         
@@ -787,7 +784,7 @@ class Stage(Trackable, CostModeled):
     def get_cost_breakdown(self):
         breakdown = []
         breakdown.append(('Plasma cell', self.get_length() * CostModeled.cost_per_length_plasma_stage))
-        breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
+        #breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
         return (self.name, breakdown)
 
 
@@ -817,7 +814,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     #@abstractmethod   # TODO: calculate the dumped power and use it for the dump cost model.
     def dumped_power(self):
-        return None
+        return self.efficiency.dumped_power
 
 
     # ==================================================
@@ -829,6 +826,10 @@ class Stage(Trackable, CostModeled):
         self.efficiency.driver_to_wake = (Etot0_driver-Etot_driver)/Etot0_driver
         self.efficiency.wake_to_beam = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
         self.efficiency.driver_to_beam = self.efficiency.driver_to_wake*self.efficiency.wake_to_beam
+        if self.get_rep_rate_average() is not None:
+            self.efficiency.dumped_power = Etot_driver*self.get_rep_rate_average()
+        else:    
+            self.efficiency.dumped_power = None
 
 
     # ==================================================
@@ -893,6 +894,8 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def plot_evolution(self, bunch='beam'):
+
+        from matplotlib import pyplot as plt
         
         # select bunch
         if bunch == 'beam':
@@ -1030,6 +1033,8 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================  
     def plot_wakefield(self):
+
+        from matplotlib import pyplot as plt
         
         # extract wakefield if not already existing
         if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
@@ -1069,9 +1074,9 @@ class Stage(Trackable, CostModeled):
         # get wakefield
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
-            axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
+            axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source.energy is not None:
-            Ez_driver_max = self.driver_source.energy/self.get_length()
+            Ez_driver_max = self.driver_source.energy/self.length_flattop
             axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
@@ -1111,6 +1116,9 @@ class Stage(Trackable, CostModeled):
         --------
           None
         """
+
+        from matplotlib import pyplot as plt
+        from matplotlib.colors import LogNorm
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
@@ -1157,7 +1165,7 @@ class Stage(Trackable, CostModeled):
                 z_beam = zs_I[np.abs(Is[zs_I < z_mid]).argmax()]
                 Ez_driver = Ezs0[zs0 > z_mid].max()
                 Ez_beam = np.interp(z_beam, zs0, Ezs0)
-                Ezmax = 1.7*np.max([np.abs(Ez_driver), np.abs(Ez_beam)])
+                Ezmax = 2.3*1.7*np.max([np.abs(Ez_driver), np.abs(Ez_beam)])
             
             # plot on-axis wakefield and axes
             ax2 = ax1.twinx()
@@ -1205,7 +1213,7 @@ class Stage(Trackable, CostModeled):
             
         # save the figure
         if savefig is not None:
-            fig.savefig(str(savefig), bbox_inches='tight', dpi=1000)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
         
         return 
 
@@ -1222,11 +1230,11 @@ class Stage(Trackable, CostModeled):
         
 
 class VariablesOverspecifiedError(Exception):
-    "Exception class to throw when trying to set too many overlapping variables"
+    "Exception class to throw when trying to set too many overlapping variables."
     pass
 class VariablesOutOfRangeError(Exception):
     "Exception class to throw when calculated or set variables are out of allowed range."
 class StageError(Exception):
-    "Exception class for Stege to throw in other cases"
+    "Exception class for ``Stage`` to throw in other cases."
 
     
