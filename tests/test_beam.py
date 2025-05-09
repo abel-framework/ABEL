@@ -426,7 +426,7 @@ def test_reset_phase_space():
     "Test reset_phase_space to ensure it initializes an 8xN zero matrix for the specified number of particles."
     beam = Beam()
     beam.reset_phase_space(10)
-    assert beam._Beam__phasespace.shape == (8, 10)
+    assert beam._Beam__phasespace.shape == (11, 10)
     assert (beam._Beam__phasespace == 0).all()
 
     # Purposedly trigger exceptions
@@ -497,7 +497,7 @@ def test_getitem():
     beam.set_phase_space(Q, xs, ys, zs)
     random_integer = random.randint(0, 999)
     particle = beam[random_integer]
-    assert particle.shape == (8,)
+    assert particle.shape == (11,)
     assert np.allclose(particle[0], xs[random_integer])
     assert np.allclose(particle[1], ys[random_integer])
     assert np.allclose(particle[2], zs[random_integer])
@@ -2178,11 +2178,11 @@ def test_magnify_beta_function():
 
     x_offset = 5.354e-6
     y_offset = 0.1516e-6
-    ux_offset = 0.0
+    ux_offset = 1.0e-15
     uy_offset = 1583681.8243787317
     beta_mag = 5.0  # Magnify
 
-    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset, y_angle=uy_offset/energy2proper_velocity(3e9))
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
     beam = source.track()
     initial_beam = copy.deepcopy(beam)
 
@@ -2207,7 +2207,7 @@ def test_magnify_beta_function():
     assert np.isclose(beam.y_offset(), y_offset, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_x(), initial_beam.beam_size_x()*mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_y(), initial_beam.beam_size_y()*mag, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_angle(), initial_beam.x_angle(), rtol=0, atol=1e-15)
     assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_x(), initial_beam.divergence_x()/mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_y(), initial_beam.divergence_y()/mag, rtol=1e-15, atol=0.0)
@@ -2219,7 +2219,7 @@ def test_magnify_beta_function():
 
 
     beta_mag = 1/beta_mag  # De-magnify
-    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset, y_angle=uy_offset/energy2proper_velocity(3e9))
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
     beam = source.track()
     initial_beam = copy.deepcopy(beam)
 
