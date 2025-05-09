@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import scipy.constants as SI
+import scipy.signal as sig
 from abel import Source, Beam
 from abel.utilities.beam_physics import generate_trace_space_xy, generate_symm_trace_space_xyz
 from abel.utilities.relativity import energy2gamma
@@ -74,10 +75,14 @@ class SourceFromProfile(Source):
         data = read_function(self.file, header=None) # z-position and current
 
         zs0 = np.array(data[0]) + self.z_offset
-        Is = np.array(data[1])
+        Is0 = np.array(data[1])
+        Is0 = sig.medfilt(Is0, kernel_size=5)
         # Get particle distribution in Zs
-        zs = np.random.choice(zs0, size=num_particles_actual, p=Is/np.sum(Is))
+
+        z_interp = np.linspace(zs0[0], zs0[-1], int(1e4))
+        I_interp = np.interp(z_interp, zs0, Is0)
         
+        zs = np.random.choice(z_interp, size=num_particles_actual, p=I_interp/np.sum(I_interp))
         Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
         if self.symmetrize:
             zs = np.tile(zs, num_tiling)
