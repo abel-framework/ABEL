@@ -37,3 +37,10 @@ def pad_upwards(arr_max, padding=0.05):
     if padding < 0.0:
         padding = np.abs(padding)
     return arr_max*(1.0 + np.sign(arr_max)*padding)
+
+###################################################
+def check_kwargs(valid_kwargs, kwargs):
+    for key in kwargs.keys():
+        if kwargs and key not in valid_kwargs:
+            raise ValueError(f"function gotten unexpected keyword, {key}")
+
