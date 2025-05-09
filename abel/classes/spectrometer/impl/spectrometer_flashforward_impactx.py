@@ -20,6 +20,12 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
         self.current_quad1 = 60 # [A]
         self.current_quad2 = -60 # [A]
         self.current_quad3 = 50 # [A]
+
+        self.g1 = None
+        self.g2 = None
+        self.g3 = None
+
+        self.B_dipole = None
         # TODO: implement imaging (using regular matrix tracking, to be added as a utility)
 
         # pre-defined lengths
@@ -42,23 +48,19 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
     def get_length(self):
         return self.s_LEMS - self.s_CELLCENTRE
 
-    def current2strength_quad(self, I, p0, **kwargs):
-        # Check that we only get valid keyword_arguments
-        check_kwargs(valid_kwargs=["g"], kwargs=kwargs)
+    def current2strength_quad(self, I, p0, g):
         # Option for just entering the field-values
-        if kwargs:
-            g = kwargs["g"] #T/m
+        if g:
+            g = g #T/m
         else:
             g = I * 0.9 # TODO: improve conversion
             
         k = g*SI.e/p0
         return k
 
-    def current2field_dipole(self, I, **kwargs):
-        # Check that we only get valid keyword_arguments
-        check_kwargs(valid_kwargs=["B"], kwargs=kwargs)
-        if kwargs:
-            return kwargs["B"] # T
+    def current2field_dipole(self, I, B_dipole):
+        if B_dipole:
+            return B_dipole
         else:
             return I * 0.0014 # TODO: improve conversion
 
@@ -108,14 +110,14 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
         p0y = SI.m_e*gamma0x*SI.c*np.sqrt(1-1/gamma0x**2);
         
         # define dipole
-        Bdip = self.current2field_dipole(self.current_dipole)
+        Bdip = self.current2field_dipole(self.current_dipole, self.B_dipole)
         phi = Bdip*self.length_dipole*SI.e/p0x
         dipole = impactx.elements.ExactSbend(name="dipole", ds=self.length_dipole, phi=np.rad2deg(phi), B=Bdip, nslice=ns, rotation=90)
         
         # define quads
-        quad1 = impactx.elements.ExactQuad(name='quad1', ds=self.length_quad, k=self.current2strength_quad(self.current_quad1, p0x))
-        quad2 = impactx.elements.ExactQuad(name="quad2", ds=self.length_quad, k=self.current2strength_quad(self.current_quad2, p0x))
-        quad3 = impactx.elements.ExactQuad(name="quad3", ds=self.length_quad, k=self.current2strength_quad(self.current_quad3, p0x))
+        quad1 = impactx.elements.ExactQuad(name='quad1', ds=self.length_quad, k=self.current2strength_quad(self.current_quad1, p0x, self.g1))
+        quad2 = impactx.elements.ExactQuad(name="quad2", ds=self.length_quad, k=self.current2strength_quad(self.current_quad2, p0x, self.g2))
+        quad3 = impactx.elements.ExactQuad(name="quad3", ds=self.length_quad, k=self.current2strength_quad(self.current_quad3, p0x, self.g3))
         
         # derived separations
         d1 = self.s_Q11FLFDIAG - self.s_CELLCENTRE - self.length_quad/2 - object_plane_x;
