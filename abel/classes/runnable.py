@@ -42,7 +42,7 @@ class Runnable(ABC):
                 print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
 
             # if overwrite_from is None: # TODO
-            self.track(beam=None, savedepth=self.savedepth, runnable=self, verbose=self.verbose) # This returns the beam that is saved in trackable.track()->Source/stage-parentclass.track()->childclass.track(), but is not assigned to a variable here.
+            self.track(beam=None, savedepth=self.savedepth, runnable=self, verbose=self.verbose) # This returns the beam that is saved in trackable.track()->Source/stage-parentclass.track()->childclass.track() (executed from beamline.track()), but is not assigned to a variable here.
 
             # save object to file
             self.save()
