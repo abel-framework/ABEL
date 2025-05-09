@@ -418,7 +418,7 @@ def test_reset_phase_space():
     "Test reset_phase_space to ensure it initializes an 8xN zero matrix for the specified number of particles."
     beam = Beam()
     beam.reset_phase_space(10)
-    assert beam._Beam__phasespace.shape == (8, 10)
+    assert beam._Beam__phasespace.shape == (11, 10)
     assert (beam._Beam__phasespace == 0).all()
 
     # Purposedly trigger exceptions
@@ -489,7 +489,7 @@ def test_getitem():
     beam.set_phase_space(Q, xs, ys, zs)
     random_integer = random.randint(0, 999)
     particle = beam[random_integer]
-    assert particle.shape == (8,)
+    assert particle.shape == (11,)
     assert np.allclose(particle[0], xs[random_integer])
     assert np.allclose(particle[1], ys[random_integer])
     assert np.allclose(particle[2], zs[random_integer])

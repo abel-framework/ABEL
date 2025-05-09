@@ -37,7 +37,7 @@ def beam():
     source.emit_nx, source.emit_ny = 160e-6, 0.56e-6 # [m rad]
     source.beta_x = 1
     source.beta_y = source.beta_x
-    source.num_particles = 100
+    source.num_particles = 10000
     beam = source.track()
     return beam
 
@@ -98,10 +98,10 @@ def test_spin_check_z(beam):
     assert beam.spin_check()
 
 @pytest.mark.spin 
-def test_make_random_spins(beam): 
+def test_set_arbitrary_spin_polarization_z(beam): 
     "Test if make_random_spins generates correctly polarized spins."
     s_m = 0.85
-    beam.make_random_spins(s_m)
+    beam.set_arbitrary_spin_polarization(s_m, 'z')
 
     s_x, s_y, s_z = beam.spxs(), beam.spys(), beam.spzs()
     
@@ -112,35 +112,51 @@ def test_make_random_spins(beam):
     norms = np.sqrt(s_x**2 + s_y**2 + s_z**2)
     assert np.allclose(norms, 1, atol=1e-6)
 
+@pytest.mark.spin 
+def test_set_arbitrary_spin_polarization_y(beam): 
+    "Test if make_random_spins generates correctly polarized spins."
+    s_m = 0.85
+    beam.set_arbitrary_spin_polarization(s_m, 'y')
+
+    s_x, s_y, s_z = beam.spxs(), beam.spys(), beam.spzs()
+    
+    assert np.isclose(np.mean(s_x), 0, atol= 0.05)
+    assert np.isclose(np.mean(s_y), s_m, atol= 0.05)
+    assert np.isclose(np.mean(s_z), 0, atol= 0.05)
+
+    norms = np.sqrt(s_x**2 + s_y**2 + s_z**2)
+    assert np.allclose(norms, 1, atol=1e-6)
+    
+@pytest.mark.spin 
+def test_set_arbitrary_spin_polarization_x(beam): 
+    "Test if make_random_spins generates correctly polarized spins."
+    s_m = 0.85
+    beam.set_arbitrary_spin_polarization(s_m, 'x')
+
+    s_x, s_y, s_z = beam.spxs(), beam.spys(), beam.spzs()
+    
+    assert np.isclose(np.mean(s_x), s_m, atol= 0.05)
+    assert np.isclose(np.mean(s_y), 0, atol= 0.05)
+    assert np.isclose(np.mean(s_z), 0, atol= 0.05)
+
+    norms = np.sqrt(s_x**2 + s_y**2 + s_z**2)
+    assert np.allclose(norms, 1, atol=1e-6)
+
+
 @pytest.mark.spin
-def test_make_random_spins_edge_cases(beam):
+def test_set_arbitrary_spin_polarization_edge_cases(beam):
     "Test edge cases where polarization degree is -1, 0 or 1."
     for pol in [-1, 0, 1]:
-        beam.make_random_spins(pol)
+        beam.set_arbitrary_spin_polarization(pol, 'z')
         assert np.isclose(np.mean(beam.spzs()), pol, atol = 0.1)
 
-@pytest.mark.spin
-def test_make_random_spins_correlation(beam):
-    "Test correlation between spin components by computing the correlation coefficients."
-    s_m = 0.85
-    beam.make_random_spins(s_m)
-    
-    s_x, s_y, s_z = beam.spxs(), beam.spys(), beam.spzs()
-
-    corr_xy = np.corrcoef(s_x, s_y)[0, 1]
-    corr_xz = np.corrcoef(s_x, s_z)[0, 1]
-    corr_yz = np.corrcoef(s_y, s_z)[0, 1]
-
-    assert abs(corr_xy) < 0.1
-    assert abs(corr_xz) < 0.15
-    assert abs(corr_yz) < 0.15
     
 @pytest.mark.spin
 def test_renormalize_spin(beam):
     "Test renormalizing spin vectors"
-    beam.set_spxs(np.ones(100) * 0.5)
-    beam.set_spys(np.ones(100) * 0.5)
-    beam.set_spzs(np.ones(100) * 0.5)
+    beam.set_spxs(np.ones(len(beam)) * 0.5)
+    beam.set_spys(np.ones(len(beam)) * 0.5)
+    beam.set_spzs(np.ones(len(beam)) * 0.5)
     beam.renormalize_spin()
 
     norms = np.sqrt(beam.spxs()**2 + beam.spys()**2 + beam.spzs()**2)

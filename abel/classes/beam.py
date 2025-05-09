@@ -1015,19 +1015,22 @@ class Beam():
         self.set_spys(np.zeros(len(self)))
         self.set_spzs(np.ones(len(self))*np.sign(sign))
 
-    def make_random_spins(self, mean_z_spin_proj, seed=42):
+    def set_arbitrary_spin_polarization(self, polarization, direction='z', seed=None):
         """
-        Generates a random distribution of points on the surface of a sphere of radius 1, with the mean along z is 
-        ``mean_z_spin_proj``.
-        For mean_z_spin_proj=0, points are uniformly distributed on the surface of the sphere.
+        Generates a random distribution of points on the surface of a sphere of radius 1, with the mean along a defined 'direction' is 
+        'polarization'.
+        For polarization=0, points are uniformly distributed on the surface of the sphere.
     
         Parameters
         ----------
-        mean_z_spin_proj: float
-            Mean value of z-projection of the generated spins.
+        polarization: float
+            Mean value of projection in the defined direction for the generated spins.
+
+        direction: string
+            Spin direction (default is z).
 
         seed: int, optional
-            Seed to initialize the random number generator (defalt is 42).
+            Seed to initialize the random number generator (default is 42).
             
 
         References
@@ -1035,29 +1038,42 @@ class Beam():
         .. [1] Michael J. Quin, Kristjan Poder 
         {https://github.com/fbpic/fbpic/blob/dev/fbpic/particles/spin/spin_tracker.py#L276}
         """
-        np.random.seed(seed)
-        self.alpha = None
+        if seed is not None:
+            np.random.seed(seed)
+        alpha = None
 
-        if abs(mean_z_spin_proj) == 1:
-            self.set_spin_polarized_z(np.sign(mean_z_spin_proj))
+        if polarization == 0:
+            self.set_spin_unpolarized()
             return
-        elif mean_z_spin_proj == 0:
-            spzs = np.random.uniform(-1,1, len(self))
+        elif abs(polarization) == 1:
+            sps = np.ones(len(self))*polarization
         else:
-            if self.alpha is None:
-                sol = fsolve(lambda alpha: 1. / alpha - 1. / np.tanh(alpha) - mean_z_spin_proj, 0.5)
-                self.alpha = sol[0]
+            if alpha is None:
+                sol = fsolve(lambda alpha0: 1. / alpha0 - 1. / np.tanh(alpha0) - polarization, 0.5)
+                alpha = sol[0]
             u = np.random.uniform(0, 1, len(self))
-            spzs = - 1 / self.alpha * np.log(np.exp(self.alpha) * (1 - u) + np.exp(-self.alpha) * u)
+            sps = - 1 / alpha * np.log(np.exp(alpha) * (1 - u) + np.exp(-alpha) * u)
 
         phi = np.random.uniform(0, 2*np.pi, len(self))
-        sin_theta = np.sqrt(1 - spzs**2)
-        spxs = sin_theta * np.cos(phi)
-        spys = sin_theta * np.sin(phi)
+        sin_theta = np.sqrt(1 - sps**2)
+        sps_cos = sin_theta * np.cos(phi)
+        sps_sin = sin_theta * np.sin(phi)
+
+        if direction == 'x':
+            self.set_spxs(sps)
+            self.set_spys(sps_cos)
+            self.set_spzs(sps_sin)
+        elif direction == 'y':
+            self.set_spxs(sps_cos)
+            self.set_spys(sps)
+            self.set_spzs(sps_sin)
+        elif direction == 'z':
+            self.set_spxs(sps_cos)
+            self.set_spys(sps_sin)
+            self.set_spzs(sps)
+        else:
+            raise Exception('Not a valid direction')
         
-        self.set_spxs(spxs)
-        self.set_spys(spys)
-        self.set_spzs(spzs)
 
     def renormalize_spin(self):
         "Renormalizing the spin vectors."
@@ -1091,7 +1107,6 @@ class Beam():
     def plot_spins(self, num_bins=None):
         if num_bins is None:
             num_bins = int(min(np.round(np.sqrt(len(self)/2)), 100))
-        print(num_bins)
         fig, axs = plt.subplots(1,3)
         fig.set_figwidth(12)
         fig.set_figheight(4) 
@@ -1109,7 +1124,7 @@ class Beam():
         axs[2].set_xlabel(r'$s_z$')
 
     def plot_spins_2D(self):
-        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+        fig, axs = plt.subplots(3, 1, figsize=(5, 12))
         
         hb1 = axs[0].hexbin(self.spxs(), self.spys(), gridsize=50, cmap=CONFIG.default_cmap, mincnt=1)
         axs[0].set_xlabel(r'$s_x$')
@@ -1130,7 +1145,12 @@ class Beam():
     def plot_spins_3D(self):
         fig = plt.figure(figsize=(12,4))
         axs = fig.add_subplot(111, projection='3d')
-        axs.scatter(self.spxs(), self.spys(), self.spzs(), alpha=0.2, s=1)
+        spxs = self.spxs()
+        spys = self.spys()
+        spzs = self.spzs()
+        from random import sample
+        mask = sample(range(len(self)), min(3000,len(self)))
+        axs.scatter(spxs[mask], spys[mask],spzs[mask], alpha=0.2, s=1)
         axs.set_xlabel(r'$s_x$')
         axs.set_ylabel(r'$s_y$')
         axs.set_zlabel(r'$s_z$')
@@ -1910,9 +1930,14 @@ class Beam():
         pxs_unscaled = particles['momentum']['x'].load_chunk()
         pys_unscaled = particles['momentum']['y'].load_chunk()
         pzs_unscaled = particles['momentum']['z'].load_chunk()
-        spxs = particles['spin']['x'].load_chunk()
-        spys = particles['spin']['y'].load_chunk()
-        spzs = particles['spin']['z'].load_chunk()
+        try:
+            spxs = particles['spin']['x'].load_chunk()
+            spys = particles['spin']['y'].load_chunk()
+            spzs = particles['spin']['z'].load_chunk()
+        except:
+            spxs = None
+            spys = None
+            spzs = None
         series.flush()
         
         # apply SI scaling
