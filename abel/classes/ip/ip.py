@@ -1,10 +1,16 @@
 from abc import abstractmethod
-from abel import Runnable, Event, Beam
+from abel.classes.runnable import Runnable
+from abel.classes.event import Event
+from abel.classes.beam import Beam
 from abel.classes.cost_modeled import CostModeled
-import os
+import os, shutil
 import numpy as np
 
 class InteractionPoint(Runnable, CostModeled):
+    
+    def __init__(self, num_ips=1):
+        self.num_ips = num_ips
+        super().__init__()
     
     # run simulation
     def run(self, runnable1, runnable2, run_name=None, all_by_all=False, verbose=True, overwrite=False, step_filter=None):
@@ -18,9 +24,6 @@ class InteractionPoint(Runnable, CostModeled):
         # make base folder and clear tracking directory
         if not os.path.exists(self.run_path()):
             os.mkdir(self.run_path())
-        else:
-            if overwrite:
-                self.clear_run_data()
 
         shots_to_perform = np.arange(runnable1.num_shots)
         if step_filter is not None:
@@ -48,6 +51,9 @@ class InteractionPoint(Runnable, CostModeled):
             for shot2 in shots2:
                 self.shot2 = int(shot2)
                 
+                if overwrite:
+                    self.clear_run_data(shot1, shot2)
+                
                 # load or run event
                 files = self.run_data()
                 if self.shot_path()+'event.h5' in files:
@@ -68,7 +74,7 @@ class InteractionPoint(Runnable, CostModeled):
                     
                     # get event
                     event = self.interact(beam1, beam2)
-                    event.save(self)
+                    event.save(self, shot1=shot1, shot2=shot2)
                     
                     if verbose:
                         print(f">> EVENT {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
@@ -76,7 +82,20 @@ class InteractionPoint(Runnable, CostModeled):
         # return event from last interaction
         return event
     
-    
+    # clear tracking data
+    def clear_run_data(self, shot1=None, shot2=None):
+        
+        # determine folder based on shot
+        if shot1 is not None and shot2 is not None:
+            clear_path = self.shot_path(shot1, shot2)
+        else:
+            clear_path = self.run_path()
+            
+        # delete and remake folder
+        if os.path.exists(clear_path):
+            shutil.rmtree(clear_path)
+        os.makedirs(clear_path)
+        
     # generate track path
     def shot_path(self, shot1=None, shot2=None):
         if shot1 is None:
@@ -93,10 +112,10 @@ class InteractionPoint(Runnable, CostModeled):
         if shot_name is not None:
             files = [f for f in files if shot_name in f]
         return files
-
+    
     
     def get_cost_breakdown(self):
-        return ('Interaction point', CostModeled.cost_per_ip)
+        return (f'Interaction point ({self.num_ips}x)', CostModeled.cost_per_ip * self.num_ips)
     
     # interact
     @abstractmethod

@@ -23,6 +23,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import os
 import pytest
+import scipy.constants as SI
+import numpy as np
 
 from abel import *
 from abel.classes.stage.stage import VariablesOverspecifiedError, VariablesOutOfRangeError, StageError

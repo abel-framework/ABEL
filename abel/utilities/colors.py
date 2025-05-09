@@ -1,8 +1,5 @@
-import matplotlib
+import matplotlib.colors as colors
 import numpy as np
-import pyqtgraph as pg
-import matplotlib.pylab as plt
-import matplotlib.cm as cmx
 
 def get_cmap_by_name(name):
     "Get the provided color maps by string, for specification by e.g. config files"
@@ -16,9 +13,13 @@ def get_cmap_by_name(name):
 ## Written by Pau Gonzalez & Carl A. Lindstrøm, 2020
 
 def discrete_colorMap(num_curves: int, base_color: str):
+
+    import matplotlib.cm as cmx
+    import matplotlib.pylab as plt
+    
     values = np.arange(num_curves)
     cms = plt.get_cmap(base_color)
-    cNorm = matplotlib.colors.Normalize(vmin=-1, vmax=values[-1])
+    cNorm = colors.Normalize(vmin=-1, vmax=values[-1])
     scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cms)
     cols = []
     for i in range(num_curves):
@@ -165,7 +166,7 @@ C = np.array([[1.        , 1.        , 1.        ],
               [0.625     , 0.        , 0.        ],
               [0.5625    , 0.        , 0.        ],
               [0.5       , 0.        , 0.        ]])
-zero = matplotlib.colors.ListedColormap(C)
+zero = colors.ListedColormap(C)
 
 C = np.array([[0.        , 0.        , 0.        ],
               [0.2       , 0.2       , 0.2       ],
@@ -231,7 +232,7 @@ C = np.array([[0.        , 0.        , 0.        ],
               [0.64285713, 0.        , 0.        ],
               [0.5714286 , 0.        , 0.        ],
               [0.5       , 0.        , 0.        ]])
-cmapMin = matplotlib.colors.ListedColormap(C)
+cmapMin = colors.ListedColormap(C)
 
 C = np.array([[1.        , 1.        , 1.        ],
               [0.97297794, 0.94769382, 0.98444986],
@@ -489,7 +490,7 @@ C = np.array([[1.        , 1.        , 1.        ],
               [0.97600728, 0.60990727, 0.35931239],
               [0.97637439, 0.59937632, 0.35813439],
               [0.97649997, 0.5887    , 0.35690001]])
-cubicZero = matplotlib.colors.ListedColormap(C)
+cubicZero = colors.ListedColormap(C)
 
 C = np.array([[4.70600009e-01, 0.00000000e+00, 5.21600008e-01],
               [4.74906594e-01, 2.54508544e-04, 5.33200324e-01],
@@ -747,7 +748,7 @@ C = np.array([[4.70600009e-01, 0.00000000e+00, 5.21600008e-01],
               [9.76007283e-01, 6.09907269e-01, 3.59312385e-01],
               [9.76374388e-01, 5.99376321e-01, 3.58134389e-01],
               [9.76499975e-01, 5.88699996e-01, 3.56900007e-01]])
-cubic = matplotlib.colors.ListedColormap(C)
+cubic = colors.ListedColormap(C)
 
 C = np.array([[0.        , 0.        , 0.        ],
               [0.        , 0.        , 0.03225806],
@@ -1005,7 +1006,7 @@ C = np.array([[0.        , 0.        , 0.        ],
               [1.        , 0.9375    , 0.9375    ],
               [1.        , 0.96875   , 0.96875   ],
               [1.        , 1.        , 1.        ]])
-zeroInv = matplotlib.colors.ListedColormap(C)
+zeroInv = colors.ListedColormap(C)
 
 
 D = np.array([[255, 255, 255],
@@ -1021,7 +1022,7 @@ D = np.array([[255, 255, 255],
               [255, 190, 120]])/255
 F = np.array([0, 0.08, 0.17, 0.25, 0.39, 0.48, 0.56, 0.68, 0.78, 0.86, 1])
 C = np.vstack([np.interp(np.linspace(0, 1, 1000), F, D[:, i]) for i in range(3)]).T
-FLASHForward = matplotlib.colors.ListedColormap(C)
+FLASHForward = colors.ListedColormap(C)
 
 
 D = np.array([[20, 40, 110],
@@ -1036,4 +1037,4 @@ D = np.array([[20, 40, 110],
               [255, 190, 120]])/255
 F = np.array([0.08, 0.17, 0.25, 0.39, 0.48, 0.56, 0.68, 0.78, 0.86, 1])
 C = np.vstack([np.interp(np.linspace(0, 1, 1000), F, D[:, i]) for i in range(3)]).T
-FLASHForward_nowhite = matplotlib.colors.ListedColormap(C)
+FLASHForward_nowhite = colors.ListedColormap(C)

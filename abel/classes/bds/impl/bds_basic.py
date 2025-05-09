@@ -1,6 +1,5 @@
-import copy
 import numpy as np
-from abel import BeamDeliverySystem
+from abel.classes.bds.bds import BeamDeliverySystem
 
 class BeamDeliverySystemBasic(BeamDeliverySystem):
     
@@ -22,6 +21,8 @@ class BeamDeliverySystemBasic(BeamDeliverySystem):
         return self.nom_energy
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+
+        import copy
         
         # transport phase spaces to waist (in each plane)
         ds_x = beam.alpha_x()/beam.gamma_x()

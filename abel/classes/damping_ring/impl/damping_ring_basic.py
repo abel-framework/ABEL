@@ -77,11 +77,11 @@ class DampingRingBasic(DampingRing):
     def wallplug_power(self):
         energy_per_train = self.get_emitted_power() * self.get_damping_time()
         wallplug_energy_per_train = energy_per_train / self.wallplug_to_rf_efficiency
-        return wallplug_energy_per_train * self.rep_rate_trains
+        return wallplug_energy_per_train * self.rep_rate_trains * self.num_rings
         
     def energy_usage(self):
         return self.wallplug_power() / (self.rep_rate_trains * self.num_bunches_in_train)
         
         
-    def get_length(self):
-        return 0.0 # does not add to the traversed distance
+    #def get_length(self):
+    #    return 0.0 # does not add to the traversed distance

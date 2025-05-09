@@ -1,5 +1,5 @@
 import numpy as np
-from abel import BeamDeliverySystem
+from abel.classes.bds.bds import BeamDeliverySystem
 
 class BeamDeliverySystemFlatBeamTransformer(BeamDeliverySystem):
     

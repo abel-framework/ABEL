@@ -3,9 +3,40 @@ import numpy as np
 
 class CostModeled(ABC):
 
+    # from CLIC-K 2018 
+    cost_factor_electrical_distribution = 0.03933
+    cost_factor_survey_alignment = 0.02379
+    cost_factor_cooling_ventilation = 0.06636
+    cost_factor_transport_installation = 0.00583
+    
+    cost_factor_infrastructure_and_services = cost_factor_electrical_distribution + cost_factor_survey_alignment + cost_factor_cooling_ventilation + cost_factor_transport_installation
+    
+    cost_factor_safety_systems = 0.01845
+    cost_factor_machine_control_infrastructure = 0.02120
+    cost_factor_machine_protection = 0.00129
+    cost_factor_access_safety_control_system = 0.00372
+    
+    cost_factor_controls_protection_and_safety = cost_factor_safety_systems + cost_factor_machine_protection + cost_factor_machine_protection + cost_factor_access_safety_control_system
+    
     # cost per length of tunnel
     # REF: ILC TDR 2013 (using 500 GeV example), same as for FCC
-    cost_per_length_tunnel = 0.06e6 # [ILCU/m]
+    #cost_per_length_tunnel = 0.06e6 # [ILCU/m]
+
+    cost_per_volume_tunnel = 714.75/(1.2*1.04) # [ILCU/m^3] CLIC cost, converted from 2018 EUR to USD
+    cost_per_volume_tunnel_widening = 561.65/(1.2*1.04) # [ILCU/m^3] FCC cost, converted from 2018 EUR to USD
+    
+    # 4.3 meter diameter tunnel (transport tunnels)
+    cost_per_length_tunnel_small = 14835.64/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012, inflated by 75% today [31% in 2012])
+    
+    # 5.6 meter diameter tunnel (damping ring tunnels etc.)
+    cost_per_length_tunnel_medium = 25199.694/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012, inflated by 75% today [31% in 2012])
+
+    # 8 meter diameter tunnel (widened tunnel)
+    cost_per_length_tunnel_large = 25199.694*2.0408/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012, inflated by 75% today [31% in 2012])
+
+    cost_per_length_surfacebuilding = 41506/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012)
+    #cost_per_length_cutandcover_small = 0.008768e6*1.1811*0.9139 # [ILCU/m] (CLIC cost, converted from 2018 EUR to USD, deflated from 2018 to 2012)
+    cost_per_length_cutandcover = 12308/(1.2*1.04) # [ILCU/m] (CLIC cost, converted from 2018 EUR to ILCU)
 
     # cost per length of RF structure, not including klystrons (ILC is 0.24e6 with power)
     # REF: CLIC CDR update 2018 (using 380 GeV klystron-based example)
@@ -16,11 +47,10 @@ class CostModeled(ABC):
     # REF: ILC TDR 2013 (using 500 GeV example)
     # 2.753 BILCU / (17804 structures * (1.038/0.711) m/structure)
     cost_per_length_rf_structure_superconducting = 0.106e6 # [ILCU/m]
-
-    # TODO: add cost of dumps
+    
     # TODO: add cost of RTML
     # TODO: add cost of power infrastructure
-    # TODO: add cost of cryo-plants
+    # TODO: add cost of He cryo-plants
 
     # cost of klystrons
     # REF: ILC TDR 2013 (using 500 GeV example)
@@ -36,41 +66,57 @@ class CostModeled(ABC):
     # cost of transport line
     # REF: ILC TDR 2013 (using 500 GeV example, based on RTML)
     # 477 MILCU for 30 km of RTML
-    cost_per_length_transport_line = 0.0159e6 # [ILCU/m]
+    #cost_per_length_transport_line = 0.0159e6 # [ILCU/m]
     
-    # cost of source
-    cost_per_source = 50e6 # [ILCU]
+    # cost of source (thermionic; guesstimate)
+    cost_per_source = 10e6 # [ILCU]
 
     # cost of polarized source
-    # REF: ILC TDR 2013 (using 500 GeV example)
-    cost_per_source_polarized_electrons = 96e6 # [ILCU]
-    cost_per_source_polarized_positrons = 192e6 # [ILCU]
+    # REF: ILC TDR 2013 (using 500 GeV example) same as ILC but subtracting 50 MILCU for the 5 GeV linac.
+    cost_per_source_polarized_electrons = 82e6 # [ILCU]
+    cost_per_source_polarized_positrons = 178e6 # [ILCU]
 
-    # cost of turnarounds
-    cost_per_length_turnaround = 0.025e6 # [ILCU/m]
+    # cost of turnarounds (as BDS)
+    #cost_per_length_turnaround = 0.025e6 # [ILCU/m]
+    cost_per_length_turnaround = 0.04044e6 # [ILCU/m]
+
+    # cost of combiner rings (scaled to fit CLIC cost)
+    cost_per_length_combiner_ring = 0.079e6 # [ILCU/m]
+    cost_per_rfkicker_combiner_ring = 1e6 # [ILCU/kicker]
 
     # cost of interstages
-    cost_per_length_interstage = 0.095e6#0.04044e6 # [ILCU/m] as BDS
+    cost_per_length_interstage = 0.04044e6 # [ILCU/m] as BDS
+
+    # cost of interstages
+    cost_per_length_driver_delay_chicane = 0.04044e6 # [ILCU/m] as BDS due to many dipoles
 
     # cost of plasma stages
-    cost_per_length_plasma_stage = 0.095e6 # [ILCU/m] vessel, HV source/laser
+    #cost_per_length_plasma_stage = 0.095e6 # [ILCU/m] vessel, HV source/laser
+    cost_per_length_plasma_stage = 3*0.0154e6 # [ILCU/m] 3 times instrumented beamline (diagnostics + cell material + guiding)
 
     # cost of interaction point (the halls etc.)
     # REF: ILC TDR 2013 (using 500 GeV example)
-    cost_per_ip = 184e6 # [ILCU]
+    cost_per_ip = (191.6e6/(1.2*1.04))/2 # [ILCU] Half of CLIC dual IP cost.
+
+    cost_per_experimental_area = 20e6 # [ILCU] (from CLIC; 22 MCHF in 2018 deflated to 2012, not converted to dollar)
 
     # cost of damping ring
     # REF: ILC TDR 2013 (two rings)
-    cost_per_length_damping_ring = 0.0517e6 # [ILCU/m]
+    #cost_per_length_damping_ring = 0.0517e6 # [ILCU/m]
+    cost_per_length_damping_ring = 0.260e6 # [ILCU/m] # REF: CLIC CDR 2018 (average of 3 rings)
+    
 
     # cost of BDS
     cost_per_length_bds = 0.04044e6 # [ILCU/m]
 
-    # cost per length of instrumented beamline (as BDS)
-    cost_per_length_instrumented_beamline = 0.04044e6 # [ILCU/m]
+    # cost of transfer lines
+    cost_per_length_transfer_line = 0.0154e6 # [ILCU/m] REF: ILC (477 MILCU for 31 km)
 
-    # cost of beam dumps (TODO: add more detail and per power costs)
-    cost_per_driver_dump = 1e6 # [ILCU]
+    # cost per length of instrumented beamline (as transfer line)
+    cost_per_length_instrumented_beamline = 0.0154e6 # [ILCU/m]
+
+    # cost of beam dumps (scaled from ILC 1 TeV)
+    cost_per_power_beam_dump = 67e6/(14e6*2) # [ILCU/W] based on cost for two 14 MW beams
 
     # cost of energy
     cost_per_energy = 0.05/(3600*1000)# ILCU/J (50 euros per MWh, based on CERN estimate)
@@ -84,7 +130,7 @@ class CostModeled(ABC):
     
     
     @classmethod
-    def cost_per_klystron(cls, num_klystrons, rf_frequency, avarage_power_klystron, peak_power_klystron):
+    def cost_per_klystron(cls, num_klystrons, rf_frequency, average_power_klystron, peak_power_klystron):
         "Cost per klystron, including modulator, LLRF and waveguides [ILC units]"
 
         if rf_frequency == 1e9: # L-band
@@ -103,24 +149,18 @@ class CostModeled(ABC):
             cost_klystron = (rel_cost_per_peak_power/rel_cost_per_peak_power_ref) * (peak_power_klystron/ref_peak_power) * 380e3 * 0.91 
     
             # cost of modulator (assumed to scale with average power)
-            cost_modulator = avarage_power_klystron * 370e3/112.5e3 * 0.91 # CLIC modulator cost in 2018 (average over 470 with 0.92 learning curve)
+            cost_modulator = average_power_klystron * 370e3/112.5e3 * 0.91 # CLIC modulator cost in 2018 (average over 470 with 0.92 learning curve)
 
-        elif rf_frequency == 3e9: # S-band
+        else: # rf_frequency == 3e9: # S-band
             
             # S-band C^3-like klystron
-            cost_klystron = (peak_power_klystron/50e6) * 500e3 * 0.75 # CLIC modulator cost in 2023, rough
+            cost_per_peak_power_klystron = 0.012 * 0.75 # [ILCU/peak W]
+            cost_klystron = peak_power_klystron * cost_per_peak_power_klystron # CLIC modulator cost in 2023, rough
     
             # cost of modulator (assumed to scale with average power)
-            cost_modulator = avarage_power_klystron * 500e3/16e3 * 0.75 # C^3 modulator cost in 2023, rough
+            cost_per_peak_power_modulator = 0.008 * 0.75 # [ILCU/peak W]
+            cost_modulator = peak_power_klystron * cost_per_peak_power_modulator
         
-        else:
-            
-            # S-band C^3-like klystron
-            cost_klystron = (peak_power_klystron/50e6) * 500e3 * 0.75 # CLIC modulator cost in 2023, rough
-    
-            # cost of modulator (assumed to scale with average power)
-            cost_modulator = avarage_power_klystron * 500e3/16e3 * 0.75 # C^3 modulator cost in 2023, rough
-            
         # cost of LLRF
         cost_llrf = 50e3 * 0.91
 
@@ -159,7 +199,6 @@ class CostModeled(ABC):
             cost = elements
                 
         return cost
-
     
     def print_cost(self):
         "Print the cost breakdown"
@@ -185,6 +224,29 @@ class CostModeled(ABC):
                     print(f"{'-- '.rjust(3*level+3)}{element[0]}: {round(element[1]/1e6)} MILCU")
         else:
             print(f"{'-- '.rjust(3*level+3)}{name}: {round(elements/1e6)} MILCU")
+
             
-            
-            
+    ignore_cost_civil_construction = False
+    
+    def get_cost_civil_construction(self, tunnel_diameter=None, cut_and_cover=False, surface_building=False, tunnel_widening_factor=None):    
+        "Get the civil engineering cost of the element [ILC units]"
+        if self.ignore_cost_civil_construction:
+            return 0
+        else:
+            total_cost = 0
+            if cut_and_cover:
+                total_cost = self.get_length() * self.cost_per_length_cutandcover
+                if surface_building:
+                    total_cost += self.get_length() * self.cost_per_length_surfacebuilding
+                return total_cost
+            else:
+                if tunnel_diameter is None:
+                    return self.get_length() * self.cost_per_length_tunnel_large
+                else:
+                    tunnel_area = np.pi*((tunnel_diameter+1.1)/2)**2
+                    tunnel_cost = self.get_length() * tunnel_area * self.cost_per_volume_tunnel
+                    if tunnel_widening_factor is not None:
+                        widening_area = tunnel_area * (tunnel_widening_factor-1)
+                        widening_cost = self.get_length() * widening_area * self.cost_per_volume_tunnel_widening
+                        tunnel_cost += widening_cost
+                    return tunnel_cost

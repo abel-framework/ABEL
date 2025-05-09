@@ -22,7 +22,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
+from abel.utilities.plasma_physics import beta_matched
 import os
+import scipy.constants as SI
+import numpy as np
 
 def check_beam_source_parameters(beam, source):
     assert np.allclose(beam.particle_mass, SI.m_e, rtol=1e-05, atol=1e-08)
@@ -62,7 +65,7 @@ def test_SourceBasic2Beam():
     source = SourceBasic()
     source.bunch_length = 40.0e-06                                                # [m], rms.
     source.num_particles = 10000                                               
-    source.charge = -e * 1.0e10                                                   # [C]
+    source.charge = -SI.e * 1.0e10                                                   # [C]
 
     # Energy parameters
     source.energy = 3e9                                                           # [eV]
@@ -100,7 +103,7 @@ def test_SourceTrapezoid2Beam():
     source = SourceTrapezoid()
     source.bunch_length = 1050e-6                                                 # [m], rms.
     source.num_particles = 30000                                               
-    source.charge = -e * 5.0e10                                                   # [C]
+    source.charge = -SI.e * 5.0e10                                                   # [C]
     source.current_head = 0.1e3                                                   # [A]
 
     # Energy parameters
@@ -139,7 +142,7 @@ def test_SourceFlatopBeam():
     source = SourceFlatTop()
     source.bunch_length = 1050e-6                                                 # [m], rms.
     source.num_particles = 30000                                               
-    source.charge = -e * 5.0e10                                                   # [C]
+    source.charge = -SI.e * 5.0e10                                                   # [C]
 
     # Energy parameters
     source.energy = 4.0e9                                                         # [eV]

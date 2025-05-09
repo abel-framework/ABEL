@@ -40,10 +40,8 @@ Ben Chen, 7 October 2023, University of Oslo
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.constants import c, e, m_e, epsilon_0 as eps0
-from abel.classes.beam import *
-#from abel.utilities.other import find_closest_value_in_arr
+from scipy.constants import c, e, m_e, epsilon_0 as eps0 # TODO: replace with "import scipy.constants as SI" for consistency
+from abel.classes.beam import Beam
 from abel.utilities.relativity import energy2gamma
 from abel.utilities.plasma_physics import k_p
 from tqdm import tqdm
@@ -192,6 +190,7 @@ def twoD_transverse_wake_instability_particles(beam, offsets, tr_momenta, plasma
 
         # Check whether beam comes into contact with plasma bubble boundary
         if np.any(np.abs(offsets) - bubble_radius >= 0):
+            import matplotlib.pyplot as plt
             print('$s=$' f'{format(prop_length, ".2f")}' ' m')
             plt.figure()
             plt.scatter(zs_sorted, offsets*1e6, 'r', label='Transverse offset') 

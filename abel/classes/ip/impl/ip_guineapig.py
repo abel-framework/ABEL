@@ -1,14 +1,8 @@
-import uuid, os
-import numpy as np
-import scipy.constants as SI
-from string import Template
-import abel
-from abel import InteractionPoint, CONFIG
-from abel.apis.guineapig.guineapig_api import guineapig_run
+from abel.classes.ip.ip import InteractionPoint
 
 class InteractionPointGuineaPig(InteractionPoint):
     
-    def __init__(self, enable_waist_shift = False):
+    def __init__(self, enable_waist_shift=False, do_pairs=True, do_coherent=True):
         super().__init__()
         self.enable_waist_shift = enable_waist_shift
         self.waist_shift_frac = 1 # fraction of bunch length
@@ -16,6 +10,14 @@ class InteractionPointGuineaPig(InteractionPoint):
     # perform GUINEA-PIG simulation
     def interact(self, beam1, beam2, load_beams=False):
 
+        import uuid, os
+        import numpy as np
+        import scipy.constants as SI
+        from abel.CONFIG import CONFIG
+        from abel.apis.guineapig.guineapig_api import guineapig_run
+        import abel
+        from string import Template
+        
         nsigma_cut = 5
         
         # make inputs
@@ -52,7 +54,7 @@ class InteractionPointGuineaPig(InteractionPoint):
                   'n_m2': len(beam2),
                   'cut_x': max(abs(beam1.x_offset())+nsigma_cut*beam1.beam_size_x(), abs(beam2.x_offset())+nsigma_cut*beam2.beam_size_x())*1e9,
                   'cut_y': max(abs(beam1.y_offset())+nsigma_cut*beam1.beam_size_y(), abs(beam2.y_offset())+nsigma_cut*beam2.beam_size_y())*1e9,
-                  'cut_z': nsigma_cut*max(beam1.bunch_length(), beam2.bunch_length())*1e6,
+                  'cut_z': 0.66*nsigma_cut*max(beam1.bunch_length(), beam2.bunch_length())*1e6,
                   'load_beam': 3*int(load_beams)}
 
         # create temporary folder

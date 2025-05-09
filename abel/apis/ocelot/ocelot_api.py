@@ -1,4 +1,4 @@
-from abel import Beam
+from abel.classes.beam import Beam
 import scipy.constants as SI
 import numpy as np
 
