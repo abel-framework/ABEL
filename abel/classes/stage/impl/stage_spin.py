@@ -45,9 +45,7 @@ class StageSpin(Stage):
 
         beam = copy.deepcopy(beam0)
         driver = copy.deepcopy(driver0)
-    
-        final_spins = [] 
-        all_spins = [] 
+ 
 
         sx = beam.spxs()
         sy = beam.spys()
@@ -61,6 +59,9 @@ class StageSpin(Stage):
         gamma0s = energy2gamma(E0)
         n_particles = len(beam)
 
+        final_spins = np.empty((n_particles, 3))
+        all_spins = []
+
         # Uniform energy gain for all particles
         deltaEs = np.full(len(E0), self.nom_energy_gain_flattop)
         Ef = E0 + deltaEs
@@ -73,24 +74,23 @@ class StageSpin(Stage):
             S0 = np.array([sx[i], sy[i], sz[i]]) #get the initial spin vector
 
             # Transverse motion evolution using Hill's equation
-            x, ux, gamma = evolve_hills_equation_analytic(x0[i], ux0[i], L, gamma0s[i], dgamma_ds[i], k_p(self.plasma_density))
+            x, ux, gamma = evolve_hills_equation_analytic_evolution(x0[i], ux0[i], L, gamma0s[i], dgamma_ds[i], k_p(self.plasma_density))
 
-            y, uy, _ = evolve_hills_equation_analytic(y0[i], uy0[i], L, gamma0s[i], dgamma_ds[i], k_p(self.plasma_density))
+            y, uy, _ = evolve_hills_equation_analytic_evolution(y0[i], uy0[i], L, gamma0s[i], dgamma_ds[i], k_p(self.plasma_density))
 
            
             
             N = len(x)
             ss = np.linspace(0, L, N)  # Different positions along the particle's path through the stage
-            gamma = gamma0s[i] + dgamma_ds[i] * ss / L
+            #gamma = gamma0s[i] + dgamma_ds[i] * ss / L
 
             #Transverse + longitudinal velocities
             ux = np.ravel(ux)
             uy = np.ravel(uy)
-            gamma_vals = gamma
-            beta_x = ux/SI.c
-            beta_y = uy/SI.c
-            total_beta2 = 1.0 - 1.0 / gamma_vals**2
-            beta_z = np.sqrt(np.clip(total_beta2 - beta_x**2 - beta_y**2, 1e-12, None))
+            beta_x = ux/(SI.c*gamma)
+            beta_y = uy/(SI.c*gamma)
+            beta_z = 1.0 - 1.0 / gamma**2
+        
 
             #Time steps 
             ds = np.diff(ss)
@@ -108,25 +108,28 @@ class StageSpin(Stage):
                 Bs.append(B)
             Es, Bs = np.array(Es), np.array(Bs)
             
-        #Track spin
-        S_hist = np.zeros((N, 3))
-        S_hist[0] = S0
-        for j in range(1, N):
-            S_prev = S_hist[j - 1]
-            print(S_prev)
-            beta_vec = np.array([beta_x[j - 1], beta_y[j - 1], beta_z[j - 1]])
-            dt = dt_arr[j - 1]
-            gamma_val = gamma_vals[j - 1]
-            E = Es[j - 1]
-            B = Bs[j - 1]
-            S_hist[j] = tbmt_boris_spin_update(S_prev, E, B, beta_vec, gamma_val, dt)
-            print(S_hist)
-            S_hist[j] /= np.linalg.norm(S_hist[j])  # Normalize spin
-
-        final_spins.append(S_hist[-1])
-        all_spins.append(S_hist)
-        
+            
+            #Track spin
+            S_hist = np.zeros((N, 3))
+            S_hist[0,:] = S0
+            for j in range(1, N):
+                S_prev = S_hist[j - 1]
+                beta_vec = np.array([beta_x[j - 1], beta_y[j - 1], beta_z[j - 1]])
+                dt = dt_arr[j - 1]
+                gamma_val = gamma[j - 1]
+                E = Es[j - 1]
+                B = Bs[j - 1]
+                S_hist[j,:] = tbmt_boris_spin_update(S_prev, E, B, beta_vec, gamma_val, dt)
+                S_hist[j,:] /= np.linalg.norm(S_hist[j,:])  # Normalize spin
+    
+            final_spins[i,:] = S_hist[-1,:]
+            all_spins.append(S_hist)
+            
         plot_spin_tracking(all_spins, ss)
+
+        beam.set_spxs(final_spins[:,0])
+        beam.set_spys(final_spins[:,1])
+        beam.set_spzs(final_spins[:,2])
 
         # ========== Betatron oscillations ==========
         deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)

@@ -13,7 +13,7 @@ SI.r_e = SI.physical_constants['classical electron radius'][0]
 Simulates particle motion and tracks spin motion using the T-BMT equation
 """
 
-def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp=None, g=None, N=500):
+def evolve_hills_equation_analytic_evolution(x0, ux0, L, gamma0, dgamma_ds, kp=None, g=None, N=500):
     s = np.linspace(0, L, N)
 
     xp0 = ux0 / gamma2proper_velocity(gamma0)
@@ -58,14 +58,14 @@ def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp=None, g=Non
 
 def plasma_E_field(r_vec, t, k_p): 
     x, y, _ = r_vec
-    Ex = SI.m_e * (k_p ** 2) * x / SI.e
-    Ey = SI.m_e * (k_p ** 2) * y / SI.e
+    Ex = SI.m_e * (k_p ** 2) * x * SI.c **2 / (2 *SI.e)
+    Ey = SI.m_e * (k_p ** 2) * y * SI.c **2 / (2 *SI.e)
     return np.array([Ex, Ey, 0.0])
 
 def plasma_B_field(r_vec, t, k_p):
-    Ex, Ey, _ = plasma_E_field(r_vec, t, k_p)
-    By = Ex / SI.c
-    Bx = -Ey / SI.c
+    #Ex, Ey, _ = plasma_E_field(r_vec, t, k_p)
+    By = 0.0
+    Bx = 0.0
     return np.array([Bx, By, 0.0])
 
     
@@ -82,25 +82,27 @@ def tbmt_boris_spin_update(S, E, B, beta_vec, gamma, dt):
     gamma = float(gamma)
 
     a = 0.00115965218128
-    term1 = B / gamma
-    term2 = -np.cross(beta_vec, E) / (SI.c ** 2)
-    term3 = (gamma / (gamma + 1.0)) * (np.dot(beta_vec, B) * beta_vec)
-    Omega = - (q / m) * (term1 + term2 + term3) * (1 + a)
+    term1 = (a + 1 / gamma)*SI.c * B
+    term2 = - (a + 1/(gamma+1)) * np.cross(beta_vec, E)
+    term3 = - a*(gamma / (gamma + 1)) * (np.dot(beta_vec*SI.c , B) * beta_vec)
+    Omega = - (q / m) * (term1 + term2 + term3)/SI.c
+
+    return S+np.cross(Omega, S)*dt
    
 
-    omega_mag = np.linalg.norm(Omega)
-    if np.isclose(omega_mag, 0):
-        return S.copy()
+    #omega_mag = np.linalg.norm(Omega)
+    #if np.isclose(omega_mag, 0):
+        #return S.copy()
 
-    theta = omega_mag * dt
-    u = Omega / omega_mag #unit vector in the direction of omega
+    #theta = omega_mag * dt
+    #u = Omega / omega_mag #unit vector in the direction of omega
 
-    S_par = np.dot(S, u) * u #component of s parallel to the rotation axis, projecting s onto u
-    S_perp = S - S_par #component of s perpendicular to the rotation axis
-    S_rot = S_perp * np.cos(theta) + np.cross(u, S) * np.sin(theta) + S_par
+    #S_par = np.dot(S, u) * u #component of s parallel to the rotation axis, projecting s onto u
+    #S_perp = S - S_par #component of s perpendicular to the rotation axis
+    #S_rot = S_perp * np.cos(theta) + np.cross(u, S) * np.sin(theta) + S_par
     #Rotating the perpendicular component by the angle theta, crossing to get the part of S that contributes to the rotation, parallel comp remains the same
     
-    return S_rot / np.linalg.norm(S_rot)
+    #return S_rot / np.linalg.norm(S_rot)
 
 
 def plot_spin_tracking(all_spins, ss):
@@ -109,6 +111,7 @@ def plot_spin_tracking(all_spins, ss):
         plt.plot(ss, spins[:, 0], label=f"Spin X (Particle {i+1})")
         plt.plot(ss, spins[:, 1], label=f"Spin Y (Particle {i+1})")
         plt.plot(ss, spins[:, 2], label=f"Spin Z (Particle {i+1})")
+        break
 
     plt.title("Spin Tracking of Particles")
     plt.xlabel("Stage Length (m)")
