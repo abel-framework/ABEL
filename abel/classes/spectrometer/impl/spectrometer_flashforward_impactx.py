@@ -1,5 +1,6 @@
 from abel.classes.spectrometer.spectrometer import Spectrometer
 from types import SimpleNamespace
+from abel.utilities.other import check_kwargs
 import scipy.constants as SI
 import numpy as np
 
@@ -41,13 +42,25 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
     def get_length(self):
         return self.s_LEMS - self.s_CELLCENTRE
 
-    def current2strength_quad(self, I, p0):
-        g = I * 0.9 # TODO: improve conversion
+    def current2strength_quad(self, I, p0, **kwargs):
+        # Check that we only get valid keyword_arguments
+        check_kwargs(valid_kwargs=["g"], kwargs=kwargs)
+        # Option for just entering the field-values
+        if kwargs:
+            g = kwargs["g"] #T/m
+        else:
+            g = I * 0.9 # TODO: improve conversion
+            
         k = g*SI.e/p0
         return k
 
-    def current2field_dipole(self, I):
-        return I * 0.0014 # TODO: improve conversion
+    def current2field_dipole(self, I, **kwargs):
+        # Check that we only get valid keyword_arguments
+        check_kwargs(valid_kwargs=["B"], kwargs=kwargs)
+        if kwargs:
+            return kwargs["B"] # T
+        else:
+            return I * 0.0014 # TODO: improve conversion
 
     def get_dispersion(self, energy=None):
         if energy is None:
