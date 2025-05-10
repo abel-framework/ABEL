@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
 from abc import abstractmethod
-from matplotlib import patches
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
-
 import numpy as np
-from matplotlib import pyplot as plt
 
 class RFAccelerator(Trackable, CostModeled):
     """
@@ -78,6 +75,11 @@ class RFAccelerator(Trackable, CostModeled):
         # is more fundamental for CLICopti modelling.
         self.bunch_charge           = None # [C]
 
+        # default civil construction settings
+        self.use_tunnel = True
+        self.use_cutandcover = False
+        self.use_surfacebuilding = False
+        
         self.name = 'RF accelerator'
 
     def __str__(self):
@@ -273,8 +275,6 @@ class RFAccelerator(Trackable, CostModeled):
         return self.length
 
     def survey_object(self):
-        #return patches.Rectangle((0, -1), self.get_length(), 2)
-
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
         y_points = np.linspace(0, 0, npoints)
@@ -353,6 +353,18 @@ class RFAccelerator(Trackable, CostModeled):
         if cooling_cost is not None:
             breakdown.append((f"Cryo plants ({self.heat_power_at_cryo_temperature()/1e6:.1f} MW at {self.operating_temperature:.0f} K)", cooling_cost))
         return (self.name, breakdown)
+    
+    #def get_cost_civil_construction(self):
+    #    cost_civil_construction = 0
+    #    if self.use_tunnel:
+    #        cost_civil_construction += self.get_length() * CostModeled.cost_per_length_tunnel
+    #    elif self.use_cutandcover:
+    #        cost_civil_construction += self.get_length() * CostModeled.cost_per_length_cutandcover_large
+    #    if self.use_surfacebuilding:
+    #        cost_civil_construction += self.get_length() * CostModeled.cost_per_length_surfacebuilding
+    #    return cost_civil_construction
+            
+        
 
 class RFAcceleratorInitializationException(Exception):
     "An Exception class that is raised when trying to access a uninitialized field"

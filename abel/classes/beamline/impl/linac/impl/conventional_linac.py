@@ -3,16 +3,19 @@ from abel.classes.source.source import Source
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.damping_ring.damping_ring import DampingRing
 from abel.classes.turnaround.turnaround import Turnaround
+from abel.classes.transfer_line.transfer_line import TransferLine
 from abel.classes.bds.bds import BeamDeliverySystem
+from abel.classes.cost_modeled import CostModeled
 
 class ConventionalLinac(Linac):
     
-    def __init__(self, source=None, rf_injector=None, damping_ring=None, rf_accelerator=None, turnaround=None, bds=None, nom_energy=None, num_bunches_in_train=None,  bunch_separation=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_injector=None, transfer_line=None, damping_ring=None, rf_accelerator=None, turnaround=None, bds=None, nom_energy=None, num_bunches_in_train=None, bunch_separation=None, rep_rate_trains=None):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
         #self.source = source
         self.rf_injector = rf_injector
+        self.transfer_line = transfer_line
         self.damping_ring = damping_ring
         self.rf_accelerator = rf_accelerator
         self.turnaround = turnaround
@@ -38,6 +41,11 @@ class ConventionalLinac(Linac):
             self.rf_injector.name = 'RF injector'
             self.trackables.append(self.rf_injector)
 
+        # add transfer line (optional)
+        if self.transfer_line is not None:
+            assert(isinstance(self.transfer_line, TransferLine))
+            self.trackables.append(self.transfer_line)
+            
         # add damping ring (optional)
         if self.damping_ring is not None:
             assert(isinstance(self.damping_ring, DampingRing))
@@ -109,14 +117,28 @@ class ConventionalLinac(Linac):
              nom_energy_gain += self.rf_accelerator.get_nom_energy_gain()
 
         return nom_energy_gain
-    
 
-    def get_cost_breakdown(self):
+    def get_cost_breakdown_civil_construction(self):
+        breakdown = []
+        for trackable in self.trackables:
+            if isinstance(trackable, RFAccelerator):
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+            elif isinstance(trackable, BeamDeliverySystem):
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=8.0)))
+            else:
+                breakdown.append((trackable.name, trackable.get_cost_civil_construction(tunnel_diameter=5.6)))
+        return ('Civil construction', breakdown)
+
+    def get_cost_breakdown(self, include_civil_construction=True):
 
         breakdown = []
         breakdown.append(self.source.get_cost_breakdown())
         if self.rf_injector is not None:
             breakdown.append((self.rf_injector.get_cost_breakdown()))
+        transferline_length = 0.0
+        if self.transfer_line is not None:
+            breakdown.append((self.transfer_line.get_cost_breakdown()))
+            transferline_length = self.transfer_line.get_length()
         if self.damping_ring is not None:
             breakdown.append(self.damping_ring.get_cost_breakdown())
         breakdown.append(self.rf_accelerator.get_cost_breakdown())
@@ -124,7 +146,9 @@ class ConventionalLinac(Linac):
             breakdown.append((self.turnaround.get_cost_breakdown()))
         if self.bds is not None:
             breakdown.append(self.bds.get_cost_breakdown())
-        breakdown.append(self.get_cost_breakdown_civil_construction())
+        
+        if include_civil_construction:
+            breakdown.append(self.get_cost_breakdown_civil_construction())
         
         return (self.name, breakdown)
     

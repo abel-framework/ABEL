@@ -133,6 +133,7 @@ dmypy.json
 
 # Jupyter files
 *.jupyter/
+*/core
 
 # ABEL specific
 *run_data/

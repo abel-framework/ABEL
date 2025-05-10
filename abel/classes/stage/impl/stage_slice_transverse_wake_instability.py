@@ -31,31 +31,20 @@ import numpy as np
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
 from tqdm import tqdm
 import time
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors  # For logarithmic colour scales
-from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
-from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+from matplotlib import pyplot as plt
 
 from abel.physics_models.slices_transverse_wake_instability import *
 from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field
 from abel.utilities.relativity import energy2gamma
 from abel.utilities.statistics import prct_clean, prct_clean2d
 from abel.utilities.other import find_closest_value_in_arr
-import abel.utilities.colors as cmaps
-from abel.classes.stage.impl.stage_wake_t import StageWakeT
-from openpmd_viewer import OpenPMDTimeSeries
-from scipy.interpolate import UnivariateSpline
-from scipy.interpolate import interp1d
-#from scipy.stats import linregress
-import scipy.signal as signal
-import concurrent.futures  # Parallel execution
 
 from types import SimpleNamespace
-from abel import Stage, CONFIG
-from abel import Beam
-import warnings, copy
-import os
-import pickle
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
+from abel.classes.stage.stage import Stage
+from abel.classes.stage.impl.stage_wake_t import StageWakeT
+import warnings, copy, os
 
 
 class StageSlicesTransWakeInstability(Stage):
@@ -143,7 +132,7 @@ class StageSlicesTransWakeInstability(Stage):
         yp_slices_start = self.particles2slices(beam=beam0, beam_quant=beam0.yps(), z_slices=xi_slices)
         energy_slices_start = self.particles2slices(beam=beam0, beam_quant=beam0.Es(), z_slices=xi_slices)
                 
-
+        #import matplotlib.pyplot as plt
         #plt.figure()
         #plt.scatter(beam0.zs()*1e6, beam0.xs()*1e6)
         #plt.plot(xi_slices*1e6, x_slices_start*1e6, 'r')
@@ -236,6 +225,7 @@ class StageSlicesTransWakeInstability(Stage):
         #_, y_slices_table, yp_slices_table, _ = transverse_wake_instability(plasma_density, Ez, bubble_radius, main_num_profile, y_slices_start, yp_slices_start, energy_slices_start, stage_length, s_slices_start, xi_slices)
 
         # Parallel execution
+        import concurrent.futures  # Parallel execution
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future1 = executor.submit(transverse_wake_instability_slices, plasma_density, Ez, bubble_radius, main_num_profile, x_slices_start, xp_slices_start, energy_slices_start, stage_length, s_slices_start, xi_slices)
             future2 = executor.submit(transverse_wake_instability_slices, plasma_density, Ez, bubble_radius, main_num_profile, y_slices_start, yp_slices_start, energy_slices_start, stage_length, s_slices_start, xi_slices)
@@ -538,6 +528,8 @@ class StageSlicesTransWakeInstability(Stage):
     
     # ==================================================
     def beam_energy_gains_interpolate(self, s_slices, energy_slices_start, energy_slices, beam0):
+
+        from scipy.interpolate import interp1d
         
         #energy_slices_start = self.energy_slices_main  # The current energies of the beam slices.
         zs = beam0.zs()
@@ -583,6 +575,8 @@ class StageSlicesTransWakeInstability(Stage):
         sse_Ez: [V^2/m^2] float 
             Sum of squared errors (sse) of Ez_fit vs. the corresponding part of Ez.
         """
+
+        from scipy.interpolate import interp1d
         
         sigma_z = self.main_source.bunch_length  # [m]
         z_offset_main = np.mean(beam.zs())
@@ -633,6 +627,8 @@ class StageSlicesTransWakeInstability(Stage):
             Plasma bubble radius over the simulation box.
         """
 
+        import scipy.signal as signal
+        
         # Find the offsets of the beams
         drive_beam = self.drive_beam
         x_offset_driver = np.mean(drive_beam.xs())
@@ -700,6 +696,8 @@ class StageSlicesTransWakeInstability(Stage):
         sse_rb: [m^2] float 
             Sum of squared errors (sse) of rb_fit vs. the corresponding part of rb.
         """
+
+        from scipy.interpolate import interp1d
         
         sigma_z = self.main_source.bunch_length  # [m]
         z_offset_main = np.mean(beam.zs())
@@ -877,6 +875,7 @@ class StageSlicesTransWakeInstability(Stage):
     # ==================================================
     # Save the object to a file, obsolete
     def save(self, save_dir, filename='stage.pkl'):
+        import pickle
         path = save_dir + filename
         with open(path, 'wb') as f:
             pickle.dump(self, f)
@@ -885,6 +884,7 @@ class StageSlicesTransWakeInstability(Stage):
     # ==================================================
     # Load an object from a file, obsolete
     def load(self, diag_dir, filename='stage.pkl'):
+        import pickle
         path = diag_dir + filename
         with open(path, 'rb') as f:
             object = pickle.load(f)
@@ -973,6 +973,8 @@ class StageSlicesTransWakeInstability(Stage):
     # ==================================================
     def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=r'$\xi$ [$\mathrm{\mu}$m]', ylab=r'$x$ [$\mathrm{\mu}$m]', clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
         
+        from matplotlib.colors import LogNorm  # For logarithmic colour scales
+        
         if axes is None:
             fig = plt.figure()  # an empty figure with an axes
             ax = fig.add_axes([.15, .15, .75, .75])
@@ -985,6 +987,7 @@ class StageSlicesTransWakeInstability(Stage):
             cbar_ax = None
 
         if reduce_cax_pad is True:
+            from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
             # Create an axis on the right side of ax. The width of cax will be 5%
             # of ax and the padding between cax and ax will be fixed at 0.05 inch.
             divider = make_axes_locatable(ax)
@@ -997,7 +1000,7 @@ class StageSlicesTransWakeInstability(Stage):
 
         # Make a 2D plot
         if log_cax is True:
-            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=colors.LogNorm(vmin+1, vmax))
+            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=LogNorm(vmin+1, vmax))
         else:
             p = ax.imshow(data, extent=extent, vmin=vmin, vmax=vmax, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation)
 
@@ -1043,7 +1046,9 @@ class StageSlicesTransWakeInstability(Stage):
     
     # ==================================================
     def density_map_diags(self, beam=None, plot_centroids=False):
-
+        
+        import abel.utilities.colors as cmaps
+        
         if beam is None:
             beam = self.main_beam
 
@@ -1205,7 +1210,9 @@ class StageSlicesTransWakeInstability(Stage):
 
         plot_k_beta: Plot the betatron wavenumber along the beam.
         '''
-
+        
+        from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+        
         # Define the color map and boundaries
         colors = ['black', 'red', 'orange', 'yellow']
         bounds = [0, 0.2, 0.4, 0.8, 1]
@@ -1350,7 +1357,7 @@ class StageSlicesTransWakeInstability(Stage):
     
     # ==================================================
     def plot_Ez_rb_cut(self, z_slices=None, main_num_profile=None, zs_Ez=None, Ez=None, Ez_cut=None, zs_rho=None, bubble_radius=None, bubble_radius_cut=None, zlab='$z$ [$\mathrm{\mu}$m]'):
-
+        
         if z_slices is None:
             z_slices = self.zs_main_cut
         if main_num_profile is None:
@@ -1398,6 +1405,7 @@ class StageSlicesTransWakeInstability(Stage):
     # ==================================================
     # Plots the transverse oscillation vs propagation coordinate s for selected beam slices.
     def slice_offset_s_diag(self, beam):
+        
         z_slices = self.zs_main_cut
         
         # Beam slices data
@@ -1486,7 +1494,7 @@ class StageSlicesTransWakeInstability(Stage):
     # ==================================================
     # Plots snapshots of the beam slices vs xi at various propagation distances s.
     def centroid_snapshot_plots(self, beam):
-
+        
         x_slices_table = self.x_slices_table_main
         y_slices_table = self.y_slices_table_main
         s_slices_table = self.s_slices_table_main
@@ -1614,7 +1622,7 @@ class StageSlicesTransWakeInstability(Stage):
     
     # ==================================================
     def instability_plots(self, s_ref_slice, x_ref_slice, xp_ref_slice, s_slices=None, x_slices=None, norm_amp_fac_s=None, mean_energy_s=None, energy_spread_s=None):
-
+        
         #TODO: change out norm_amp_fac_s
         
         num_beam_slice = self.num_beam_slice
