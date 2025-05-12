@@ -131,7 +131,6 @@ class StageHipace(Stage):
             Rb = blowout_radius(self.plasma_density, driver0.peak_current())
         else:
             Rb = blowout_radius(self.plasma_density, beam0.peak_current())
-        box_size_r = 2*np.max([4/k_p(self.plasma_density), 2*Rb])
 
         if driver0 is not None:
             box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
