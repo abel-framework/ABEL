@@ -114,9 +114,9 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
         dipole = impactx.elements.ExactSbend(name="dipole", ds=self.length_dipole, phi=np.rad2deg(phi), B=Bdip, nslice=ns, rotation=90)
         
         # define quads
-        quad1 = impactx.elements.ExactQuad(name='quad1', ds=self.length_quad, k=self.field2strength_quad(self.g1, p0x))
-        quad2 = impactx.elements.ExactQuad(name="quad2", ds=self.length_quad, k=self.field2strength_quad(self.g2, p0x))
-        quad3 = impactx.elements.ExactQuad(name="quad3", ds=self.length_quad, k=self.field2strength_quad(self.g3, p0x))
+        quad1 = impactx.elements.ExactQuad(name='quad1', ds=self.length_quad, k=self.field2strength_quad(self.g1, p0x), nslice=ns)
+        quad2 = impactx.elements.ExactQuad(name="quad2", ds=self.length_quad, k=self.field2strength_quad(self.g2, p0x), nslice=ns)
+        quad3 = impactx.elements.ExactQuad(name="quad3", ds=self.length_quad, k=self.field2strength_quad(self.g3, p0x), nslice=ns)
         
         # derived separations
         d1 = self.s_Q11FLFDIAG - self.s_CELLCENTRE - self.length_quad/2 - object_plane_x;
