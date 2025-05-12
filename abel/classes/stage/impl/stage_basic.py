@@ -144,7 +144,8 @@ class StageBasic(Stage):
                     driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
         # ========== Decelerate the driver with homogeneous energy loss ==========
-        driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
+        if driver_outgoing is not None:
+            driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
 
         # calculate efficiency
         self.calculate_efficiency(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)

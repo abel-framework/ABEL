@@ -1581,6 +1581,33 @@ class Beam():
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um^2)')
 
+
+    def plot_spectrometer_x(self):
+        dQdxde, xs, Es = self.phase_space_density(self.xs, self.Es)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        p = ax.pcolor(xs*1e6, Es/1e9, -dQdxde*1e9, cmap=CONFIG.default_cmap, shading='auto')
+        ax.set_xlabel('x (um)')
+        ax.set_ylabel('E (GeV)')
+        ax.set_title('Spectrometer image (energy vs. horizontal)')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
+
+    def plot_spectrometer_y(self):
+        dQdyde, ys, Es = self.phase_space_density(self.ys, self.Es)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        p = ax.pcolor(ys*1e6, Es/1e9, -dQdyde*1e9, cmap=CONFIG.default_cmap, shading='auto')
+        ax.set_xlabel('y (um)')
+        ax.set_ylabel('E (GeV)')
+        ax.set_title('Spectrometer image (energy vs. vertical)')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
+        
     
     # TODO: unfinished!
     # def plot_bunch_pattern(self):

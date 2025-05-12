@@ -21,9 +21,9 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
         self.current_quad2 = -60 # [A]
         self.current_quad3 = 50 # [A]
 
-        self.g1 = None
-        self.g2 = None
-        self.g3 = None
+        self.g1 = 27.11 # [T/m]
+        self.g2 = -37.27 # [T/m]
+        self.g3 = 40.29 # [T/m]
 
         self.B_dipole = None
         # TODO: implement imaging (using regular matrix tracking, to be added as a utility)
@@ -48,13 +48,12 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
     def get_length(self):
         return self.s_LEMS - self.s_CELLCENTRE
 
-    def current2strength_quad(self, I, p0, g):
-        # Option for just entering the field-values
-        if g:
-            g = g #T/m
-        else:
-            g = I * 0.9 # TODO: improve conversion
-            
+    def current2strength_quad(self, I, p0):
+        g = I * 0.9 # TODO: improve conversion
+        k = g*SI.e/p0
+        return k
+
+    def field2strength_quad(self, g, p0):
         k = g*SI.e/p0
         return k
 
@@ -115,9 +114,9 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
         dipole = impactx.elements.ExactSbend(name="dipole", ds=self.length_dipole, phi=np.rad2deg(phi), B=Bdip, nslice=ns, rotation=90)
         
         # define quads
-        quad1 = impactx.elements.ExactQuad(name='quad1', ds=self.length_quad, k=self.current2strength_quad(self.current_quad1, p0x, self.g1))
-        quad2 = impactx.elements.ExactQuad(name="quad2", ds=self.length_quad, k=self.current2strength_quad(self.current_quad2, p0x, self.g2))
-        quad3 = impactx.elements.ExactQuad(name="quad3", ds=self.length_quad, k=self.current2strength_quad(self.current_quad3, p0x, self.g3))
+        quad1 = impactx.elements.ExactQuad(name='quad1', ds=self.length_quad, k=self.field2strength_quad(self.g1, p0x))
+        quad2 = impactx.elements.ExactQuad(name="quad2", ds=self.length_quad, k=self.field2strength_quad(self.g2, p0x))
+        quad3 = impactx.elements.ExactQuad(name="quad3", ds=self.length_quad, k=self.field2strength_quad(self.g3, p0x))
         
         # derived separations
         d1 = self.s_Q11FLFDIAG - self.s_CELLCENTRE - self.length_quad/2 - object_plane_x;
