@@ -8,7 +8,7 @@ from abel.classes.beamline.impl.linac.linac import Linac
 
 class ExperimentFLASHForward(Experiment):
     
-    def __init__(self, energy=1.05e9, plasma_length=0.033, plasma_density=7e21, rel_energy_spread=0.01, ion_species='H'):
+    def __init__(self, energy=1.05e9, plasma_length=0.033, plasma_density=7e21, rel_energy_spread=0.001, ion_species='H'):
 
         self.energy = energy
         self.rel_energy_spread = rel_energy_spread
