@@ -1781,33 +1781,38 @@ class Beam():
 
 
     # ==================================================
-    def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=None, ylab=None, clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
-        
-        if axes is None:
-            fig = plt.figure()  # an empty figure with an axes
-            ax = fig.add_axes([.15, .15, .75, .75])
-            cbar_ax = fig.add_axes([.85, .15, .03, .75])
-        else:
-            #ax = axes[0]  # TODO: adjust colourbar axes
-            #cbar_ax = axes[1]
-            
-            ax = axes
-            cbar_ax = None
+    def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab=None, ylab=None, clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, cax_pad=0.03):
 
-        if reduce_cax_pad is True:
-            # Create an axis on the right side of ax. The width of cax will be 5%
-            # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+        if axes is None:
+            from matplotlib.gridspec import GridSpec
+
+            # Create a figure with GridSpec
+            fig = plt.figure(figsize=(5, 4))
+            gs = GridSpec(1, 2, width_ratios=[1, 0.03], wspace=cax_pad)  # Adjust cax_pad for padding
+            
+            ax = fig.add_subplot(gs[0, 0])  # Main plot axes
+            cbar_ax = fig.add_subplot(gs[0, 1])  # Colour bar axes
+        else:
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+            ax = axes
             divider = make_axes_locatable(ax)
-            cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
+            cbar_ax = divider.append_axes("right", size="3%", pad=cax_pad)
 
         if vmin is None:
             vmin = data.min()
         if vmax is None:
             vmax = data.max()
 
+        # Modify tick parameters
+        ax.tick_params(axis='both', direction='out', length=4)
+        #ax.xaxis.set_ticks_position('both')  # Ticks on both top and bottom
+        ax.minorticks_on()  # Enable minor ticks
+        ax.tick_params(axis='both', which='minor', direction='out', length=2.5)  # Configure minor ticks
+
         # Make a 2D plot
         if log_cax is True:
-            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=colors.LogNorm(vmin+1, vmax))
+            from matplotlib.colors import LogNorm
+            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=LogNorm(vmin+1, vmax))
         else:
             p = ax.imshow(data, extent=extent, vmin=vmin, vmax=vmax, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation)
 
@@ -1816,30 +1821,15 @@ class Beam():
             ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
 
         # Add a colourbar
-        cbar = plt.colorbar(p, ax=ax, cax=cbar_ax)
+        cbar = plt.colorbar(p, ax=ax, cax=cbar_ax, pad=cax_pad)
         cbar.set_label(clab)
-
-        # Set the tick formatter to use power notation
-        #import matplotlib.ticker as ticker
-        #cbar.ax.yaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
-        #cbar.ax.tick_params(axis='y', which='major', pad=10)
-
-        #import matplotlib.ticker as ticker
-        #fmt = ticker.ScalarFormatter(useMathText=True)
-        #fmt.set_powerlimits((-3, 19))
-        #cbar.ax.yaxis.set_major_formatter(fmt)
-
-        # Customize the colorbar tick locator and formatter
-        #from matplotlib.ticker import ScalarFormatter
-        #cbar.ax.yaxis.set_major_locator(plt.MaxNLocator(nbins=6))  # Set the number of tick intervals
-        #cbar.ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))  # Use scientific notation
 
         ax.set_ylabel(ylab)
         ax.set_xlabel(xlab)
 
     
     # ==================================================
-    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', reduce_cax_pad=False):
+    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, scale=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', log_cax=False, cax_pad=0.03):
 
         if weights is None:
             weights = self.weightings()
@@ -1854,17 +1844,17 @@ class Beam():
             extent = hist_range[0] + hist_range[1]
         
         binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
-        beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
-        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
+        
+        if scale is None:
+            beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
+        else:
+            beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)/scale
+        
+        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, log_cax=log_cax, cax_pad=cax_pad)
 
     
     # ==================================================
     def density_map_diags(self):
-        
-        #colors = ['white', 'aquamarine', 'lightgreen', 'green']
-        #colors = ['white', 'forestgreen', 'limegreen', 'lawngreen', 'aquamarine', 'deepskyblue']
-        #bounds = [0, 0.2, 0.4, 0.8, 1]
-        #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
         
         cmap = CONFIG.default_cmap
 
@@ -1887,7 +1877,7 @@ class Beam():
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
-        fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
+        fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(5*3, 4*3))
         fig.suptitle(r'$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
 
         nbins = int(np.sqrt(len(weights)/2))
@@ -1997,6 +1987,9 @@ class Beam():
         extent_energ[2] = extent_energ[2]/1e9  # [GeV]
         extent_energ[3] = extent_energ[3]/1e9  # [GeV]
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
+
+        # Adjust layout to prevent overlaps
+        plt.tight_layout()  # Avoid overlap globally
 
         
     # ==================================================
