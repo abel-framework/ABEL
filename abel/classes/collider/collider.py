@@ -457,12 +457,12 @@ class Collider(Runnable, CostModeled):
             # run first linac arm
             if self.verbose:
                 print(">> LINAC #1")
-            self.linac1.scan(self.run_name + "/linac1", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            self.linac1.scan(self.run_name + "/linac1", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=self.overwrite)
             
             # run second linac arm
             if self.verbose:
                 print(">> LINAC #2")
-            self.linac2.scan(self.run_name + "/linac2", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            self.linac2.scan(self.run_name + "/linac2", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=self.overwrite)
             
             # simulate collisions
             if self.verbose:
