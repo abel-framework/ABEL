@@ -30,6 +30,7 @@ class StageHipace(Stage):
         self.plasma_density_from_file = plasma_density_from_file
         self.save_drivers = save_drivers
         self.no_plasma = no_plasma
+        self.scale_density = 1
 
         # external focusing (APL-like) [T/m]
         self.external_focusing_radial = external_focusing_radial
@@ -406,6 +407,7 @@ class StageHipace(Stage):
         if self.plasma_density_from_file is not None:
             density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
             ns = density_table[:,1]
+            ns *= self.scale_density
             self.plasma_density = ns.max()
             if locations is not None:
                 ss = density_table[:,0]
