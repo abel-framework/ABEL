@@ -29,7 +29,7 @@ class ExperimentFLASHForward(Experiment):
         
         stage = StageHipace()
         stage.num_nodes = 16
-        stage.num_cell_xy = 511
+        stage.num_cell_xy = 1023
         stage.ion_motion = True
         stage.beam_ionization = True
         stage.ion_species = self.ion_species
@@ -41,7 +41,7 @@ class ExperimentFLASHForward(Experiment):
         stage.mesh_refinement = True
         
         stage.upramp = stage.__class__()
-        stage.upramp.num_nodes = 4
+        stage.upramp.num_nodes = 5
         stage.upramp.nom_energy = source.energy
         stage.upramp.ion_motion = stage.ion_motion
         stage.upramp.ion_species = stage.ion_species
