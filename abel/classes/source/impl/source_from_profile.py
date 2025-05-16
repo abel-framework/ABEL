@@ -79,7 +79,7 @@ class SourceFromProfile(Source):
         Is0 = sig.medfilt(Is0, kernel_size=5)
         # Get particle distribution in Zs
 
-        z_interp = np.linspace(zs0[0], zs0[-1], int(1e4))
+        z_interp = np.linspace(zs0[0], zs0[-1], int(1e5))
         I_interp = np.interp(z_interp, zs0, Is0)
         
         zs = np.random.choice(z_interp, size=num_particles_actual, p=I_interp/np.sum(I_interp))
