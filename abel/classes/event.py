@@ -5,11 +5,13 @@ from abel.classes.beam import Beam
 class Event():
     
     # empty beam
-    def __init__(self, input_beam1=None, input_beam2=None, shot=0):
+    def __init__(self, input_beam1=None, input_beam2=None, output_beam1=None, output_beam2=None, shot=0):
         
         # save beams
         self.input_beam1 = input_beam1
         self.input_beam2 = input_beam2
+        self.output_beam1 = output_beam1
+        self.output_beam2 = output_beam2
         
         # luminosity spectrum
         self.luminosity_full = None
@@ -80,12 +82,14 @@ class Event():
             if not "_beam" in key:
                 series.iterations[0].set_attribute(key, value)
         
-        # flush
-        series.flush()
-        
         # save beams
         self.input_beam1.save(beam_name="input_beam1", series=series)
         self.input_beam2.save(beam_name="input_beam2", series=series)
+        self.output_beam1.save(beam_name="output_beam1", series=series)
+        self.output_beam2.save(beam_name="output_beam2", series=series)
+        
+        # flush
+        series.flush()
         
         # now the file is closed
         del series
@@ -104,6 +108,8 @@ class Event():
         if load_beams:
             event.input_beam1 = Beam.load(filename, "input_beam1")
             event.input_beam2 = Beam.load(filename, "input_beam2")
+            event.output_beam1 = Beam.load(filename, "output_beam1")
+            event.output_beam2 = Beam.load(filename, "output_beam2")
         
         # load file and add metadata
         series = io.Series(filename, io.Access.read_only)
