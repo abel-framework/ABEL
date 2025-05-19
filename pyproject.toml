@@ -23,10 +23,11 @@ dependencies = [
    "Wake-T",
    "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
    "ax-platform",
-   "CLICopti",
-   "RF-Track"
+   "CLICopti >= 2.2",
+   "RF-Track",
+   "impactx-noacc"
 ]
-requires-python = ">= 3"
+requires-python = ">=3,<3.13"
 
 authors = [
   {name = "Carl Andreas Lindstrøm", email = "c.a.lindstrom@fys.uio.no"},
@@ -55,6 +56,7 @@ markers = [
   "stageGeometry: Test stage geometry calculation functionality",
   "transverse_wake_instability_linac: Test linacs based on StagePrtclTransWakeInstability",
   "StagePrtclTransWakeInstability: Tests on StagePrtclTransWakeInstability",
+  "spin: test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
   "beam: Tests for the Beam class",
 ]

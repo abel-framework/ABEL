@@ -8,20 +8,9 @@ Ben Chen, 6 October 2023, University of Oslo
 
 import numpy as np
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
-from scipy.interpolate import interp1d
-import scipy.signal as signal
-
+from matplotlib import pyplot as plt
 import time
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors  # For logarithmic colour scales
-from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
-from matplotlib.colors import LogNorm
-from matplotlib.animation import FuncAnimation
-from matplotlib import ticker as mticker
-from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
 
-from joblib import Parallel, delayed  # Parallel tracking
-from joblib_progress import joblib_progress  # TODO: remove
 from types import SimpleNamespace
 import os, copy, warnings, uuid, shutil
 
@@ -29,10 +18,10 @@ from abel.physics_models.particles_transverse_wake_instability import *
 from abel.physics_models.twoD_particles_transverse_wake_instability import *  # TODO: remove
 from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field, blowout_radius
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
-from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam, plasma_stage_setup, extract_initial_and_final_Ez_rho
-from abel import Stage, CONFIG
-from abel import Beam
-
+from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, plasma_stage_setup, extract_initial_and_final_Ez_rho
+from abel.classes.stage.stage import Stage
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
 
 
 
@@ -240,6 +229,9 @@ class StagePrtclTransWakeInstability(Stage):
         #if self.parent is not None and self.upramp is not None and self.downramp is not None:
         #    raise ValueError('Currently does not support ramps with both upramp and downramp.')
 
+        from joblib import Parallel, delayed  # Parallel tracking
+        from joblib_progress import joblib_progress  # TODO: remove
+
         # Set the diagnostics directory
         if runnable is not None:
             self.run_path = runnable.run_path()
@@ -414,6 +406,7 @@ class StagePrtclTransWakeInstability(Stage):
         if bubble_radius_wakeT.max() < 0.5 * R_blowout or bubble_radius_roi.any()==0:
             warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
 
+        import scipy.signal as signal
         idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
         if idxs_bubble_peaks.size > 0:
             warnings.warn("The bubble radius may not be smooth.", UserWarning)
@@ -908,6 +901,8 @@ class StagePrtclTransWakeInstability(Stage):
         Ez_fit : [V/m] 1D interpolation object 
             Interpolated axial longitudinal Ez from beam head to tail.
         """
+
+        from scipy.interpolate import interp1d
         
         zs = beam.zs()
 
@@ -974,6 +969,9 @@ class StagePrtclTransWakeInstability(Stage):
             drive beam axis.
         """
 
+        import scipy.signal as signal
+        from scipy.interpolate import interp1d
+        
         # Check if plasma_tr_coord is strictly growing from start to end
         if not np.all(np.diff(plasma_tr_coord) > 0):
             raise ValueError('plasma_tr_coord needs to be strictly increasing from start to end.')
@@ -1079,6 +1077,8 @@ class StagePrtclTransWakeInstability(Stage):
             corresponding to abnormal spikes are ``False``.
         """
 
+        import scipy.signal as signal
+
         # Mask based on the first derivative of bubble_radius
         drb_dz = np.gradient(bubble_radius, zs_bubble_radius)  # First derivative
 
@@ -1174,6 +1174,8 @@ class StagePrtclTransWakeInstability(Stage):
         rb_fit : [m] 1D interpolation object 
             Interpolated plasma ion bubble radius from beam head to tail.
         """
+
+        from scipy.interpolate import interp1d
         
         zs = beam.zs()
 
@@ -1387,6 +1389,8 @@ class StagePrtclTransWakeInstability(Stage):
     # Overloads the plot_wake method in the Stage class.
     def plot_wake(self, show_Ez=True, trace_rb=False, savefig=None, aspect='auto'):
         
+        from matplotlib.colors import LogNorm
+        
         # Extract density if not already existing
         assert hasattr(self.initial.plasma.density, 'rho'), 'No wake'
         assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield'
@@ -1477,6 +1481,8 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=r'$\xi$ [$\mathrm{\mu}$m]', ylab=r'$x$ [$\mathrm{\mu}$m]', clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
         
+        from matplotlib.colors import LogNorm
+        
         if axes is None:
             fig = plt.figure()  # an empty figure with an axes
             ax = fig.add_axes([.15, .15, .75, .75])
@@ -1490,6 +1496,7 @@ class StagePrtclTransWakeInstability(Stage):
         if reduce_cax_pad is True:
             # Create an axis on the right side of ax. The width of cax will be 5%
             # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+            from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
             divider = make_axes_locatable(ax)
             cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
 
@@ -1500,7 +1507,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Make a 2D plot
         if log_cax is True:
-            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=colors.LogNorm(vmin+1, vmax))
+            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=LogNorm(vmin+1, vmax))
         else:
             p = ax.imshow(data, extent=extent, vmin=vmin, vmax=vmax, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation)
 
@@ -1537,7 +1544,9 @@ class StagePrtclTransWakeInstability(Stage):
         n_th_particle:  Use this to reduce the amount of plotted particles by 
         only plotting every n_th_particle particle.
         '''
-
+        
+        from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+        
         # Define the color map and boundaries
         colors = ['black', 'red', 'orange', 'yellow']
         bounds = [0, 0.2, 0.4, 0.8, 1]
@@ -1836,7 +1845,10 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Animate the horizontal sideview (top view)
     def animate_sideview_x(self, evolution_folder):
-
+        
+        from matplotlib import ticker as mticker
+        from matplotlib.animation import FuncAnimation
+        
         files = sorted(os.listdir(evolution_folder))
         
         if len(files) != len(self.evolution.beam.location):
@@ -1982,7 +1994,7 @@ class StagePrtclTransWakeInstability(Stage):
             axs[2,1].yaxis.set_label_position('right')
         
             return cax
-        
+
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
@@ -2004,7 +2016,10 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Animate the vertical sideview
     def animate_sideview_y(self, evolution_folder):
-
+        
+        from matplotlib import ticker as mticker
+        from matplotlib.animation import FuncAnimation
+        
         files = sorted(os.listdir(evolution_folder))
 
         if len(files) != len(self.evolution.beam.location):
@@ -2142,7 +2157,7 @@ class StagePrtclTransWakeInstability(Stage):
             axs[2,1].yaxis.set_label_position('right')
         
             return cax
-        
+
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
@@ -2164,7 +2179,10 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Animate the horizontal phase space
     def animate_phasespace_x(self, evolution_folder):
-
+        
+        from matplotlib import ticker as mticker
+        from matplotlib.animation import FuncAnimation
+        
         files = sorted(os.listdir(evolution_folder))
 
         if len(files) != len(self.evolution.beam.location):
@@ -2350,7 +2368,10 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Animate the vertical phase space
     def animate_phasespace_y(self, evolution_folder):
-
+        
+        from matplotlib import ticker as mticker
+        from matplotlib.animation import FuncAnimation
+        
         files = sorted(os.listdir(evolution_folder))
 
         if len(files) != len(self.evolution.beam.location):

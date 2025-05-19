@@ -1,14 +1,9 @@
-from abel import Stage, CONFIG
-from matplotlib import pyplot as plt
+from abel.CONFIG import CONFIG
+from abel.classes.stage.stage import Stage
 import numpy as np
-import scipy
 import scipy.constants as SI
 from abel.utilities.plasma_physics import *
-import wake_t
 import os, shutil, uuid, copy, sys
-from openpmd_viewer import OpenPMDTimeSeries
-from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
-from contextlib import contextmanager
 from abel.physics_models.particles_transverse_wake_instability import transverse_wake_instability_particles
 
 class StageQuasistatic2d(Stage):
@@ -28,10 +23,14 @@ class StageQuasistatic2d(Stage):
     # track the particles through
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
+        import wake_t
+        from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
+        from openpmd_viewer import OpenPMDTimeSeries
+        import warnings
+
         self.stage_number = beam_incoming.stage_number
         
         # suppress numba warnings from Ocelot
-        import warnings
         warnings.simplefilter('ignore', category=RuntimeWarning)
         
         # make driver (and convert to WakeT bunch)
@@ -83,6 +82,7 @@ class StageQuasistatic2d(Stage):
             os.mkdir(tmpfolder)
 
         # function to quiet the tracking output
+        from contextlib import contextmanager
         @contextmanager
         def suppress_stdout():
             with open(os.devnull, "w") as devnull:
@@ -147,8 +147,9 @@ class StageQuasistatic2d(Stage):
                 rbs[i] = (rbs_upper-rbs_lower)/2
 
             # interpolate for each particle
-            rbs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
-            Ezs_interp = scipy.interpolate.interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
+            import scipy.interpolate.interp1d as interp1d
+            rbs_interp = interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
+            Ezs_interp = interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
             
             # perform tracking  # TODO: transverse_wake_instability_particles() signa has changed.
             beam = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length_flattop, show_prog_bar=True)

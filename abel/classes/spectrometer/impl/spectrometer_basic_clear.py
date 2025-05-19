@@ -1,4 +1,4 @@
-from abel import Spectrometer
+from abel.classes.spectrometer.spectrometer import Spectrometer
 
 class SpectrometerBasicCLEAR(Spectrometer):
     

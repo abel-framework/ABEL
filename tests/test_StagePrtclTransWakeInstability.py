@@ -23,6 +23,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
+import shutil
 
 def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False):
     driver = SourceTrapezoid()
@@ -53,10 +54,12 @@ def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=Fal
 
 
 def setup_basic_main_source(plasma_density, ramp_beta_mag):
+    from abel.utilities.plasma_physics import beta_matched
+
     main = SourceBasic()
     main.bunch_length = 40.0e-06                                                  # [m], rms. Standard value
     main.num_particles = 10000                                               
-    main.charge = -e * 1.0e10                                                     # [C]
+    main.charge = -SI.e * 1.0e10                                                     # [C]
 
     # Energy parameters
     main.energy = 369.6e9                                                         # [eV], HALHF v2 last stage nominal input energy

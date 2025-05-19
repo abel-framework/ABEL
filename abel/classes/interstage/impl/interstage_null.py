@@ -1,5 +1,5 @@
 import scipy.constants as SI
-from abel import Interstage
+from abel.classes.interstage.interstage import Interstage
 
 class InterstageNull(Interstage):
     

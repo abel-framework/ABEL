@@ -1,7 +1,5 @@
 import scipy.constants as SI
 import numpy as np
-from abel import Beam
-import warnings
 
 
 # ==================================================
@@ -71,6 +69,9 @@ def rft_beam2abel_beam(beam_rft):
     """
     Converts a RF-Track ``Bunch6dT`` object to an ABEL ``Beam`` object.
     """
+    
+    import warnings
+    from abel.classes.beam import Beam
 
     phase_space_rft = beam_rft.get_phase_space('%X %Px %Y %Py %Z %Pz %Q %N %m', 'good')
     xs_rft = phase_space_rft[:,0]  # [mm]

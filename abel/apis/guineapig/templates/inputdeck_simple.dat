@@ -47,12 +47,13 @@ $$PARAMETERS:: default
     cut_y = $cut_y;
     cut_z = $cut_z;
     force_symmetric = 0;
-    electron_ratio = 0.2;
+    electron_ratio = 0.5;
     do_espread = 1;
     do_photons = 0;
     store_beam = 0;
     photon_ratio = 0.2;
-    do_coherent = 0;
+    do_coherent = 1;
+    do_pairs = 1;
     rndm_load = 0;
     rndm_save = 0;
     hist_ee_bins = 1010;

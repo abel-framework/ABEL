@@ -1,12 +1,9 @@
-from abel import Stage, Beam, CONFIG
+from abel.classes.stage.stage import Stage
+from abel.classes.beam import Beam
+from abel.CONFIG import CONFIG
 import scipy.constants as SI
-from matplotlib import pyplot as plt
-from abel.utilities.plasma_physics import blowout_radius, k_p, beta_matched
-from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
 import os, shutil, uuid
 import numpy as np
-import wake_t
-from openpmd_viewer import OpenPMDTimeSeries
 
 class StageWakeT(Stage):
     
@@ -24,6 +21,8 @@ class StageWakeT(Stage):
     # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
+        from abel.utilities.plasma_physics import blowout_radius, k_p, beta_matched
+        
         self.stage_number = beam0.stage_number
         
         # make temp folder
@@ -45,6 +44,7 @@ class StageWakeT(Stage):
         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # convert beams to WakeT bunches
+        from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch
         driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
         
@@ -74,6 +74,7 @@ class StageWakeT(Stage):
         dz = matched_beta/10
         
         n_out = round(self.length/dz/8)
+        import wake_t
         plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
@@ -96,6 +97,7 @@ class StageWakeT(Stage):
         shutil.rmtree(tmpfolder)
         
         # extract beams
+        from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         driver = wake_t_bunch2beam(bunches[0][-1])
         
@@ -146,6 +148,8 @@ class StageWakeT(Stage):
 
     # ==================================================
     def __extract_initial_and_final_step(self, tmpfolder):
+
+        from openpmd_viewer import OpenPMDTimeSeries
         
         # prepare to read simulation data
         source_path = tmpfolder + 'hdf5/'
@@ -249,6 +253,7 @@ class StageWakeT(Stage):
 
     # ==================================================
     def matched_beta_function(self, energy):
+        from abel.utilities.plasma_physics import beta_matched
         return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
 
     

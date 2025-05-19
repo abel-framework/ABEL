@@ -24,6 +24,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import pytest
 from abel import *
 import matplotlib
+import shutil
 matplotlib.use('Agg')  # Use a backend that does not display figure to suppress plots.
 
 def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False):
@@ -55,10 +56,12 @@ def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=Fal
 
 
 def setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9):
+    from abel.utilities.plasma_physics import beta_matched
+
     main = SourceBasic()
     main.bunch_length = 40.0e-06                                                    # [m], rms. Standard value
     main.num_particles = 10000                                               
-    main.charge = -e * 1.0e10                                                       # [C]
+    main.charge = -SI.e * 1.0e10                                                       # [C]
 
     # Energy parameters
     main.energy = energy                                                            # [eV], Default set to HALHF v2 second to last stage nominal input energy

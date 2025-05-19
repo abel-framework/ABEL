@@ -9,11 +9,12 @@ SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1, calc_evolution=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
         self.transformer_ratio = transformer_ratio
+        self.depletion_efficiency = depletion_efficiency
         self.calc_evolution = calc_evolution
         
     
@@ -99,7 +100,6 @@ class StageBasic(Stage):
         # ========== Accelerate beam with homogeneous energy gain ==========
         beam.set_Es(beam.Es() + self.nom_energy_gain_flattop)
 
-
         # ========== Rotate the coordinate system of the beams back to original ==========
         if isinstance(self.driver_source, Source) and (self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0):
 
@@ -137,6 +137,14 @@ class StageBasic(Stage):
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
+        # ========== Decelerate the driver with homogeneous energy loss ==========
+        driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
+
+        # calculate efficiency
+        self.calculate_efficiency(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
+        
+        # save current profile
+        self.calculate_beam_current(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
 
         # return the beam (and optionally the driver)
         if self._return_tracked_driver:

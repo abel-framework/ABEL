@@ -1,7 +1,7 @@
-import time
 import numpy as np
 import scipy.constants as SI
-from abel import Source, Beam
+from abel.classes.beam import Beam
+from abel.classes.source.source import Source
 from abel.utilities.beam_physics import generate_trace_space_xy, generate_symm_trace_space_xyz
 from abel.utilities.relativity import energy2gamma
 

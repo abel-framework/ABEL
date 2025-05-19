@@ -1,16 +1,9 @@
-from abel import Beam
 import scipy.constants as SI
-import numpy as np
-import warnings
-import wake_t
-from abel.utilities.plasma_physics import k_p, blowout_radius
-from abel.utilities.relativity import momentum2energy
-from abel.utilities.statistics import weighted_mean, weighted_std
-from abel.classes.stage.stage import SimulationDomainSizeError
-
 
 # convert from WakeT particle bunch to ABEL beam
 def wake_t_bunch2beam(bunch):
+
+    from abel.classes.beam import Beam
     
     # extract phase space (with charge)
     phasespace = bunch.get_6D_matrix_with_charge()
@@ -35,6 +28,8 @@ def wake_t_bunch2beam(bunch):
 # convert from ABEL beam to WakeT particle bunch
 def beam2wake_t_bunch(beam, name='beam'):
     
+    import wake_t
+
     # convert the beam
     bunch = wake_t.ParticleBunch(w=beam.weightings(),
                                  x=beam.xs(),
@@ -69,7 +64,9 @@ def wake_t_hdf5_load(file_path, species='beam'):
     beam : ``Beam`` object
     """
 
+    from abel import Beam
     import openpmd_api as io
+    import numpy as np
     
     # load file
     series = io.Series(file_path, io.Access.read_only)
@@ -179,6 +176,12 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     ----------
     plasma_stage : Wake-T ``PlasmaStage`` object
     """
+
+    import numpy as np
+    import warnings
+    import wake_t
+    from abel.utilities.plasma_physics import k_p, blowout_radius
+    from abel.classes.stage.stage import SimulationDomainSizeError
 
     if abel_main_beam is None:
         driver_only = True
@@ -297,6 +300,10 @@ def wake_t_remove_halo_particles(bunch, nsigma=20):
     Bunch halo cleaning (extreme outliers)
     """
 
+    import numpy as np
+    import wake_t
+    from abel.utilities.statistics import weighted_mean, weighted_std
+
     weightings = bunch.w
     x_offset = weighted_mean(bunch.x, weightings, clean=True)
     y_offset = weighted_mean(bunch.y, weightings, clean=True)
@@ -358,6 +365,9 @@ def wakeT_r_E_filter(bunch, r_thres, pz_thres):
     ----------
     filtered_bunch : Wake-T ``ParticleBunch``
     """
+
+    import numpy as np
+    import wake_t
 
     rs = np.sqrt(bunch.x**2 + bunch.y**2)
     r_filter = rs > r_thres

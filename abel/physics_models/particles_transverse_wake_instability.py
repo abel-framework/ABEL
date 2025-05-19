@@ -7,20 +7,16 @@ Ben Chen, 5 October 2023, University of Oslo
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.constants import c, e, m_e, epsilon_0 as eps0
+from scipy.constants import c, e, m_e, epsilon_0 as eps0 # TODO: replace with "import scipy.constants as SI" for consistency
+import scipy.constants as SI
 
 from tqdm import tqdm
-#import time
-#from joblib import Parallel, delayed  # Parallel tracking
-#from joblib_progress import joblib_progress
 import csv, os
-#from types import SimpleNamespace
 
-from abel.classes.beam import *  # TODO: no need to import everything.
-from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2energy, gamma2momentum
+from abel.classes.beam import Beam
+from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2energy, gamma2momentum, energy2gamma
 from abel.utilities.plasma_physics import k_p
-from abel.utilities.statistics import weighted_mean, weighted_std
+from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam, beam2wake_t_bunch, wakeT_r_E_filter #, wake_t_remove_halo_particles
 #from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation, push_driver
 from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig
@@ -88,6 +84,9 @@ class PrtclTransWakeEvolution:
 
     # =============================================
     def __init__(self, data_length):
+
+        from types import SimpleNamespace
+        
         self.index = 0  # Keeping track of the current index.
         
         self.beam = SimpleNamespace()
@@ -139,6 +138,8 @@ class PrtclTransWakeEvolution:
 
     # =============================================
     def save_evolution(self, beam, driver, clean, is_wake_t_driver=False):
+        from abel.utilities.relativity import energy2proper_velocity
+
         if self.index >= len(self.beam.location):
             raise ValueError('Data recording already completed.')
             

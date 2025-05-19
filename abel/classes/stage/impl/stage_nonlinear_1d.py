@@ -1,11 +1,9 @@
-from abel import Stage, CONFIG
-from matplotlib import pyplot as plt
+from abel.CONFIG import CONFIG
+from abel.classes.stage.stage import Stage
 import numpy as np
 import scipy.constants as SI
-import warnings, copy
+import copy
 from types import SimpleNamespace
-from abel.utilities.plasma_physics import *
-from abel.physics_models.plasma_wake_1d import wakefield_1d
 
 class StageNonlinear1d(Stage):
     
@@ -109,6 +107,8 @@ class StageNonlinear1d(Stage):
     
     # wakefield (Lu equation)
     def __wakefield(self, beam=None, driver=None, density=None):
+
+        from abel.physics_models.plasma_wake_1d import wakefield_1d
         
         # get density
         if density is None:
@@ -141,6 +141,9 @@ class StageNonlinear1d(Stage):
     
     
     def plot_wakefield(self, beam=None, save_to_file=None, include_wake_radius=True):
+
+        from matplotlib import pyplot as plt
+        from abel.utilities.plasma_physics import wave_breaking_field
         
         # get wakefield
         Ezs, zs, rs = self.__wakefield(beam)
