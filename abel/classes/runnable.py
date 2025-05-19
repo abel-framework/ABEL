@@ -361,9 +361,6 @@ class Runnable(ABC):
             column corresponds to a shot.
         """
 
-        #val_mean, val_std = self.extract_function(lambda obj : beam_fcn(obj.get_beam(index=index)))
-        #return val_mean, val_std
-    
         input_list = inspect.signature(beam_fcn).parameters
         if 'clean' in input_list:  # Check if the input list contains clean.
             val_mean, val_std = self.extract_function(lambda obj, clean : beam_fcn(obj.get_beam(index=index), clean), clean)
@@ -373,26 +370,6 @@ class Runnable(ABC):
             
 
     def extract_function(self, fcn, clean=False):
-
-        # # prepare the arrays
-        # val_mean = np.empty(self.num_steps)
-        # val_std = np.empty(self.num_steps)
-        
-        # # extract values
-        # if self.is_scan():
-            
-        #     for step in range(self.num_steps):
-                
-        #         # get values for this step
-        #         val_output = np.empty(self.num_shots_per_step)
-        #         for shot_in_step in range(self.num_shots_per_step):
-        #             val_output[shot_in_step] = fcn(self[step, shot_in_step])
-                    
-        #         # get step mean and error
-        #         val_mean[step] = np.mean(val_output)
-        #         val_std[step] = np.std(val_output)
-        
-        # return val_mean, val_std
 
         # Prepare the arrays
         val_mean = np.empty(self.num_steps)
@@ -418,40 +395,6 @@ class Runnable(ABC):
 
         return val_mean, val_std
 
-
-    # Extract mean and standard deviation value of beam parameters across a scan
-    # def extract_scan_mean_std(self, beam_fcn, clean=False, index=-1):
-    #     input_list = inspect.signature(beam_fcn).parameters
-    #     if 'clean' in input_list:  # Check if the input list contains clean.
-    #         val_mean, val_std = self.scan_extract_function(lambda obj, clean : beam_fcn(obj.get_beam(index=index), clean), clean)
-    #     else:
-    #         val_mean, val_std = self.scan_extract_function(lambda obj : beam_fcn(obj.get_beam(index=index)))
-    #     return val_mean, val_std
-    
-    
-    # def scan_extract_function(self, fcn, clean=False):
-        
-    #     # extract values
-    #     val_mean = np.empty(self.num_steps)
-    #     val_std = np.empty(self.num_steps)
-    #     for step in range(self.num_steps):
-            
-    #         # get values for this step
-    #         val_output = np.empty(self.num_shots_per_step)
-    #         for shot_in_step in range(self.num_shots_per_step):
-                
-    #             input_list = inspect.signature(fcn).parameters
-    #             if 'clean' in input_list:  # Check if the input list contains clean.
-    #                 val_output[shot_in_step] = fcn(self[step, shot_in_step], clean=clean)
-    #             else:
-    #                 val_output[shot_in_step] = fcn(self[step, shot_in_step])
-                
-    #         # get step mean and error
-    #         val_mean[step] = np.mean(val_output)
-    #         val_std[step] = np.std(val_output)
-
-    #     return val_mean, val_std
-    
 
     def scan_steps_beam_params(self, beam_fcn, clean=False):
         """
