@@ -17,7 +17,7 @@ def prct_clean2d(xs, ys, enable=True, cut_percentile=5):
     mask_x = clean_mask(xs, enable=enable, cut_percentile=cut_percentile/2)
     mask_y = clean_mask(ys, enable=enable, cut_percentile=cut_percentile/2)
     mask = np.logical_and(mask_x, mask_y)
-    return x[mask], y[mask]
+    return xs[mask], ys[mask]
 
 def weighted_mean(values, weights, clean=False, cut_percentile=5):
     if np.sum(weights) == 0.0:
