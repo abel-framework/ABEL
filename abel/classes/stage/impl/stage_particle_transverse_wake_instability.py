@@ -1,5 +1,7 @@
 """
-Stage class with the transverse wake instability model as described in thesis "Instability and Beam-Beam Study for Multi-TeV PWFA e+e- and gamma gamma Linear Colliders" (https://cds.cern.ch/record/2754022?ln=en).
+Stage class with the transverse wake instability model as described in thesis 
+"Instability and Beam-Beam Study for Multi-TeV PWFA e+e- and gamma gamma Linear 
+Colliders" (https://cds.cern.ch/record/2754022?ln=en).
 
 Ben Chen, 6 October 2023, University of Oslo
 """
@@ -780,7 +782,8 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, probe_evol_period=1, make_animations=False):
         """
-        Used for copying a predefined stage's settings and configurations to set up flat ramps. Overloads the parent class' method.
+        Used for copying a predefined stage's settings and configurations to set
+        up flat ramps. Overloads the parent class' method.
     
         Parameters
         ----------
@@ -791,7 +794,10 @@ class StagePrtclTransWakeInstability(Stage):
             Length of the ramp.
 
         probe_evol_period : int, optional
-            Set to larger than 0 to determine the probing period for beam evolution diagnostics. This is given in units of time steps, so that e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd time step. Default value: 1.
+            Set to larger than 0 to determine the probing period for beam 
+            evolution diagnostics. This is given in units of time steps, so that
+            e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd
+            time step. Default value: 1.
 
         make_animations : bool, optional
             Flag for making animations.
@@ -875,7 +881,8 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def Ez_shift_fit(self, Ez, zs_Ez, beam, z_slices=None):
         """
-        Cuts out the longitudinal axial E-field Ez over the beam region and makes a fit using the z-coordinates for the region.
+        Cuts out the longitudinal axial E-field Ez over the beam region and 
+        makes a fit using the z-coordinates for the region.
 
         Parameters
         ----------
@@ -883,7 +890,8 @@ class StagePrtclTransWakeInstability(Stage):
             Axial longitudinal E-field.
             
         zs_Ez : [m] 1D float ndarray
-            z-coordinates for ``Ez``. Monotonically increasing from first to last element.
+            z-coordinates for ``Ez``. Monotonically increasing from first to 
+            last element.
 
         beam : ABEL ``Beam`` object
             
@@ -894,7 +902,8 @@ class StagePrtclTransWakeInstability(Stage):
         Returns
         ----------
         Ez_fit(z_slices) : [V/m] 1D float ndarray
-            Axial Ez for the region of interest shifted to the location of the beam.
+            Axial Ez for the region of interest shifted to the location of the 
+            beam.
 
         Ez_fit : [V/m] 1D interpolation object 
             Interpolated axial longitudinal Ez from beam head to tail.
@@ -929,32 +938,40 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def trace_bubble_radius(self, plasma_num_density, plasma_tr_coord, plasma_z_coord, driver_offset, threshold=0.8):
         """
-        - For extracting the plasma ion bubble radius by finding the coordinates in which the plasma number density goes from zero to a threshold value.
-        - The symmetry axis is determined using the transverse offset of the drive beam.
+        - For extracting the plasma ion bubble radius by finding the coordinates
+        in which the plasma number density goes from zero to a threshold value.
+        - The symmetry axis is determined using the transverse offset of the 
+        drive beam.
         - z is the propagation direction pointing to the right.
         
         Parameters
         ----------
         plasma_num_density : [n0] 2D float ndarray
-            Plasma number density in units of initial number density n0. Need to be oriented with propagation direction pointing to the right and positive offset pointing upwards.
+            Plasma number density in units of initial number density n0. Need to
+            be oriented with propagation direction pointing to the right and 
+            positive offset pointing upwards.
             
         plasma_tr_coord : [m] 1D float ndarray 
-            Transverse coordinate of ``plasma_num_density``. Needs to be strictly growing from start to end.
+            Transverse coordinate of ``plasma_num_density``. Needs to be 
+            strictly growing from start to end.
 
         plasma_z_coord : [m] 1D float ndarray 
-            Longitudinal coordinate of ``plasma_num_density``. Needs to be strictly growing from start to end.
+            Longitudinal coordinate of ``plasma_num_density``. Needs to be
+            strictly growing from start to end.
 
         driver_offset : [m] float
             Mean transverse offset of the drive beam.
             
         threshold : float, optional
-            Defines a threshold for the plasma density to determine ``bubble_radius``.
+            Defines a threshold for the plasma density to determine
+            ``bubble_radius``.
 
             
         Returns
         ----------
         bubble_radius : [m] 1D float ndarray 
-            Plasma bubble radius over the simulation box, measured from the drive beam axis.
+            Plasma bubble radius over the simulation box, measured from the 
+            drive beam axis.
         """
 
         # Check if plasma_tr_coord is strictly growing from start to end
@@ -1051,13 +1068,15 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma ion bubble radius along the whole simulation domain.
             
         zs_bubble_radius_axial : [m] 1D float ndarray, optional
-            Co-moving coordinates of the bubble radius. Same length as ``bubble_radius``
+            Co-moving coordinates of the bubble radius. Same length as 
+            ``bubble_radius``
 
             
         Returns
         ----------
         mask : [m] 1D bool ndarray
-            An array of the same length as ``bubble_radius`` where the elements corresponding to abnormal spikes are ``False``.
+            An array of the same length as ``bubble_radius`` where the elements 
+            corresponding to abnormal spikes are ``False``.
         """
 
         # Mask based on the first derivative of bubble_radius
@@ -1117,7 +1136,8 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def trace_bubble_radius_WakeT(self, plasma_num_density, plasma_tr_coord, plasma_z_coord, threshold=0.8):
         """
-        The plasma wake calculated by Wake-T is always centered around r = 0.0, so that driver_offset=0.0 are used as inputs in trace_bubble_radius().
+        The plasma wake calculated by Wake-T is always centered around r = 0.0, 
+        so that driver_offset=0.0 are used as inputs in trace_bubble_radius().
         """
         bubble_radius = self.trace_bubble_radius(plasma_num_density=plasma_num_density, plasma_tr_coord=plasma_tr_coord, plasma_z_coord=plasma_z_coord, driver_offset=0.0, threshold=threshold)
 
@@ -1127,7 +1147,8 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def rb_shift_fit(self, rb, zs_rb, beam, z_slices=None):
         """
-        Cuts out the bubble radius over the beam region and makes a fit using the z-coordinates for the region.
+        Cuts out the bubble radius over the beam region and makes a fit using 
+        the z-coordinates for the region.
 
         Parameters
         ----------
@@ -1135,7 +1156,8 @@ class StagePrtclTransWakeInstability(Stage):
             Plasma ion bubble radius along the whole simulation domain.
             
         zs_rb : [m] 1D float ndarray
-            z-coordinates for ``rb``. Monotonically increasing from first to last element.
+            z-coordinates for ``rb``. Monotonically increasing from first to 
+            last element.
 
         beam : ABEL ``Beam`` object
             
@@ -1146,7 +1168,8 @@ class StagePrtclTransWakeInstability(Stage):
         Returns
         ----------
         rb_roi : [m] 1D float ndarray
-            Plasma ion bubble radius for the region of interest shifted to the location of the beam.
+            Plasma ion bubble radius for the region of interest shifted to the 
+            location of the beam.
 
         rb_fit : [m] 1D interpolation object 
             Interpolated plasma ion bubble radius from beam head to tail.
@@ -1511,7 +1534,8 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     def scatter_diags(self, beam, n_th_particle=1):
         '''
-        n_th_particle:  Use this to reduce the amount of plotted particles by only plotting every n_th_particle particle.
+        n_th_particle:  Use this to reduce the amount of plotted particles by 
+        only plotting every n_th_particle particle.
         '''
 
         # Define the color map and boundaries

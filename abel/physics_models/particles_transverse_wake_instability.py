@@ -1,5 +1,7 @@
 """
-Transverse wake instability model as described in thesis "Instability and Beam-Beam Study for Multi-TeV PWFA e+e- and gamma gamma Linear Colliders" (https://cds.cern.ch/record/2754022?ln=en).
+Transverse wake instability model as described in thesis "Instability and 
+Beam-Beam Study for Multi-TeV PWFA e+e- and gamma gamma Linear Colliders"
+(https://cds.cern.ch/record/2754022?ln=en).
 
 Ben Chen, 5 October 2023, University of Oslo
 """
@@ -231,7 +233,8 @@ class PrtclTransWakeEvolution:
 ###################################################
 def calc_tr_instability_wakefield(skin_depth, bubble_radius, zs_sorted, weights_sorted, offsets):
     """
-    Single pass integration of intra-beam wakefield (Stupakov's wake function).
+    Single pass integration of intra-beam wakefield (Stupakov's wake 
+    function).
 
     Parameters
     ----------
@@ -275,33 +278,40 @@ def calc_tr_instability_wakefield(skin_depth, bubble_radius, zs_sorted, weights_
 ###################################################
 def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
     """
-    Calculates the perturbation to the linear ion background transverse wakefield caused by ion motion set up by a drive beam and a main beam. Based on C. Benedetti's model [1]_.
+    Calculates the perturbation to the linear ion background transverse 
+    wakefield caused by ion motion set up by a drive beam and a main beam. 
+    Based on C. Benedetti's model [1]_.
     
     Parameters
     ----------
-    beam: ABEL ``Beam`` object
+    beam : ABEL ``Beam`` object
         The main beam to be tracked.
 
-    drive_beam: ABEL ``Beam`` object
+    drive_beam : ABEL ``Beam`` object
         The drive beam.
 
     trans_wake_config : ``PrtclTransWakeConfig`` object
-        Contains the configurations for the transverse wake instability calculations.
+        Contains the configurations for the transverse wake instability 
+        calculations.
 
         
     Returns
     ----------
     intpl_Wx_perts : [V/m] 1D float ndarray
-        The x-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle.
+        The x-component of the transverse ion wakefield perturbation of each 
+        ``beam`` macroparticle.
 
     intpl_Wy_perts : [V/m] 1D float ndarray
-        The y-component of the transverse ion wakefield perturbation of each ``beam`` macroparticle.
+        The y-component of the transverse ion wakefield perturbation of each 
+        ``beam`` macroparticle.
 
         
     References
     ----------
-    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, "Emittance preservation in plasma-based accelerators with ion motion," Phys. Rev. Accel. Beams. 20, 111301 (2017);. https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
-
+    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, 
+    "Emittance preservation in plasma-based accelerators with ion motion", 
+    Phys. Rev. Accel. Beams. 20, 111301 (2017);. 
+    https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
     """
     
     ion_motion_config = trans_wake_config.ion_motion_config
@@ -358,22 +368,30 @@ def update_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_s
     ...
 
     tot_offsets_sqr : [m^2] 1D float ndarray
-        The radial offset of each beam macroparticle defined as "(x-x_axis)^2 + (y-y_axis)^2".
+        The radial offset of each beam macroparticle defined as 
+        "(x-x_axis)^2 + (y-y_axis)^2".
 
     offsets : [m] 1D float ndarray
-        The transverse offset component (x or y) of each beam macroparticle defined as "x-x_axis" or "y-y_axis". The component direction must be the same as ``tr_momenta_comp`` and ``ion_wakefield_perts``.
+        The transverse offset component (x or y) of each beam macroparticle 
+        defined as "x-x_axis" or "y-y_axis". The component direction must 
+        be the same as ``tr_momenta_comp`` and ``ion_wakefield_perts``.
 
     tr_momenta_comp : [kg m/s] 1D float ndarray
-        The transverse momentum component (x or y) of each beam macroparticle. The component direction must be the same as ``offsets`` and ``ion_wakefield_perts``.
+        The transverse momentum component (x or y) of each beam 
+        macroparticle. The component direction must be the same as ``offsets`` 
+        and ``ion_wakefield_perts``.
 
     ion_wakefield_perts : [V/m] 1D float ndarray
-        The transverse ion wakefield perturbation component (x or y) of each beam macroparticle. The component direction must be the same as ``offsets`` and ``tr_momenta_comp``.
+        The transverse ion wakefield perturbation component (x or y) of each 
+        beam macroparticle. The component direction must be the same as 
+        ``offsets`` and ``tr_momenta_comp``.
 
 
     Returns
     ----------
     new_tr_momenta_comp : [kg m/s] 1D float ndarray
-        The updated transverse momentum component (x or y) of each beam macroparticle.
+        The updated transverse momentum component (x or y) of each beam
+        macroparticle.
     """
     
     enable_tr_instability = trans_wake_config.enable_tr_instability
@@ -414,7 +432,8 @@ def update_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_s
 
 ###################################################
 def push_driver(wake_t_driver, wake_t_fields, time_step, pusher='boris'):
-    "Evolves a Wake-T drive beam ``wake_t_driver``for one time step ``time_step``."
+    "Evolves a Wake-T drive beam ``wake_t_driver``for one time step "
+    "``time_step``."
     wake_t_driver.evolve([wake_t_fields], t=wake_t_driver.prop_distance/SI.c, dt=time_step, pusher=pusher)
 
     #return wake_t_driver
@@ -428,20 +447,25 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
 
     Parameters
     ----------
-    beam: ABEL ``Beam`` object
+    beam : ABEL ``Beam`` object
         The main beam to be tracked.
 
-    drive_beam0: ABEL ``Beam`` object
+    drive_beam0 : ABEL ``Beam`` object
         The input drive beam.
         
     Ez_fit_obj : [V/m] interpolation object
-        1D interpolation object of longitudinal E-field fitted to axial E-field using a selection of zs along the main beam. Used to determine the value of the longitudinal E-field for all beam zs.
+        1D interpolation object of longitudinal E-field fitted to axial 
+        E-field using a selection of zs along the main beam. Used to 
+        determine the value of the longitudinal E-field for all beam zs.
         
     rb_fit_obj : [m] interpolation object
-        1D interpolation object of plasma bubble radius fitted to axial bubble radius using a selection of zs along the main beam. Used to determine the value of the bubble radius for all beam zs.
+        1D interpolation object of plasma bubble radius fitted to axial 
+        bubble radius using a selection of zs along the main beam. Used to 
+        determine the value of the bubble radius for all beam zs.
 
     trans_wake_config : ``PrtclTransWakeConfig`` object
-        Contains the configurations for the transverse wake instability calculations.
+        Contains the configurations for the transverse wake instability 
+        calculations.
     
         
     Returns
@@ -808,7 +832,12 @@ def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorte
 ###################################################
 def save_beam(main_beam, file_path, stage_num, time_step, num_time_steps):
     """
-    Saves ``main_beam`` as a .h5 file to ``file_path``. Only used in ``transverse_wake_instability_particles()`` when ``PrtclTransWakeEvolution.save_evolution()`` is called and ``PrtclTransWakeConfig.trans_wake_config.make_animations=True``, as one needs to save as many beam files as the length of ``PrtclTransWakeEvolution.beam.location``.
+    Saves ``main_beam`` as a .h5 file to ``file_path``. Only used in 
+    ``transverse_wake_instability_particles()`` when 
+    ``PrtclTransWakeEvolution.save_evolution()`` is called and 
+    ``PrtclTransWakeConfig.trans_wake_config.make_animations=True``, as one 
+    needs to save as many beam files as the length of 
+    ``PrtclTransWakeEvolution.beam.location``.
 
     Parameters
     ----------
@@ -831,8 +860,11 @@ def save_time_step(arrays, file_path):
 
     Parameters
     ----------
-    arrays : List of ndarrays in the order
-        ``xs_sorted``, ``ys_sorted``, ``zs_sorted``, ``pxs_sorted``, ``pys_sorted``, ``pzs_sorted``, ``weights_sorted``, ``Ez``, ``bubble_radius``, ``intpl_Wx_perts``, ``intpl_Wy_perts``
+    arrays : List of ndarrays 
+        In the order
+        ``xs_sorted``, ``ys_sorted``, ``zs_sorted``, ``pxs_sorted``, 
+        ``pys_sorted``, ``pzs_sorted``, ``weights_sorted``, ``Ez``, 
+        ``bubble_radius``, ``intpl_Wx_perts``, ``intpl_Wy_perts``
 
     file_path : str
         Specifies the path of the file to store the data in.
