@@ -1098,7 +1098,7 @@ class Stage(Trackable, CostModeled):
         
     # ==================================================
     # plot wake
-    def plot_wake(self, aspect='equal', savefig=None):
+    def plot_wake(self, aspect='equal', show_beam=True, savefig=None):
         """
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
@@ -1177,7 +1177,8 @@ class Stage(Trackable, CostModeled):
             cbar_width_fraction = 0.015  # Fraction of the figure width for the colorbar width
     
             # create colorbar axes based on the relative position and size
-            cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
+            if show_beam:
+                cax1 = fig.add_axes([axpos.x1 + pad_fraction, axpos.y0, cbar_width_fraction, axpos.height])
             cax2 = fig.add_axes([axpos.x1 + pad_fraction + cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
             cax3 = fig.add_axes([axpos.x1 + pad_fraction + 2*cbar_width_fraction, axpos.y0, cbar_width_fraction, axpos.height])
             clims = np.array([1e-2, 1e3])*self.plasma_density
@@ -1197,11 +1198,12 @@ class Stage(Trackable, CostModeled):
             cb_electrons.set_ticklabels([])
             
             # plot beam electrons
-            p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
-            p_beam.set_clim(clims/1e6)
-            cb_beam = plt.colorbar(p_beam, cax=cax1)
-            cb_beam.set_ticklabels([])
-            cb_beam.ax.tick_params(axis='y', which='both', direction='in')
+            if show_beam:
+                p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
+                p_beam.set_clim(clims/1e6)
+                cb_beam = plt.colorbar(p_beam, cax=cax1)
+                cb_beam.set_ticklabels([])
+                cb_beam.ax.tick_params(axis='y', which='both', direction='in')
             
             # set labels
             if i==(num_plots-1):
