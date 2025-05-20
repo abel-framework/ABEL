@@ -982,6 +982,19 @@ class Beam():
         return max(abs(Is))
     
     ## SPIN STATISTICS
+
+    def spin_polarization_x(self):
+        "Spin polarization in the horizontal (x) plane."
+        return np.mean(self.spxs())
+
+    def spin_polarization_y(self):
+        "Spin polarization in the vertical (y) plane."
+        return np.mean(self.spys())
+
+    def spin_polarization_z(self):
+        "Spin polarization in the longitudinal (z) plane."
+        return np.mean(self.spzs())
+        
     def spin_check(self):
         "Checks if any spin norms are close to zero."
         s_norm = np.sqrt(self.spxs()**2 + self.spys()**2 + self.spzs()**2)

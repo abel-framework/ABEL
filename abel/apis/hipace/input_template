@@ -36,6 +36,8 @@ beam.injection_type = from_file
 beam.input_file = $filename_beam
 beam.iteration = 0
 beam.do_radiation_reaction = $radiation_reaction
+beam.do_spin_tracking = $do_spin_tracking
+beam.initial_spin = 0 1 0 # TODO: remove this when tracking of input file spins is implemented
 
 driver.injection_type = from_file
 driver.input_file = $filename_driver
