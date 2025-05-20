@@ -1,4 +1,4 @@
-from abel.classes.stage.stage import Stage
+from abel.classes.stage.stage import Stage, SimulationDomainSizeError
 from abel.classes.beam import Beam
 from abel.CONFIG import CONFIG
 import scipy.constants as SI
@@ -21,7 +21,8 @@ class StageWakeT(Stage):
     # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
-        from abel.utilities.plasma_physics import blowout_radius, k_p, beta_matched
+        import wake_t
+        from abel.utilities.plasma_physics import blowout_radius, k_p
         
         self.stage_number = beam0.stage_number
         
@@ -74,7 +75,7 @@ class StageWakeT(Stage):
         dz = matched_beta/10
         
         n_out = round(self.length/dz/8)
-        import wake_t
+        
         plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
@@ -122,6 +123,8 @@ class StageWakeT(Stage):
     # ==================================================
     def __extract_evolution(self, bunches):
     #def __extract_evolution(self, tmpfolder, bunches, runnable):
+
+        import wake_t
 
         # get beam
         beam_evol = wake_t.diagnostics.analyze_bunch_list(bunches[1])
@@ -420,6 +423,8 @@ class StageWakeT(Stage):
         ----------
         N/A
         '''
+
+        from matplotlib import pyplot as plt
 
         # prepare figure
         fig, axs = plt.subplots(4,1)
