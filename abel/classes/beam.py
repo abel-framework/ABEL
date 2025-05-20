@@ -1582,8 +1582,16 @@ class Beam():
         cb.ax.set_ylabel('Charge density (pC/um^2)')
 
 
-    def plot_spectrometer_x(self):
+    def plot_spectrometer_x(self, range_x=None, range_y=None):
         dQdxde, xs, Es = self.phase_space_density(self.xs, self.Es)
+        if range_x is not None:
+            mask = (xs>=range_x[0]) & (xs<= range_x[1])
+            xs = xs[mask]
+            dQdxde = dQdxde[:,mask] 
+        if range_y is not None:
+            mask = (Es>=range_y[0]) & (Es<= range_y[1])
+            Es = Es[mask]
+            dQdxde = dQdxde[mask,:]
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
