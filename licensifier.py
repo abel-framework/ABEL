@@ -54,6 +54,8 @@ def treat_file(filename, doIt=False):
         has_inexact_blurb_files.append(filename)
         return()
 
+    #TODO: Handle update of core authors and year
+    
     #Blurbless file!
     #INSERT!
 
