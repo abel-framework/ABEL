@@ -30,7 +30,7 @@ import sys
 has_inexact_blurb_files = []
 
 def treat_file(filename, doIt=False):
-    print("checking inside : ", end='')
+    print("checking inside ... ", end='')
 
     fi_ = open(filename,'r')
     fi = fi_.read()
@@ -41,13 +41,13 @@ def treat_file(filename, doIt=False):
     for r in BLURB_RE:
         if re.search(r, fi):
             has_blurb = True
-            print('has_blurb ', end='')
+            print('has_blurb ...', end='')
 
     #Look for a pre-existing exactly matching BLURB        
     has_exact_blurb = False
     if BLURB in fi:
         has_exact_blurb = True
-        print("has_exact_blurb", end='')
+        print("has_exact_blurb ...", end='')
         return()
 
     if has_blurb and not has_exact_blurb:
@@ -60,16 +60,20 @@ def treat_file(filename, doIt=False):
     #INSERT!
 
     #After hashbang
+    BLURB_ = BLURB
     if fi.startswith('#!'):
         fi_start = fi.index('\n')+1
         print("\t skip-hashbang",end='')
+        BLURB_ = "\n" + BLURB + 2*"\n"
     else:
         fi_start = 0
+        BLURB_ = BLURB + 2*"\n"
     
-    fi = fi[:fi_start] + '\n' + BLURB + 2*'\n' + fi[fi_start:]
-    print()
+    fi = fi[:fi_start] + BLURB_ + fi[fi_start:]
+
+    print("EDIT:")
     print('"""')
-    print (fi[0:len(BLURB)*2])
+    print (fi[0:len(BLURB_)*2])
     print('...')
     print('"""')
 
