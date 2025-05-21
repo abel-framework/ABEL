@@ -61,11 +61,12 @@ def treat_file(filename, doIt=False):
 
     #After hashbang
     if fi.startswith('#!'):
-        fi_start = fi.index('\n')
+        fi_start = fi.index('\n')+1
+        print("\t skip-hashbang",end='')
     else:
         fi_start = 0
     
-    fi = fi[:fi_start+1] + '\n' + BLURB + 2*'\n' + fi[fi_start+1:]
+    fi = fi[:fi_start] + '\n' + BLURB + 2*'\n' + fi[fi_start:]
     print()
     print('"""')
     print (fi[0:len(BLURB)*2])
@@ -89,6 +90,9 @@ if __name__ == "__main__":
     print("One or more file paths can be specified, if so it will only modify these.")
     print("By default, all files passing the regexes in SEARCH_FILETYPES_RE in SEARCH FOLDERS, but not in EXCLUDE_EXPLICIT_FILES will be analysed/treated")
     print("Also by default, all files in SEARCH_EXPLICIT_FILES will also be analysed/treated")
+    print()
+    print("Tip: Before running with --doit, commit all your changes.")
+    print("This way you can undo the licensifier changes by running `git checkout .` in the repository root.")
     print()
     
     print("BLURB to be added:")
