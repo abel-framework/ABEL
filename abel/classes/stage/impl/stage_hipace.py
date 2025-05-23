@@ -119,8 +119,8 @@ class StageHipace(Stage):
         if self.driver_only:
             box_min_z = driver0.z_offset() + driver0.bunch_length() - np.max([2*np.pi/k_p(self.plasma_density), 2.1*blowout_radius(self.plasma_density, driver0.peak_current())])
         else:
-            box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length() 
-        box_min_z = box_min_z - 1.5/k_p(self.plasma_density)
+            box_min_z = max(beam0.z_offset() - num_sigmas * beam0.bunch_length(), np.min(beam0.zs())-0.5/k_p(self.plasma_density))
+        #box_min_z = box_min_z - 1.5/k_p(self.plasma_density)
         if driver0 is not None:
             box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
         else:
