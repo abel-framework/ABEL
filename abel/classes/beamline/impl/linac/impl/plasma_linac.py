@@ -1435,3 +1435,30 @@ class PlasmaLinac(Linac):
         plt.close()
 
         return filename
+
+
+    def print_summary(self):
+        # TODO: Make print_summary() for each class below and call on these instead.
+        print('== Plasma-linac parameters ==========')
+        print('Number of plasma stages: ', self.num_stages)
+        print('Nominal energy [GeV]: ', self.nom_energy/1e9 if self.nom_energy is not None else "None")
+
+        print('\n== Driver source ==========')
+        self.stage.driver_source.print_summary()
+
+        print('\n== Stage ==========')
+        self.stage.print_summary()
+
+        if self.stage.upramp is not None:
+            print('\n== Upramp ==========')
+            self.stage.upramp.print_summary()
+
+        if self.stage.downramp is not None:
+            print('\n== Downramp ==========')
+            self.stage.downramp.print_summary()
+
+        print('\n== Interstage ==========')
+        self.interstage.print_summary()
+
+        print('\n== Source ==========')
+        self.source.print_summary()

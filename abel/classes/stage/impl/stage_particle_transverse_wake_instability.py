@@ -211,7 +211,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.reljitter = SimpleNamespace()
         self.reljitter.plasma_density = 0
 
-        self.interstages_enabled = False
+        self.interstages_enabled = False  # TODO: to be removed.
         self.parallel_track_2D = False
 
         # internally sampled values (given some jitter)
@@ -260,7 +260,7 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
             #self.drive_beam = driver_incoming                    ######################
-        
+
 
         # ========== Rotate the coordinate system of the beams ==========
         # Perform beam rotations before calling on upramp tracking.
@@ -694,7 +694,7 @@ class StagePrtclTransWakeInstability(Stage):
         particle_density = hist / bin_volumes
 
         # Sum along the y-axis to obtain a 2D projection onto the zx plane
-        projection_zx = np.sum(particle_density, axis=2)
+        projection_zx = np.sum(particle_density, axis=2)  # TODO: More suitable to use the centre zx slice instead of projection?
         projection_zx = projection_zx.T
         extent_beams = np.array([edges_z[0], edges_z[-1], edges_x[0], edges_x[-1]])
         #TODO: projection_zy?
@@ -2774,6 +2774,41 @@ class StagePrtclTransWakeInstability(Stage):
         with open(self.run_path + 'output.txt', 'r') as f:
             print(f.read())
         f.close()
+
+
+    # ==================================================
+    def print_summary(self):
+        
+        print('Type: ', type(self))
+
+        if self.plasma_density  is None:
+            print(f"Plasma density [m^-3]:\t\t\t\t\t Not set")
+        else:
+            print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}")
+        if self.length_flattop  is None:
+            print(f"Stage flattop length [m]:\t\t\t\t Not set")
+        else:
+            print(f"Stage flattop length [m]:\t\t\t\t {self.length_flattop  :.3f}")
+        if self.length  is None:
+            print(f"Stage total length [m]:\t\t\t\t\t Not set")
+        else:
+            print(f"Stage total length [m]:\t\t\t\t\t {self.length  :.3f}")
+        
+        nom_energy_gain = self.nom_energy_gain 
+        if nom_energy_gain is None:
+            print(f"Nominal energy gain [GeV/m]:\t\t\t\t Not set")
+        else:
+            print(f"Nominal energy gain [GeV/m]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")
+
+        print(f"Time step [betatron wavelength/c]:\t\t\t {self.time_step_mod :.3f}")
+        print(f"Ramp beta magnification:\t\t\t\t {self.ramp_beta_mag :.3f}")
+        
+        print(f"Transverse wake instability enabled:\t\t\t {str(self.enable_tr_instability) :s}")
+        print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
+        print(f"Ion motion enabled:\t\t\t\t\t {str(self.enable_ion_motion) :s}")
+        
+        
+        
 
 
 
