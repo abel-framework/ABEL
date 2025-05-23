@@ -563,12 +563,11 @@ class Collider(Runnable, CostModeled):
 
     ## SCAN PLOTS
 
-    def plot_cost_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=True, overwrite=True):
-
-        from datetime import datetime
+    def plot_cost_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True, savefig=None, legend=True):
         
         # set default scan name
         if scan_name is None:
+            from datetime import datetime
             scan_name = 'param_scan_' + param + '_' + datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # set default upper and lower bounds
@@ -602,7 +601,7 @@ class Collider(Runnable, CostModeled):
         for i in range(num_steps):
             scan_self = copy.deepcopy(self)
             scan_self.set_attr(param, scan_vals[i])
-            scan_self.run(scan_name, num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
+            scan_self.run(scan_name+"_"+str(i), num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
 
             # extract values (TODO: allow for more shots per step)
             full_programme_cost[i] = scan_self.full_programme_cost()
@@ -628,42 +627,42 @@ class Collider(Runnable, CostModeled):
         fig.set_figheight(CONFIG.plot_width_default*0.6)
 
         cumul_cost = construction_cost_ip
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.zeros_like(scan_vals))), 'steelblue', label='Construction (IP)')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.zeros_like(scan_vals))), '#a5c6e2', label='Construction (IP)')
         
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += construction_cost_linac1
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'skyblue', label=f'Construction ({scan_self.linac1.name})')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), '#80afd6', label=f'Construction ({scan_self.linac1.name})')
         
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += construction_cost_linac2
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'lightblue', label=f'Construction ({scan_self.linac2.name})')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), '#5b98ca', label=f'Construction ({scan_self.linac2.name})')
 
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += construction_cost_infrastructure
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'lightskyblue', label='Infrastructure & services')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), '#3c80b9', label='Infrastructure & services')
 
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += construction_cost_cps
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'deepskyblue', label='Controls, protection & safety')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), '#306694', label='Controls, protection & safety')
         
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += overhead_cost
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Overhead cost')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), '#244d6f', label='Overhead cost')
         
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += energy_cost
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Energy cost')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'tab:red', label='Energy cost')
         
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += maintenance_cost
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Maintenance cost')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'tab:orange', label='Maintenance cost')
         
         cumul_cost_last = copy.deepcopy(cumul_cost)
         cumul_cost += carbon_tax_cost
-        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), label='Carbon tax')
+        ax.fill(np.concatenate((scan_vals/scale, np.flip(scan_vals/scale))), np.concatenate((cumul_cost/1e9, np.flip(cumul_cost_last/1e9))), 'tab:green', label='Carbon tax')
 
-        ax.plot(scan_vals/scale, eu_cost/1e9, ls='--', color='k', label='Cost (EU accounting)')
-        ax.plot(scan_vals/scale, itf_cost/1e9, ls=':', color='k', label='Cost (Snowmass ITF accounting)')
+        #ax.plot(scan_vals/scale, eu_cost/1e9, ls='--', color='k', label='Cost (EU accounting)')
+        #ax.plot(scan_vals/scale, itf_cost/1e9, ls=':', color='k', label='Cost (Snowmass ITF accounting)')
         ax.plot(scan_vals/scale, full_programme_cost/1e9, ls='-', color='k', label='Full programme cost')
         
         
@@ -674,15 +673,21 @@ class Collider(Runnable, CostModeled):
         ax.set_xlim(lower/scale, upper/scale)
         ax.set_ylim(0, 1.25*max(full_programme_cost/1e9))
         ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.25*max(full_programme_cost/1e9)], ls=':', color='gray')
-        plt.legend(reverse=True)
+        
+        if legend:
+            plt.legend(reverse=True, loc='center left', bbox_to_anchor=(1, 0.5))
+
+        if savefig is not None:
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
         return scan_self
 
     # TODO: delete data option
-    def plot_length_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True):
-        
+    def plot_length_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True, savefig=None, legend=True):
+
         # set default scan name
         if scan_name is None:
+            from datetime import datetime
             scan_name = 'param_scan_' + param + '_' + datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # set default upper and lower bounds
@@ -707,7 +712,7 @@ class Collider(Runnable, CostModeled):
         for i in range(num_steps):
             scan_self = copy.deepcopy(self)
             scan_self.set_attr(param, scan_vals[i])
-            scan_self.run(scan_name, num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
+            scan_self.run(scan_name+"_"+str(i), num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
 
             # extract values (TODO: allow for more shots per step)
             length_end_to_end[i], length_linac2[i], length_linac1[i] = scan_self.length_end_to_end(return_arm_lengths=True)
@@ -733,15 +738,21 @@ class Collider(Runnable, CostModeled):
         ax.set_xlim(lower/scale, upper/scale)
         ax.set_ylim(0, 1.1*max(length_end_to_end/1e3))
         ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.1*max(length_end_to_end/1e3)], ls=':', color='gray')
-        plt.legend(reverse=True)
+        
+        if legend:
+            plt.legend(reverse=True, loc='center left', bbox_to_anchor=(1, 0.5))
+
+        if savefig is not None:
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
         return scan_self
 
     # TODO: delete data option
-    def plot_power_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True):
+    def plot_power_variation(self, param, scan_name=None, num_shots_per_step=1, num_steps=11, lower=None, upper=None, scale=1, label=None, xscale='log', parallel=False, overwrite=True, savefig=None, legend=True):
         
         # set default scan name
         if scan_name is None:
+            from datetime import datetime
             scan_name = 'param_scan_' + param + '_' + datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # set default upper and lower bounds
@@ -766,7 +777,7 @@ class Collider(Runnable, CostModeled):
         for i in range(num_steps):
             scan_self = copy.deepcopy(self)
             scan_self.set_attr(param, scan_vals[i])
-            scan_self.run(scan_name, num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
+            scan_self.run(scan_name+"_"+str(i), num_shots=num_shots_per_step, parallel=parallel, overwrite=overwrite, verbose=False)
 
             # extract values (TODO: allow for more shots per step)
             power_linac1[i] = scan_self.linac1.wallplug_power()
@@ -800,7 +811,12 @@ class Collider(Runnable, CostModeled):
         ax.set_xlim(lower/scale, upper/scale)
         ax.set_ylim(0, 1.1*max(power_total/1e6))
         ax.plot(np.array([1,1])*self.get_nested_attr(param)/scale, [0, 1.1*max(power_total/1e6)], ls=':', color='gray')
-        plt.legend(reverse=True)
+        
+        if legend:
+            plt.legend(reverse=True, loc='center left', bbox_to_anchor=(1, 0.5))
+
+        if savefig is not None:
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
         return scan_self
         
