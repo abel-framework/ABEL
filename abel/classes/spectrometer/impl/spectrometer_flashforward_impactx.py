@@ -112,6 +112,7 @@ class SpectrometerFLASHForwardImpactX(Spectrometer):
         
         # define dipole
         Bdip = self.current2field_dipole(self.current_dipole, self.B_dipole)
+        self.B_dipole = Bdip
         phi = Bdip*self.length_dipole*SI.e/p0x
         dipole = impactx.elements.ExactSbend(name="dipole", ds=self.length_dipole, phi=np.rad2deg(phi), B=Bdip, nslice=ns, rotation=90)
         
