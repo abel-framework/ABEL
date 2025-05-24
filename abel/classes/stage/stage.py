@@ -1140,7 +1140,7 @@ class Stage(Trackable, CostModeled):
         
     # ==================================================
     # plot wake
-    def plot_wake(self, aspect='equal', show_beam=True, savefig=None):
+    def plot_wake(self, aspect='equal', show_beam=True, savefig=None, Ez_lim=None):
         """
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
@@ -1207,7 +1207,10 @@ class Stage(Trackable, CostModeled):
                 z_beam = zs_I[np.abs(Is[zs_I < z_mid]).argmax()]
                 Ez_driver = Ezs0[zs0 > z_mid].max()
                 Ez_beam = np.interp(z_beam, zs0, Ezs0)
-                Ezmax = 2.3*1.7*np.max([np.abs(Ez_driver), np.abs(Ez_beam)])
+                if Ez_lim is None:
+                    Ezmax = 2.3*1.7*np.max([np.abs(Ez_driver), np.abs(Ez_beam)])
+                else:
+                    Ezmax = abs(Ez_lim)
             
             # plot on-axis wakefield and axes
             ax2 = ax1.twinx()
