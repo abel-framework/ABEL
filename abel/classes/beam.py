@@ -1582,7 +1582,7 @@ class Beam():
         cb.ax.set_ylabel('Charge density (pC/um^2)')
 
 
-    def plot_spectrometer_x(self, range_x=None, range_y=None):
+    def plot_spectrometer_x(self, range_x=None, range_y=None, vlim=None, title=None):
         dQdxde, xs, Es = self.phase_space_density(self.xs, self.Es)
         if range_x is not None:
             mask = (xs>=range_x[0]) & (xs<= range_x[1])
@@ -1594,12 +1594,21 @@ class Beam():
             dQdxde = dQdxde[mask,:]
 
         fig, ax = plt.subplots()
+        fig.tight_layout()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, Es/1e9, -dQdxde*1e9, cmap=CONFIG.default_cmap, shading='auto')
+        if vlim is not None:
+            p = ax.pcolor(xs*1e6, Es/1e9, -dQdxde*1e9, cmap=CONFIG.default_cmap, shading='auto', vmin=vlim[0], vmax=vlim[1])
+        else:
+            p = ax.pcolor(xs*1e6, Es/1e9, -dQdxde*1e9, cmap=CONFIG.default_cmap, shading='auto')
+
         ax.set_xlabel('x (um)')
         ax.set_ylabel('E (GeV)')
-        ax.set_title('Spectrometer image (energy vs. horizontal)')
+        if not title:
+            ax.set_title('Spectrometer image (energy vs. horizontal)')
+        else:
+            ax.set_title(f'{title}')
+
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/GeV)')
 
