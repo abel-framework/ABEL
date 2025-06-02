@@ -11,9 +11,7 @@ hipace.verbose = 1
 max_step = $max_step # TODO: set automatic timestep
 
 hipace.depos_order_xy = 2
-
 geometry.coord_sys   = 0                  # 0: Cartesian
-geometry.is_periodic = 1 1 0  # Is periodic?
 geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
 geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z
 
@@ -37,7 +35,6 @@ beam.input_file = $filename_beam
 beam.iteration = 0
 beam.do_radiation_reaction = $radiation_reaction
 beam.do_spin_tracking = $do_spin_tracking
-beam.initial_spin = 0 1 0 # TODO: remove this when tracking of input file spins is implemented
 
 driver.injection_type = from_file
 driver.input_file = $filename_driver

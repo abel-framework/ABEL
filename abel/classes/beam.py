@@ -1905,10 +1905,7 @@ class Beam():
         particles['momentum'].unit_dimension = {io.Unit_Dimension.L: 1, io.Unit_Dimension.M: 1, io.Unit_Dimension.T: -1}
         particles['charge'].unit_dimension = {io.Unit_Dimension.T: 1, io.Unit_Dimension.I: 1}
         particles['mass'].unit_dimension = {io.Unit_Dimension.M: 1}
-        
-        #particles['spin']['z'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
-        #particles['spin']['x'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
-        #particles['spin']['y'].unit_dimension = {io.Unit_dimension.M: 1, io.Unit_dimension.L: 2, io.Unit_dimension.T: -1}
+        particles['spin'].unit_dimension = {io.Unit_Dimension.M: 1, io.Unit_Dimension.L: 2, io.Unit_Dimension.T: -1}
         
         # save data to file
         series.flush()
