@@ -105,8 +105,8 @@ class Collider(Runnable, CostModeled):
             self.linac1.bunch_separation = self.bunch_separation
             self.linac2.bunch_separation = self.bunch_separation
         if self.num_bunches_in_train is not None:
-            self.linac1.num_bunches_in_train = self.num_bunches_in_train
-            self.linac2.num_bunches_in_train = self.num_bunches_in_train
+            self.linac1.num_bunches_in_train = int(self.num_bunches_in_train)
+            self.linac2.num_bunches_in_train = int(self.num_bunches_in_train)
         if self.rep_rate_trains is not None:
             self.linac1.rep_rate_trains = self.rep_rate_trains
             self.linac2.rep_rate_trains = self.rep_rate_trains
