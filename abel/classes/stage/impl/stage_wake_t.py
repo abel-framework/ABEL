@@ -4,17 +4,20 @@ from abel.CONFIG import CONFIG
 import scipy.constants as SI
 import os, shutil, uuid
 import numpy as np
+from types import SimpleNamespace
 
 class StageWakeT(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, drive_beam=None, ramp_beta_mag=1, num_cell_xy=256, keep_data=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, drive_beam=None, num_cell_xy=256, keep_data=False, ion_motion=False):
         
-        super().__init__(length, nom_energy_gain, plasma_density, driver_source)
+        super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
-        self.ramp_beta_mag = ramp_beta_mag
         self.num_cell_xy = num_cell_xy
         self.keep_data = keep_data
         self.drive_beam = drive_beam
+
+        # physics flags
+        self.ion_motion = ion_motion
 
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
@@ -33,11 +36,12 @@ class StageWakeT(Stage):
             driver0 = self.driver_source.track()
             self.drive_beam = driver0 
         else:
-            driver0 = self.drive_beam  # Allows the drive beam to be passed from outside.
+            driver0 = self.drive_beam  # Allows the drive beam to be passed from outside. # TODO: do with SourceCapsule instead
         
         # apply plasma-density up ramp (demagnify beta function)
-        driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
-        beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+        if self.ramp_beta_mag is not None:
+            driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+            beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # convert beams to WakeT bunches
         from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch
@@ -63,10 +67,16 @@ class StageWakeT(Stage):
         # find stepsize
         beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
         dz = beta_matched/10
-        
+
+        # select the wakefield model (ion motion or not)
+        if self.ion_motion:
+            wakefield_model='quasistatic_2d_ion'
+        else:
+            wakefield_model='quasistatic_2d'
+            
         n_out = round(self.length/dz/8)
         import wake_t
-        plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model='quasistatic_2d',
+        plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model=wakefield_model,
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
@@ -98,8 +108,9 @@ class StageWakeT(Stage):
         beam.location = beam0.location
         
         # apply plasma-density down ramp (magnify beta function)
-        beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-        driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+        if self.ramp_beta_mag is not None:
+            beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
+            driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # calculate efficiency
         self.calculate_efficiency(beam0, driver0, beam, driver)
@@ -114,26 +125,45 @@ class StageWakeT(Stage):
     #def __extract_evolution(self, tmpfolder, bunches, runnable):
 
         # get beam
-        beam_evol = wake_t.diagnostics.analyze_bunch_list(bunches[1])
+        from wake_t.diagnostics import analyze_bunch_list
+
+        # cycle through bunches (driver and trailing bunch)
+        for i, bunch in enumerate(bunches):
+
+            # extract data
+            import warnings
+            warnings.filterwarnings("ignore")
+            beam_evol = analyze_bunch_list(bunch)
+            
+            # make container
+            evol = SimpleNamespace()
+            
+            # store variables
+            evol.location = beam_evol['prop_dist']
+            evol.charge = beam_evol['q_tot']
+            evol.energy = beam_evol['avg_ene']*SI.m_e*SI.c**2/SI.e
+            evol.z = np.empty_like(evol.location)*np.nan
+            evol.x = beam_evol['x_avg']
+            evol.y = beam_evol['y_avg']
+            evol.xp = beam_evol['theta_x']
+            evol.yp = beam_evol['theta_y']
+            evol.rel_energy_spread = beam_evol['rel_ene_spread']
+            evol.energy_spread = evol.rel_energy_spread*evol.energy
+            evol.beam_size_x = beam_evol['sigma_x']
+            evol.beam_size_y = beam_evol['sigma_y']
+            evol.bunch_length = beam_evol['sigma_z']
+            evol.emit_nx = beam_evol['emitt_x']
+            evol.emit_ny = beam_evol['emitt_y']
+            evol.beta_x = beam_evol['beta_x']
+            evol.beta_y = beam_evol['beta_y']
+            evol.plasma_density = np.ones_like(evol.location)*self.plasma_density
+            
+            # assign it to the right beam
+            if i == 0:
+                self.evolution.driver = evol
+            elif i == 1:
+                self.evolution.beam = evol
         
-        # store variables
-        self.evolution.location = beam_evol['prop_dist']
-        self.evolution.charge = beam_evol['q_tot']
-        self.evolution.energy = beam_evol['avg_ene']*SI.m_e*SI.c**2/SI.e
-        #self.evolution.z = beam_evol['z_avg']
-        self.evolution.x = beam_evol['x_avg']
-        self.evolution.y = beam_evol['y_avg']
-        self.evolution.xp = beam_evol['theta_x']
-        self.evolution.yp = beam_evol['theta_y']
-        self.evolution.rel_energy_spread = beam_evol['rel_ene_spread']
-        self.evolution.energy_spread = self.evolution.rel_energy_spread*self.evolution.energy
-        self.evolution.beam_size_x = beam_evol['sigma_x']
-        self.evolution.beam_size_y = beam_evol['sigma_y']
-        self.evolution.bunch_length = beam_evol['sigma_z']
-        self.evolution.emit_nx = beam_evol['emitt_x']
-        self.evolution.emit_ny = beam_evol['emitt_y']
-        self.evolution.beta_x = beam_evol['beta_x']
-        self.evolution.beta_y = beam_evol['beta_y']
 
     
     def __extract_initial_and_final_step(self, tmpfolder):
@@ -233,12 +263,4 @@ class StageWakeT(Stage):
         jz_driver, _, _ = np.histogram2d(data_driver[0][mask_driver], data_driver[2][mask_driver], weights=data_driver[3][mask_driver], bins=Nbins, range=[extent[2:4],extent[0:2]])
         self.final.beam.density.extent = metadata_plasma.imshow_extent
         self.final.beam.density.rho = (jz_beam+jz_driver)/(dr*dr*dz)
-        
-        
-    def energy_usage(self):
-        return None # TODO
-    
-    def matched_beta_function(self, energy):
-        from abel.utilities.plasma_physics import beta_matched
-        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
         
