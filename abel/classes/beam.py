@@ -202,16 +202,19 @@ class Beam():
             
             if pzs is not None:
                 if np.any(pzs < pz_thres):
-                    raise ValueError('pzs contains values that are too small.')
+                    print('pzs contains values that are too small.')
+                    #raise ValueError('pzs contains values that are too small.')
                 uzs = momentum2proper_velocity(pzs)
 
             elif Es is not None:
                 if np.any(Es < energy_thres):
-                    raise ValueError('Es contains values that are too small.')
+                    print('Es contains values that are too small.')
+                    #raise ValueError('Es contains values that are too small.')
                 uzs = energy2proper_velocity(Es)
         else:
             if np.any(uzs < uz_thres):
-                raise ValueError('uzs contains values that are too small.')
+                print('uzs contains values that are too small.')
+                #raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
         if uxs is None:
