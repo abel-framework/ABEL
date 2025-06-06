@@ -1224,29 +1224,34 @@ class Beam():
     
     ## phase spaces
     
-    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
+    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None, hlims=None, vlims=None):
         self.remove_nans()
         if hbins is None:
             hbins = round(np.sqrt(len(self))/2)
         if vbins is None:
             vbins = round(np.sqrt(len(self))/2)
+        if hlims is not None:
+            hbins = np.linspace(min(hlims), max(hlims), hbins)
+        if vlims is not None:
+            vbins = np.linspace(min(vlims), max(vlims), vbins)
         counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
         density = (counts/np.diff(vedges)).T/np.diff(hedges)
 
-        #dx = np.diff(hedges)
-        #dy = np.diff(vedges)
-        #bin_areas = dx[:, None] * dy[None, :]
-        #density = counts/bin_areas
-        #print(np.sum(density*np.diff(vedges)*np.diff(hedges))/self.charge())
         return density, hctrs, vctrs
     
-    def density_lps(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
+    def density_lps(self, zbins=None, Ebins=None, zlims=None, Elims=None):
+        return self.phase_space_density(self.zs, self.Es, hbins=zbins, vbins=Ebins, hlims=zlims, vlims=Elims)
     
-    def density_transverse(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)
+    def density_transverse(self, xbins=None, ybins=None, xlims=None, ylims=None):
+        return self.phase_space_density(self.xs, self.ys, hbins=xbins, vbins=ybins, hlims=xlims, vlims=ylims)
+
+    def density_trace_space_x(self, xbins=None, xpbins=None, xlims=None, xplims=None):
+        return self.phase_space_density(self.xs, self.xps, hbins=xbins, vbins=xpbins, hlims=xlims, vlims=xplims)
+        
+    def density_trace_space_y(self, ybins=None, ypbins=None, ylims=None, yplims=None):
+        return self.phase_space_density(self.ys, self.yps, hbins=ybins, vbins=ypbins, hlims=ylims, vlims=yplims)
 
     
     # ==================================================
@@ -1541,8 +1546,8 @@ class Beam():
         ax.set_xlabel('z (um)')
         ax.set_ylabel('Beam current (kA)')
     
-    def plot_lps(self):
-        dQdzdE, zs, Es = self.density_lps()
+    def plot_lps(self, zlims=None, Elims=None):
+        dQdzdE, zs, Es = self.density_lps(zlims=zlims, Elims=Elims)
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
@@ -1551,12 +1556,12 @@ class Beam():
         p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
         ax.set_xlabel('z (um)')
         ax.set_ylabel('E (GeV)')
-        ax.set_title('Longitudinal phase space')
+        ax.set_title(f'Longitudinal phase space \n σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/GeV)')
         
-    def plot_trace_space_x(self):
-        dQdxdxp, xs, xps = self.phase_space_density(self.xs, self.xps)
+    def plot_trace_space_x(self, xlims=None, xplims=None):
+        dQdxdxp, xs, xps = self.density_trace_space_x(xlims=xlims, xplims=xplims)
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
@@ -1564,12 +1569,12 @@ class Beam():
         p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         ax.set_xlabel('x (um)')
         ax.set_ylabel('x'' (mrad)')
-        ax.set_title('Horizontal trace space')
+        ax.set_title(f'Horizontal trace space \n β = {self.beta_x()*1e3:.0f} mm, α = {self.alpha_x():.1f}, εn = {self.norm_emittance_x()*1e6:.2f} mm mrad')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/mrad)')
         
-    def plot_trace_space_y(self):
-        dQdydyp, ys, yps = self.phase_space_density(self.ys, self.yps)
+    def plot_trace_space_y(self, ylims=None, yplims=None):
+        dQdydyp, ys, yps = self.density_trace_space_y(ylims=ylims, yplims=yplims)
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
@@ -1577,7 +1582,7 @@ class Beam():
         p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         ax.set_xlabel('y (um)')
         ax.set_ylabel('y'' (mrad)')
-        ax.set_title('Vertical trace space')
+        ax.set_title(f'Vertical trace space \n β = {self.beta_y()*1e3:.0f} mm, α = {self.alpha_y():.1f}, εn = {self.norm_emittance_y()*1e6:.2f} mm mrad')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/mrad)')
 
