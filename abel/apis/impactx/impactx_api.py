@@ -251,7 +251,7 @@ def particle_container2beam(particle_container):
     
     beam.set_xs(array[:,1])
     beam.set_ys(array[:,2])
-    beam.set_zs(array[:,3])
+    beam.set_zs(-array[:,3])
     
     beam.set_uxs(ref.pz*(array[:,4])*SI.c)
     beam.set_uys(ref.pz*(array[:,5])*SI.c)
@@ -283,7 +283,7 @@ def beam2particle_container(beam, sim=None, verbose=False):
     ref.set_kin_energy_MeV(beam.energy()/1e6)
     ref.s = beam.location
     
-    dx, dy, dz, dpx, dpy, dpz = pycoord.to_ref_part_t_from_global_t(ref, beam.xs(), beam.ys(), -beam.zs(), beam.uxs()/SI.c, beam.uys()/SI.c, beam.uzs()/SI.c)
+    dx, dy, dz, dpx, dpy, dpz = pycoord.to_ref_part_t_from_global_t(ref, beam.xs(), beam.ys(), beam.zs(), beam.uxs()/SI.c, beam.uys()/SI.c, beam.uzs()/SI.c)
     dx, dy, dt, dpx, dpy, dpt = pycoord.to_s_from_t(ref, dx, dy, dz, dpx, dpy, dpz)
     
     if not Config.have_gpu:  # initialize using cpu-based PODVectors

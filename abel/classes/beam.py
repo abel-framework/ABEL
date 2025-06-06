@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, particle_mass=SI.m_e):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -38,6 +38,8 @@ class Beam():
         # bunch pattern information
         self.num_bunches_in_train = num_bunches_in_train
         self.bunch_separation = bunch_separation # [s]
+
+        self.particle_mass = particle_mass
         
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
@@ -202,16 +204,19 @@ class Beam():
             
             if pzs is not None:
                 if np.any(pzs < pz_thres):
-                    raise ValueError('pzs contains values that are too small.')
+                    print('pzs contains values that are too small.')
+                    #raise ValueError('pzs contains values that are too small.')
                 uzs = momentum2proper_velocity(pzs)
 
             elif Es is not None:
                 if np.any(Es < energy_thres):
-                    raise ValueError('Es contains values that are too small.')
+                    print('Es contains values that are too small.')
+                    #raise ValueError('Es contains values that are too small.')
                 uzs = energy2proper_velocity(Es)
         else:
             if np.any(uzs < uz_thres):
-                raise ValueError('uzs contains values that are too small.')
+                print('uzs contains values that are too small.')
+                #raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
         if uxs is None:

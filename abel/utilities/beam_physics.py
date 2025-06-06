@@ -160,9 +160,14 @@ def Dmat(l, inv_rho=0, k=0):
     
     
 
-def evolve_beta_function(ls, ks, beta0, alpha0=0, fast=False):
+def evolve_beta_function(ls, ks, beta0, alpha0=0, fast=False, plot=False):
+
+    # overwrite fast-calculation toggle if plotting 
+    if plot and fast:
+        fast = False
+        
     if not fast:
-        Nres = 50
+        Nres = 100
         evolution = np.empty([3, Nres*len(ls)])
     else:
         evolution = None
@@ -190,33 +195,54 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, fast=False):
     # calculate final Twiss parameters
     beta = beta0*Rtot[0,0]**2 - 2*alpha0*Rtot[0,0]*Rtot[0,1] + gamma0*Rtot[0,1]**2
     alpha = -beta0*Rtot[0,0]*Rtot[1,0] + alpha0*(Rtot[1,1]*Rtot[0,0]+Rtot[0,1]*Rtot[1,0]) - gamma0*Rtot[0,1]*Rtot[1,1]
-    
+
+    if plot:
+        from matplotlib import pyplot as plt
+        # prepare plot
+        fig, ax = plt.subplots(1,1)
+        ax.plot(evolution[0,:], np.sqrt(evolution[1,:]))
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel('Square root of beta function (m^0.5)]')
+        
     return beta, alpha, evolution
 
 
-def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False):
+def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False):
+    
+    # overwrite fast-calculation toggle if plotting 
+    if plot and fast:
+        fast = False
+        
     if not fast:
-        Nres = 100
-        evolution = np.empty([3, Nres*len(ls)])
+        Nres_high = 200
+        Nres_low = 20
+        Ntot = Nres_high*np.sum(abs(inv_rhos)>0) + Nres_low*np.sum(abs(inv_rhos)==0)
+        evolution = np.empty([3, Ntot])
     else:
         evolution = None
     
     # calculate transfer matrix evolution
     Dtot = np.identity(3)
+    i_last = 0
     for i in range(len(ls)):
         
-        # full beta evolution
+        # full dispersion evolution
         if not fast:
+            
+            if abs(inv_rhos[i]) > 0:
+                Nres = Nres_high
+            else:
+                Nres = Nres_low
+            
             s0 = np.sum(ls[:i])
             ss_l = s0 + np.linspace(0, ls[i], Nres)
             for j in range(len(ss_l)):
                 D_l = Dmat(ss_l[j]-s0, inv_rhos[i], ks[i]) @ Dtot
-                #ss[i*Nres+j] = ss_l[j]
-                #Dxs[i*Nres+j] = Dx0*D_l[0,0] + Dpx0*D_l[1,2] + D_l[0,2]
-                evolution[0,i*Nres+j] = ss_l[j]
-                evolution[1,i*Nres+j] = Dx0*D_l[0,0] + Dpx0*D_l[1,2] + D_l[0,2]
-                evolution[2,i*Nres+j] = Dx0*D_l[1,0] + Dpx0*D_l[1,1] + D_l[1,2]
-        
+                evolution[0,i_last+j] = ss_l[j]
+                evolution[1,i_last+j] = Dx0*D_l[0,0] + Dpx0*D_l[1,2] + D_l[0,2]
+                evolution[2,i_last+j] = Dx0*D_l[1,0] + Dpx0*D_l[1,1] + D_l[1,2]
+            i_last = i_last + Nres
+            
         # final matrix
         Dtot = Dmat(ls[i],inv_rhos[i],ks[i]) @ Dtot
     
@@ -224,23 +250,33 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False):
     Dx = Dx0*Dtot[0,0] + Dpx0*Dtot[0,1] + Dtot[0,2]
     Dpx = Dx0*Dtot[1,0] + Dpx0*Dtot[1,1] + Dtot[1,2]
     
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(evolution[0,:], evolution[1,:])
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel('Dispersion (m)')
+        
     return Dx, Dpx, evolution
 
 
-def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False):
+def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=False):
     
+    # overwrite fast-calculation toggle if plotting 
+    if plot and fast:
+        fast = False
+        
     # element resolution
     Nress = np.zeros(len(ls))
     for i in range(len(ls)):
         Nress[i] = 100
     
     # use five energy offsets for good accuracy
-    delta = 1e-5
+    delta = 1e-4
     deltas = delta * np.arange(-2,3)
     
     # declare lists
     if not fast:
-        #ss = np.zeros(Nres*len(ls))
         ss = np.zeros(1+int(np.sum(Nress)))
         xs = np.zeros([1+int(np.sum(Nress)),len(deltas)])
         xps = np.zeros([1+int(np.sum(Nress)),len(deltas)])
@@ -310,7 +346,68 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False):
 
     # return dispersions
     DDx = (-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2)
-    DDpx = (xp[2] - 2*xp[1] + xp[0])/(delta**2)
+    DDpx = -(xp[2] - 2*xp[1] + xp[0])/(2*delta**2)
 
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(evolution[0,:], evolution[2,:])
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel('Second-order dispersion (m)')
+        
     return DDx, DDpx, evolution
+
+
+def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, plot=False):
+
+    # get the dispersion evolution
+    _, _, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False)
+    ss = evolution_disp[0]
+    Dxs = evolution_disp[1]
+    R56s = np.empty_like(ss)
+
+    # intialize at zero R56
+    R56s[0] = 0
+
+    # make cumulative lengths
+    ssl = np.append([0.0], np.cumsum(ls))
+    ssl = ssl[:-1]
+    
+    # calculate the evolution
+    for i in range(len(ss)-1):
+
+        s_prev = ss[i]
+        index_element_prev = np.argmin(abs(ssl - s_prev))
+        index_element_ceil_prev = index_element_prev + int(ssl[index_element_prev] <= s_prev) - 1
+        inv_rho_prev = inv_rhos[index_element_ceil_prev]
+
+        s = ss[i+1]
+        index_element = np.argmin(abs(ssl - s))
+        index_element_ceil = index_element + int(ssl[index_element] <= s) - 1
+        inv_rho = inv_rhos[index_element_ceil]
+
+        ds = ss[i+1]-ss[i]
+        inv_rho_halfstep = (inv_rho_prev+inv_rho)/2
+        Dx_halfstep = (Dxs[i]+Dxs[i+1])/2
+        deltaR56 = Dx_halfstep * inv_rho * ds
+        R56s[i+1] = R56s[i] + deltaR56
+
+    # save evolution
+    evolution = np.empty([2, len(ss)])
+    evolution[0,:] = ss
+    evolution[1,:] = R56s
+
+    # extract final R56
+    R56 = R56s[-1]
+
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(evolution[0,:], evolution[1,:])
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel('Longitudinal dispersion, R56 (m)')
+
+    return R56, evolution
+
+    
 

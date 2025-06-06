@@ -2,7 +2,7 @@ from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.source.source import Source
 from abel.classes.stage.stage import Stage
-from abel.classes.interstage.interstage import Interstage
+from abel.classes.interstage import Interstage
 from abel.classes.bds.bds import BeamDeliverySystem
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.beamline.impl.linac.linac import Linac
