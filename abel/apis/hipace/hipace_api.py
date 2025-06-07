@@ -9,7 +9,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=False, do_spin_tracking=False):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, mesh_refinement=False, do_spin_tracking=False):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -50,10 +50,10 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         num_cell_xy = new_num_cell_xy
 
     # plasma-density profile from file
-    if abs(external_focusing_radial) > 0:
-        external_focusing_radial_comment = ''
+    if abs(external_focusing_gradient) > 0:
+        external_focusing_comment = ''
     else:
-        external_focusing_radial_comment = '#'
+        external_focusing_comment = '#'
 
     # mesh refinement (level 1)
     res_mr0 = box_size_xy/num_cell_xy
@@ -97,8 +97,8 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'density_comment2': density_comment2,
               'ion_species': ion_species,
               'beam_ionization': int(beam_ionization),
-              'external_focusing_radial': abs(external_focusing_radial),
-              'external_focusing_radial_comment': external_focusing_radial_comment,
+              'external_focusing': abs(external_focusing_gradient),
+              'external_focusing_comment': external_focusing_comment,
               'filename_beam': filename_beam,
               'filename_driver': filename_driver}
 
