@@ -349,7 +349,8 @@ class Beam():
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
         if np.any(uzs < uz_thres):
-            raise ValueError('uzs contains values that are too small.')
+            print('uzs contains values that are too small.')
+            #raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
     def set_xps(self, xps):
@@ -359,7 +360,8 @@ class Beam():
     def set_Es(self, Es):
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         if np.any(Es < energy_thres):
-            raise ValueError('Es contains values that are too small.')
+            print('Es contains values that are too small.')
+            #raise ValueError('Es contains values that are too small.')
         self.set_uzs(energy2proper_velocity(Es))
         
     def set_qs(self, qs):
