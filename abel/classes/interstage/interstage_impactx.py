@@ -6,10 +6,14 @@ import scipy.constants as SI
 
 class InterstageImpactX(Interstage):
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, 
-                num_slices=50, keep_data=False):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0,
+                 use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True,
+                 enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, keep_data=False):
         
-        super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole)
+        super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, 
+                         use_nonlinearity=use_nonlinearity, use_chicane=use_chicane, 
+                         use_sextupole=use_sextupole, use_gaps=use_gaps, use_thick_lenses=use_thick_lenses, 
+                         enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
 
         # simulation options
         self.num_slices = num_slices
@@ -26,14 +30,11 @@ class InterstageImpactX(Interstage):
         # calculate the momentum
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         
-        # add beam diagnostics
-        #monitor = impactx.elements.BeamMonitor("monitor", backend="h5")
-
         # gap drift (with monitors)
         gap = []
         if self.use_gaps:
             gap.append(impactx.elements.ExactDrift(ds=self.length_gap, nslice=1))
-            #gap.append(monitor)
+            #gap.append(impactx.elements.BeamMonitor(name='monitor', backend='default', encoding='g', period_sample_intervals=10))
         
         # define dipole
         B_dip = self.field_dipole
@@ -114,11 +115,12 @@ class InterstageImpactX(Interstage):
         
         # run ImpactX
         from abel.apis.impactx.impactx_api import run_impactx
-        beam, self.evolution = run_impactx(lattice, beam0, verbose=False, runnable=runnable, keep_data=self.keep_data, 
+        beam, evol = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, keep_data=self.keep_data, 
                                  space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
+        self.evolution = evol
         
         return super().track(beam, savedepth, runnable, verbose)
-
+    
     
     def plot_layout(self):
 

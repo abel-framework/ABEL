@@ -100,8 +100,9 @@ class StageQuasistatic2d(Stage):
         driver_waket = wake_t_bunch2beam(bunches[0][-1])
         
         # save evolution of the beam and driver
-        self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
-        self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
+        if self.calculate_evolution:
+            self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
+            self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
 
         # extract wakefield info
         ts = OpenPMDTimeSeries(tmpfolder+'hdf5/')

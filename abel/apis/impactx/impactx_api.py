@@ -32,7 +32,7 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
             sim.isr_order = 1
     
     # convert to ImpactX particle container
-    _, sim = beam2particle_container(beam0, sim=sim, verbose=verbose)
+    _, sim = beam2particle_container(beam0, sim=sim, verbose=verbose, nom_energy=nom_energy)
     
     # assign the lattice
     sim.lattice.extend(lattice)
@@ -61,9 +61,12 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     # change back to original directory
     os.chdir(original_folder)
 
-    # delete run folder
+    # delete run folder (or move it to the run folder)
     if not keep_data:
         shutil.rmtree(runfolder)
+    else:
+        new_dir = shutil.move(runfolder, runnable.shot_path())
+        os.rename(new_dir, os.path.join(os.path.dirname(new_dir),'impactx_sims'))
 
     return beam, evol
 
@@ -169,6 +172,46 @@ def finalize_impactx_sim(sim, verbose=False):
         else:
             eval('amr.finalize()')
 
+def extract_beams(path='', runnable=None):
+
+    from abel.classes.beam import Beam
+    import openpmd_api as io
+
+    if runnable is not None:
+        path = os.path.join(runnable.shot_path(), 'impactx_sims')
+        
+    # load OpenPMD series
+    series = io.Series(os.path.join(path,'diags/openPMD/monitor.h5'), io.Access.read_only)
+    steps = list(series.iterations)
+    
+    ss = np.zeros_like(steps, dtype=np.float64)
+    dispx2 = np.zeros_like(steps, dtype=np.float64)
+    return
+    for i in range(len(steps)):
+        
+        beam_raw = series.iterations[steps[i]].particles["beam"]
+        #print(beam_raw)
+        ss[i] = beam_raw.get_attribute("s_ref")
+
+        beam_df = beam_raw.to_df()
+        #print(beam_df)
+        
+        q_particle = np.array(beam_df.weighting)*(SI.m_e*SI.c**2/SI.e)*SI.e
+        Q = sum(q_particle)
+        
+        xs = np.array(beam_df.position_x)
+        ys = np.array(beam_df.position_y)
+        zs = np.array(beam_df.position_t)
+        uxs = ref.pz*(np.array(beam_df.momentum_x))*SI.c
+        uys = ref.pz*(np.array(beam_df.momentum_y))*SI.c
+        uzs = ref.pz*(1-np.array(beam_df.momentum_t))*SI.c
+        
+        beam = Beam()
+        beam.set_phase_space(self, Q, xs, ys, zs, uxs=uxs, uys=uys, uzs=uzs)
+        beam.location = ss[i]
+        
+        break
+        
 
 def extract_evolution(path='', second_order=False):
     
@@ -201,7 +244,7 @@ def extract_evolution(path='', second_order=False):
     evol.charge = diags["charge_C"]
     evol.dispersion_x = diags["dispersion_x"]
     evol.dispersion_y = diags["dispersion_y"]
-
+    
     if second_order:
 
         import openpmd_api as io
@@ -266,7 +309,7 @@ def particle_container2beam(particle_container):
 
     
 # convert from ABEL beam to ImpactX particle container
-def beam2particle_container(beam, sim=None, verbose=False):
+def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
 
     import amrex.space3d as amr
     from impactx import Config
@@ -275,12 +318,16 @@ def beam2particle_container(beam, sim=None, verbose=False):
     # make simulation object if not already existing
     if sim is None:
         sim = initialize_impactx_sim(verbose=verbose)
-    
+
+    # select beam energy as nominal if none given
+    if nom_energy is None:
+        nom_energy = beam.energy()
+        
     # reference particle
     ref = sim.particle_container().ref_particle()
     ref.set_charge_qe(-1.0)
     ref.set_mass_MeV(0.510998950)
-    ref.set_kin_energy_MeV(beam.energy()/1e6)
+    ref.set_kin_energy_MeV(nom_energy/1e6)
     ref.s = beam.location
     
     dx, dy, dz, dpx, dpy, dpz = pycoord.to_ref_part_t_from_global_t(ref, beam.xs(), beam.ys(), beam.zs(), beam.uxs()/SI.c, beam.uys()/SI.c, beam.uzs()/SI.c)

@@ -4,19 +4,22 @@ import numpy as np
 
 class InterstageBasic(Interstage):
     
-    def __init__(self, nom_energy=None, length=None, dipole_length=None, dipole_field=None, beta0=None, R56=None, phase_advance=1.5*np.pi):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0,
+                 use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True,
+                 enable_csr=True, enable_isr=True, enable_space_charge=False, phase_advance=2*np.pi):
         
-        super().__init__(nom_energy=nom_energy, dipole_length=dipole_length, dipole_field=dipole_field, beta0=beta0)
+        super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, 
+                         use_nonlinearity=use_nonlinearity, use_chicane=use_chicane, 
+                         use_sextupole=use_sextupole, use_gaps=use_gaps, use_thick_lenses=use_thick_lenses, 
+                         enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
         
-        self.length = length
         self.phase_advance = phase_advance
-        self.R56 = R56
     
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         
         # compress beam
-        beam.compress(R_56=self.get_R56(), nom_energy=self.nom_energy)
+        beam.compress(R_56=self.R56, nom_energy=self.nom_energy)
         
         # rotate transverse phase spaces (assumed achromatic)
         if callable(self.beta0):
@@ -34,42 +37,4 @@ class InterstageBasic(Interstage):
         beam.set_yps(yps_rotated)
         
         return super().track(beam, savedepth, runnable, verbose)
-
-    
-    # evaluate dipole length (if it is a function)
-    def get_dipole_length(self):
-        if callable(self.dipole_length):
-            return self.dipole_length(self.nom_energy)
-        else:
-            return self.dipole_length
-
-    
-    # evaluate dipole field (if it is a function)
-    def get_dipole_field(self):
-        if callable(self.dipole_field):
-            return self.dipole_field(self.nom_energy)
-        else:
-            return self.dipole_field
-
-    
-    # evaluate longitudinal dispersion (R56)
-    def get_R56(self):
-        if self.R56 is not None:
-            if callable(self.R56):
-                return self.R56(self.nom_energy)
-            else:
-                return self.R56
-        else:
-            return -self.get_dipole_field()**2*SI.c**2*self.get_dipole_length()**3/(3*self.nom_energy**2)
-    
-    
-    # lattice length
-    def get_length(self):
-        if self.length is not None:
-            if callable(self.length):
-                return self.length(self.nom_energy)
-            else:
-                return self.length
-        else:
-            return 4.7875*self.get_dipole_length()
         
