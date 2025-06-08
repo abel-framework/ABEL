@@ -22,7 +22,7 @@ class InterstageImpactX(Interstage):
     
     def get_lattice(self):
 
-        import impactx
+        from impactx import elements
         
         # initialize lattice
         lattice = []
@@ -33,52 +33,60 @@ class InterstageImpactX(Interstage):
         # gap drift (with monitors)
         gap = []
         if self.use_gaps:
-            gap.append(impactx.elements.ExactDrift(ds=self.length_gap, nslice=1))
-            #gap.append(impactx.elements.BeamMonitor(name='monitor', backend='default', encoding='g', period_sample_intervals=10))
+            gap.append(elements.ExactDrift(ds=self.length_gap, nslice=1))
+            #gap.append(elements.BeamMonitor(name='monitor', backend='default', encoding='g', period_sample_intervals=10))
         
         # define dipole
         B_dip = self.field_dipole
         phi_dip = self.length_dipole*B_dip*SI.e/p0
-        dipole = impactx.elements.ExactSbend(ds=self.length_dipole, phi=np.rad2deg(phi_dip), B=B_dip, nslice=self.num_slices)
+        dipole = elements.ExactSbend(ds=self.length_dipole, phi=np.rad2deg(phi_dip), B=B_dip, nslice=self.num_slices)
 
         # define plasma lens
         kl_lens = self.strength_plasma_lens
         tau_lens = self.nonlinearity_plasma_lens
         plasma_lens = []
+
+        pl_aperture = elements.Aperture(aperture_x=self.lens_radius, aperture_y=self.lens_radius, shape="elliptical")
+        if self.use_apertures: # add aperture to the plasma lens
+            plasma_lens.append(pl_aperture)
+            
         if self.use_thick_lenses:
-            drift_slice_pl = impactx.elements.ExactDrift(ds=self.length_plasma_lens/(self.num_slices+1), nslice=1)
-            pl_slice = impactx.elements.TaperedPL(k=kl_lens/self.num_slices, taper=tau_lens)
+            drift_slice_pl = elements.ExactDrift(ds=self.length_plasma_lens/(self.num_slices+1), nslice=1)
+            pl_slice = elements.TaperedPL(k=kl_lens/self.num_slices, taper=tau_lens)
             plasma_lens.extend([drift_slice_pl, pl_slice]*self.num_slices)
             plasma_lens.append(drift_slice_pl)
         else:
-            plasma_lens.append(impactx.elements.TaperedPL(k=kl_lens, taper=tau_lens))
+            plasma_lens.append(elements.TaperedPL(k=kl_lens, taper=tau_lens))
+
+        if self.use_apertures: # add another one at the end of the lens
+            plasma_lens.append(pl_aperture)
 
         # define first chicane dipole
         B_chic1 = self.field_chicane_dipole1
         phi_chic1 = self.length_chicane_dipole*B_chic1*(SI.e/p0)
         if abs(B_chic1) > 0:
-            chicane_dipole1 = impactx.elements.ExactSbend(ds=self.length_chicane_dipole, phi=np.rad2deg(phi_chic1), B=B_chic1, nslice=self.num_slices)
+            chicane_dipole1 = elements.ExactSbend(ds=self.length_chicane_dipole, phi=np.rad2deg(phi_chic1), B=B_chic1, nslice=self.num_slices)
         else:
-            chicane_dipole1 = impactx.elements.ExactDrift(ds=self.length_chicane_dipole, nslice=self.num_slices)
+            chicane_dipole1 = elements.ExactDrift(ds=self.length_chicane_dipole, nslice=self.num_slices)
 
         # define second chicane dipole
         B_chic2 = self.field_chicane_dipole2
         phi_chic2 = self.length_chicane_dipole*B_chic2*(SI.e/p0)
         if abs(B_chic2) > 0:
-            chicane_dipole2 = impactx.elements.ExactSbend(ds=self.length_chicane_dipole, phi=np.rad2deg(phi_chic2), B=B_chic2, nslice=self.num_slices)
+            chicane_dipole2 = elements.ExactSbend(ds=self.length_chicane_dipole, phi=np.rad2deg(phi_chic2), B=B_chic2, nslice=self.num_slices)
         else:
-            chicane_dipole2 = impactx.elements.ExactDrift(ds=self.length_chicane_dipole, nslice=self.num_slices)
+            chicane_dipole2 = elements.ExactDrift(ds=self.length_chicane_dipole, nslice=self.num_slices)
 
         # define sextupole
         ml_sext = self.strength_sextupole
         half_sextupole = []
         if self.use_thick_lenses:
-            drift_slice_sext = impactx.elements.ExactDrift(ds=self.length_sextupole/(self.num_slices+1)/2, nslice=1)
-            sext_slice = impactx.elements.Multipole(multipole=3, K_normal=ml_sext/self.num_slices, K_skew=0)
+            drift_slice_sext = elements.ExactDrift(ds=self.length_sextupole/(self.num_slices+1)/2, nslice=1)
+            sext_slice = elements.Multipole(multipole=3, K_normal=ml_sext/self.num_slices, K_skew=0)
             half_sextupole.extend([drift_slice_sext, sext_slice]*self.num_slices)
             half_sextupole.append(drift_slice_sext)
         else:
-            half_sextupole.append(impactx.elements.Multipole(multipole=3, K_normal=ml_sext, K_skew=0))
+            half_sextupole.append(elements.Multipole(multipole=3, K_normal=ml_sext, K_skew=0))
         
         # specify the lattice sequence
         lattice.extend(gap)

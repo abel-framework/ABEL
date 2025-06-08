@@ -8,8 +8,8 @@ import scipy.constants as SI
 class Interstage(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0,
-                 use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True,
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, lens_radius=1e-3,
+                 use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True, use_apertures=True,
                  enable_csr=True, enable_isr=True, enable_space_charge=False):
         
         super().__init__()
@@ -17,6 +17,7 @@ class Interstage(Trackable, CostModeled):
         # main parameters
         self.nom_energy = nom_energy
         self._R56 = R56
+        self.lens_radius = lens_radius
 
         # main parameters (functions of energy)
         self._beta0 = beta0
@@ -42,6 +43,7 @@ class Interstage(Trackable, CostModeled):
         self.use_sextupole = use_sextupole
         self.use_gaps = use_gaps
         self.use_thick_lenses = use_thick_lenses
+        self.use_apertures = use_apertures
 
         # physics flags
         self.enable_csr = enable_csr
