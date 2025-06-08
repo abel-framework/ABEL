@@ -116,7 +116,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     
     # set the partition based on the number of nodes and tasks
     # based on LUMI (see https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/partitions/)
-    if num_nodes <= 4 and num_tasks_per_node <= 8:
+    if num_nodes <= 2 and num_tasks_per_node <= 8:
         partition_name = CONFIG.partition_name_small
     elif num_nodes <= 32 and num_tasks_per_node <= 8:
         partition_name = CONFIG.partition_name_devel
