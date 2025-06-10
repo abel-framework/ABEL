@@ -1545,63 +1545,110 @@ class Beam():
         fig.set_figwidth(6)
         fig.set_figheight(4)        
         ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
-        ax.set_xlabel('z (um)')
+        ax.set_xlabel('z (μm)')
         ax.set_ylabel('Beam current (kA)')
     
-    def plot_lps(self, zlims=None, Elims=None):
-        dQdzdE, zs, Es = self.density_lps(zlims=zlims, Elims=Elims)
-
+    def plot_lps(self, zlims=None, Elims=None, chromatic=False, num_samples=10000):
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-            
-        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('z (um)')
+        if not chromatic:
+            dQdzdE, zs, Es = self.density_lps(zlims=zlims, Elims=Elims)
+            p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
+            deltalim = round(4*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.zs()[inds]*1e6, self.Es()[inds]/1e9, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+        if zlims is not None:
+            ax.set_xlim(np.array(zlims)*1e6)
+        if Elims is not None:
+            ax.set_ylim(np.array(Elims)/1e9)
+        ax.set_xlabel('z (μm)')
         ax.set_ylabel('E (GeV)')
-        ax.set_title(f'Longitudinal phase space \n σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
+        ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
         cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
+        if not chromatic:
+            cb.ax.set_ylabel('Charge density (pC/μm/GeV)')
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
         
-    def plot_trace_space_x(self, xlims=None, xplims=None):
-        dQdxdxp, xs, xps = self.density_trace_space_x(xlims=xlims, xplims=xplims)
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('x'' (mrad)')
-        ax.set_title(f'Horizontal trace space \n β = {self.beta_x()*1e3:.0f} mm, α = {self.alpha_x():.1f}, εn = {self.norm_emittance_x()*1e6:.2f} mm mrad')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
         
-    def plot_trace_space_y(self, ylims=None, yplims=None):
-        dQdydyp, ys, yps = self.density_trace_space_y(ylims=ylims, yplims=yplims)
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('y (um)')
-        ax.set_ylabel('y'' (mrad)')
-        ax.set_title(f'Vertical trace space \n β = {self.beta_y()*1e3:.0f} mm, α = {self.alpha_y():.1f}, εn = {self.norm_emittance_y()*1e6:.2f} mm mrad')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
-
-    def plot_transverse_profile(self):
-        dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys)
-
+    def plot_trace_space_x(self, xlims=None, xplims=None, chromatic=False, num_samples=10000):
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)
-        p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
-        #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
-        #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('y (um)')
-        ax.set_title('Transverse profile')
+        if not chromatic:
+            dQdxdxp, xs, xps = self.density_trace_space_x(xlims=xlims, xplims=xplims)
+            p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            inds = round(np.linspace(0, len(self)-1, num_samples)) if len(self) > num_samples else range(len(self))
+            deltalim = round(4*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.xs()[inds]*1e6, self.xps()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+        if xlims is not None:
+            ax.set_xlim(np.array(xlims)*1e6)
+        if xplims is not None:
+            ax.set_ylim(np.array(xplims)*1e3)
+        ax.set_xlabel('x (μm)')
+        ax.set_ylabel('x'' (mrad)')
+        ax.set_title(f'Horizontal trace space (s = {self.location:.2f} m) \n β = {self.beta_x()*1e3:.0f} mm, α = {self.alpha_x():.1f}, εn = {self.norm_emittance_x()*1e6:.2f} mm mrad')
         cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um^2)')
+        if not chromatic:
+            cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
+        
+    def plot_trace_space_y(self, ylims=None, yplims=None, chromatic=False, num_samples=10000):
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        if not chromatic:
+            dQdydyp, ys, yps = self.density_trace_space_y(ylims=ylims, yplims=yplims)
+            p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
+            deltalim = round(4*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.ys()[inds]*1e6, self.yps()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+        if ylims is not None:
+            ax.set_xlim(np.array(ylims)*1e6)
+        if yplims is not None:
+            ax.set_ylim(np.array(yplims)*1e3)
+        ax.set_xlabel('y (μm)')
+        ax.set_ylabel('y'' (mrad)')
+        ax.set_title(f'Vertical trace space (s = {self.location:.2f} m) \n β = {self.beta_y()*1e3:.0f} mm, α = {self.alpha_y():.1f}, εn = {self.norm_emittance_y()*1e6:.2f} mm mrad')
+        cb = fig.colorbar(p)
+        if not chromatic:
+            cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
+
+    def plot_transverse_profile(self, xlims=None, ylims=None, chromatic=False, num_samples=10000):
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)
+        if not chromatic:
+            dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys, hlims=xlims, vlims=ylims)
+            p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
+            deltalim = round(4*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.xs()[inds]*1e6, self.ys()[inds]*1e6, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+        if xlims is not None:
+            ax.set_xlim(np.array(xlims)*1e6)
+        if ylims is not None:
+            ax.set_ylim(np.array(ylims)*1e6)
+        ax.set_xlabel('x (μm)')
+        ax.set_ylabel('y (μm)')
+        ax.set_title('Transverse profile')
+        ax.set_title(f"Transverse profile (s = {self.location:.2f} m) \n σx = {self.beam_size_x()*1e6:.0f} μm, σx' = {self.divergence_x()*1e3:.2f} mrad, σy = {self.beam_size_y()*1e6:.2f} μm, σy' = {self.divergence_y()*1e3:.1f} mrad")
+        cb = fig.colorbar(p)
+        if not chromatic:
+            cb.ax.set_ylabel('Charge density (pC/μm^2)')
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
 
     
     # TODO: unfinished!

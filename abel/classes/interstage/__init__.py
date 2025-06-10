@@ -8,7 +8,7 @@ import scipy.constants as SI
 class Interstage(Trackable, CostModeled):
     
     @abstractmethod
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, lens_radius=1e-3,
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, lens_radius=2e-3,
                  use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True, use_apertures=True,
                  enable_csr=True, enable_isr=True, enable_space_charge=False):
         

@@ -4,7 +4,7 @@ import uuid, os, shutil
 import scipy.constants as SI
 from types import SimpleNamespace
 
-def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, space_charge=False, csr=False, isr=False, verbose=False):
+def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, verbose=False):
 
     # create a new directory
     original_folder = os.getcwd()
@@ -15,7 +15,7 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     if not os.path.exists(runfolder):
         os.makedirs(runfolder)
     os.chdir(runfolder)
-
+    
     # make simulation
     sim = initialize_impactx_sim(verbose=verbose)
     
@@ -61,6 +61,13 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     # change back to original directory
     os.chdir(original_folder)
 
+    # save beams if requested
+    if runnable is not None and save_beams:
+        from abel.apis.impactx.impactx_api import extract_beams
+        beams = extract_beams(runfolder, beam0=beam0)
+        for beam_step in beams:
+            beam_step.save(runnable=runnable)
+        
     # delete run folder (or move it to the run folder)
     if not keep_data:
         shutil.rmtree(runfolder)
@@ -122,21 +129,38 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     return evol
 
 
-def initialize_impactx_sim(verbose=False):
-
-    import amrex.space3d as amr
-    from impactx import ImpactX
+def initialize_amrex(verbose=False):
     
-    # add before the simulation setup
+    import amrex.space3d as amr
+    
     pp_prof = amr.ParmParse("tiny_profiler")
     pp_prof.add("enabled", int(verbose))
     
-    # set AMReX verbosity
     if not amr.initialized():
         if verbose:
             amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
         else:
             eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
+
+
+def finalize_amrex(verbose=False):
+    
+    import amrex.space3d as amr
+    
+    if amr.initialized():
+        if verbose:
+            amr.finalize()
+        else:
+            eval('amr.finalize()')
+
+
+def initialize_impactx_sim(verbose=False):
+
+    import amrex.space3d as amr
+    from impactx import ImpactX
+    
+    # set AMReX verbosity
+    initialize_amrex(verbose=verbose)
 
     # make simulation object
     sim = ImpactX()
@@ -158,21 +182,16 @@ def initialize_impactx_sim(verbose=False):
 
 
 def finalize_impactx_sim(sim, verbose=False):
-
-    import amrex.space3d as amr
     
     # finalize and delete the simulation
     sim.finalize()
     del sim
     
     # finalize AMReX
-    if amr.initialized():
-        if verbose:
-            amr.finalize()
-        else:
-            eval('amr.finalize()')
+    finalize_amrex()
 
-def extract_beams(path='', runnable=None):
+
+def extract_beams(path='', runnable=None, beam0=None):
 
     from abel.classes.beam import Beam
     import openpmd_api as io
@@ -186,31 +205,35 @@ def extract_beams(path='', runnable=None):
     
     ss = np.zeros_like(steps, dtype=np.float64)
     dispx2 = np.zeros_like(steps, dtype=np.float64)
-    return
+
+    beams = []
     for i in range(len(steps)):
         
         beam_raw = series.iterations[steps[i]].particles["beam"]
-        #print(beam_raw)
-        ss[i] = beam_raw.get_attribute("s_ref")
-
-        beam_df = beam_raw.to_df()
-        #print(beam_df)
         
-        q_particle = np.array(beam_df.weighting)*(SI.m_e*SI.c**2/SI.e)*SI.e
-        Q = sum(q_particle)
+        ss[i] = beam_raw.get_attribute("s_ref")
+        pz_ref = beam_raw.get_attribute("pz_ref")
+        
+        beam_df = beam_raw.to_df()
+        Q = np.sum(beam_df.qm*beam_df.weighting)*(SI.m_e*SI.c**2)
         
         xs = np.array(beam_df.position_x)
         ys = np.array(beam_df.position_y)
         zs = np.array(beam_df.position_t)
-        uxs = ref.pz*(np.array(beam_df.momentum_x))*SI.c
-        uys = ref.pz*(np.array(beam_df.momentum_y))*SI.c
-        uzs = ref.pz*(1-np.array(beam_df.momentum_t))*SI.c
+        uxs = pz_ref*(np.array(beam_df.momentum_x))*SI.c
+        uys = pz_ref*(np.array(beam_df.momentum_y))*SI.c
+        uzs = pz_ref*(1-np.array(beam_df.momentum_t))*SI.c
         
         beam = Beam()
-        beam.set_phase_space(self, Q, xs, ys, zs, uxs=uxs, uys=uys, uzs=uzs)
+        beam.set_phase_space(Q, xs, ys, zs, uxs=uxs, uys=uys, uzs=uzs)
         beam.location = ss[i]
-        
-        break
+        if beam0 is not None:
+            beam.trackable_number = beam0.trackable_number
+            beam.stage_number = beam0.stage_number
+
+        beams.append(beam)
+
+    return beams
         
 
 def extract_evolution(path='', second_order=False):
