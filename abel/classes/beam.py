@@ -1229,9 +1229,9 @@ class Beam():
     def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None, hlims=None, vlims=None):
         self.remove_nans()
         if hbins is None:
-            hbins = round(np.sqrt(len(self))/2)
+            hbins = round(np.sqrt(len(self))/4)
         if vbins is None:
-            vbins = round(np.sqrt(len(self))/2)
+            vbins = round(np.sqrt(len(self))/4)
         if hlims is not None:
             hbins = np.linspace(min(hlims), max(hlims), hbins)
         if vlims is not None:
@@ -1548,10 +1548,14 @@ class Beam():
         ax.set_xlabel('z (μm)')
         ax.set_ylabel('Beam current (kA)')
     
-    def plot_lps(self, zlims=None, Elims=None, chromatic=False, num_samples=10000):
+    def plot_lps(self, zlims=None, Elims=None, chromatic=False, num_samples=10000, dQdEdzlim=None, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5)  
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
         if not chromatic:
             dQdzdE, zs, Es = self.density_lps(zlims=zlims, Elims=Elims)
             p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
@@ -1570,8 +1574,15 @@ class Beam():
         cb = fig.colorbar(p)
         if not chromatic:
             cb.ax.set_ylabel('Charge density (pC/μm/GeV)')
+            if dQdEdzlim is not None:
+                p.set_clim([0, dQdEdzlim*1e15])
         else:
             cb.ax.set_ylabel('Rel. energy offset (%)')
+           
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
         
         
     def plot_trace_space_x(self, xlims=None, xplims=None, chromatic=False, num_samples=10000):
@@ -1624,31 +1635,40 @@ class Beam():
         else:
             cb.ax.set_ylabel('Rel. energy offset (%)')
 
-    def plot_transverse_profile(self, xlims=None, ylims=None, chromatic=False, num_samples=10000):
+    def plot_transverse_profile(self, xlims=None, ylims=None, chromatic=False, num_samples=10000, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5) 
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
         if not chromatic:
             dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys, hlims=xlims, vlims=ylims)
-            p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
+            p = ax.pcolor(xs*1e3, ys*1e3, -dQdxdy*1e3, cmap=CONFIG.default_cmap, shading='auto')
         else:
             from abel.utilities.colors import FLASHForward_nowhite as cmap
             inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
             deltalim = round(4*self.rel_energy_spread(), 2)
-            p = ax.scatter(self.xs()[inds]*1e6, self.ys()[inds]*1e6, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+            p = ax.scatter(self.xs()[inds]*1e3, self.ys()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
         if xlims is not None:
-            ax.set_xlim(np.array(xlims)*1e6)
+            ax.set_xlim(np.array(xlims)*1e3)
         if ylims is not None:
-            ax.set_ylim(np.array(ylims)*1e6)
-        ax.set_xlabel('x (μm)')
-        ax.set_ylabel('y (μm)')
+            ax.set_ylim(np.array(ylims)*1e3)
+        ax.set_xlabel('x (mm)')
+        ax.set_ylabel('y (mm)')
         ax.set_title('Transverse profile')
-        ax.set_title(f"Transverse profile (s = {self.location:.2f} m) \n σx = {self.beam_size_x()*1e6:.0f} μm, σx' = {self.divergence_x()*1e3:.2f} mrad, σy = {self.beam_size_y()*1e6:.2f} μm, σy' = {self.divergence_y()*1e3:.1f} mrad")
+        ax.set_title(f"Transverse profile (s = {self.location:.2f} m) \n σx = {self.beam_size_x()*1e6:.1f} μm, σy = {self.beam_size_y()*1e6:.1f} μm")
         cb = fig.colorbar(p)
         if not chromatic:
-            cb.ax.set_ylabel('Charge density (pC/μm^2)')
+            cb.ax.set_ylabel('Charge density (nC/mm^2)')
         else:
             cb.ax.set_ylabel('Rel. energy offset (%)')
+            
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
 
     
     # TODO: unfinished!

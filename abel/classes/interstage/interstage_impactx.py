@@ -36,6 +36,8 @@ class InterstageImpactX(Interstage):
             from abel.apis.impactx.impactx_api import initialize_amrex
             initialize_amrex()
             monitor = elements.BeamMonitor(name='monitor', backend='h5', encoding='g')
+        else:
+            monitor = []
         
         # gap drift (with monitors)
         gap = []
@@ -123,7 +125,13 @@ class InterstageImpactX(Interstage):
         lattice.extend(gap)
         lattice.append(dipole)
         lattice.extend(gap)
-        
+
+        # remove first and last monitor
+        if lattice[0] == monitor:
+            del lattice[0]
+        if lattice[-1] == monitor:
+            del lattice[-1]
+                
         return lattice
 
         

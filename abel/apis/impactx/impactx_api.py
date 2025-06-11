@@ -228,8 +228,8 @@ def extract_beams(path='', runnable=None, beam0=None):
         beam.set_phase_space(Q, xs, ys, zs, uxs=uxs, uys=uys, uzs=uzs)
         beam.location = ss[i]
         if beam0 is not None:
-            beam.trackable_number = beam0.trackable_number
-            beam.stage_number = beam0.stage_number
+            beam.trackable_number = beam0.trackable_number+1
+            beam.stage_number = beam0.stage_number+1
 
         beams.append(beam)
 
