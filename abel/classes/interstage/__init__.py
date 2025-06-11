@@ -9,7 +9,7 @@ class Interstage(Trackable, CostModeled):
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, lens_radius=2e-3,
-                 use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True, use_apertures=True,
+                 use_nonlinearity=True, use_chicane=True, use_sextupole=False, use_gaps=True, use_thick_lenses=True, use_apertures=True,
                  enable_csr=True, enable_isr=True, enable_space_charge=False):
         
         super().__init__()
@@ -25,10 +25,10 @@ class Interstage(Trackable, CostModeled):
         self._field_dipole = field_dipole
 
         # length ratios
-        self.length_ratio_gap = 0.02
+        self.length_ratio_gap = 0.03
         self.length_ratio_plasma_lens = 0.05
-        self.length_ratio_chicane_dipole = 0.85
-        self.length_ratio_sextupole = 0.3
+        self.length_ratio_chicane_dipole = 0.89 # 0.85 is better for sextupole on
+        self.length_ratio_sextupole = 0.04 # 0.3 is better for sextupole on
 
         # derivable (but also settable) parameters
         self._field_ratio_chicane_dipole1 = None
@@ -137,9 +137,11 @@ class Interstage(Trackable, CostModeled):
     @property
     def length_sextupole(self):
         if self.use_thick_lenses:
-            return float(self.use_sextupole) * self.length_dipole * self.length_ratio_sextupole
+            return self.length_dipole * self.length_ratio_sextupole
+            #return float(self.use_sextupole) * self.length_dipole * self.length_ratio_sextupole
         else:
-            return float(self.use_sextupole) * self.length_dipole * 1e-6
+            #return float(self.use_sextupole) * self.length_dipole * 1e-6
+            return self.length_dipole * 1e-6
 
     
     ## DERIVED PARAMETERS
@@ -282,25 +284,28 @@ class Interstage(Trackable, CostModeled):
         Dx_mid = Dx_lens*(1/4)*(1 + 3*L2/L1 + 2*(B2*L2**2)/(B1*L1**2))
         DDxp_mid = (2*Dpx_lens)*((3/4)*(L1/L2 + 1) - 1)*(2.0-int(self.use_nonlinearity))
 
-        # guesstimate the sextupole strength (starting point for optimization)
-        ml_sext0 = int(self.use_sextupole)*2*DDxp_mid/Dx_mid**2
-        m_sext0 = ml_sext0/self.length_sextupole
-
         # get the second dipole
         B_chic2 = self.field_chicane_dipole2
         
-        # minimizer function for second-order dispersion (central second-order dispersion prime is zero)
-        from abel.utilities.beam_physics import evolve_second_order_dispersion
-        def minfun_second_order_dispersion(params):
-            ls, inv_rhos, ks, ms, taus = self.matrix_lattice(k_lens=k_lens, tau_lens=tau_lens, B_chic2=B_chic2, m_sext=params[0], half_lattice=True)
-            _, DDpx, _ = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=True) 
-            return DDpx**2
+        # guesstimate the sextupole strength (starting point for optimization)
+        if self.use_sextupole:
+            ml_sext0 = int(self.use_sextupole)*2*DDxp_mid/Dx_mid**2
+            m_sext0 = ml_sext0/self.length_sextupole
     
-        # match the beta function
-        from scipy.optimize import minimize
-        result_dispersion = minimize(minfun_second_order_dispersion, m_sext0, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
-        self._strength_sextupole = result_dispersion.x[0]*self.length_sextupole
-    
+            # minimizer function for second-order dispersion (central second-order dispersion prime is zero)
+            from abel.utilities.beam_physics import evolve_second_order_dispersion
+            def minfun_second_order_dispersion(params):
+                ls, inv_rhos, ks, ms, taus = self.matrix_lattice(k_lens=k_lens, tau_lens=tau_lens, B_chic2=B_chic2, m_sext=params[0], half_lattice=True)
+                _, DDpx, _ = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=True) 
+                return DDpx**2
+        
+            # match the beta function
+            from scipy.optimize import minimize
+            result_dispersion = minimize(minfun_second_order_dispersion, m_sext0, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
+            self._strength_sextupole = result_dispersion.x[0]*self.length_sextupole
+        else:
+            self.strength_sextupole
+        
         
     
     ## MATRIX LATTICE
@@ -331,7 +336,10 @@ class Interstage(Trackable, CostModeled):
         
         # sextupole strength array
         if m_sext is None:
-            m_sext = self.strength_sextupole/self.length_sextupole
+            if self.use_sextupole:
+                m_sext = self.strength_sextupole/self.length_sextupole
+            else:
+                m_sext = 0
         ms = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, m_sext])
 
         # plasma-lens transverse taper array
@@ -569,7 +577,7 @@ class Interstage(Trackable, CostModeled):
         # plot the orbits
         alpha = 0.15
         lw_dotted = 0.8
-        lw_solid = 1.5
+        lw_solid = 1.2
         col_low = '#E42F2C'
         if abs(delta) > 0:
             col_mid = '#67b607'
@@ -619,7 +627,7 @@ class Interstage(Trackable, CostModeled):
                 ys_left = ys[inds] - width_dipole*np.cos(thetas[inds])
                 xs_right = xs[inds] + width_dipole*np.sin(thetas[inds])
                 ys_right = ys[inds] + width_dipole*np.cos(thetas[inds])
-                ax.fill(np.concatenate([xs_left, np.flip(xs_right)]), np.concatenate([ys_left, np.flip(ys_right)]), '#ededed', edgecolor='#d9d9d9', lw=lw_element, zorder=0)
+                ax.fill(np.concatenate([xs_left, np.flip(xs_right)]), np.concatenate([ys_left, np.flip(ys_right)]), '#f2f2f2', edgecolor='#d9d9d9', lw=lw_element, zorder=0)
             # add plasma lens
             if abs(ks[i]) > 0:
                 xs_left = xs[inds] - width_lens*np.sin(thetas[inds])
@@ -645,6 +653,9 @@ class Interstage(Trackable, CostModeled):
         else:
             ax.set_ylim(min(ys)-width_dipole*2, max(ys)+width_dipole*2)
         ax.set_xlim(min(xs)-(max(xs)-min(xs))*0.02, max(xs)+(max(xs)-min(xs))*0.02)
+
+        # invert axis to have positive values on the "right"
+        ax.yaxis.set_inverted(True)
 
         # save figure to file
         if savefig is not None:

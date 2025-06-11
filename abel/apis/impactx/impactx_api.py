@@ -219,7 +219,7 @@ def extract_beams(path='', runnable=None, beam0=None):
         
         xs = np.array(beam_df.position_x)
         ys = np.array(beam_df.position_y)
-        zs = np.array(beam_df.position_t)
+        zs = -np.array(beam_df.position_t)
         uxs = pz_ref*(np.array(beam_df.momentum_x))*SI.c
         uys = pz_ref*(np.array(beam_df.momentum_y))*SI.c
         uzs = pz_ref*(1-np.array(beam_df.momentum_t))*SI.c

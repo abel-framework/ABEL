@@ -1568,7 +1568,7 @@ class Beam():
             ax.set_xlim(np.array(zlims)*1e6)
         if Elims is not None:
             ax.set_ylim(np.array(Elims)/1e9)
-        ax.set_xlabel('z (μm)')
+        ax.set_xlabel('ξ (μm)')
         ax.set_ylabel('E (GeV)')
         ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
         cb = fig.colorbar(p)
@@ -1594,7 +1594,7 @@ class Beam():
             p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
         else:
             from abel.utilities.colors import FLASHForward_nowhite as cmap
-            inds = round(np.linspace(0, len(self)-1, num_samples)) if len(self) > num_samples else range(len(self))
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
             deltalim = round(4*self.rel_energy_spread(), 2)
             p = ax.scatter(self.xs()[inds]*1e6, self.xps()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
         if xlims is not None:
@@ -1647,10 +1647,11 @@ class Beam():
             dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys, hlims=xlims, vlims=ylims)
             p = ax.pcolor(xs*1e3, ys*1e3, -dQdxdy*1e3, cmap=CONFIG.default_cmap, shading='auto')
         else:
-            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            #from abel.utilities.colors import FLASHForward_nowhite as cmap
+            from abel.utilities.colors import RGB as cmap
             inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
-            deltalim = round(4*self.rel_energy_spread(), 2)
-            p = ax.scatter(self.xs()[inds]*1e3, self.ys()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+            deltalim = round(3*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.xs()[inds]*1e3, self.ys()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2, alpha=0.8)
         if xlims is not None:
             ax.set_xlim(np.array(xlims)*1e3)
         if ylims is not None:
