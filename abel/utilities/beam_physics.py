@@ -409,5 +409,55 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, plot=False):
 
     return R56, evolution
 
+
+
+
+def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
+
+    # points per dipole
+    num_steps = 25
     
+    # calculate the orbit
+    xs = np.array([x0])
+    ys = np.array([y0])
+    ss = np.array([s0])
+    thetas = np.array([theta0])
+    
+    for i in range(len(ls)):
+
+        dtheta = ls[i]*inv_rhos[i]
+        thetas_next = np.linspace(0, dtheta, num_steps)
+        ss_next = np.linspace(0, ls[i], num_steps)
+        if abs(dtheta) > 0:
+            xs_next = np.sin(thetas_next)/inv_rhos[i]
+            ys_next = -(1-np.cos(thetas_next))/inv_rhos[i]
+        else:
+            xs_next = ss_next
+            ys_next = np.zeros_like(ss_next)
+
+        ss = np.append(ss, ss[-1] + ss_next)
+        xs = np.append(xs, xs[-1] + xs_next*np.cos(thetas[-1]) + ys_next*np.sin(thetas[-1]))
+        ys = np.append(ys, ys[-1] - xs_next*np.sin(thetas[-1]) + ys_next*np.cos(thetas[-1]))
+        thetas = np.append(thetas, thetas[-1] + thetas_next)
+
+    # save orbit
+    evolution = np.zeros([4, len(ss)])
+    evolution[0,:] = xs
+    evolution[1,:] = ys
+    evolution[2,:] = ss
+    evolution[3,:] = thetas
+    
+    # final angle
+    theta = thetas[-1]
+
+    # plot if required
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(evolution[0,:], evolution[1,:])
+        ax.set_xlabel('x (m)')
+        ax.set_ylabel('y (m)')
+    
+    return theta, evolution
+
 

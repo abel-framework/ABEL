@@ -341,11 +341,11 @@ class Interstage(Trackable, CostModeled):
         
         # mirror symmetrize the lattice
         if not half_lattice:
-            ls = np.append(ls, np.flip(ls))
-            inv_rhos = np.append(inv_rhos, np.flip(inv_rhos))
-            ks = np.append(ks, np.flip(ks))
-            ms = np.append(ms, np.flip(ms))
-            taus = np.append(taus, np.flip(taus))
+            ls = np.append(np.append(ls[:-1], 2*ls[-1]), np.flip(ls[:-1]))
+            inv_rhos = np.append(np.append(inv_rhos[:-1], inv_rhos[-1]), np.flip(inv_rhos[:-1]))
+            ks = np.append(np.append(ks[:-1], ks[-1]), np.flip(ks[:-1]))
+            ms = np.append(np.append(ms[:-1], ms[-1]), np.flip(ms[:-1]))
+            taus = np.append(np.append(taus[:-1], taus[-1]), np.flip(taus[:-1]))
         
         return ls, inv_rhos, ks, ms, taus
         
@@ -513,7 +513,137 @@ class Interstage(Trackable, CostModeled):
         axs[3].set_ylabel('Longitudinal dispersion, R56 (mm)')
         axs[3].set_xlim(long_limits)
         axs[3].set_xlabel(long_label)
+
+    
+    def plot_layout(self, delta=0.2, axes_equal=False, savefig=None):
+
+        from matplotlib import pyplot as plt
+        from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion, evolve_orbit
+        from scipy.integrate import cumulative_trapezoid
+
+        # get the lengths and strengths
+        ls, inv_rhos, ks, ms, taus = self.matrix_lattice()
         
+        # prepare plots
+        fig, ax = plt.subplots(1)
+        fig.set_figwidth(12)
+        fig.set_figheight(2)
+
+        # get the orbit
+        theta, _ = evolve_orbit(ls, inv_rhos)
+        _, evol_orbit = evolve_orbit(ls, inv_rhos, theta0=-theta/2)
+        xs = evol_orbit[0,:]
+        ys = evol_orbit[1,:]
+        ss = evol_orbit[2,:]
+        thetas = evol_orbit[3,:]
+
+        # define the width of the dipole
+        width_dipole = 0.1*max(ss)/6
+
+        # calculate dispersions
+        _, _, evol_disp = evolve_dispersion(ls, inv_rhos, ks, fast=False)
+        _, _, evol_disp2 = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False)
+        delta = abs(delta)
+        Dx = np.interp(ss, evol_disp[0], evol_disp[1])
+        DDx = np.interp(ss, evol_disp2[0], evol_disp2[2])
+        offset_disp = Dx*delta - DDx*delta**2
+        xs_low = xs - offset_disp*np.sin(thetas)
+        ys_low = ys - offset_disp*np.cos(thetas)
+        xs_high = xs + offset_disp*np.sin(thetas)
+        ys_high = ys + offset_disp*np.cos(thetas)
+
+        # calculate beam size
+        _, _, evol_beta = evolve_beta_function(ls, ks, self.beta0, fast=False)
+        betas = np.interp(ss, evol_beta[0], evol_beta[1])
+        if abs(delta) > 0:
+            emit_gx = offset_disp[np.argmax(betas)]**2/max(betas)
+        else:
+            emit_gx = width_dipole**2/max(betas)
+        sigxs = np.sqrt(betas*emit_gx)/2
+        phis = np.append([0], cumulative_trapezoid(ss, 1/betas))
+        
+        # plot the orbits
+        alpha = 0.15
+        lw_dotted = 0.8
+        lw_solid = 1.5
+        col_low = '#E42F2C'
+        if abs(delta) > 0:
+            col_mid = '#67b607'
+        else:
+            col_mid = '#0182EC'
+        col_high = '#0182EC'
+
+        if abs(delta) > 0:
+            
+            # add lower energy
+            if not axes_equal:
+                ax.fill(np.concatenate([xs_low - sigxs*np.sin(thetas), np.flip(xs_low+sigxs*np.sin(thetas))]),
+                    np.concatenate([ys_low - sigxs*np.cos(thetas), np.flip(ys_low+sigxs*np.cos(thetas))]), col_low, alpha=alpha)
+                ax.plot(xs_low - sigxs*np.sin(thetas)*np.sin(phis), ys_low - sigxs*np.cos(thetas)*np.sin(phis), ':', lw=lw_dotted, c=col_low)
+            ax.plot(xs_low, ys_low, lw=lw_solid, c=col_low)
+
+        # add high energy
+        if not axes_equal or abs(delta)==0:
+            ax.fill(np.concatenate([xs - sigxs*np.sin(thetas), np.flip(xs+sigxs*np.sin(thetas))]),
+                np.concatenate([ys - sigxs*np.cos(thetas), np.flip(ys+sigxs*np.cos(thetas))]), col_mid, alpha=alpha)
+        if not axes_equal:
+            ax.plot(xs - sigxs*np.sin(thetas)*np.sin(phis), ys - sigxs*np.cos(thetas)*np.sin(phis), ':', lw=lw_dotted, c=col_mid)
+        ax.plot(xs, ys, lw=lw_solid, c=col_mid)
+
+        if abs(delta) > 0:
+            # add average energy
+            if not axes_equal:
+                ax.fill(np.concatenate([xs_high - sigxs*np.sin(thetas), np.flip(xs_high+sigxs*np.sin(thetas))]),
+                    np.concatenate([ys_high - sigxs*np.cos(thetas), np.flip(ys_high+sigxs*np.cos(thetas))]), col_high, alpha=alpha)
+                ax.plot(xs_high - sigxs*np.sin(thetas)*np.sin(phis), ys_high - sigxs*np.cos(thetas)*np.sin(phis), ':', lw=lw_dotted, c=col_high)
+            ax.plot(xs_high, ys_high, lw=lw_solid, c=col_high)
+            
+        
+        # add elements
+        lw_element=0.75
+        if not axes_equal:
+            width_dipole = max(abs(offset_disp))*2.5
+        width_lens = width_dipole*0.8
+        width_sextupole = width_dipole*0.6
+        ssl = np.append([0.0], np.cumsum(ls))
+        ssl = ssl[:-1]
+        for i in range(len(ls)-1):
+            inds = np.logical_and(ss <= ssl[i+1], ss >= ssl[i])
+            # add dipole
+            if abs(inv_rhos[i]) > 0:
+                xs_left = xs[inds] - width_dipole*np.sin(thetas[inds])
+                ys_left = ys[inds] - width_dipole*np.cos(thetas[inds])
+                xs_right = xs[inds] + width_dipole*np.sin(thetas[inds])
+                ys_right = ys[inds] + width_dipole*np.cos(thetas[inds])
+                ax.fill(np.concatenate([xs_left, np.flip(xs_right)]), np.concatenate([ys_left, np.flip(ys_right)]), '#ededed', edgecolor='#d9d9d9', lw=lw_element, zorder=0)
+            # add plasma lens
+            if abs(ks[i]) > 0:
+                xs_left = xs[inds] - width_lens*np.sin(thetas[inds])
+                ys_left = ys[inds] - width_lens*np.cos(thetas[inds])
+                xs_right = xs[inds] + width_lens*np.sin(thetas[inds])
+                ys_right = ys[inds] + width_lens*np.cos(thetas[inds])
+                ax.fill(np.concatenate([xs_left, np.flip(xs_right)]), np.concatenate([ys_left, np.flip(ys_right)]), '#fad1ac', edgecolor='#fcb577', lw=lw_element, zorder=0)
+            if abs(ms[i]) > 0:
+                xs_left = xs[inds] - width_sextupole*np.sin(thetas[inds])
+                ys_left = ys[inds] - width_sextupole*np.cos(thetas[inds])
+                xs_right = xs[inds] + width_sextupole*np.sin(thetas[inds])
+                ys_right = ys[inds] + width_sextupole*np.cos(thetas[inds])
+                ax.fill(np.concatenate([xs_left, np.flip(xs_right)]), np.concatenate([ys_left, np.flip(ys_right)]), '#cfe3cf', edgecolor='#abd4ab', lw=lw_element, zorder=0)
+
+        # add labels
+        ax.set_xlabel('z (m)')
+        ax.set_ylabel('x (m)')
+
+        # set axis limits
+        if axes_equal:
+            ax.axis('equal')
+        else:
+            ax.set_ylim(min(ys)-width_dipole*2, max(ys)+width_dipole*2)
+        ax.set_xlim(min(xs)-(max(xs)-min(xs))*0.02, max(xs)+(max(xs)-min(xs))*0.02)
+
+        # save figure to file
+        if savefig is not None:
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
         
     
     ## SURVEY PLOTS
