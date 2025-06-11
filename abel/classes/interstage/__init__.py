@@ -437,7 +437,7 @@ class Interstage(Trackable, CostModeled):
     
     ## PLOTTING OPTICS
 
-    def plot_optics(self):
+    def plot_optics(self, savefig=None):
 
         from matplotlib import pyplot as plt
         from matplotlib import patches
@@ -477,11 +477,11 @@ class Interstage(Trackable, CostModeled):
         axs[0].axis('off')
         for i in range(len(ls)):
             if abs(inv_rhos[i]) > 0: # add dipoles
-                axs[0].add_patch(patches.Rectangle((ssl[i],-0.75), ls[i], 1.5, fc='lightgray'))
+                axs[0].add_patch(patches.Rectangle((ssl[i],-0.75), ls[i], 1.5, fc='#d9d9d9'))
             if abs(ks[i]) > 0: # add plasma lenses
-                axs[0].add_patch(patches.Rectangle((ssl[i],0), ls[i], 1, fc='black'))
+                axs[0].add_patch(patches.Rectangle((ssl[i],0), ls[i], 1, fc='#fcb577'))
             if abs(ms[i]) > 0: # add sextupole
-                axs[0].add_patch(patches.Rectangle((ssl[i],-0.5), ls[i], 1, fc='#7dc451'))
+                axs[0].add_patch(patches.Rectangle((ssl[i],-0.5), ls[i], 1, fc='#abd4ab'))
         axs[0].set_xlim(long_limits)
         axs[0].set_ylim([-1, 1])
 
@@ -505,7 +505,7 @@ class Interstage(Trackable, CostModeled):
         axs[2].plot(ss_disp1, dispersion / 1e-3, '-', color=colx1, label='1st order')
         axs[2].set_ylabel('Dispersion')
         axs[2].set_xlim(long_limits)
-        axs[2].legend(loc='upper right', reverse=True, fontsize='small')
+        axs[2].legend(loc='best', reverse=True, fontsize='small')
         
         # plot R56
         axs[3].plot(ss_R56, np.zeros_like(ss_R56), ':', color=col0)
@@ -513,6 +513,10 @@ class Interstage(Trackable, CostModeled):
         axs[3].set_ylabel('Longitudinal dispersion, R56 (mm)')
         axs[3].set_xlim(long_limits)
         axs[3].set_xlabel(long_label)
+
+         # save figure to file
+        if savefig is not None:
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
     
     def plot_layout(self, delta=0.2, axes_equal=False, savefig=None):
@@ -623,6 +627,7 @@ class Interstage(Trackable, CostModeled):
                 xs_right = xs[inds] + width_lens*np.sin(thetas[inds])
                 ys_right = ys[inds] + width_lens*np.cos(thetas[inds])
                 ax.fill(np.concatenate([xs_left, np.flip(xs_right)]), np.concatenate([ys_left, np.flip(ys_right)]), '#fad1ac', edgecolor='#fcb577', lw=lw_element, zorder=0)
+            # add sextupole
             if abs(ms[i]) > 0:
                 xs_left = xs[inds] - width_sextupole*np.sin(thetas[inds])
                 ys_left = ys[inds] - width_sextupole*np.cos(thetas[inds])
