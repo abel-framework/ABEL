@@ -207,15 +207,18 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, fast=False, plot=False):
     return beta, alpha, evolution
 
 
-def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False):
+def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
     
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
         fast = False
         
     if not fast:
-        Nres_high = 200
-        Nres_low = 20
+        Nres_high = 100
+        Nres_low = 10
+        if high_res:
+            Nres_high = Nres_high*10
+            Nres_low = Nres_low*10
         Ntot = Nres_high*np.sum(abs(inv_rhos)>0) + Nres_low*np.sum(abs(inv_rhos)==0)
         evolution = np.empty([3, Ntot])
     else:
@@ -358,10 +361,14 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
     return DDx, DDpx, evolution
 
 
-def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, plot=False):
+def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
 
+    # overwrite fast-calculation toggle if plotting 
+    if plot and fast:
+        fast = False
+       
     # get the dispersion evolution
-    _, _, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False)
+    _, _, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=high_res)
     ss = evolution_disp[0]
     Dxs = evolution_disp[1]
     R56s = np.empty_like(ss)
@@ -370,8 +377,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, plot=False):
     R56s[0] = 0
 
     # make cumulative lengths
-    ssl = np.append([0.0], np.cumsum(ls))
-    ssl = ssl[:-1]
+    ssl = np.append([0.0], np.cumsum(ls))[:-1]
     
     # calculate the evolution
     for i in range(len(ss)-1):
@@ -388,14 +394,17 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, plot=False):
 
         ds = ss[i+1]-ss[i]
         inv_rho_halfstep = (inv_rho_prev+inv_rho)/2
-        Dx_halfstep = (Dxs[i]+Dxs[i+1])/2
-        deltaR56 = Dx_halfstep * inv_rho * ds
+        Dx = Dxs[i+1]
+        deltaR56 = Dx * inv_rho_halfstep * ds
         R56s[i+1] = R56s[i] + deltaR56
 
     # save evolution
-    evolution = np.empty([2, len(ss)])
-    evolution[0,:] = ss
-    evolution[1,:] = R56s
+    if not fast:
+        evolution = np.empty([2, len(ss)])
+        evolution[0,:] = ss
+        evolution[1,:] = R56s
+    else:
+        evolution = None
 
     # extract final R56
     R56 = R56s[-1]

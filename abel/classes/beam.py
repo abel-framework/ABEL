@@ -1585,10 +1585,14 @@ class Beam():
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
         
         
-    def plot_trace_space_x(self, xlims=None, xplims=None, chromatic=False, num_samples=10000):
+    def plot_trace_space_x(self, xlims=None, xplims=None, chromatic=False, num_samples=10000, dQdxdxplim=None, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5)  
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
         if not chromatic:
             dQdxdxp, xs, xps = self.density_trace_space_x(xlims=xlims, xplims=xplims)
             p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
@@ -1602,18 +1606,29 @@ class Beam():
         if xplims is not None:
             ax.set_ylim(np.array(xplims)*1e3)
         ax.set_xlabel('x (μm)')
-        ax.set_ylabel('x'' (mrad)')
+        ax.set_ylabel("x' (mrad)")
         ax.set_title(f'Horizontal trace space (s = {self.location:.2f} m) \n β = {self.beta_x()*1e3:.0f} mm, α = {self.alpha_x():.1f}, εn = {self.norm_emittance_x()*1e6:.2f} mm mrad')
         cb = fig.colorbar(p)
         if not chromatic:
+            if dQdxdxplim is not None:
+                p.set_clim([0, dQdxdxplim*1e3])
             cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
         else:
             cb.ax.set_ylabel('Rel. energy offset (%)')
+            
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
         
-    def plot_trace_space_y(self, ylims=None, yplims=None, chromatic=False, num_samples=10000):
+    def plot_trace_space_y(self, ylims=None, yplims=None, chromatic=False, num_samples=10000, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5)  
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
         if not chromatic:
             dQdydyp, ys, yps = self.density_trace_space_y(ylims=ylims, yplims=yplims)
             p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
@@ -1627,13 +1642,18 @@ class Beam():
         if yplims is not None:
             ax.set_ylim(np.array(yplims)*1e3)
         ax.set_xlabel('y (μm)')
-        ax.set_ylabel('y'' (mrad)')
+        ax.set_ylabel("y' (mrad)")
         ax.set_title(f'Vertical trace space (s = {self.location:.2f} m) \n β = {self.beta_y()*1e3:.0f} mm, α = {self.alpha_y():.1f}, εn = {self.norm_emittance_y()*1e6:.2f} mm mrad')
         cb = fig.colorbar(p)
         if not chromatic:
             cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
         else:
             cb.ax.set_ylabel('Rel. energy offset (%)')
+            
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
 
     def plot_transverse_profile(self, xlims=None, ylims=None, chromatic=False, num_samples=10000, figsize=None, savefig=None):
         fig, ax = plt.subplots()

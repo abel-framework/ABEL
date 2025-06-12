@@ -25,10 +25,10 @@ class Interstage(Trackable, CostModeled):
         self._field_dipole = field_dipole
 
         # length ratios
-        self.length_ratio_gap = 0.03
+        self.length_ratio_gap = 0.025
         self.length_ratio_plasma_lens = 0.05
-        self.length_ratio_chicane_dipole = 0.89 # 0.85 is better for sextupole on
-        self.length_ratio_sextupole = 0.04 # 0.3 is better for sextupole on
+        self.length_ratio_chicane_dipole = 0.9 # 0.85 is better for sextupole on
+        self.length_ratio_sextupole = 0.05 # 0.3 is better for sextupole on
 
         # derivable (but also settable) parameters
         self._field_ratio_chicane_dipole1 = None
@@ -475,7 +475,7 @@ class Interstage(Trackable, CostModeled):
         fig.set_figheight(11)
         col0 = "tab:gray"
         colx1 = "tab:blue"
-        colx2 = "#c2e6ff" # lighter version of tab:blue
+        colx2 = "#d7e9f5" # lighter version of tab:blue
         colz = "tab:green"
         long_label = 'Location [m]'
         long_limits = [min(ss_beta), max(ss_beta)]
@@ -502,23 +502,23 @@ class Interstage(Trackable, CostModeled):
         
         # plot beta function
         axs[1].plot(ss_beta, self.beta0*np.ones_like(ss_beta), ':', color=col0)
-        axs[1].plot(ss_beta, betas, color=colx1)
-        axs[1].set_ylabel('Beta function [m]')
+        axs[1].plot(ss_beta, np.sqrt(betas), color=colx1)
+        axs[1].set_ylabel(r'$\sqrt{\mathrm{Beta\hspace{0.3}function}}$ (m$^{0.5}$)')
         axs[1].set_xlim(long_limits)
-        axs[1].set_yscale('log')
+        #axs[1].set_yscale('log')
         
         # plot dispersion
         axs[2].plot(ss_disp1, np.zeros_like(ss_disp1), ':', color=col0)
-        axs[2].plot(ss_disp2, second_order_dispersion / 1e-3, color=colx2, label='2nd order')
+        axs[2].plot(ss_disp2, second_order_dispersion / 1e-3, '-', color=colx2, label='2nd order')
         axs[2].plot(ss_disp1, dispersion / 1e-3, '-', color=colx1, label='1st order')
-        axs[2].set_ylabel('Dispersion')
+        axs[2].set_ylabel('Horizontal dispersion (mm)')
         axs[2].set_xlim(long_limits)
         axs[2].legend(loc='best', reverse=True, fontsize='small')
         
         # plot R56
         axs[3].plot(ss_R56, np.zeros_like(ss_R56), ':', color=col0)
         axs[3].plot(ss_R56, R56/1e-3, color=colz)
-        axs[3].set_ylabel('Longitudinal dispersion, R56 (mm)')
+        axs[3].set_ylabel(r'Longitudinal dispersion, $R_{56}$ (mm)')
         axs[3].set_xlim(long_limits)
         axs[3].set_xlabel(long_label)
 
@@ -527,7 +527,7 @@ class Interstage(Trackable, CostModeled):
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
     
-    def plot_layout(self, delta=0.2, axes_equal=False, savefig=None):
+    def plot_layout(self, delta=0.1, axes_equal=False, use_second_order_dispersion=True, savefig=None):
 
         from matplotlib import pyplot as plt
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion, evolve_orbit
@@ -558,7 +558,10 @@ class Interstage(Trackable, CostModeled):
         delta = abs(delta)
         Dx = np.interp(ss, evol_disp[0], evol_disp[1])
         DDx = np.interp(ss, evol_disp2[0], evol_disp2[2])
-        offset_disp = Dx*delta - DDx*delta**2
+        if use_second_order_dispersion:
+            offset_disp = Dx*delta - DDx*delta**2
+        else:
+            offset_disp = Dx*delta
         xs_low = xs - offset_disp*np.sin(thetas)
         ys_low = ys - offset_disp*np.cos(thetas)
         xs_high = xs + offset_disp*np.sin(thetas)
@@ -614,7 +617,7 @@ class Interstage(Trackable, CostModeled):
         # add elements
         lw_element=0.75
         if not axes_equal:
-            width_dipole = max(abs(offset_disp))*2.5
+            width_dipole = max(abs(offset_disp))*2
         width_lens = width_dipole*0.8
         width_sextupole = width_dipole*0.6
         ssl = np.append([0.0], np.cumsum(ls))
