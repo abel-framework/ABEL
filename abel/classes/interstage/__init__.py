@@ -211,21 +211,15 @@ class Interstage(Trackable, CostModeled):
     
     ## MATCHING
     
-    def match_all(self):
+    def match_lattice(self):
         "Combined matching the beta function, first- and second-order dispersion and the R56"
         self.match_beta_function()
         self.match_dispersion_and_R56()
-        self.match_second_order_dispersion()
+        if self.use_sextupole:
+            self.match_second_order_dispersion()
     
     def match_beta_function(self):
         "Matching the beta function by adjusting the plasma-lens strength."
-        
-        # approzimate the focal length
-        L1eff = self.length_dipole + 2*self.length_gap + self.length_plasma_lens/2
-        L2eff = 2*self.length_chicane_dipole + self.length_plasma_lens/2 + 3*self.length_gap + self.length_sextupole/2
-        f0 = 1/(1/L1eff + 1/L2eff)
-        kl_lens0 = 1/f0
-        k_lens0 = kl_lens0/self.length_plasma_lens
         
         # minimizer function for beta matching (central alpha function is zero)
         from abel.utilities.beam_physics import evolve_beta_function
@@ -234,6 +228,16 @@ class Interstage(Trackable, CostModeled):
             _, alpha, _ = evolve_beta_function(ls, ks, self.beta0, fast=True) 
             return alpha**2
     
+        # initial guess for the lens strength
+        if self._strength_plasma_lens is not None:
+            kl_lens0 = self._strength_plasma_lens
+        else:
+            L1eff = self.length_dipole + 2*self.length_gap + self.length_plasma_lens/2
+            L2eff = 2*self.length_chicane_dipole + self.length_plasma_lens/2 + 3*self.length_gap + self.length_sextupole/2
+            f0 = 1/(1/L1eff + 1/L2eff)
+            kl_lens0 = 1/f0
+        k_lens0 = kl_lens0/self.length_plasma_lens
+            
         # match the beta function
         from scipy.optimize import minimize
         result_beta = minimize(minfun_beta, k_lens0, tol=1e-10, options={'maxiter': 50})
@@ -257,10 +261,20 @@ class Interstage(Trackable, CostModeled):
             _, Dpx_mid, _ = evolve_dispersion(ls, inv_rhos, ks, fast=True) 
             R56_mid, _ = evolve_R56(ls, inv_rhos, ks) 
             return Dpx_mid**2 + (R56_mid - nom_R56/2)**2
-    
+
+        # initial guess for the chicane dipole fields
+        if self._field_ratio_chicane_dipole1 is not None:
+            B_chic1_guess = self.field_chicane_dipole1
+        else:
+            B_chic1_guess = self.field_dipole/2
+        if self._field_ratio_chicane_dipole2 is not None:
+            B_chic2_guess = self.field_chicane_dipole2
+        else:
+            B_chic2_guess = -self.field_dipole/2
+        
         # match the beta function
         from scipy.optimize import minimize
-        result_dispersion_R56 = minimize(minfun_dispersion_R56, [self.field_dipole/2, -self.field_dipole/2], tol=1e-20, options={'maxiter': 50})
+        result_dispersion_R56 = minimize(minfun_dispersion_R56, [B_chic1_guess, B_chic2_guess], tol=1e-16, options={'maxiter': 50})
         self._field_ratio_chicane_dipole1 = result_dispersion_R56.x[0]/self.field_dipole
         self._field_ratio_chicane_dipole2 = result_dispersion_R56.x[1]/self.field_dipole
     
@@ -663,7 +677,33 @@ class Interstage(Trackable, CostModeled):
         # save figure to file
         if savefig is not None:
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
+
+    ## PRINT INFO
+
+    def print_summary(self):
+        print('------------------------------------------------')
+        print(f'Main dipole (2x):          {self.length_dipole:.3f} m,  B = {self.field_dipole:.2f} T')
+        print(f'Plasma lens (2x):          {self.length_plasma_lens:.3f} m,  g = {self.field_gradient_plasma_lens:.0f} T/m')
+        if self.use_chicane:
+            print(f'Outer chicane dipole (2x): {self.length_chicane_dipole:.3f} m,  B = {self.field_chicane_dipole1:.2f} T')
+            print(f'Inner chicane dipole (2x): {self.length_chicane_dipole:.3f} m,  B = {self.field_chicane_dipole2:.2f} T')
+        if self.use_sextupole:
+            print(f'Sextupole:                 {self.length_sextupole:.3f} m,  m = {self.field_gradient_sextupole:.0f} T/m^2')
+            print(f'Gaps (10x):                {self.length_gap:.3f} m')
+        else:
+            print(f'Central gap:               {self.length_sextupole + 2*self.length_gap:.3f} m')
+            print(f'Other gaps (8x):           {self.length_gap:.3f} m')
         
+        print('------------------------------------------------')
+        print(f'             Total length: {self.get_length():.3f} m')
+        print(f'         Total bend angle:           {np.rad2deg(self.total_bend_angle()):.2f} deg')
+        print('------------------------------------------------')
+
+    def total_bend_angle(self):
+        from abel.utilities.relativity import energy2momentum
+        p0 = energy2momentum(self.nom_energy)
+        BL = 2*(self.length_dipole*self.field_dipole + self.length_chicane_dipole*(self.field_chicane_dipole1 + self.field_chicane_dipole2))
+        return BL*SI.e/p0
     
     ## SURVEY PLOTS
     

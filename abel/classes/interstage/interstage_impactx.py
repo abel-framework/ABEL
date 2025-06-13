@@ -138,7 +138,7 @@ class InterstageImpactX(Interstage):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         
         # re-perform the matching
-        self.match_all()
+        self.match_lattice()
         
         # get lattice
         lattice = self.get_lattice()

@@ -8,16 +8,16 @@ class CONFIG:
     _config_templatepath = os.path.join(os.path.dirname(os.path.realpath(__file__)),"abelconfig.toml")
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls, verbose=False):
         "Used to initialize the CONFIG class from abel/__init__.py after import, since we later access it as CONFIG.varname"
         if len(CONFIG._config_searchpath) == 0:
             raise ValueError("_config_searchpaths is empty; something is wrong")
         
         configFile = None
         for p in cls._config_searchpath:
-            print (p)
             if os.path.isfile(p):
-                print("Loading ABEL config from '"+p+"'")
+                if verbose:
+                    print("Loading ABEL config from '"+p+"'")
                 configFile = p
         if configFile == None:
             print("Copying a template config into '",cls._config_searchpath[0],"'")
@@ -30,7 +30,8 @@ class CONFIG:
         import tomllib
         with open(configFile, 'rb') as cf:
             cfdata = tomllib.load(cf)
-        #print (cfdata)
+        if verbose:
+            print(cfdata)
 
         #TODO: Keep track of which variables from the toml have been used,
         #      and which haven't, then print a warning at the end
