@@ -229,13 +229,10 @@ class Interstage(Trackable, CostModeled):
             return alpha**2
     
         # initial guess for the lens strength
-        if self._strength_plasma_lens is not None:
-            kl_lens0 = self._strength_plasma_lens
-        else:
-            L1eff = self.length_dipole + 2*self.length_gap + self.length_plasma_lens/2
-            L2eff = 2*self.length_chicane_dipole + self.length_plasma_lens/2 + 3*self.length_gap + self.length_sextupole/2
-            f0 = 1/(1/L1eff + 1/L2eff)
-            kl_lens0 = 1/f0
+        L1eff = self.length_dipole + 2*self.length_gap + self.length_plasma_lens/2
+        L2eff = 2*self.length_chicane_dipole + self.length_plasma_lens/2 + 3*self.length_gap + self.length_sextupole/2
+        f0 = 1/(1/L1eff + 1/L2eff)
+        kl_lens0 = 1/f0
         k_lens0 = kl_lens0/self.length_plasma_lens
             
         # match the beta function

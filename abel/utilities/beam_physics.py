@@ -470,3 +470,93 @@ def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
     return theta, evolution
 
 
+def evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, plot=False):
+    """
+    Evolution of the curly H function (i.e., single-particle emittance of the dispersion).
+    """
+    
+    _, _, evol_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=True)
+    ss = evol_disp[0]
+    Dxs = evol_disp[1]
+    Dpxs = evol_disp[2]
+    
+    _, _, evol_beta = evolve_beta_function(ls, ks, beta0, alpha0=alpha0, fast=False, plot=False)
+    betas = np.interp(ss, evol_beta[0], np.sqrt(evol_beta[1]))**2
+    alphas = np.interp(ss, evol_beta[0], evol_beta[2])
+    gammas = (1+alphas**2)/betas
+
+    # combine into curly H function (i.e., the "dispersion emittance")
+    curlyHs = Dxs**2*gammas + 2*alphas*Dxs*Dpxs + betas*Dpxs**2
+
+    # save evolution
+    evolution = np.zeros([2, len(ss)])
+    evolution[0,:] = ss
+    evolution[1,:] = curlyHs
+    
+    curlyH = curlyHs[-1]
+
+    # plot if required
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(ss, curlyHs*1e6)
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel(r'$\mathscr{H}$ (mm mrad)')
+    
+    return curlyH, evolution
+
+
+def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False):
+
+    _, evol = evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=alpha0, Dx0=Dx0, Dpx0=Dpx0, plot=False)
+    ss = evol[0,:]
+    curlyHs = evol[1,:]
+    I5s = np.empty_like(ss)
+    
+    # make cumulative lengths
+    ssl = np.append([0.0], np.cumsum(ls))[:-1]
+    
+    # intialize at zero R56
+    I5s[0] = 0
+    
+    # calculate the evolution
+    for i in range(len(ss)-1):
+
+        s_prev = ss[i]
+        index_element_prev = np.argmin(abs(ssl - s_prev))
+        index_element_ceil_prev = index_element_prev + int(ssl[index_element_prev] <= s_prev) - 1
+        inv_rho_prev = inv_rhos[index_element_ceil_prev]
+
+        s = ss[i+1]
+        index_element = np.argmin(abs(ssl - s))
+        index_element_ceil = index_element + int(ssl[index_element] <= s) - 1
+        inv_rho = inv_rhos[index_element_ceil]
+
+        ds = ss[i+1]-ss[i]
+        inv_rho_halfstep = (inv_rho_prev+inv_rho)/2
+        curlyH = curlyHs[i+1]
+        deltaI5 = curlyH * abs(inv_rho_halfstep)**3 * ds
+        I5s[i+1] = I5s[i] + deltaI5
+
+    # save evolution
+    if not fast:
+        evolution = np.empty([2, len(ss)])
+        evolution[0,:] = ss
+        evolution[1,:] = I5s
+    else:
+        evolution = None
+
+    # extract final R56
+    I5 = I5s[-1]
+
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(ss, I5s)
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel(r'Fifth synchrotron radiation integral, $I_5$ (m$^{-1}$)')
+        ax.set_yscale('log')
+
+    return I5, evolution
+    
+
