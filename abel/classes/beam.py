@@ -959,10 +959,10 @@ class Beam():
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
 
-    def norm_amplitude_x(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
-            beta_x = beta_matched(plasma_density, self.energy())
-            alpha_x = 0
+    def norm_amplitude_x(self, beta_x=None, alpha_x=None, clean=False):
+        if beta_x is not None:
+            if alpha_x is None:
+                alpha_x = 0
         else:
             covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
             emgx = np.sqrt(np.linalg.det(covx))
@@ -970,17 +970,25 @@ class Beam():
             alpha_x = -covx[1,0]/emgx
         return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
         
-    def norm_amplitude_y(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
-            beta_y = beta_matched(plasma_density, self.energy())
-            alpha_y = 0
+    def norm_amplitude_y(self, beta_y=None, alpha_y=None, clean=False):
+        if beta_y is not None:
+            if alpha_y is None:
+                alpha_y = 0
         else:
             covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
             emgy = np.sqrt(np.linalg.det(covy))
             beta_y = covy[0,0]/emgy
             alpha_y = -covy[1,0]/emgy
         return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
-        
+
+    def norm_amplitude_emittance_growth_x(self, beta_x=None, alpha_x=None, clean=False):
+        A_x = self.norm_amplitude_x(beta_x=beta_x, alpha_x=alpha_x, clean=clean) # only works of alpha=0
+        return A_x**2/2
+
+    def norm_amplitude_emittance_growth_y(self, beta_y=None, alpha_y=None, clean=False):
+        A_y = self.norm_amplitude_y(beta_y=beta_y, alpha_y=alpha_y, clean=clean)
+        return A_y**2/2
+    
     def peak_density(self):  # TODO: this is only valid for Gaussian beams.
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
