@@ -54,24 +54,31 @@ class InterstageImpactX(Interstage):
         dipole = elements.ExactSbend(ds=self.length_dipole, phi=np.rad2deg(phi_dip), B=B_dip, nslice=self.num_slices)
 
         # define plasma lens
+
+        ds_pl = self.length_plasma_lens/(self.num_slices+1)
+        drift_slice_pl = elements.ExactDrift(ds=ds_pl, nslice=1)
+        plasma_lens1 = [drift_slice_pl]
+        plasma_lens2 = [drift_slice_pl]
         kl_lens = self.strength_plasma_lens
         tau_lens = self.nonlinearity_plasma_lens
-        plasma_lens = []
-
-        pl_aperture = elements.Aperture(aperture_x=self.lens_radius, aperture_y=self.lens_radius, shape="elliptical")
-        if self.use_apertures: # add aperture to the plasma lens
-            plasma_lens.append(pl_aperture)
-            
-        if self.use_thick_lenses:
-            drift_slice_pl = elements.ExactDrift(ds=self.length_plasma_lens/(self.num_slices+1), nslice=1)
-            pl_slice = elements.TaperedPL(k=kl_lens/self.num_slices, taper=tau_lens)
-            plasma_lens.extend([drift_slice_pl, pl_slice]*self.num_slices)
-            plasma_lens.append(drift_slice_pl)
-        else:
-            plasma_lens.append(elements.TaperedPL(k=kl_lens, taper=tau_lens))
-
-        if self.use_apertures: # add another one at the end of the lens
-            plasma_lens.append(pl_aperture)
+        dxs = np.random.normal(loc=self.lens_offset_x, scale=self.jitter.lens_offset_x, size=2)
+        dxps = np.random.normal(scale=self.jitter.lens_angle_x, size=2)
+        dys = np.random.normal(loc=self.lens_offset_y, scale=self.jitter.lens_offset_y, size=2)
+        dyps = np.random.normal(scale=self.jitter.lens_angle_y, size=2)
+        for i in range(self.num_slices):
+            dl = ds_pl*(i+1) - self.length_plasma_lens/2
+            plasma_lens1.append(elements.TaperedPL(k=kl_lens/self.num_slices, taper=tau_lens, dx=dxs[0]+dl*dxps[0], dy=dys[0]+dl*dyps[0]))
+            plasma_lens1.append(drift_slice_pl)
+            plasma_lens2.append(elements.TaperedPL(k=kl_lens/self.num_slices, taper=tau_lens, dx=dxs[1]+dl*dxps[1], dy=dys[1]+dl*dyps[1]))
+            plasma_lens2.append(drift_slice_pl)
+        
+        # add another one at the end of the lens
+        if self.use_apertures:
+            aperture = elements.Aperture(aperture_x=self.lens_radius, aperture_y=self.lens_radius, shape="elliptical")
+            pl = [aperture]
+            pl.extend(plasma_lens)
+            pl.append(aperture)
+            plasma_lens = pl
 
         # define first chicane dipole
         B_chic1 = self.field_chicane_dipole1
@@ -90,38 +97,36 @@ class InterstageImpactX(Interstage):
             chicane_dipole2 = elements.ExactDrift(ds=self.length_chicane_dipole, nslice=self.num_slices)
 
         # define sextupole
-        ml_sext = self.strength_sextupole
-        half_sextupole = []
-        if self.use_thick_lenses:
+        half_sextupole_or_gap = []
+        if self.use_sextupole:
             drift_slice_sext = elements.ExactDrift(ds=self.length_sextupole/(self.num_slices+1)/2, nslice=1)
-            sext_slice = elements.Multipole(multipole=3, K_normal=ml_sext/self.num_slices, K_skew=0)
+            sext_slice = elements.Multipole(multipole=3, K_normal=self.strength_sextupole/self.num_slices, K_skew=0)
             half_sextupole.extend([drift_slice_sext, sext_slice]*self.num_slices)
             half_sextupole.append(drift_slice_sext)
-            # TODO: upgrade to class impactx.elements.ExactMultipole when available
         else:
-            half_sextupole.append(elements.Multipole(multipole=3, K_normal=ml_sext, K_skew=0))
+            half_sextupole = [elements.ExactDrift(ds=self.length_sextupole/2, nslice=1)]
 
         
         # specify the lattice sequence
         lattice.extend(gap)
         lattice.append(dipole)
         lattice.extend(gap)
-        lattice.extend(plasma_lens)
+        lattice.extend(plasma_lens1)
         lattice.extend(gap)
         lattice.append(chicane_dipole1)
         lattice.extend(gap)
         lattice.append(chicane_dipole2)
         lattice.extend(gap)
-        lattice.extend(half_sextupole)
+        lattice.extend(half_sextupole_or_gap)
         if self.use_monitors:
             lattice.append(monitor)
-        lattice.extend(half_sextupole)
+        lattice.extend(half_sextupole_or_gap)
         lattice.extend(gap)
         lattice.append(chicane_dipole2)
         lattice.extend(gap)
         lattice.append(chicane_dipole1)
         lattice.extend(gap)
-        lattice.extend(plasma_lens)
+        lattice.extend(plasma_lens2)
         lattice.extend(gap)
         lattice.append(dipole)
         lattice.extend(gap)

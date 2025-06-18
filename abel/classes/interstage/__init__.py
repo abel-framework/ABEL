@@ -30,6 +30,15 @@ class Interstage(Trackable, CostModeled):
         self.length_ratio_chicane_dipole = 0.9 # 0.85 is better for sextupole on
         self.length_ratio_sextupole = 0.05 # 0.3 is better for sextupole on
 
+        # lens alignment and jitter
+        self.lens_offset_x = 0
+        self.lens_offset_y = 0
+        self.jitter = SimpleNamespace()
+        self.jitter.lens_offset_x = 0
+        self.jitter.lens_offset_y = 0
+        self.jitter.lens_angle_x = 0
+        self.jitter.lens_angle_y = 0
+        
         # derivable (but also settable) parameters
         self._field_ratio_chicane_dipole1 = None
         self._field_ratio_chicane_dipole2 = None
@@ -214,7 +223,7 @@ class Interstage(Trackable, CostModeled):
     def match_lattice(self):
         "Combined matching the beta function, first- and second-order dispersion and the R56"
         self.match_beta_function()
-        self.match_dispersion_and_R56()
+        self.match_dispersion_and_R56(high_res=False)
         if self.use_sextupole:
             self.match_second_order_dispersion()
     
@@ -237,10 +246,10 @@ class Interstage(Trackable, CostModeled):
             
         # match the beta function
         from scipy.optimize import minimize
-        result_beta = minimize(minfun_beta, k_lens0, tol=1e-10, options={'maxiter': 50})
+        result_beta = minimize(minfun_beta, k_lens0, tol=1e-20, options={'maxiter': 200})
         self._strength_plasma_lens = result_beta.x[0]*self.length_plasma_lens
     
-    def match_dispersion_and_R56(self):
+    def match_dispersion_and_R56(self, high_res=False):
         "Cancelling the dispersion and matchign the R56 by adjusting the chicane dipoles."
         
         # assume negative R56
@@ -251,13 +260,16 @@ class Interstage(Trackable, CostModeled):
         # get plasma-lens strength
         k_lens = self.strength_plasma_lens/self.length_plasma_lens
         
+        Dpx_scale = self.length_dipole*self.field_dipole*SI.c/self.nom_energy
+        R56_scale = self.length_dipole**3*self.field_dipole**2*SI.c**2/self.nom_energy**2
+        
         # minimizer function for dispersion (central dispersion prime is zero)
         from abel.utilities.beam_physics import evolve_dispersion, evolve_R56
         def minfun_dispersion_R56(params):
             ls, inv_rhos, ks, _, _ = self.matrix_lattice(k_lens=k_lens, tau_lens=0, B_chic1=params[0], B_chic2=params[1], m_sext=0, half_lattice=True)
             _, Dpx_mid, _ = evolve_dispersion(ls, inv_rhos, ks, fast=True) 
-            R56_mid, _ = evolve_R56(ls, inv_rhos, ks) 
-            return Dpx_mid**2 + (R56_mid - nom_R56/2)**2
+            R56_mid, _ = evolve_R56(ls, inv_rhos, ks, high_res=high_res) 
+            return (Dpx_mid/Dpx_scale)**2 + ((R56_mid - nom_R56/2)/R56_scale)**2
 
         # initial guess for the chicane dipole fields
         if self._field_ratio_chicane_dipole1 is not None:
@@ -430,7 +442,7 @@ class Interstage(Trackable, CostModeled):
         
         # plot transverse offset
         axs[2,0].plot(evol.location, evol.y*1e6, color=col2)  
-        axs[2,0].plot(evol.location, evol.y*1e6, color=col1)
+        axs[2,0].plot(evol.location, evol.x*1e6, color=col1)
         axs[2,0].set_ylabel(r'Transverse offset [$\mathrm{\mu}$m]')
         axs[2,0].set_xlabel(long_label)
         axs[2,0].set_xlim(long_limits)
