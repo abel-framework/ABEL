@@ -394,10 +394,10 @@ class Runnable(ABC):
                 if not hasattr(self, 'label'):
                     self.label = ''
                 
-                #if abs(val_std) == 0 or np.isnan(val_std):
-                ax.plot(scan.vals/self.scale, val_mean/scale, ls='-', label=legend[len(fcns)*j + i])
-                #else:
-                #ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend[i])
+                if abs(np.sum(val_std)) == 0 or np.isnan(val_std).any():
+                    ax.plot(scan.vals/self.scale, val_mean/scale, ls='-', label=legend[len(fcns)*j + i])
+                else:
+                    ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend[i])
                 if legend[i] is not None:
                     ax.legend()
                 
