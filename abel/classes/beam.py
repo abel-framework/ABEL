@@ -42,6 +42,7 @@ class Beam():
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
         self.location = 0        
+        self.particle_mass = SI.m_e
     
     
     # reset phase space
