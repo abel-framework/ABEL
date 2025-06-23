@@ -9,13 +9,14 @@ SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False, test_beam_between_ramps=False):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
         self.transformer_ratio = transformer_ratio
         self.depletion_efficiency = depletion_efficiency
         self.calc_evolution = calc_evolution
+        self.test_beam_between_ramps = test_beam_between_ramps
         
     
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
@@ -137,6 +138,37 @@ class StageBasic(Stage):
 
         # ========== Decelerate the driver with homogeneous energy loss ==========
         driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
+
+
+        # ========== Bookkeeping ==========
+        # Store beams for comparison between ramps and its parent
+        if self.test_beam_between_ramps:
+            if self.parent is None:
+
+                # # The original drive beam before roation and ramps
+                # self.driver_incoming = driver_incoming
+
+                # # The outgoing beams for the main stage need to be recorded before potential rotation for correct comparison with its ramps.
+                # self.beam_out = beam
+                # self.driver_out = driver
+
+                # Store beams for the main stage
+                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # Drive beam after the upramp
+                                               beam_before_tracking=beam0,  # Main beam after the upramp
+                                               driver_outgoing=driver,  # Drive beam after tracking, before the downramp
+                                               beam_outgoing=beam,  # Main beam after tracking, before the downramp
+                                               driver_incoming=driver_incoming)  # The original drive beam before rotation and ramps
+            else:
+                # # Ramps record the final beams as their output beams, as they should not perform any rotation between instability tracking and this line.
+                # self.beam_out = beam_outgoing
+                # self.driver_out = driver_outgoing
+
+                # Store beams for the ramps
+                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # A deepcopy of the incoming drive beam before tracking.
+                                               beam_before_tracking=beam0,  # A deepcopy of the incoming main beam before tracking.
+                                               driver_outgoing=driver_outgoing,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                               beam_outgoing=beam_outgoing,  # Main beam after tracking through the ramp (has not been un-rotated)
+                                               driver_incoming=None)  # Only the main stage needs to store the original drive beam
 
         # calculate efficiency
         self.calculate_efficiency(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
