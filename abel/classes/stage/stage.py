@@ -893,8 +893,6 @@ class Stage(Trackable, CostModeled):
         Stores drive beams and main beams before and between ramps/stage for 
         comparison in tests. The beams are stored as attributes in the 
         ramps/stage.
-
-        None of lines in the docstring text should exceed this length ..........
         
 
         Parameters
