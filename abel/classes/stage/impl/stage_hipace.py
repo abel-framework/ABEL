@@ -17,7 +17,7 @@ except:
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=True, run_path=None):
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=True, do_spin_tracking=False, run_path=None):
         
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -40,6 +40,7 @@ class StageHipace(Stage):
         self.mesh_refinement = mesh_refinement
         self.beam_ionization = beam_ionization
         self.radiation_reaction = radiation_reaction
+        self.do_spin_tracking = do_spin_tracking
 
         # other
         self.run_path = run_path
@@ -152,7 +153,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial, mesh_refinement=self.mesh_refinement)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
         
         ## RUN SIMULATION
@@ -223,6 +224,8 @@ class StageHipace(Stage):
     
     def __extract_evolution(self, tmpfolder, beam0, runnable):
 
+        from abel.apis.hipace import read_insitu_diagnostics
+        
         # suppress divide-by-zero errors
         np.seterr(divide='ignore', invalid='ignore')
 
@@ -262,6 +265,16 @@ class StageHipace(Stage):
             evol.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
             evol.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
             evol.plasma_density = self.get_plasma_density(evol.location)
+
+            # add spin information
+            if '[sx]' in np.dtype(average_data.dtype).names:
+                evol.spin_x = average_data['[sx]']
+                evol.spin_y = average_data['[sy]']
+                evol.spin_z = average_data['[sz]']
+            else:
+                evol.spin_x = None
+                evol.spin_y = None
+                evol.spin_z = None
             
             # beta functions (temporary fix)
             evol.beta_x = evol.beam_size_x**2*(evol.energy/0.5109989461e6)/evol.emit_nx # TODO: improve with x-x' correlations instead of x-px
