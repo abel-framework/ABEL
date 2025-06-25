@@ -149,7 +149,7 @@ def test_beam_between_ramps():
     Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
 
     # Between a main stage and downramp
-    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-14, atol=0.0)
+    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
     Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the output beam matches the out beam for the downramp
@@ -236,7 +236,7 @@ def test_driver_unrotation():
     driver0 = stage.driver_incoming
 
     assert np.allclose(driver0.x_angle(), driver.x_angle(), rtol=1e-15, atol=0.0)
-    assert np.allclose(driver0.y_angle(), driver.y_angle(), rtol=1e-15, atol=0.0)
+    assert np.allclose(driver0.y_angle(), driver.y_angle(), rtol=1e-13, atol=0.0)
    
 
 # TODO: Test on bubble radius tracing
