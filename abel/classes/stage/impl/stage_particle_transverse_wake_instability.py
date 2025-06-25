@@ -71,7 +71,7 @@ class StagePrtclTransWakeInstability(Stage):
     """
 
     # ==================================================
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, time_step_mod=0.05, show_prog_bar=None, run_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, time_step_mod=0.05, show_prog_bar=None, test_beam_between_ramps=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
         TODO: Short description
         None of lines in the docstring text should exceed this length ..........
@@ -201,7 +201,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Simulation flag
         self.show_prog_bar = show_prog_bar
-        self.run_tests = run_tests
+        self.test_beam_between_ramps = test_beam_between_ramps
 
         # Bookkeeping quantities
         self.driver_to_wake_efficiency = None
@@ -624,7 +624,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.driver_to_beam_efficiency = (beam_outgoing.energy()-beam_incoming.energy())/driver_outgoing.energy() * beam_outgoing.abs_charge()/driver_outgoing.abs_charge()
         
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.run_tests:
+        if self.test_beam_between_ramps:
             if self.parent is None:
                 # The original drive beam before roation and ramps
                 self.driver_incoming = driver_incoming

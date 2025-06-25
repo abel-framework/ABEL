@@ -82,7 +82,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag):
     return main
 
 
-def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, return_tracked_driver=False, run_tests=False):
+def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, return_tracked_driver=False, test_beam_between_ramps=False):
 
     stage = StagePrtclTransWakeInstability()
     stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
@@ -110,7 +110,7 @@ def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_sou
     stage.make_animations = False
 
     stage._return_tracked_driver = return_tracked_driver
-    stage.run_tests = run_tests
+    stage.test_beam_between_ramps = test_beam_between_ramps
 
     # Set up ramps after the stage is fully configured
     if use_ramps:
@@ -138,7 +138,7 @@ def test_beam_between_ramps():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, run_tests=True)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=True)
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
@@ -181,7 +181,7 @@ def test_stage_length_gradient_energyGain():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, run_tests=False)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
 
     stage.length_flattop = 7.8                                                    # [m]
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
@@ -194,7 +194,7 @@ def test_stage_length_gradient_energyGain():
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, run_tests=False)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
@@ -229,7 +229,7 @@ def test_driver_unrotation():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, run_tests=True)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, test_beam_between_ramps=True)
 
     stage.nom_energy = 369.6e9                                                    # [eV], HALHF v2 last stage nominal input energy
     _, driver = stage.track(main_source.track())
