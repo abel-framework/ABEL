@@ -852,6 +852,156 @@ class Stage(Trackable, CostModeled):
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
 
+
+    # ==================================================
+    def rotate_beam_coordinate_systems(self, driver_incoming, beam_incoming):
+        """
+        Rotates the coordinate systems of the incoming drive beam and main
+        beam using passive transformation such that z-axis in the new frame 
+        is aligned with the drive beam propagation direction.
+
+        Currently does not support drive beam tilt not aligned with beam 
+        propagation direction.
+        
+
+        Parameters
+        ----------
+        driver_incoming : ``Beam`` object
+            The incoming drive beam before any rotation and ramps.
+
+        beam_incoming : ``Beam`` object
+            The incoming drive beam before any rotation and ramps.
+
+
+        Returns
+        ----------
+        drive_beam_rotated : ``Beam`` object
+            Rotated drive beam. Returns a deepcopy of the input 
+            ``driver_incoming`` if the driver source of the stage does not have 
+            neither angular jitter nor angular offset.
+
+        beam_rotated : ``Beam`` object
+            Rotated main beam. Returns a deepcopy of the input ``beam_incoming`` 
+            if the driver source of the stage does not have neither angular 
+            jitter nor angular offset.
+        """
+
+        drive_beam_rotated = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
+        beam_rotated = copy.deepcopy(beam_incoming)
+
+        # Check if the driver source of the stage has angular offset
+        has_angular_offset = self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0
+
+        # Perform rotation if there is angular offset
+        if has_angular_offset:
+
+            driver_x_angle = driver_incoming.x_angle()
+            driver_y_angle = driver_incoming.y_angle()
+            
+            beam0_x_angle = beam_incoming.x_angle()
+            beam0_y_angle = beam_incoming.y_angle()
+
+            # Calculate the angles that will be used to rotate the beams' frame
+            rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
+            rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+            # The model currently does not support drive beam tilt not aligned with beam propagation, so need to first ensure that the drive beam is aligned to its own propagation direction. This is done using active transformation to rotate the beam around x- and y-axis
+            drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+
+            # Use passive transformation to rotate the frame of the beams
+            drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
+            beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+
+            if np.abs( drive_beam_rotated.x_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'driver_incoming x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_rotated x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
+                warnings.warn(driver_error_string)
+
+            if np.abs( drive_beam_rotated.y_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'driver_incoming y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_rotated y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
+                warnings.warn(driver_error_string)
+    
+            if np.abs( -(beam_rotated.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
+                
+            if np.abs( (beam_rotated.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
+
+        return drive_beam_rotated, beam_rotated
+    
+
+    # ==================================================
+    def undo_beam_coordinate_systems_rotation(self, driver_incoming, driver_outgoing, beam_outgoing):
+        """
+        Undoes the passive coordinate transformation performed on the drive 
+        beam and main beam at the start of the stage. 
+
+
+        Parameters
+        ----------
+        driver_incoming : ``Beam`` object
+            The incoming drive beam before any rotation and ramps.
+
+        driver_outgoing : ``Beam`` object
+            The outgoing drive beam after downramp.
+
+        beam_outgoing : ``Beam`` object
+            The outgoing main beam after downramp.
+
+
+        Returns
+        ----------
+        driver_outgoing : ``Beam`` object
+            Drive beam rotated back to its original coordinate system before the 
+            stage. Returns the input ``driver_outgoing`` if the driver source of 
+            the stage does not have neither angular jitter nor angular offset.
+
+        beam_outgoing : ``Beam`` object
+            Main beam rotated back to its original coordinate system before the 
+            stage. Returns the input ``beam_incoming`` if the driver source of 
+            the stage does not have neither angular jitter nor angular offset.
+        """
+
+        # Check if the driver source of the stage has angular offset
+        has_angular_offset = self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0
+        
+        if has_angular_offset:
+
+            driver_x_angle = driver_incoming.x_angle()
+            driver_y_angle = driver_incoming.y_angle()
+
+            # Calculate the angles that will be used to rotate the beams' frame
+            rotation_angle_x, rotation_angle_y = driver_incoming.beam_alignment_angles()
+            rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+            # Angles of beam before rotating back to original coordinate system
+            beam_x_angle = beam_outgoing.x_angle()
+            beam_y_angle = beam_outgoing.y_angle()
+
+            driver_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+            beam_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+            
+            # Add drifts to the beam
+            x_drift = self.length_flattop * np.tan(driver_x_angle)
+            y_drift = self.length_flattop * np.tan(driver_y_angle)
+            xs = beam_outgoing.xs()
+            ys = beam_outgoing.ys()
+            beam_outgoing.set_xs(xs + x_drift)
+            beam_outgoing.set_ys(ys + y_drift)
+            xs_driver = driver_outgoing.xs()
+            ys_driver = driver_outgoing.ys()
+            driver_outgoing.set_xs(xs_driver + x_drift)
+            driver_outgoing.set_ys(ys_driver + y_drift)
+            
+            #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
+        
+            if driver_incoming.x_angle() != 0 and np.abs( (beam_outgoing.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
+                
+            if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
+
+        return driver_outgoing, beam_outgoing
+
     
     # ==================================================
     def save_driver_to_file(self, driver, runnable):
