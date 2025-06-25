@@ -626,19 +626,19 @@ class StagePrtclTransWakeInstability(Stage):
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.test_beam_between_ramps:
             if self.parent is None:
-                # The original drive beam before roation and ramps
-                self.driver_incoming = driver_incoming
-
-                # The outgoing beams for the main stage need to be recorded before potential rotation for correct comparison with its ramps.
-                self.beam_out = beam
-                self.driver_out = driver
+                # Store beams for the main stage
+                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # Drive beam after the upramp, before tracking
+                                               beam_before_tracking=beam0,  # Main beam after the upramp, before tracking
+                                               driver_outgoing=driver,  # Drive beam after tracking, before the downramp
+                                               beam_outgoing=beam,  # Main beam after tracking, before the downramp
+                                               driver_incoming=driver_incoming)  # The original drive beam before rotation and ramps
             else:
-                # Ramps record the final beams as their output beams, as they should not perform any rotation between instability tracking and this line.
-                self.beam_out = beam_outgoing
-                self.driver_out = driver_outgoing
-
-            self.driver_in = drive_beam_ramped  # Drive beam before instability tracking
-            self.beam_in = beam0  # Main beam before instability tracking
+                # Store beams for the ramps
+                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # A deepcopy of the incoming drive beam before tracking.
+                                               beam_before_tracking=beam0,  # A deepcopy of the incoming main beam before tracking.
+                                               driver_outgoing=driver_outgoing,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                               beam_outgoing=beam_outgoing,  # Main beam after tracking through the ramp (has not been un-rotated)
+                                               driver_incoming=None)  # Only the main stage needs to store the original drive beam
 
         # Copy meta data from input beam_outgoing (will be iterated by super)
         beam_outgoing.trackable_number = beam_incoming.trackable_number
