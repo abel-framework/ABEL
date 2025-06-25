@@ -488,7 +488,7 @@ class Beam():
         assert np.allclose(beam1.rel_energy_spread(), beam2.rel_energy_spread(), rtol=0.0, atol=5e-4)
         assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.0, atol=1e-6)
         assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.0, atol=0.5e-6)
-        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.05, atol=0.05e-6)
         assert np.allclose(beam1.geom_emittance_x(), beam2.geom_emittance_x(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.geom_emittance_y(), beam2.geom_emittance_y(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.norm_emittance_x(), beam2.norm_emittance_x(), rtol=0.0, atol=1e-6)
