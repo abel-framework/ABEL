@@ -257,7 +257,7 @@ class DriverDelaySystem(BeamDeliverySystem):
         """
         Use the quad-values found earlier, to find periodic beta/alpha-function
         """
-        if not self.ks:
+        if not list(self.ks):
             self.match_quads()
 
         from abel.utilities.beam_physics import evolve_beta_function
@@ -298,7 +298,7 @@ class DriverDelaySystem(BeamDeliverySystem):
         from abel.utilities.beam_physics import evolve_beta_function
 
         # Get lattice
-        if not self.ks:
+        if not list(self.ks):
             self.ks = self.match_quads()
         
         self.lattice = self.get_lattice(self.ks)
