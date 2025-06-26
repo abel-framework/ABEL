@@ -9,7 +9,7 @@ class Interstage(Trackable, CostModeled):
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, lens_radius=2e-3, charge_sign=-1,
-                 use_chromaticity_correction=True, use_sextupole=False, use_apertures=True, enable_csr=True, enable_isr=True, enable_space_charge=False):
+                 cancel_chromaticity=True, cancel_sec_order_dispersion=False, use_apertures=True, enable_csr=True, enable_isr=True, enable_space_charge=False):
         
         super().__init__()
 
@@ -28,17 +28,8 @@ class Interstage(Trackable, CostModeled):
         self.length_ratio_gap = 0.025
         self.length_ratio_plasma_lens = 0.05
         self.length_ratio_chicane_dipole = 0.85
-        self.length_ratio_sextupole = 0.25
+        self.length_ratio_central_gap_or_sextupole = 0.25
 
-        # lens alignment and jitter
-        self.lens_offset_x = 0
-        self.lens_offset_y = 0
-        self.jitter = SimpleNamespace()
-        self.jitter.lens_offset_x = 0
-        self.jitter.lens_offset_y = 0
-        self.jitter.lens_angle_x = 0
-        self.jitter.lens_angle_y = 0
-        
         # derivable (but also settable) parameters
         self._field_ratio_chicane_dipole1 = None
         self._field_ratio_chicane_dipole2 = None
@@ -47,14 +38,23 @@ class Interstage(Trackable, CostModeled):
         self._strength_sextupole = None # [1/m^2]
         
         # feature toggles
-        self.use_chromaticity_correction = use_chromaticity_correction
-        self.use_sextupole = use_sextupole
+        self.cancel_chromaticity = cancel_chromaticity
+        self.cancel_sec_order_dispersion = cancel_sec_order_dispersion
         self.use_apertures = use_apertures
 
         # physics flags
         self.enable_csr = enable_csr
         self.enable_isr = enable_isr
         self.enable_space_charge = enable_space_charge
+        
+        # lens alignment and jitter
+        self.lens_offset_x = 0
+        self.lens_offset_y = 0
+        self.jitter = SimpleNamespace()
+        self.jitter.lens_offset_x = 0
+        self.jitter.lens_offset_y = 0
+        self.jitter.lens_angle_x = 0
+        self.jitter.lens_angle_y = 0
         
         # evolution (saved when tracking)
         self.evolution = SimpleNamespace()
@@ -80,7 +80,6 @@ class Interstage(Trackable, CostModeled):
     
     ## ENERGY-FUNCTION PARAMETERS
     
-    # evaluate R56 (if it is a function)
     @property
     def R56(self) -> float:
         if callable(self._R56):
@@ -91,7 +90,6 @@ class Interstage(Trackable, CostModeled):
     def R56(self, val):
         self._R56 = val
         
-    # evaluate initial beta function (if it is a function)
     @property
     def beta0(self) -> float:
         if callable(self._beta0):
@@ -102,7 +100,6 @@ class Interstage(Trackable, CostModeled):
     def beta0(self, val):
         self._beta0 = val
 
-    # evaluate dipole field (if it is a function)
     @property
     def field_dipole(self) -> float:
         if callable(self._field_dipole):
@@ -113,7 +110,6 @@ class Interstage(Trackable, CostModeled):
     def field_dipole(self, val):
         self._field_dipole = val
 
-    # evaluate dipole length (if it is a function)
     @property
     def length_dipole(self) -> float:
         if callable(self._length_dipole):
@@ -125,7 +121,7 @@ class Interstage(Trackable, CostModeled):
         self._length_dipole = val
     
     
-    ## RATIO-DEFINED PARAMETERS
+    ## RATIO-DEFINED LENGTHS
     
     @property
     def length_gap(self) -> float:
@@ -140,11 +136,39 @@ class Interstage(Trackable, CostModeled):
         return self.length_dipole * self.length_ratio_chicane_dipole
 
     @property
-    def length_sextupole(self) -> float:
-        return self.length_dipole * self.length_ratio_sextupole
+    def length_central_gap_or_sextupole(self) -> float:
+        return self.length_dipole * self.length_ratio_central_gap_or_sextupole
 
     
-    ## DERIVED PARAMETERS
+    ## STRENGTH VALUES
+
+    @property
+    def strength_plasma_lens(self) -> float:
+        if self._strength_plasma_lens is None:
+            self.match_beta_function()
+        return self._strength_plasma_lens
+
+    @property
+    def nonlinearity_plasma_lens(self) -> float:
+        if self._nonlinearity_plasma_lens is None:
+            self.match_chromatic_amplitude()
+        return self._nonlinearity_plasma_lens
+        
+    @property
+    def strength_sextupole(self) -> float:
+        if self._strength_sextupole is None:
+            self.match_second_order_dispersion()
+        return self._strength_sextupole
+
+
+    
+    ## FIELD VALUES
+    
+    @property
+    def field_gradient_plasma_lens(self) -> float:
+        "Plasma-lens field gradient [T/m]"
+        p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
+        return self.charge_sign*self.strength_plasma_lens*p0/(SI.e*self.length_plasma_lens)
 
     @property
     def field_chicane_dipole1(self) -> float:
@@ -158,61 +182,75 @@ class Interstage(Trackable, CostModeled):
             self.match_dispersion_and_R56()
         return self.field_dipole * self._field_ratio_chicane_dipole2
 
-        
-    @property
-    def strength_plasma_lens(self) -> float:
-        if self._strength_plasma_lens is None:
-            self.match_beta_function()
-        return self._strength_plasma_lens
-
-    @property
-    def field_gradient_plasma_lens(self) -> float:
-        "Plasma-lens field gradient [T/m]"
-        p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
-        return self.charge_sign*self.strength_plasma_lens*p0/(SI.e*self.length_plasma_lens)
-
-    @property
-    def nonlinearity_plasma_lens(self) -> float:
-        if self._nonlinearity_plasma_lens is None:
-            if self._nonlinearity_plasma_lens is None:
-                self.match_chromaticity()
-            return self._nonlinearity_plasma_lens
-            
-            ## calculate dispersion and dispersion prime in the lens
-            #p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
-            #Dpx_lens = -self.charge_sign*self.length_dipole*self.field_dipole*SI.e/p0
-            #Dx_lens = Dpx_lens*(self.length_dipole/2 + self.length_gap + self.length_plasma_lens/2)
-
-            # calculate exact nonlinearity (inverse of the dispersion)
-            #tau_lens = -float(self.use_nonlinearity)/Dx_lens
-            
-            #return tau_lens
-        else:
-            return self._nonlinearity_plasma_lens
-   
-    @property
-    def strength_sextupole(self) -> float:
-        if self._strength_sextupole is None:
-            self.match_second_order_dispersion()
-        return self._strength_sextupole
-
     @property
     def field_gradient_sextupole(self) -> float:
         "Sextupole field gradient [T/m^2]"
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
-        return self.charge_sign*self.strength_sextupole*p0/(SI.e*self.length_sextupole)
+        return self.charge_sign*self.strength_sextupole*p0/(SI.e*self.length_central_gap_or_sextupole)
+
+    
+    
+    ## MATRIX LATTICE
+
+    # full lattice 
+    def matrix_lattice(self, k_lens=None, tau_lens=None, B_chic1=None, B_chic2=None, m_sext=None, half_lattice=False):
+
+        from abel.utilities.relativity import energy2momentum
+        
+        # element length array
+        dL = self.length_gap
+        ls = np.array([dL, self.length_dipole, dL, self.length_plasma_lens, dL, 
+                       self.length_chicane_dipole, dL, self.length_chicane_dipole, dL, self.length_central_gap_or_sextupole/2])
+        
+        # bending strength array
+        if B_chic1 is None:
+            B_chic1 = self.field_chicane_dipole1
+        if B_chic2 is None:
+            B_chic2 = self.field_chicane_dipole2
+        Bs = np.array([0, self.field_dipole, 0, 0, 0, B_chic1, 0, B_chic2, 0, 0])
+        inv_rhos = -self.charge_sign * Bs * SI.e / energy2momentum(self.nom_energy)
+        
+        # focusing strength array
+        if k_lens is None:
+            k_lens = self.strength_plasma_lens/self.length_plasma_lens
+        ks = np.array([0, 0, 0, k_lens, 0, 0, 0, 0, 0, 0])
+        
+        # sextupole strength array
+        if m_sext is None:
+            if self.cancel_sec_order_dispersion:
+                m_sext = self.strength_sextupole/self.length_central_gap_or_sextupole
+            else:
+                m_sext = 0
+        ms = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, m_sext])
+
+        # plasma-lens transverse taper array
+        if tau_lens is None:
+            tau_lens = self.nonlinearity_plasma_lens
+        taus = np.array([0, 0, 0, tau_lens, 0, 0, 0, 0, 0, 0])
+        
+        # mirror symmetrize the lattice
+        if not half_lattice:
+            ls = np.append(np.append(ls[:-1], 2*ls[-1]), np.flip(ls[:-1]))
+            inv_rhos = np.append(np.append(inv_rhos[:-1], inv_rhos[-1]), np.flip(inv_rhos[:-1]))
+            ks = np.append(np.append(ks[:-1], ks[-1]), np.flip(ks[:-1]))
+            ms = np.append(np.append(ms[:-1], ms[-1]), np.flip(ms[:-1]))
+            taus = np.append(np.append(taus[:-1], taus[-1]), np.flip(taus[:-1]))
+        
+        return ls, inv_rhos, ks, ms, taus
+        
 
     
     ## MATCHING
     
-    def match_lattice(self):
+    def match(self):
         "Combined matching the beta function, first- and second-order dispersion and the R56"
         self.match_beta_function()
         self.match_dispersion_and_R56(high_res=False)
-        if self.use_chromaticity_correction:
-            self.match_chromaticity()
-        if self.use_sextupole:
+        if self.cancel_chromaticity:
+            self.match_chromatic_amplitude()
+        if self.cancel_sec_order_dispersion:
             self.match_second_order_dispersion()
+
     
     def match_beta_function(self):
         "Matching the beta function by adjusting the plasma-lens strength."
@@ -225,12 +263,9 @@ class Interstage(Trackable, CostModeled):
             return alpha**2
     
         # initial guess for the lens strength
-        L1eff = self.length_dipole + 2*self.length_gap + self.length_plasma_lens/2
-        L2eff = 2*self.length_chicane_dipole + self.length_plasma_lens/2 + 3*self.length_gap + self.length_sextupole/2
-        f0 = 1/(1/L1eff + 1/L2eff)
-        kl_lens0 = 1/f0
-        k_lens0 = kl_lens0/self.length_plasma_lens
-            
+        f = 1/(1/(self.length_dipole + self.length_plasma_lens/2 + 2*self.length_gap) + 1/(2*self.length_chicane_dipole + self.length_central_gap_or_sextupole/2 + self.length_plasma_lens/2 + 3*self.length_gap))
+        k_lens0 = 1/(f*self.length_plasma_lens)
+        
         # match the beta function
         from scipy.optimize import minimize
         result_beta = minimize(minfun_beta, k_lens0, tol=1e-20, options={'maxiter': 200})
@@ -245,9 +280,6 @@ class Interstage(Trackable, CostModeled):
         if self.R56 > 0:
             print('Positive R56 given, flipping sign to negative')
         
-        # get plasma-lens strength
-        k_lens = self.strength_plasma_lens/self.length_plasma_lens
-
         # normalizing scale for the merit function
         Dpx_scale = self.length_dipole*self.field_dipole*SI.c/self.nom_energy
         R56_scale = self.length_dipole**3*self.field_dipole**2*SI.c**2/self.nom_energy**2
@@ -255,20 +287,14 @@ class Interstage(Trackable, CostModeled):
         # minimizer function for dispersion (central dispersion prime is zero)
         from abel.utilities.beam_physics import evolve_dispersion, evolve_R56
         def minfun_dispersion_R56(params):
-            ls, inv_rhos, ks, _, _ = self.matrix_lattice(k_lens=k_lens, tau_lens=0, B_chic1=params[0], B_chic2=params[1], m_sext=0, half_lattice=True)
+            ls, inv_rhos, ks, _, _ = self.matrix_lattice(tau_lens=0, B_chic1=params[0], B_chic2=params[1], m_sext=0, half_lattice=True)
             _, Dpx_mid, _ = evolve_dispersion(ls, inv_rhos, ks, fast=True) 
             R56_mid, _ = evolve_R56(ls, inv_rhos, ks, high_res=high_res) 
             return (Dpx_mid/Dpx_scale)**2 + ((R56_mid - nom_R56/2)/R56_scale)**2
 
         # initial guess for the chicane dipole fields
-        if self._field_ratio_chicane_dipole1 is not None:
-            B_chic1_guess = self.field_chicane_dipole1
-        else:
-            B_chic1_guess = self.field_dipole/2
-        if self._field_ratio_chicane_dipole2 is not None:
-            B_chic2_guess = self.field_chicane_dipole2
-        else:
-            B_chic2_guess = -self.field_dipole/2
+        B_chic1_guess = self.field_dipole/2
+        B_chic2_guess = -self.field_dipole/2
         
         # match the beta function
         from scipy.optimize import minimize
@@ -277,11 +303,11 @@ class Interstage(Trackable, CostModeled):
         self._field_ratio_chicane_dipole2 = result_dispersion_R56.x[1]/self.field_dipole
     
     
-    def match_chromaticity(self):
+    def match_chromatic_amplitude(self):
         "Matching the chroaticity of function by adjusting the plasma-lens nonlinearity."
 
         # stop if nonlinearity is turned off
-        if not self.use_chromaticity_correction:
+        if not self.cancel_chromaticity:
             self._nonlinearity_plasma_lens = 0.0
             return
         
@@ -311,96 +337,28 @@ class Interstage(Trackable, CostModeled):
         "Cancelling the second-order dispersion by adjusting the sextupole strength."
 
         # stop if nonlinearity is turned off
-        if not self.use_sextupole:
+        if not self.cancel_sec_order_dispersion:
             self._strength_sextupole = 0.0
             return
-            
-        # get lens parameters
-        k_lens = self.strength_plasma_lens/self.length_plasma_lens
-        tau_lens = self.nonlinearity_plasma_lens
+
+        # normalizing scale for the merit function
+        DDpx_scale = self.length_dipole*self.field_dipole*SI.c/self.nom_energy
         
-        # calculate dispersion and dispersion prime in the lens
-        from abel.utilities.relativity import energy2momentum
-        Dpx_lens = -self.charge_sign*self.length_dipole*self.field_dipole*SI.e/energy2momentum(self.nom_energy)
-        Dx_lens = Dpx_lens*(self.length_dipole/2 + self.length_gap + self.length_plasma_lens/2)
-
-        # estimate the central dispersion and second order dispersion prime
-        L1 = self.length_dipole
-        L2 = 2*self.length_chicane_dipole
-        B1 = self.field_dipole
-        B2 = self.field_chicane_dipole1
-        Dx_mid = Dx_lens*(1/4)*(1 + 3*L2/L1 + 2*(B2*L2**2)/(B1*L1**2))
-        DDxp_mid = (2*Dpx_lens)*((3/4)*(L1/L2 + 1) - 1)*(2.0-int(self.use_chromaticity_correction))
-
-        # get the second dipole
-        B_chic2 = self.field_chicane_dipole2
-        
-        # guesstimate the sextupole strength (starting point for optimization)
-        ml_sext0 = 2*DDxp_mid/Dx_mid**2
-        m_sext0 = ml_sext0/self.length_sextupole
-
         # minimizer function for second-order dispersion (central second-order dispersion prime is zero)
         from abel.utilities.beam_physics import evolve_second_order_dispersion
         def minfun_second_order_dispersion(params):
-            ls, inv_rhos, ks, ms, taus = self.matrix_lattice(k_lens=k_lens, tau_lens=tau_lens, B_chic2=B_chic2, m_sext=params[0], half_lattice=True)
+            ls, inv_rhos, ks, ms, taus = self.matrix_lattice(m_sext=params[0], half_lattice=True)
             _, DDpx, _ = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=True) 
-            return DDpx**2
+            return (DDpx/DDpx_scale)**2
+
+        # guesstimate the sextupole strength (starting point for optimization)
+        Dx_scale = -self.length_dipole**2*self.field_dipole*SI.c/self.nom_energy/2
+        m_sext0 = 1.11/(Dx_scale*self.length_central_gap_or_sextupole*self.length_dipole)
     
         # match the beta function
         from scipy.optimize import minimize
         result_dispersion = minimize(minfun_second_order_dispersion, m_sext0, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
-        self._strength_sextupole = result_dispersion.x[0]*self.length_sextupole
-    
-        
-        
-    
-    ## MATRIX LATTICE
-
-    # full lattice 
-    def matrix_lattice(self, k_lens=None, tau_lens=None, B_chic1=None, B_chic2=None, m_sext=None, half_lattice=False):
-
-        from abel.utilities.relativity import energy2momentum
-        
-        # element length array
-        dL = self.length_gap
-        ls = np.array([dL, self.length_dipole, dL, self.length_plasma_lens, dL, 
-                       self.length_chicane_dipole, dL, self.length_chicane_dipole, dL, self.length_sextupole/2])
-        
-        # bending strength array
-        if B_chic1 is None:
-            B_chic1 = self.field_chicane_dipole1
-        if B_chic2 is None:
-            B_chic2 = self.field_chicane_dipole2
-        Bs = np.array([0, self.field_dipole, 0, 0, 0, B_chic1, 0, B_chic2, 0, 0])
-        inv_rhos = -self.charge_sign * Bs * SI.e / energy2momentum(self.nom_energy)
-        
-        # focusing strength array
-        if k_lens is None:
-            k_lens = self.strength_plasma_lens/self.length_plasma_lens
-        ks = np.array([0, 0, 0, k_lens, 0, 0, 0, 0, 0, 0])
-        
-        # sextupole strength array
-        if m_sext is None:
-            if self.use_sextupole:
-                m_sext = self.strength_sextupole/self.length_sextupole
-            else:
-                m_sext = 0
-        ms = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, m_sext])
-
-        # plasma-lens transverse taper array
-        if tau_lens is None:
-            tau_lens = self.nonlinearity_plasma_lens
-        taus = np.array([0, 0, 0, tau_lens, 0, 0, 0, 0, 0, 0])
-        
-        # mirror symmetrize the lattice
-        if not half_lattice:
-            ls = np.append(np.append(ls[:-1], 2*ls[-1]), np.flip(ls[:-1]))
-            inv_rhos = np.append(np.append(inv_rhos[:-1], inv_rhos[-1]), np.flip(inv_rhos[:-1]))
-            ks = np.append(np.append(ks[:-1], ks[-1]), np.flip(ks[:-1]))
-            ms = np.append(np.append(ms[:-1], ms[-1]), np.flip(ms[:-1]))
-            taus = np.append(np.append(taus[:-1], taus[-1]), np.flip(taus[:-1]))
-        
-        return ls, inv_rhos, ks, ms, taus
+        self._strength_sextupole = result_dispersion.x[0]*self.length_central_gap_or_sextupole
         
     
     ## PLOTTING
@@ -625,7 +583,8 @@ class Interstage(Trackable, CostModeled):
 
     
     def plot_layout(self, delta=0.1, axes_equal=False, use_second_order_dispersion=True, savefig=None):
-
+        "Plot the layout with beam orbit and dispersion."
+        
         from matplotlib import pyplot as plt
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion, evolve_orbit
         from scipy.integrate import cumulative_trapezoid
@@ -760,6 +719,7 @@ class Interstage(Trackable, CostModeled):
         if savefig is not None:
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
+    
     ## PRINT INFO
 
     def print_summary(self):
@@ -768,11 +728,11 @@ class Interstage(Trackable, CostModeled):
         print(f'Plasma lens (2x):          {self.length_plasma_lens:.3f} m,  g = {self.field_gradient_plasma_lens:.1f} T/m')
         print(f'Outer chicane dipole (2x): {self.length_chicane_dipole:.3f} m,  B = {self.field_chicane_dipole1:.3f} T')
         print(f'Inner chicane dipole (2x): {self.length_chicane_dipole:.3f} m,  B = {self.field_chicane_dipole2:.3f} T')
-        if self.use_sextupole:
-            print(f'Sextupole:                 {self.length_sextupole:.3f} m,  m = {self.field_gradient_sextupole:.1f} T/m^2')
+        if self.cancel_sec_order_dispersion:
+            print(f'Sextupole:                 {self.length_central_gap_or_sextupole:.3f} m,  m = {self.field_gradient_sextupole:.1f} T/m^2')
             print(f'Gaps (10x):                {self.length_gap:.3f} m')
         else:
-            print(f'Central gap:               {self.length_sextupole + 2*self.length_gap:.3f} m')
+            print(f'Central gap:               {self.length_central_gap_or_sextupole + 2*self.length_gap:.3f} m')
             print(f'Other gaps (8x):           {self.length_gap:.3f} m')
         
         print('------------------------------------------------')
@@ -780,14 +740,16 @@ class Interstage(Trackable, CostModeled):
         print(f'         Total bend angle:           {np.rad2deg(self.total_bend_angle()):.2f} deg')
         print('------------------------------------------------')
 
+    
+    
+    ## SURVEY PLOTS
+    
     def total_bend_angle(self):
         from abel.utilities.relativity import energy2momentum
         BL = 2*(self.length_dipole*self.field_dipole + self.length_chicane_dipole*(self.field_chicane_dipole1 + self.field_chicane_dipole2))
         theta = self.charge_sign*BL*SI.e/energy2momentum(self.nom_energy)
         return theta
-    
-    ## SURVEY PLOTS
-    
+
     def survey_object(self):
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)

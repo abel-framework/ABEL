@@ -6,11 +6,11 @@ import scipy.constants as SI
 
 class InterstageImpactX(Interstage):
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, use_chromaticity_correction=True, use_sextupole=True,
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True,
                        enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, keep_data=False):
         
         super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, 
-                         use_chromaticity_correction=use_chromaticity_correction, use_sextupole=use_sextupole, 
+                         cancel_chromaticity=cancel_chromaticity, cancel_sec_order_dispersion=cancel_sec_order_dispersion, 
                          enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
         
         # simulation options
@@ -19,12 +19,13 @@ class InterstageImpactX(Interstage):
 
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+        "Track plasma-lens-based interstage using ImpactX."
         
         # re-perform the matching
-        self.match_lattice()
+        self.match()
 
         # get the lattice
-        lattice = self.get_lattice()
+        lattice = self.get_impactx_lattice()
         
         # run ImpactX
         from abel.apis.impactx.impactx_api import run_impactx
@@ -34,8 +35,9 @@ class InterstageImpactX(Interstage):
         return super().track(beam, savedepth, runnable, verbose)
     
     
-    def get_lattice(self):
-
+    def get_impactx_lattice(self):
+        "Set up the ImpactX plasma-lens-based interstage lattice."
+        
         from impactx import elements
         from abel.utilities.relativity import energy2momentum
         
@@ -106,10 +108,10 @@ class InterstageImpactX(Interstage):
             chicane_dipole2 = elements.ExactDrift(ds=self.length_chicane_dipole, nslice=self.num_slices)
 
         # define sextupole (or gap)
-        if self.use_sextupole:
-            half_sextupole_or_gap = elements.ExactMultipole(ds=self.length_sextupole/2, k_normal=[0.,0.,self.strength_sextupole/self.length_sextupole], k_skew=[0.,0.,0.], nslice=self.num_slices)
+        if self.cancel_sec_order_dispersion:
+            half_sextupole_or_gap = elements.ExactMultipole(ds=self.length_central_gap_or_sextupole/2, k_normal=[0.,0.,self.strength_sextupole/self.length_central_gap_or_sextupole], k_skew=[0.,0.,0.], nslice=self.num_slices)
         else:
-            half_sextupole_or_gap = elements.ExactDrift(ds=self.length_sextupole/2, nslice=1)
+            half_sextupole_or_gap = elements.ExactDrift(ds=self.length_central_gap_or_sextupole/2, nslice=1)
         
         # specify the lattice sequence
         lattice.extend(gap)

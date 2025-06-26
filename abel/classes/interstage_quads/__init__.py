@@ -9,7 +9,7 @@ class InterstageQuads(Trackable, CostModeled):
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, polarity_quads=1, beta_ratio_central = 2, 
-                 use_apertures=True, use_chromaticity_correction=True, use_central_sextupole=True,
+                 use_apertures=True, cancel_chromaticity=True, cancel_sec_order_dispersion=True,
                  enable_csr=True, enable_isr=True, enable_space_charge=False, charge_sign=-1):
         
         super().__init__()
@@ -50,8 +50,8 @@ class InterstageQuads(Trackable, CostModeled):
         self._strength_sextupole3 = None # [1/m]
         
         # feature toggles
-        self.use_chromaticity_correction = use_chromaticity_correction
-        self.use_central_sextupole = use_central_sextupole
+        self.cancel_chromaticity = cancel_chromaticity
+        self.cancel_sec_order_dispersion = cancel_sec_order_dispersion
         self.use_apertures = use_apertures
 
         # physics flags
@@ -154,13 +154,13 @@ class InterstageQuads(Trackable, CostModeled):
     @property
     def field_chicane_dipole1(self) -> float:
         if self._field_ratio_chicane_dipole1 is None:
-            self.match_lattice()
+            self.match()
         return self.field_dipole * self._field_ratio_chicane_dipole1
 
     @property
     def field_chicane_dipole2(self) -> float:
         if self._field_ratio_chicane_dipole2 is None:
-            self.match_lattice()
+            self.match()
         return self.field_dipole * self._field_ratio_chicane_dipole2
 
         
@@ -204,19 +204,19 @@ class InterstageQuads(Trackable, CostModeled):
     @property
     def strength_sextupole1(self) -> float:
         if self._strength_sextupole1 is None:
-            self.cancel_chromaticity()
+            self.match_chromatic_amplitude()
         return self._strength_sextupole1
 
     @property
     def strength_sextupole2(self) -> float:
         if self._strength_sextupole2 is None:
-            self.cancel_chromaticity()
+            self.match_chromatic_amplitude()
         return self._strength_sextupole2
         
     @property
     def strength_sextupole3(self) -> float:
         if self._strength_sextupole3 is None:
-            self.cancel_second_order_dispersion()
+            self.match_second_order_dispersion()
         return self._strength_sextupole3
     
     @property
@@ -292,14 +292,14 @@ class InterstageQuads(Trackable, CostModeled):
         
     ## MATCHING
     
-    def match_lattice(self):
+    def match(self):
         "Combined matching the beta function, first-order dispersion and the R56"
         self.match_beta_function()
-        self.cancel_dispersion_and_match_R56(high_res=False)
-        if self.use_chromaticity_correction:
-            self.cancel_chromaticity()
-        if self.use_central_sextupole:
-            self.cancel_second_order_dispersion()
+        self.match_dispersion_and_R56(high_res=False)
+        if self.cancel_chromaticity:
+            self.match_chromatic_amplitude()
+        if self.cancel_sec_order_dispersion:
+            self.match_second_order_dispersion()
 
     
     def match_beta_function(self):
@@ -308,15 +308,15 @@ class InterstageQuads(Trackable, CostModeled):
         # minimizer function for beta matching (central alpha function is zero)
         from abel.utilities.beam_physics import evolve_beta_function
         def minfun_beta(params):
-            ls, _, ks, _, _ = self.matrix_lattice(k1=params[0], k2=params[1], k3=params[2], B_chic1=0, B_chic2=0, m1=0, m2=0, m3=0, half_lattice=True)
-            beta_x, alpha_x, _ = evolve_beta_function(ls, ks, self.beta0, fast=True) 
+            ls, inv_rhos, ks, _, _ = self.matrix_lattice(k1=params[0], k2=params[1], k3=params[2], B_chic1=0, B_chic2=0, m1=0, m2=0, m3=0, half_lattice=True)
+            beta_x, alpha_x, _ = evolve_beta_function(ls, ks, self.beta0, inv_rhos=inv_rhos, fast=True) 
             beta_y, alpha_y, _ = evolve_beta_function(ls, -ks, self.beta0, fast=True)
             return alpha_x**2 + alpha_y**2 + (beta_x/beta_y-float(self.beta_ratio_central)**np.sign(self.polarity_quads))**2+ (max(beta_x/10, self.beta0)/self.beta0-1)**2 + (max(beta_y/10, self.beta0)/self.beta0-1)**2
 
         # initial guess for the quad strength
-        k1_guess = self.polarity_quads*2/(self.length_dipole*self.length_quadrupole)
-        k2_guess = -self.polarity_quads*2/(self.length_dipole*self.length_quadrupole)
-        k3_guess = k1_guess
+        k1_guess = 2*self.polarity_quads/(self.length_dipole*self.length_quadrupole)
+        k2_guess = -2*self.polarity_quads/(self.length_dipole*self.length_quadrupole)
+        k3_guess = 0.8*self.polarity_quads/(self.length_dipole*self.length_quadrupole)
         
         # match the beta function
         from scipy.optimize import minimize
@@ -326,7 +326,7 @@ class InterstageQuads(Trackable, CostModeled):
         self._strength_quadrupole3 = result_beta.x[2]*self.length_quadrupole
 
     
-    def cancel_dispersion_and_match_R56(self, high_res=False):
+    def match_dispersion_and_R56(self, high_res=False):
         "Cancelling the dispersion and matching the R56 by adjusting the chicane dipoles."
         
         # assume negative R56
@@ -347,14 +347,8 @@ class InterstageQuads(Trackable, CostModeled):
             return (Dpx_mid/Dpx_scale)**2 + ((R56_mid - nom_R56/2)/R56_scale)**2
 
         # initial guess for the chicane dipole fields
-        if self._field_ratio_chicane_dipole1 is not None:
-            B_chic1_guess = self.field_chicane_dipole1
-        else:
-            B_chic1_guess = self.field_dipole/2
-        if self._field_ratio_chicane_dipole2 is not None:
-            B_chic2_guess = self.field_chicane_dipole2
-        else:
-            B_chic2_guess = -self.field_dipole/2
+        B_chic1_guess = self.field_dipole/2
+        B_chic2_guess = -self.field_dipole/2
         
         # match the beta function
         from scipy.optimize import minimize
@@ -363,10 +357,11 @@ class InterstageQuads(Trackable, CostModeled):
         self._field_ratio_chicane_dipole2 = result_dispersion_R56.x[1]/self.field_dipole
 
     
-    def cancel_chromaticity(self):
+    def match_chromatic_amplitude(self):
+        "Cancelling the chromaticity with the two first sextupoles."
         
         # stop if nonlinearity is turned off
-        if not self.use_chromaticity_correction:
+        if not self.cancel_chromaticity:
             self._strength_sextupole1 = 0.0
             self._strength_sextupole2 = 0.0
             return
@@ -377,45 +372,51 @@ class InterstageQuads(Trackable, CostModeled):
         # minimizer function for beta matching (central alpha function is zero)
         from abel.utilities.beam_physics import evolve_chromatic_amplitude
         def minfun_Wxy(params):
-            ls, inv_rhos, ks, ms, taus = self.matrix_lattice(m1=params[0], m2=params[1], m3=0, half_lattice=True)
-            Wx_mid, _ = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, self.beta0, fast=True) 
+            ls, inv_rhos, ks, ms, taus = self.matrix_lattice(m1=params[0], m2=params[1], m3=0, half_lattice=False)
+            Wx_mid, _ = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, self.beta0, fast=True, bending_plane=True) 
             Wy_mid, _ = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, self.beta0, fast=True, bending_plane=False) 
             return (Wx_mid/W_scale)**2 + (Wy_mid/W_scale)**2
         
         # make estimate
-        m1_guess = 90/self.length_quad_gap_or_sextupole
-        m2_guess = -90/self.length_quad_gap_or_sextupole
+        m1_factor = 90 - 32*(1-self.polarity_quads)/2
+        m2_factor = 90 + 36*(1-self.polarity_quads)/2
+        m1_guess = m1_factor*self.polarity_quads/(self.length_quad_gap_or_sextupole*self.length_dipole*self.field_dipole)
+        m2_guess = -m2_factor*self.polarity_quads/(self.length_quad_gap_or_sextupole*self.length_dipole*self.field_dipole)
         
         # match the beta function
         from scipy.optimize import minimize
-        result_Wxy = minimize(minfun_Wxy, [m1_guess, m2_guess], tol=1e-16, options={'maxiter': 100})
+        result_Wxy = minimize(minfun_Wxy, [m1_guess, m2_guess], method='Nelder-Mead', 
+                              options={'maxiter': 200, 'fatol': 1e-10, 'xatol': m1_guess*1e-4})
         self._strength_sextupole1 = result_Wxy.x[0]*self.length_quad_gap_or_sextupole
         self._strength_sextupole2 = result_Wxy.x[1]*self.length_quad_gap_or_sextupole
             
     
-    def cancel_second_order_dispersion(self):
+    def match_second_order_dispersion(self):
+        "Cancelling the second-order dispersion with the central sextupole."
         
         # stop if nonlinearity is turned off
-        if not self.use_central_sextupole:
+        if not self.cancel_sec_order_dispersion:
             self._strength_sextupole3 = 0.0
             return
-        
-        # guesstimate the sextupole strength (starting point for optimization)
-        ml_sext0 = 100
-        m_sext0 = ml_sext0/self.length_central_gap_or_sextupole
 
+        # normalizing scale for the merit function
+        DDpx_scale = self.length_dipole*self.field_dipole*SI.c/self.nom_energy
+        
         # minimizer function for second-order dispersion (central second-order dispersion prime is zero)
         from abel.utilities.beam_physics import evolve_second_order_dispersion
         def minfun_second_order_dispersion(params):
             ls, inv_rhos, ks, ms, taus = self.matrix_lattice(m3=params[0], half_lattice=True)
             _, DDpx, _ = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=True) 
-            return DDpx**2
+            return (DDpx/DDpx_scale)**2
     
+        # guesstimate the sextupole strength (starting point for optimization)
+        m3_guess = 40*self.polarity_quads/(self.length_central_gap_or_sextupole*self.length_dipole*self.field_dipole)
+
         # match the beta function
         from scipy.optimize import minimize
-        result_dispersion = minimize(minfun_second_order_dispersion, m_sext0, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
+        result_dispersion = minimize(minfun_second_order_dispersion, m3_guess, method='Nelder-Mead', 
+                                     options={'maxiter': 100, 'fatol': 1e-10, 'xatol': m3_guess*1e-4})
         self._strength_sextupole3 = result_dispersion.x[0]*self.length_central_gap_or_sextupole
-            
         
     
     ## PLOTTING
@@ -513,9 +514,8 @@ class InterstageQuads(Trackable, CostModeled):
 
         # calculate evolution
         ls, inv_rhos, ks, ms, taus = self.matrix_lattice()
-        _, _, evol_beta_x = evolve_beta_function(ls, ks, self.beta0, fast=False)
+        _, _, evol_beta_x = evolve_beta_function(ls, ks, self.beta0, inv_rhos=inv_rhos, fast=False)
         _, _, evol_beta_y = evolve_beta_function(ls, -ks, self.beta0, fast=False)
-        #_, _, evol_dispersion = evolve_dispersion(ls, inv_rhos, ks, fast=False);
         _, _, evol_second_order_dispersion = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False);
         _, evol_R56 = evolve_R56(ls, inv_rhos, ks);
         ssl = np.append([0.0], np.cumsum(ls))
@@ -525,8 +525,6 @@ class InterstageQuads(Trackable, CostModeled):
         beta_xs = evol_beta_x[1]
         ss_beta_y = evol_beta_y[0]
         beta_ys = evol_beta_y[1]
-        #ss_disp1 = evol_dispersion[0]
-        #dispersion = evol_dispersion[1]
         ss_disp2 = evol_second_order_dispersion[0]
         ss_disp1 = ss_disp2
         dispersion = evol_second_order_dispersion[1]
@@ -645,7 +643,7 @@ class InterstageQuads(Trackable, CostModeled):
         axs[1].set_ylabel(r'Chromatic amplitude, $W$')
         axs[1].set_xlim(long_limits)
         axs[1].set_yscale('log')
-        axs[1].set_ylim([0.1, 2*max(max(Wys), max(Wxs))])
+        axs[1].set_ylim([1, 1.3*max(max(Wys), max(Wxs))])
         
          # save figure to file
         if savefig is not None:
@@ -692,7 +690,7 @@ class InterstageQuads(Trackable, CostModeled):
         ys_high = ys + offset_disp*np.cos(thetas)
 
         # calculate beam size
-        _, _, evol_beta = evolve_beta_function(ls, ks, self.beta0, fast=False)
+        _, _, evol_beta = evolve_beta_function(ls, ks, self.beta0, inv_rhos=inv_rhos, fast=False)
         betas = np.interp(ss, evol_beta[0], evol_beta[1])
         if abs(delta) > 0:
             emit_gx = offset_disp[np.argmax(betas)]**2/max(betas)
@@ -794,16 +792,16 @@ class InterstageQuads(Trackable, CostModeled):
     def print_summary(self):
         print('------------------------------------------------')
         print(f'Main dipoles (2x):          {self.length_dipole:.3f} m,  B = {self.field_dipole:.2f} T')
-        print(f'Outer quadrupoles (2x):          {self.length_quadrupole:.3f} m,  g = {self.field_gradient_quadrupole1:.1f} T/m')
-        print(f'Middle quadrupoles (2x):          {self.length_quadrupole:.3f} m,  g = {self.field_gradient_quadrupole2:.1f} T/m')
-        print(f'Inner quadrupoles (2x):          {self.length_quadrupole:.3f} m,  g = {self.field_gradient_quadrupole3:.1f} T/m')
+        print(f'Outer quadrupoles (2x):     {self.length_quadrupole:.3f} m,  g = {self.field_gradient_quadrupole1:.1f} T/m')
+        print(f'Middle quadrupoles (2x):    {self.length_quadrupole:.3f} m,  g = {self.field_gradient_quadrupole2:.1f} T/m')
+        print(f'Inner quadrupoles (2x):     {self.length_quadrupole:.3f} m,  g = {self.field_gradient_quadrupole3:.1f} T/m')
         print(f'Outer chicane dipoles (2x): {self.length_chicane_dipole:.3f} m,  B = {self.field_chicane_dipole1:.3f} T')
         print(f'Inner chicane dipoles (2x): {self.length_chicane_dipole:.3f} m,  B = {self.field_chicane_dipole2:.3f} T')
         if abs(self.field_gradient_sextupole1)>0 or abs(self.field_gradient_sextupole2)>0:
-            print(f'Outer sextupoles (2x):          {self.length_quad_gap_or_sextupole:.3f} m,  m = {self.field_gradient_sextupole1:.1f} T/m^2')
-            print(f'Inner sextupoles (2x):          {self.length_quad_gap_or_sextupole:.3f} m,  m = {self.field_gradient_sextupole2:.1f} T/m^2')
+            print(f'Outer sextupoles (2x):      {self.length_quad_gap_or_sextupole:.3f} m,  m = {self.field_gradient_sextupole1:.1f} T/m^2')
+            print(f'Inner sextupoles (2x):      {self.length_quad_gap_or_sextupole:.3f} m,  m = {self.field_gradient_sextupole2:.1f} T/m^2')
         if abs(self.field_gradient_sextupole3)>0:
-            print(f'Central sextupole (2x):          {self.length_central_gap_or_sextupole:.3f} m,  m = {self.field_gradient_sextupole3:.1f} T/m^2')
+            print(f'Central sextupole (1x):     {self.length_central_gap_or_sextupole:.3f} m,  m = {self.field_gradient_sextupole3:.1f} T/m^2')
         #print(f'Other gaps (12x):           {self.length_gap:.3f} m')
         
         print('------------------------------------------------')

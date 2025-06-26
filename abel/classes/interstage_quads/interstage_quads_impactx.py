@@ -6,11 +6,11 @@ import scipy.constants as SI
 
 class InterstageQuadsImpactX(InterstageQuads):
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, use_chromaticity_correction=True,
-                       use_central_sextupole=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True,
+                       cancel_sec_order_dispersion=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False):
         
         super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56,
-                         use_chromaticity_correction=use_chromaticity_correction, use_central_sextupole=use_central_sextupole,
+                         cancel_chromaticity=cancel_chromaticity, cancel_sec_order_dispersion=cancel_sec_order_dispersion,
                          enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
 
         # simulation options
@@ -18,7 +18,25 @@ class InterstageQuadsImpactX(InterstageQuads):
         self.use_monitors = use_monitors
 
     
-    def get_lattice(self):
+    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+        "Track quad-based interstage using ImpactX."
+        
+        # re-perform the matching
+        self.match()
+        
+        # get lattice
+        lattice = self.get_impactx_lattice()
+        
+        # run ImpactX
+        from abel.apis.impactx.impactx_api import run_impactx
+        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=verbose, runnable=runnable, save_beams=self.use_monitors, 
+                                           space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
+        
+        return super().track(beam, savedepth, runnable, verbose)
+
+        
+    def get_impactx_lattice(self):
+        "Set up the ImpactX  quad-based interstage lattice."
 
         from impactx import elements
         
@@ -138,20 +156,4 @@ class InterstageQuadsImpactX(InterstageQuads):
             del lattice[-1]
                 
         return lattice
-
-        
-    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
-        
-        # re-perform the matching
-        self.match_lattice()
-        
-        # get lattice
-        lattice = self.get_lattice()
-        
-        # run ImpactX
-        from abel.apis.impactx.impactx_api import run_impactx
-        beam, evol = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
-        self.evolution = evol
-        
-        return super().track(beam, savedepth, runnable, verbose)
-        
+    
