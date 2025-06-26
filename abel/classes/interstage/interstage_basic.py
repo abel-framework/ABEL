@@ -4,13 +4,11 @@ import numpy as np
 
 class InterstageBasic(Interstage):
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0,
-                 use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True,
-                 enable_csr=True, enable_isr=True, enable_space_charge=False, phase_advance=2*np.pi):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, use_nonlinearity=True, use_sextupole=True,
+                       enable_csr=True, enable_isr=True, enable_space_charge=False, phase_advance=2*np.pi):
         
         super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, 
-                         use_nonlinearity=use_nonlinearity, use_chicane=use_chicane, 
-                         use_sextupole=use_sextupole, use_gaps=use_gaps, use_thick_lenses=use_thick_lenses, 
+                         use_nonlinearity=use_nonlinearity, use_sextupole=use_sextupole, 
                          enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
         
         self.phase_advance = phase_advance

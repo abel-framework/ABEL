@@ -6,30 +6,41 @@ import scipy.constants as SI
 
 class InterstageImpactX(Interstage):
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0,
-                 use_nonlinearity=True, use_chicane=True, use_sextupole=True, use_gaps=True, use_thick_lenses=True,
-                 enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, keep_data=False):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, use_chromaticity_correction=True, use_sextupole=True,
+                       enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, keep_data=False):
         
         super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, 
-                         use_nonlinearity=use_nonlinearity, use_chicane=use_chicane, 
-                         use_sextupole=use_sextupole, use_gaps=use_gaps, use_thick_lenses=use_thick_lenses, 
+                         use_chromaticity_correction=use_chromaticity_correction, use_sextupole=use_sextupole, 
                          enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
-
+        
         # simulation options
         self.num_slices = num_slices
         self.use_monitors = use_monitors
-        self.keep_data = keep_data
 
+        
+    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+        
+        # re-perform the matching
+        self.match_lattice()
+
+        # get the lattice
+        lattice = self.get_lattice()
+        
+        # run ImpactX
+        from abel.apis.impactx.impactx_api import run_impactx
+        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors,
+                                           space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
+        
+        return super().track(beam, savedepth, runnable, verbose)
+    
     
     def get_lattice(self):
 
         from impactx import elements
+        from abel.utilities.relativity import energy2momentum
         
         # initialize lattice
         lattice = []
-
-        # calculate the momentum
-        p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         
         # add monitor (before and after gaps, and in the middle)
         if self.use_monitors:
@@ -41,20 +52,18 @@ class InterstageImpactX(Interstage):
         
         # gap drift (with monitors)
         gap = []
-        if self.use_gaps:
-            if self.use_monitors:
-                gap.append(monitor)
-            gap.append(elements.ExactDrift(ds=self.length_gap, nslice=1))
-            if self.use_monitors:
-                gap.append(monitor)
+        if self.use_monitors:
+            gap.append(monitor)
+        gap.append(elements.ExactDrift(ds=self.length_gap, nslice=1))
+        if self.use_monitors:
+            gap.append(monitor)
         
         # define dipole
         B_dip = self.field_dipole
-        phi_dip = self.length_dipole*B_dip*SI.e/p0
+        phi_dip = self.length_dipole*B_dip*SI.e/energy2momentum(self.nom_energy)
         dipole = elements.ExactSbend(ds=self.length_dipole, phi=np.rad2deg(phi_dip), B=B_dip, nslice=self.num_slices)
 
         # define plasma lens
-
         ds_pl = self.length_plasma_lens/(self.num_slices+1)
         drift_slice_pl = elements.ExactDrift(ds=ds_pl, nslice=1)
         plasma_lens1 = [drift_slice_pl]
@@ -82,7 +91,7 @@ class InterstageImpactX(Interstage):
 
         # define first chicane dipole
         B_chic1 = self.field_chicane_dipole1
-        phi_chic1 = self.length_chicane_dipole*B_chic1*(SI.e/p0)
+        phi_chic1 = self.length_chicane_dipole*B_chic1*(SI.e/energy2momentum(self.nom_energy))
         if abs(B_chic1) > 0:
             chicane_dipole1 = elements.ExactSbend(ds=self.length_chicane_dipole, phi=np.rad2deg(phi_chic1), B=B_chic1, nslice=self.num_slices)
         else:
@@ -90,22 +99,17 @@ class InterstageImpactX(Interstage):
 
         # define second chicane dipole
         B_chic2 = self.field_chicane_dipole2
-        phi_chic2 = self.length_chicane_dipole*B_chic2*(SI.e/p0)
+        phi_chic2 = self.length_chicane_dipole*B_chic2*(SI.e/energy2momentum(self.nom_energy))
         if abs(B_chic2) > 0:
             chicane_dipole2 = elements.ExactSbend(ds=self.length_chicane_dipole, phi=np.rad2deg(phi_chic2), B=B_chic2, nslice=self.num_slices)
         else:
             chicane_dipole2 = elements.ExactDrift(ds=self.length_chicane_dipole, nslice=self.num_slices)
 
-        # define sextupole
-        half_sextupole_or_gap = []
+        # define sextupole (or gap)
         if self.use_sextupole:
-            drift_slice_sext = elements.ExactDrift(ds=self.length_sextupole/(self.num_slices+1)/2, nslice=1)
-            sext_slice = elements.Multipole(multipole=3, K_normal=self.strength_sextupole/self.num_slices, K_skew=0)
-            half_sextupole.extend([drift_slice_sext, sext_slice]*self.num_slices)
-            half_sextupole.append(drift_slice_sext)
+            half_sextupole_or_gap = elements.ExactMultipole(ds=self.length_sextupole/2, k_normal=[0.,0.,self.strength_sextupole/self.length_sextupole], k_skew=[0.,0.,0.], nslice=self.num_slices)
         else:
-            half_sextupole = [elements.ExactDrift(ds=self.length_sextupole/2, nslice=1)]
-
+            half_sextupole_or_gap = elements.ExactDrift(ds=self.length_sextupole/2, nslice=1)
         
         # specify the lattice sequence
         lattice.extend(gap)
@@ -117,10 +121,10 @@ class InterstageImpactX(Interstage):
         lattice.extend(gap)
         lattice.append(chicane_dipole2)
         lattice.extend(gap)
-        lattice.extend(half_sextupole_or_gap)
+        lattice.append(half_sextupole_or_gap)
         if self.use_monitors:
             lattice.append(monitor)
-        lattice.extend(half_sextupole_or_gap)
+        lattice.append(half_sextupole_or_gap)
         lattice.extend(gap)
         lattice.append(chicane_dipole2)
         lattice.extend(gap)
@@ -139,20 +143,4 @@ class InterstageImpactX(Interstage):
                 
         return lattice
 
-        
-    def track(self, beam0, savedepth=0, runnable=None, verbose=False):
-        
-        # re-perform the matching
-        self.match_lattice()
-        
-        # get lattice
-        lattice = self.get_lattice()
-        
-        # run ImpactX
-        from abel.apis.impactx.impactx_api import run_impactx
-        beam, evol = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, keep_data=self.keep_data, save_beams=self.use_monitors,
-                                 space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
-        self.evolution = evol
-        
-        return super().track(beam, savedepth, runnable, verbose)
         

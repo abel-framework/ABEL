@@ -154,8 +154,8 @@ def Dmat(l, inv_rho=0, k=0):
                           [R[1,0], R[1,1], 0],
                           [0, 0, 1]])
     else:
-        return np.matrix([[R[0,0], R[0,1], (1-np.cos(l*inv_rho))/inv_rho],
-                          [R[1,0], R[1,1], 2*np.tan(l*inv_rho/2)],
+        return np.matrix([[R[0,0], R[0,1], -(1-np.cos(l*inv_rho))/inv_rho],
+                          [R[1,0], R[1,1], -2*np.tan(l*inv_rho/2)],
                           [0, 0, 1]])
     
     
@@ -304,7 +304,7 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
             xps_l = np.zeros([len(ss_l),len(deltas)])
         
         # dipole force (constant)
-        d2x_ds2_dip = inv_rhos[i]*(1-1/(1+deltas))
+        d2x_ds2_dip = inv_rhos[i]*(1/(1+deltas)-1)
 
         for j in range(len(ss_l)):
             for k in range(len(deltas)):
@@ -319,11 +319,11 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
                 d2x_ds2_sext = -ms[i]/(1+deltas[k])*x_samp**2/2
 
                 # total force
-                dxps = d2x_ds2_dip[k] + d2x_ds2_lens + d2x_ds2_sext
+                dxps_ds = d2x_ds2_dip[k] + d2x_ds2_lens + d2x_ds2_sext
 
                 # save last step for next iteration
                 xp_last = xp[k]
-                xp[k] = xp[k] + dxps*ds
+                xp[k] = xp_last + dxps_ds*ds
                 x[k] = x[k] + (xp[k]+xp_last)/2*ds
 
             # step particles based on fields
@@ -339,18 +339,20 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
             xps[inds,:] = xps_l
            
 
-    # dispersion evolution up to fourth order
+    # dispersion evolution up to fourth order (see https://en.wikipedia.org/wiki/Five-point_stencil)
+    # here the dispersion is defined as x(delta) = x_0 + Dx*delta + DDx*delta^2 + DDDx*delta^3 + DDDDx*delta^4 + O(delta^5)
+    # this definition requires multiplying by the factorial of the order
     if not fast:
         evolution[0,:] = ss
         evolution[1,:] = (-xs[:,4] + 8*xs[:,3] - 8*xs[:,1] + xs[:,0])/(12*delta)  # First order
-        evolution[2,:] = (-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2)  # Second order
-        evolution[3,:] = (xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3)  # Third order
-        evolution[4,:] = (xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4  # Fourth orderz
+        evolution[2,:] = 2*(-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2)  # Second order
+        evolution[3,:] = 3*2*(xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3)  # Third order
+        evolution[4,:] = 4*3*2*(xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4  # Fourth order
 
     # return dispersions
-    DDx = (-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2)
-    DDpx = -(xp[2] - 2*xp[1] + xp[0])/(2*delta**2)
-
+    DDx = 2*(-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2)
+    DDpx = 2*(-xp[4] + 16*xp[3] - 30*xp[2] + 16*xp[1] - xp[0])/(12*delta**2) # Second order
+    
     if plot:
         from matplotlib import pyplot as plt
         fig, ax = plt.subplots(1,1)
@@ -395,7 +397,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res
         ds = ss[i+1]-ss[i]
         inv_rho_halfstep = (inv_rho_prev+inv_rho)/2
         Dx = Dxs[i+1]
-        deltaR56 = Dx * inv_rho_halfstep * ds
+        deltaR56 = - Dx * inv_rho_halfstep * ds
         R56s[i+1] = R56s[i] + deltaR56
 
     # save evolution
@@ -434,12 +436,12 @@ def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
     
     for i in range(len(ls)):
 
-        dtheta = ls[i]*inv_rhos[i]
+        dtheta = -ls[i]*inv_rhos[i]
         thetas_next = np.linspace(0, dtheta, num_steps)
         ss_next = np.linspace(0, ls[i], num_steps)
         if abs(dtheta) > 0:
-            xs_next = np.sin(thetas_next)/inv_rhos[i]
-            ys_next = -(1-np.cos(thetas_next))/inv_rhos[i]
+            xs_next = -np.sin(thetas_next)/inv_rhos[i]
+            ys_next = (1-np.cos(thetas_next))/inv_rhos[i]
         else:
             xs_next = ss_next
             ys_next = np.zeros_like(ss_next)
@@ -558,5 +560,94 @@ def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot
         ax.set_yscale('log')
 
     return I5, evolution
+
+
+def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False, bending_plane=True):
+
+    # overwrite fast-calculation toggle if plotting 
+    if plot and fast:
+        fast = False
+      
+    # use five energy offsets for good accuracy
+    delta = 1e-4
+    deltas = delta * np.arange(-2,3)
+
+    # get the dispersion for calculation of effect of chromaticity correction)
+    _, _, evol_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False)
+    ss_disp = evol_disp[0]
+    Dxs = evol_disp[1]
+    
+    # calculate the average dispersion inside each element to find the effect of nonlinear elements
+    ssl = np.append([0.], np.cumulative_sum(ls))
+
+    # prepare arrays of effect of nonlinear plasma lens (tau) and sextupole (m)
+    ls_refined = np.empty(0)
+    ks_refined = np.empty(0)
+    dks_ddelta_m = np.empty(0)
+    dks_ddelta_tau = np.empty(0)
+    for i in range(len(ls)):
+        
+        if abs(taus[i]) > 0 or abs(ms[i]) > 0:
+            inds = np.logical_and(ss_disp >= ssl[i], ss_disp <= ssl[i+1])
+            num_slice = 30
+            ss_slice = np.linspace(ssl[i], ssl[i+1], num_slice)
+            Dxs_slices = np.interp(ss_slice, ss_disp, Dxs)
+            dk_ddelta_m = ms[i]*Dxs_slices
+            dk_ddelta_tau = ks[i]*taus[i]*Dxs_slices
+            ls_element = ls[i]/num_slice*np.ones_like(ss_slice)
+            ks_element = ks[i]*np.ones_like(ss_slice)
+        else:
+            ls_element = np.array([ls[i]])
+            ks_element = np.array([ks[i]])
+            dk_ddelta_m = np.array([0.0])
+            dk_ddelta_tau = np.array([0.0])
+            
+        ls_refined = np.append(ls_refined, ls_element)
+        ks_refined = np.append(ks_refined, ks_element)
+        dks_ddelta_m = np.append(dks_ddelta_m, dk_ddelta_m)
+        dks_ddelta_tau = np.append(dks_ddelta_tau, dk_ddelta_tau)
+
+    # prepare arrays
+    betas = np.empty_like(deltas)
+    alphas = np.empty_like(deltas)
+    evols = [None]*len(deltas)
+
+    if not bending_plane:
+        ks_refined = -ks_refined
+        dks_ddelta_m = -dks_ddelta_m
+    
+    # evolve the beta and alpha for different energies
+    for i, delta in enumerate(deltas):
+        ks_corrected = (ks_refined + (dks_ddelta_tau + dks_ddelta_m)*delta)/(1+delta)
+        betas[i], alphas[i], evols[i] = evolve_beta_function(ls_refined, ks_corrected, beta0, alpha0=alpha0, fast=fast, plot=False)
+    
+    # calculate the chromatic amplitude W
+    beta = betas[2]
+    alpha = alphas[2]
+    dbeta_ddelta = (-betas[4] + 8*betas[3] - 8*betas[1] + betas[0])/(12*delta)
+    dalpha_ddelta = (-alphas[4] + 8*alphas[3] - 8*alphas[1] + alphas[0])/(12*delta)
+    W = np.sqrt((dalpha_ddelta - (alpha/beta)*dbeta_ddelta)**2 + (dbeta_ddelta/beta)**2)
+
+    # save evolution
+    if not fast: 
+        evolution = np.empty((2,len(evols[2][0,:])))
+        evolution[0,:] = evols[2][0,:]
+        betas = evols[2][1,:]
+        alphas = evols[2][2,:]
+        dbeta_ddeltas = (-evols[4][1,:] + 8*evols[3][1,:] - 8*evols[1][1,:] + evols[0][1,:])/(12*delta)
+        dalpha_ddeltas = (-evols[4][2,:] + 8*evols[3][2,:] - 8*evols[1][2,:] + evols[0][2,:])/(12*delta)        
+        evolution[1,:] = np.sqrt((dalpha_ddeltas - (alphas/betas)*dbeta_ddeltas)**2 + (dbeta_ddeltas/betas)**2)
+    else:
+        evolution = None
+
+    # make plots
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(evolution[0,:], evolution[1,:])
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel('W_x')
+
+    return W, evolution
     
 

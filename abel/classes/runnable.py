@@ -375,8 +375,7 @@ class Runnable(ABC):
                 scans.extend(add_scans)
             else:
                 scans.append(add_scans)
-        else:
-            scans = [self]
+        
         # plot evolution
         fig, ax = plt.subplots(1)
         fig.set_figwidth(CONFIG.plot_width_default)
@@ -393,18 +392,25 @@ class Runnable(ABC):
                     self.scale = 1
                 if not hasattr(self, 'label'):
                     self.label = ''
-                
-                if abs(np.sum(val_std)) == 0 or np.isnan(val_std).any():
-                    ax.plot(scan.vals/self.scale, val_mean/scale, ls='-', label=legend[len(fcns)*j + i])
+
+                # identify the legend/label
+                if legend is not None and len(legend) > len(fcns)*j+i:
+                    legend_label = legend[len(fcns)*j+i]
                 else:
-                    ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend[i])
-                if legend[i] is not None:
-                    ax.legend()
+                    legend_label = None
+
+                # plot the values (with or without errorbars)
+                if abs(np.sum(val_std)) == 0 or np.isnan(val_std).any():
+                    ax.plot(scan.vals/self.scale, val_mean/scale, ls='-', label=legend_label)
+                else:
+                    ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend_label)
                 
         ax.set_xlabel(self.label)
         ax.set_ylabel(label)
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
+        if legend is not None:
+            ax.legend()
 
     
     # plot value of beam parameters across a scan

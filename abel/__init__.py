@@ -19,6 +19,7 @@ from .classes.source.source import Source
 from .classes.stage.stage import Stage
 from .classes.plasma_lens.plasma_lens import PlasmaLens
 from .classes.interstage import Interstage
+from .classes.interstage_quads import InterstageQuads
 from .classes.rf_accelerator.rf_accelerator import RFAccelerator, RFAcceleratorInitializationException
 from .classes.bds.bds import BeamDeliverySystem
 from .classes.spectrometer.spectrometer import Spectrometer
@@ -54,6 +55,7 @@ from .classes.interstage.interstage_basic import InterstageBasic
 #from .classes.interstage.impl.interstage_elegant import InterstageElegant
 #from .classes.interstage.impl.interstage_ocelot import InterstageOcelot
 from .classes.interstage.interstage_impactx import InterstageImpactX
+from .classes.interstage_quads.interstage_quads_impactx import InterstageQuadsImpactX
 #from .classes.interstage.impl.interstage_quads_impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
