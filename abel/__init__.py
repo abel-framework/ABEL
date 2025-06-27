@@ -19,7 +19,8 @@ from .classes.source.source import Source
 from .classes.stage.stage import Stage
 from .classes.plasma_lens.plasma_lens import PlasmaLens
 from .classes.interstage import Interstage
-from .classes.interstage_quads import InterstageQuads
+from .classes.interstage.plasma_lens import InterstagePlasmaLens
+from .classes.interstage.quads import InterstageQuads
 from .classes.rf_accelerator.rf_accelerator import RFAccelerator, RFAcceleratorInitializationException
 from .classes.bds.bds import BeamDeliverySystem
 from .classes.spectrometer.spectrometer import Spectrometer
@@ -50,10 +51,11 @@ from .classes.stage.impl.stage_wake_t import StageWakeT
 from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
 from .classes.stage.impl.stage_slice_transverse_wake_instability import StageSlicesTransWakeInstability
 from .classes.stage.impl.stage_particle_transverse_wake_instability import StagePrtclTransWakeInstability
-from .classes.interstage.interstage_basic import InterstageBasic
-from .classes.interstage.interstage_elegant import InterstageElegant
-from .classes.interstage.interstage_impactx import InterstageImpactX
-from .classes.interstage_quads.interstage_quads_impactx import InterstageQuadsImpactX
+from .classes.interstage.plasma_lens.basic import InterstagePlasmaLensBasic
+from .classes.interstage.plasma_lens.elegant import InterstagePlasmaLensElegant
+from .classes.interstage.plasma_lens.impactx import InterstagePlasmaLensImpactX
+from .classes.interstage.quads.basic import InterstageQuadsBasic
+from .classes.interstage.quads.impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic

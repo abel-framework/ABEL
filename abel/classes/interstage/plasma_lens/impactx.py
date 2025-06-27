@@ -1,10 +1,10 @@
-from abel.classes.interstage import Interstage
+from abel.classes.interstage.plasma_lens import InterstagePlasmaLens
 import numpy as np
 import os
 from types import SimpleNamespace
 import scipy.constants as SI
 
-class InterstageImpactX(Interstage):
+class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
     
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True,
                        enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, keep_data=False):

@@ -1,4 +1,4 @@
-from abel.classes.interstage_quads import InterstageQuads
+from abel.classes.interstage.quads import InterstageQuads
 import numpy as np
 import os
 from types import SimpleNamespace
@@ -6,8 +6,7 @@ import scipy.constants as SI
 
 class InterstageQuadsImpactX(InterstageQuads):
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True,
-                       cancel_sec_order_dispersion=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False):
         
         super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56,
                          cancel_chromaticity=cancel_chromaticity, cancel_sec_order_dispersion=cancel_sec_order_dispersion,

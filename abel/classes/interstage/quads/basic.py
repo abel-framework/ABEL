@@ -1,15 +1,12 @@
+from abel.classes.interstage.quads import InterstageQuads
 import scipy.constants as SI
-from abel.classes.interstage import Interstage
 import numpy as np
 
-class InterstageBasic(Interstage):
+class InterstageQuadsBasic(InterstageQuads):
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, use_nonlinearity=True, use_sextupole=True,
-                       enable_csr=True, enable_isr=True, enable_space_charge=False, phase_advance=2*np.pi):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True, enable_csr=False, enable_isr=False, enable_space_charge=False, phase_advance=2*np.pi):
         
-        super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, 
-                         use_nonlinearity=use_nonlinearity, use_sextupole=use_sextupole, 
-                         enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
+        super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, cancel_chromaticity=cancel_chromaticity, cancel_sec_order_dispersion=cancel_sec_order_dispersion, enable_csr=enable_csr, enable_isr=enable_isr, enable_space_charge=enable_space_charge)
         
         self.phase_advance = phase_advance
     
