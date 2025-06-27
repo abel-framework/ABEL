@@ -29,8 +29,7 @@ class InterstageImpactX(Interstage):
         
         # run ImpactX
         from abel.apis.impactx.impactx_api import run_impactx
-        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors,
-                                           space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
+        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
         
         return super().track(beam, savedepth, runnable, verbose)
     

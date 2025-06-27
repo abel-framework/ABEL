@@ -63,7 +63,6 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
 
     # save beams if requested
     if runnable is not None and save_beams:
-        from abel.apis.impactx.impactx_api import extract_beams
         beams = extract_beams(runfolder, beam0=beam0)
         for beam_step in beams:
             beam_step.save(runnable=runnable)

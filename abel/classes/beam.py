@@ -944,6 +944,14 @@ class Beam():
         covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
         return covy[1,1]/np.sqrt(np.linalg.det(covy))
 
+    def dispersion_x(self, clean=False):
+        px = np.polyfit(self.deltas(), self.xs(), 1)
+        return px[0]
+
+    def dispersion_y(self, clean=False):
+        py = np.polyfit(self.deltas(), self.ys(), 1)
+        return py[0]
+
     def intrinsic_emittance(self):
         covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
         return np.sqrt(np.sqrt(np.linalg.det(covxy)))

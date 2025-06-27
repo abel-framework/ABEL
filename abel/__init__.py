@@ -50,13 +50,10 @@ from .classes.stage.impl.stage_wake_t import StageWakeT
 from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
 from .classes.stage.impl.stage_slice_transverse_wake_instability import StageSlicesTransWakeInstability
 from .classes.stage.impl.stage_particle_transverse_wake_instability import StagePrtclTransWakeInstability
-#from .classes.interstage.impl.interstage_null import InterstageNull
 from .classes.interstage.interstage_basic import InterstageBasic
-#from .classes.interstage.impl.interstage_elegant import InterstageElegant
-#from .classes.interstage.impl.interstage_ocelot import InterstageOcelot
+from .classes.interstage.interstage_elegant import InterstageElegant
 from .classes.interstage.interstage_impactx import InterstageImpactX
 from .classes.interstage_quads.interstage_quads_impactx import InterstageQuadsImpactX
-#from .classes.interstage.impl.interstage_quads_impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic

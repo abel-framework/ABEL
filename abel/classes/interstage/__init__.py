@@ -368,6 +368,11 @@ class Interstage(Trackable, CostModeled):
         from matplotlib import pyplot as plt
         
         evol = self.evolution
+
+        # stop if no evolution calculated
+        if not hasattr(evol, 'location'):
+            print('No evolution calculated.')
+            return
         
         # prepare plot
         fig, axs = plt.subplots(3,3)
