@@ -376,13 +376,17 @@ class Interstage(Trackable, CostModeled):
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
     
-    def plot_layout(self, delta=0.1, axes_equal=False, use_second_order_dispersion=True, savefig=None):
+    def plot_layout(self, delta=0.25, axes_equal=False, use_second_order_dispersion=False, savefig=None):
         "Plot the layout with beam orbit and dispersion."
         
         from matplotlib import pyplot as plt
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion, evolve_orbit
         from scipy.integrate import cumulative_trapezoid
 
+        # with zero delta, show with equal axes
+        if delta == 0:
+            axes_equal = True
+            
         # get the lengths and strengths
         ls, inv_rhos, ks, ms, taus = self.matrix_lattice()
         
@@ -407,14 +411,11 @@ class Interstage(Trackable, CostModeled):
         delta = abs(delta)
         Dx = np.interp(ss, evol_disp2[0], evol_disp2[1])
         DDx = np.interp(ss, evol_disp2[0], evol_disp2[2])
-        if use_second_order_dispersion:
-            offset_disp = Dx*delta - DDx*delta**2
-        else:
-            offset_disp = Dx*delta
-        xs_low = xs - offset_disp*np.sin(thetas)
-        ys_low = ys - offset_disp*np.cos(thetas)
-        xs_high = xs + offset_disp*np.sin(thetas)
-        ys_high = ys + offset_disp*np.cos(thetas)
+        offset_disp = Dx*delta
+        xs_low = xs + (-Dx*delta + float(use_second_order_dispersion)*DDx*delta**2)*np.sin(thetas)
+        ys_low = ys + (-Dx*delta + float(use_second_order_dispersion)*DDx*delta**2)*np.cos(thetas)
+        xs_high = xs + (Dx*delta + float(use_second_order_dispersion)*DDx*delta**2)*np.sin(thetas)
+        ys_high = ys + (Dx*delta + float(use_second_order_dispersion)*DDx*delta**2)*np.cos(thetas)
 
         # calculate beam size
         _, _, evol_beta = evolve_beta_function(ls, ks, self.beta0, fast=False)
@@ -468,7 +469,7 @@ class Interstage(Trackable, CostModeled):
         if not axes_equal:
             width_dipole = max(abs(offset_disp))*2
         width_lens = width_dipole*0.8
-        width_sextupole = width_dipole*0.6
+        width_sextupole = width_dipole*0.75
         ssl = np.append([0.0], np.cumsum(ls))
         ssl = ssl[:-1]
         for i in range(len(ls)-1):
