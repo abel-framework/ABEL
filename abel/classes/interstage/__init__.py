@@ -527,7 +527,7 @@ class Interstage(Trackable, CostModeled):
     def total_bend_angle(self):
         ls, inv_rhos, ks, ms, taus = self.matrix_lattice(orbit_only=True)
         from abel.utilities.beam_physics import evolve_orbit
-        final_angle, _ = evolve_orbit(ls, inv_rhos, theta0=0, fast=True)
+        final_angle, _ = evolve_orbit(ls, inv_rhos, theta0=0)
         return final_angle
 
     def survey_object(self):
