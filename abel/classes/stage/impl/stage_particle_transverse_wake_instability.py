@@ -541,8 +541,8 @@ class StagePrtclTransWakeInstability(Stage):
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
-        # Perform un-rotation after track_downramp()
-        if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not its ramps.
+        # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
+        if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(driver_incoming, driver_outgoing, beam_outgoing)
