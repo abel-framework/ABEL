@@ -418,29 +418,11 @@ def probe_main_beam_field(ion_motion_config, main_sc_fields_obj):
     xs_grid_flat = X.flatten()*1e3  # [mm]
     ys_grid_flat = Y.flatten()*1e3  # [mm]
     zs_grid_flat = Z.flatten()*1e3  # [mm]
-
-    ##########################
-    # Start time
-    import time
-    start_time = time.time()
-    cpu_start_time = time.process_time()
-    ##########################
     
     # Probe beam E-field
     E_fields_beam, _ = main_sc_fields_obj.get_field(xs_grid_flat, ys_grid_flat, zs_grid_flat, np.zeros(len(zs_grid_flat)))  # [V/m]
     Exs = E_fields_beam[:,0]
     Eys = E_fields_beam[:,1]
-
-    ##########################
-    # End time
-    end_time = time.time()
-    cpu_end_time = time.process_time()
-
-    # Time usage
-    #print('Data points in get_field():', f'{len(xs_probe)}x{len(ys_probe)}x{len(zs_probe)}')
-    #print('Time taken, get_field():', end_time - start_time, 'seconds')
-    #print('CPU seconds, get_field():', cpu_end_time - cpu_start_time)
-    ##########################
     
     # Reshape the field component into a 3D array       
     Exs_3d = Exs.reshape(len(xs_probe), len(ys_probe), len(zs_probe))
