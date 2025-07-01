@@ -25,11 +25,13 @@ import pytest
 from abel import *
 import shutil
 
-def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False):
+def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0):
     driver = SourceTrapezoid()
     driver.current_head = 0.1e3                                                   # [A]
-    driver.bunch_length = 1050e-6                                                 # [m] This value is for trapezoid.
-    driver.z_offset = 1615e-6                                                     # [m]
+    driver.bunch_length = 1150e-6                                                 # [m] This value is for trapezoid.
+    driver.z_offset = 1724e-6                                                     # [m]
+    driver.x_angle = x_angle                                                      # [rad]
+    driver.y_angle = y_angle                                                      # [rad]
 
     driver.num_particles = 30000                                                 
     driver.charge = 5.0e10 * -SI.e                                                # [C]
@@ -53,16 +55,16 @@ def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=Fal
     return driver
 
 
-def setup_basic_main_source(plasma_density, ramp_beta_mag):
+def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     from abel.utilities.plasma_physics import beta_matched
 
     main = SourceBasic()
     main.bunch_length = 40.0e-06                                                  # [m], rms. Standard value
     main.num_particles = 10000                                               
-    main.charge = -SI.e * 1.0e10                                                     # [C]
+    main.charge = -SI.e * 1.0e10                                                  # [C]
 
     # Energy parameters
-    main.energy = 369.6e9                                                         # [eV], HALHF v2 last stage nominal input energy
+    main.energy = 3.0e9                                                           # [eV], HALHF v2 last stage nominal input energy
     main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
 
     # Emittances
@@ -82,12 +84,12 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag):
     return main
 
 
-def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, return_tracked_driver=False, test_beam_between_ramps=False):
+def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density=6.0e20, ramp_beta_mag=5.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, return_tracked_driver=False, test_beam_between_ramps=False, length_flattop=7.8):
 
     stage = StagePrtclTransWakeInstability()
     stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
-    stage.nom_energy_gain = 7.8e9                                                 # [eV]
-    stage.length_flattop = 7.8                                                    # [m]
+    stage.length_flattop = length_flattop                                         # [m]
+    stage.nom_energy_gain = length_flattop*1e9                                    # [eV]
     stage.plasma_density = plasma_density                                         # [m^-3]
     stage.driver_source = driver_source
     stage.main_source = main_source
@@ -136,9 +138,60 @@ def test_beam_between_ramps():
     use_ramps = True
     drive_beam_update_period = 1
 
+    # ========== Driver jitter, no angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=True)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=True)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
+
+    # Assert that there has been no significant changes in the beams between parents and its upramp
+    # Between a upramp and main stage
+    Beam.comp_beams(stage.upramp.driver_out, stage.driver_in, comp_location=True)
+    Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
+
+    # Between a main stage and downramp
+    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
+    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
+
+    # Assert that the output beam matches the out beam for the downramp
+    final_beam = linac[0].get_beam(-1)
+    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+
+    # Assert that the propagation length of the output beam matches the total length of the stage
+    assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
+
+
+    # ========== No jitter, no angular offset ==========
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, test_beam_between_ramps=True)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
+
+    # Assert that there has been no significant changes in the beams between parents and its upramp
+    # Between a upramp and main stage
+    Beam.comp_beams(stage.upramp.driver_out, stage.driver_in, comp_location=True)
+    Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
+
+    # Between a main stage and downramp
+    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
+    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
+
+    # Assert that the output beam matches the out beam for the downramp
+    final_beam = linac[0].get_beam(-1)
+    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+
+    # Assert that the propagation length of the output beam matches the total length of the stage
+    assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
+
+
+    # ========== No jitter, large angular offset ==========
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=1e-6, y_angle=1e-5)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, test_beam_between_ramps=True)
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
@@ -181,7 +234,7 @@ def test_stage_length_gradient_energyGain():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
 
     stage.length_flattop = 7.8                                                    # [m]
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
@@ -194,7 +247,7 @@ def test_stage_length_gradient_energyGain():
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
@@ -227,17 +280,245 @@ def test_driver_unrotation():
     drive_beam_update_period = 0
     return_tracked_driver = True
 
+    # ========== Driver jitter, no angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, test_beam_between_ramps=True)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, test_beam_between_ramps=True)
 
     stage.nom_energy = 369.6e9                                                    # [eV], HALHF v2 last stage nominal input energy
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
-    assert np.allclose(driver0.x_angle(), driver.x_angle(), rtol=1e-15, atol=0.0)
-    assert np.allclose(driver0.y_angle(), driver.y_angle(), rtol=1e-13, atol=0.0)
-   
+    x_drift = stage.length_flattop * np.tan(driver0.x_angle())
+    y_drift = stage.length_flattop * np.tan(driver0.y_angle())
+    xs = driver0.xs()
+    ys = driver0.ys()
+    driver0.set_xs(xs + x_drift)
+    driver0.set_ys(ys + y_drift)
+
+    assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-7)
+    assert np.allclose(driver.ys(), driver0.ys(), rtol=0.0, atol=1e-7)
+    assert np.allclose(driver.zs(), driver0.zs(), rtol=0.0, atol=1e-7)
+    assert np.allclose(driver.uxs(), driver0.uxs(), rtol=1e-12, atol=0.0)
+    assert np.allclose(driver.uys(), driver0.uys(), rtol=1e-12, atol=0.0)
+    assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-12, atol=0.0)
+    assert np.allclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
+
+    assert np.allclose(driver.x_angle(), driver0.x_angle(), rtol=1e-15, atol=0.0)
+    assert np.allclose(driver.y_angle(), driver0.y_angle(), rtol=1e-13, atol=0.0)
+
+
+    # ========== No jitter, no angular offset ==========
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+
+    stage.nom_energy = 7.8e9                                                      # [eV], HALHF v2 last stage nominal input energy 
+    _, driver = stage.track(main_source.track())
+    driver0 = stage.driver_incoming
+
+    Beam.comp_beams(driver, driver0, comp_location=False, rtol=1e-13, atol=0.0)
+
+
+    # ========== No jitter, large angular offset ==========
+    x_angle = 5e-6                                                                # [rad]
+    y_angle = 2e-5                                                                # [rad]
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+
+    stage.nom_energy = 7.8e9                                                      # [eV], HALHF v2 last stage nominal input energy 
+    _, driver = stage.track(main_source.track())
+    driver0 = stage.driver_incoming
+
+    x_drift = stage.length_flattop * np.tan(x_angle)
+    y_drift = stage.length_flattop * np.tan(y_angle)
+    xs = driver0.xs()
+    ys = driver0.ys()
+    driver0.set_xs(xs + x_drift)
+    driver0.set_ys(ys + y_drift)
+
+    assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-7)
+    assert np.allclose(driver.ys(), driver0.ys(), rtol=0.0, atol=1e-7)
+    assert np.allclose(driver.zs(), driver0.zs(), rtol=0.0, atol=1e-7)
+    assert np.allclose(driver.uxs(), driver0.uxs(), rtol=1e-12, atol=0.0)
+    assert np.allclose(driver.uys(), driver0.uys(), rtol=1e-12, atol=0.0)
+    assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-12, atol=0.0)
+    assert np.allclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
+
+    
+@pytest.mark.StagePrtclTransWakeInstability
+def test_stage2ramp():
+    """
+    Tests for StagePrtclTransWakeInstability.stage2ramp(), i.e. conversion of 
+    a stage to ramp.
+    """
+
+    np.random.seed(42)
+
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = True
+    enable_xpyp_jitter = True
+    enable_tr_instability = True
+    enable_radiation_reaction = True
+    enable_ion_motion = True
+    use_ramps = True
+    drive_beam_update_period = 0
+    return_tracked_driver = False
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, test_beam_between_ramps=True)
+
+    ramp = stage.stage2ramp()
+
+    assert np.allclose(ramp.ramp_beta_mag, 1.0, rtol=1e-15, atol=0.0)  # Always set to 1.0 for ramps.
+    assert ramp.upramp is None
+    assert ramp.downramp is None
+    assert ramp.nom_accel_gradient is None
+    assert ramp.nom_energy_gain is None
+    assert ramp.nom_accel_gradient_flattop is None
+    assert ramp.nom_energy_gain_flattop is None
+    assert ramp.length_flattop is None
+    assert ramp.length is None
+    assert ramp.plasma_density is None
+    assert ramp.driver_source is None
+
+    assert ramp.enable_tr_instability is True
+    assert ramp.enable_radiation_reaction is True
+    assert ramp.enable_ion_motion is True
+    assert ramp.drive_beam_update_period == 0
+    assert ramp._return_tracked_driver is False
+    
+
+
+@pytest.mark.StagePrtclTransWakeInstability
+def test_trace_bubble_radius():
+    """
+    Tests for checking StagePrtclTransWakeInstability.trace_bubble_radius() by 
+    comparing against the data in a .csv file.
+    """
+
+    import os
+    np.random.seed(42)
+
+    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez.csv'
+    data = np.genfromtxt(file_path, delimiter=',', dtype=None, encoding='utf-8', skip_header=1)
+
+    zs_ref = data[:,0]
+    rb_ref = data[:,1]
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source()
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, length_flattop=0.01)
+    stage.nom_energy = stage.nom_energy_gain * stage.length_flattop
+    stage.track(main_source.track())
+
+    #stage.print_current_summary(main_source.track(), beam)
+    stage.print_initial_summary(driver_source.track(), main_source.track())
+
+    rb = stage.bubble_radius_axial
+    zs = stage.zs_bubble_radius_axial
+
+    assert np.allclose(zs, zs_ref, rtol=1e-13, atol=0.0)
+    assert np.allclose(rb, rb_ref, rtol=1e-13, atol=0.0)
+
+
 
 # TODO: Test on bubble radius tracing
 
+
+@pytest.mark.StagePrtclTransWakeInstability
+def test_longitudinal_number_distribution():
+    """
+    Tests for StagePrtclTransWakeInstability.longitudinal_number_distribution().
+    """
+
+    np.random.seed(42)
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source()
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source)
+
+    beam = main_source.track()
+    main_num_profile, z_slices = stage.longitudinal_number_distribution(beam=beam)
+    drive_beam = driver_source.track()
+    drive_beam_num_profile, driver_z_slices = stage.longitudinal_number_distribution(beam=drive_beam)
+
+    # Calculate values for comparison
+    zs = beam.zs()
+    weights = beam.weightings()  # The weight of each macroparticle.
+    bin_number = stage.FD_rule_num_slice(zs)
+    num_profile, edges = np.histogram(zs, weights=weights, bins=bin_number)  # Compute the histogram of z using bin_number bins.
+    z_ctrs = (edges[0:-1] + edges[1:])/2  # Centres of the bins (zs).
+    driver_zs = drive_beam.zs()
+    driver_weights = drive_beam.weightings()  # The weight of each macroparticle.
+    driver_bin_number = stage.FD_rule_num_slice(driver_zs)
+    driver_num_profile, driver_edges = np.histogram(driver_zs, weights=driver_weights, bins=driver_bin_number)  # Compute the histogram of z using bin_number bins.
+    driver_z_ctrs = (driver_edges[0:-1] + driver_edges[1:])/2  # Centres of the bins (zs).
+
+    assert np.allclose(main_num_profile, num_profile, rtol=1e-15, atol=0.0)
+    assert np.allclose(z_slices, z_ctrs, rtol=1e-15, atol=0.0)
+    assert np.allclose(drive_beam_num_profile, driver_num_profile, rtol=1e-15, atol=0.0)
+    assert np.allclose(driver_z_slices, driver_z_ctrs, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.StagePrtclTransWakeInstability
+def test_matched_beta_function():
+    """
+    Tests for StagePrtclTransWakeInstability.matched_beta_function().
+    """
+
+    from abel.utilities.relativity import energy2gamma
+
+    np.random.seed(42)
+
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source()
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag)
+
+    kp = np.sqrt(plasma_density*SI.e**2/(SI.epsilon_0*SI.m_e*SI.c**2))  # plasma wavenumber [m^-1]
+    beta_mat = np.sqrt(2*energy2gamma(main_source.energy))/kp * ramp_beta_mag
+
+    assert np.allclose(stage.matched_beta_function(main_source.energy), beta_mat, rtol=1e-15, atol=0.0)
+
+
+
+@pytest.mark.StagePrtclTransWakeInstability
+def test_trim_attr_reduce_pickle_size():
+    """
+    Tests for StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size().
+    """
+
+    np.random.seed(42)
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source()
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True)
+
+    # Before calling StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size()
+    assert stage.upramp is not None
+    assert stage.upramp.initial is not None
+    assert stage.upramp.final is not None
+    assert stage.downramp is not None
+    assert stage.downramp.initial is not None
+    assert stage.downramp.final is not None
+
+    stage.trim_attr_reduce_pickle_size()
+
+    # After calling StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size()
+    assert stage.upramp.drive_beam is None
+    assert stage.upramp.initial is None
+    assert stage.upramp.final is None
+    assert stage.downramp.drive_beam is None
+    assert stage.downramp.initial is None
+    assert stage.downramp.final is None
+    assert stage.drive_beam is None
