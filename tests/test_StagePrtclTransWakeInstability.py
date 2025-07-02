@@ -398,40 +398,108 @@ def test_stage2ramp():
 
 
 @pytest.mark.StagePrtclTransWakeInstability
-def test_trace_bubble_radius():
+def test_rb_Ez_tracing():
     """
-    Tests for checking StagePrtclTransWakeInstability.trace_bubble_radius() by 
-    comparing against the data in a .csv file.
+    Tests for checking correct tracing of bubble radius and axial electric field 
+    by StagePrtclTransWakeInstability methods by comparing against the data in  
+    reference files.
     """
 
-    import os
+    import os, copy, uuid
+    from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, plasma_stage_setup, extract_initial_and_final_Ez_rho
+    from abel.utilities.plasma_physics import blowout_radius
+
     np.random.seed(42)
 
-    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez.csv'
-    data = np.genfromtxt(file_path, delimiter=',', dtype=None, encoding='utf-8', skip_header=1)
+    # ========== Load data from the reference file ==========
+    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez.npz'
 
-    zs_ref = data[:,0]
-    rb_ref = data[:,1]
+    data = np.load(file_path)
+    arrays = data["array"]
+    zs_ref = arrays[:,0]
+    rb_ref = arrays[:,1]
+    zs_Ez_ref = arrays[:,2]
+    Ez_ref = arrays[:,3]
+    box_size_r = data["box_size_r"]
+    num_cell_xy = data["num_cell_xy"]  # Transverse resolution for the Wake-T simulation. Same resolution in the longitudinal direction.
 
+
+    # ========== Set up a Wake-T simulation ==========
     driver_source = setup_trapezoid_driver_source()
     main_source = setup_basic_main_source()
+    ramp_beta_mag = 5.0
+    plasma_density = 6.0e20
     stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, length_flattop=0.01)
-    stage.nom_energy = stage.nom_energy_gain * stage.length_flattop
-    stage.track(main_source.track())
 
-    #stage.print_current_summary(main_source.track(), beam)
-    stage.print_initial_summary(driver_source.track(), main_source.track())
+    drive_beam = driver_source.track()
+    beam = main_source.track()
+    beam.magnify_beta_function(1/ramp_beta_mag, axis_defining_beam=drive_beam)
+    drive_beam_ramped = copy.deepcopy(drive_beam)
+    drive_beam_ramped.magnify_beta_function(1/ramp_beta_mag, axis_defining_beam=drive_beam)
 
-    rb = stage.bubble_radius_axial
-    zs = stage.zs_bubble_radius_axial
+    plasma_stage = plasma_stage_setup(plasma_density, drive_beam_ramped, beam, stage_length=None, dz_fields=None, num_cell_xy=int(num_cell_xy), n_out=1, box_size_r=box_size_r, box_min_z=zs_ref.min(), box_max_z=zs_ref.max())
 
-    assert np.allclose(zs, zs_ref, rtol=1e-13, atol=0.0)
-    assert np.allclose(rb, rb_ref, rtol=1e-13, atol=0.0)
+    # Make temp folder
+    if not os.path.exists(CONFIG.temp_path):
+        os.mkdir(CONFIG.temp_path)
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+    if not os.path.exists(tmpfolder):
+        os.mkdir(tmpfolder)
+
+    # Convert beams to Wake-T bunches
+    driver0_wake_t = beam2wake_t_bunch(drive_beam_ramped, name='driver')
+    beam0_wake_t = beam2wake_t_bunch(beam, name='beam')
+
+    plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=False)
+    
+    wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
+    
+    # remove temporary directory
+    shutil.rmtree(tmpfolder)
+
+    # Read the Wake-T simulation data
+    Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
+    zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
+    plasma_num_density = wake_t_evolution.initial.plasma.density.rho/plasma_density
+    info_rho = wake_t_evolution.initial.plasma.density.metadata
+    zs_rho = info_rho.z
+    rs_rho = info_rho.r
 
 
+    # ========== Compare the data along the whole simulation box ==========
+    rb = stage.trace_bubble_radius_WakeT(plasma_num_density=plasma_num_density, plasma_tr_coord=rs_rho, plasma_z_coord=zs_rho, threshold=0.8)
 
-# TODO: Test on bubble radius tracing
+    assert np.allclose(zs_rho, zs_ref, rtol=1e-13, atol=0.0)
+    RMSE_rb = np.sqrt(np.mean((rb-rb_ref)**2))
+    assert RMSE_rb < 5e-6
 
+    assert np.allclose(zs_Ez_wakeT, zs_Ez_ref, rtol=1e-13, atol=0.0)
+    RMSE_Ez = np.sqrt(np.mean((Ez_axis_wakeT-Ez_ref)**2))
+    assert RMSE_Ez < 0.2e9
+
+
+    # ========== Compare the data only in the region of interest ==========
+    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez_roi.npz'
+
+    data_roi = np.load(file_path)
+    arrays_roi = data_roi["array"]
+    zs_ref_roi = arrays_roi[:,0]
+    rb_ref_roi = arrays_roi[:,1]
+    Ez_ref_roi = arrays_roi[:,2]
+
+    # Cut out axial Ez over the ROI
+    Ez_roi, Ez_fit = stage.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam, zs_ref_roi)
+
+    # Cut out bubble radius over the ROI
+    R_blowout = blowout_radius(plasma_density, drive_beam_ramped.peak_current())
+    stage.estm_R_blowout = R_blowout
+    rb_roi, rb_fit = stage.rb_shift_fit(rb, zs_rho, beam, zs_ref_roi)
+    print(rb_roi[1:10])
+    print(rb_ref_roi[1:10])
+
+    assert np.allclose(Ez_roi, Ez_ref_roi, rtol=0.0, atol=0.1e9)
+    assert np.allclose(rb_roi, rb_ref_roi, rtol=0.0, atol=20e-6)
+    
 
 @pytest.mark.StagePrtclTransWakeInstability
 def test_longitudinal_number_distribution():
