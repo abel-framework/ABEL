@@ -7,7 +7,7 @@ class DriverDelaySystem(BeamDeliverySystem):
 
     def __init__(self, E_nom=1, delay_per_stage=1, length_stage=10, num_stages=2, ks=[], \
                  keep_data=False, enable_space_charge=False, enable_csr=False, enable_isr=False, \
-                 focus_at_trough = "x", fill_factor=0.7, mirrored=True, layoutnr = 1, monitors=False):
+                 focus_at_trough = "x", fill_factor=0.7, mirrored=True, layoutnr = 1, use_monitors=False):
         # E_nom in eV, delay in ns
         super().__init__()
         self._E_nom = E_nom #backing variable 
@@ -21,7 +21,7 @@ class DriverDelaySystem(BeamDeliverySystem):
         self.ks = ks
         self.mirrored = mirrored
         self.layoutnr = layoutnr
-        self.monitors = monitors
+        self.use_monitors = use_monitors
 
         # Lattice-elements lengths
         self.l_quads = 0.1
@@ -91,6 +91,8 @@ class DriverDelaySystem(BeamDeliverySystem):
     def list2lattice(self, ls: list, ks: list, phis: list):
         import impactx
         lattice=[]
+        if self.use_monitors:
+            lattice.append(impactx.elements.BeamMonitor(name="monitor", backend="h5", encoding="g"))
         ns = 50
         for i, l in enumerate(ls):
             if phis[i]!=0:
@@ -102,8 +104,8 @@ class DriverDelaySystem(BeamDeliverySystem):
             
             lattice.append(element)
 
-            if self.monitors:
-                lattice.append(impactx.elements.BeamMonitor(name="monitor"))
+            if self.use_monitors:
+                lattice.append(impactx.elements.BeamMonitor(name="monitor", backend="h5", encoding="g"))
 
         return lattice
 
@@ -326,15 +328,15 @@ class DriverDelaySystem(BeamDeliverySystem):
         return 2*(self.l_quads + 2*self.l_dipole + self.l_straight)
     
     def get_nom_energy(self):
-        ls, _, _ = self.get_element_attributes(self.lattice)
-        return np.sum(ls)
+        return self.E_nom
     
     def get_element_attributes(self, lattice):
         ls = []
         ks = []
         inverse_rs = []
         for element in lattice:
-                ls.append(element.ds)
+                if hasattr(element, "l"):
+                    ls.append(element.ds)
                 if hasattr(element, "k"):
                     ks.append(element.k)
                 else:
