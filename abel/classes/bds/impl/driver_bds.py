@@ -94,7 +94,11 @@ class DriverDelaySystem(BeamDeliverySystem):
         if self.use_monitors:
             from abel.apis.impactx.impactx_api import initialize_amrex
             initialize_amrex()
-            lattice.append(impactx.elements.BeamMonitor(name="monitor", backend="h5", encoding="g"))
+            monitor = [impactx.elements.BeamMonitor(name="monitor", backend="h5", encoding="g")]
+        else:
+            monitor=[]
+        
+        lattice.extend(monitor)
         ns = 50
         for i, l in enumerate(ls):
             if phis[i]!=0:
@@ -106,8 +110,7 @@ class DriverDelaySystem(BeamDeliverySystem):
             
             lattice.append(element)
 
-            if self.use_monitors:
-                lattice.append(impactx.elements.BeamMonitor(name="monitor", backend="h5", encoding="g"))
+            lattice.extend(monitor)
 
         return lattice
 
@@ -432,14 +435,3 @@ class DriverDelaySystem(BeamDeliverySystem):
         
         
         plt.show()
-
-
-
-
-
-
-
-
-
-
-
