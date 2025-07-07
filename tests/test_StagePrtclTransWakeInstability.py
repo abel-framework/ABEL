@@ -136,7 +136,7 @@ def test_beam_between_ramps():
     enable_radiation_reaction = True
     enable_ion_motion = False
     use_ramps = True
-    drive_beam_update_period = 1
+    drive_beam_update_period = 0  # TODO: include drive beam evolution when implemented.
 
     # ========== Driver jitter, no angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)

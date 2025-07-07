@@ -241,6 +241,76 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     
     return plasma_stage
 
+    
+# ==================================================
+def run_single_step_wake_t(plasma_density, drive_beam, beam):
+    """
+    Sets up and runs a single time step Wake-T simulation to calculate the 
+    wakefields.
+
+    Parameters
+    ----------
+    drive_beam : ABEL ``Beam`` object
+        Drive beam.
+
+    beam : ABEL ``Beam`` object
+        Main beam.
+
+        
+    Returns
+    ----------
+    wake_t_evolution : ...
+        Contains the 2D plasma density and wakefields for the initial and 
+        final time steps.
+    """
+
+    import os, uuid, shutil
+    from abel.utilities.plasma_physics import k_p
+    from abel.CONFIG import CONFIG
+
+
+    # The drive beam must be centred around r=0 before being used in Wake-T
+    driver_x_offset = drive_beam.x_offset()
+    driver_y_offset = drive_beam.y_offset()
+    drive_beam_wakeT_xs = drive_beam.xs()
+    drive_beam.set_xs(drive_beam_wakeT_xs - driver_x_offset)
+    drive_beam_wakeT_ys = drive_beam.ys()
+    drive_beam.set_ys(drive_beam_wakeT_ys - driver_y_offset)
+
+    # Also subtract the drive beam offset from the main beam used in Wake-T
+    beam0_xs = beam.xs()
+    beam.set_xs(beam0_xs - driver_x_offset)
+    beam0_ys = beam.ys()
+    beam.set_ys(beam0_ys - driver_y_offset)
+    
+    # Construct a Wake-T plasma acceleration stage
+    wakeT_xy_res = 0.1*beam.bunch_length()
+    wakeT_max_box_r = 4/k_p(plasma_density)
+    wakeT_num_cell_xy = int(wakeT_max_box_r/wakeT_xy_res)
+    plasma_stage = plasma_stage_setup(plasma_density, drive_beam, beam, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy)
+
+    # Make temp folder
+    if not os.path.exists(CONFIG.temp_path):
+        os.mkdir(CONFIG.temp_path)
+    tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+    if not os.path.exists(tmpfolder):
+        os.mkdir(tmpfolder)
+
+    # Convert beams to Wake-T bunches
+    driver0_wake_t = beam2wake_t_bunch(drive_beam, name='driver')
+    beam0_wake_t = beam2wake_t_bunch(beam, name='beam')
+
+    # Perform the Wake-T simulation
+    plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=False)
+    
+    # Extract the fields
+    wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
+    
+    # Remove temporary directory
+    shutil.rmtree(tmpfolder)
+
+    return wake_t_evolution
+
 
 # ==================================================
 def extract_initial_and_final_Ez_rho(tmpfolder):
@@ -267,7 +337,7 @@ def extract_initial_and_final_Ez_rho(tmpfolder):
         
     # prepare to read simulation data
     source_path = tmpfolder + 'hdf5/'
-    ts = OpenPMDTimeSeries(source_path)      # TODO: figure out how to skip this write and read
+    ts = OpenPMDTimeSeries(source_path)      # TODO: figure out how to skip this write and read. Look at e.g. plasma_stage.fields[0]
 
     # extract initial on-axis wakefield
     Ez0, metadata0_Ez = ts.get_field(field='E', coord='z', slice_across=['r'], iteration=min(ts.iterations))

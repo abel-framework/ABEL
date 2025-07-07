@@ -15,9 +15,9 @@ from types import SimpleNamespace
 import os, copy, warnings, uuid, shutil
 
 from abel.physics_models.particles_transverse_wake_instability import *
-from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field, blowout_radius
+from abel.utilities.plasma_physics import beta_matched, blowout_radius
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
-from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, plasma_stage_setup, extract_initial_and_final_Ez_rho
+from abel.apis.wake_t.wake_t_api import run_single_step_wake_t
 from abel.classes.stage.stage import Stage
 from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
@@ -255,7 +255,7 @@ class StagePrtclTransWakeInstability(Stage):
 
 
         # ========== Rotate the coordinate system of the beams ==========
-        # Perform beam rotations before calling on upramp tracking.
+        # Perform coordinate rotations before calling on upramp tracking.
         if self.parent is None:  # Ensures that this is the main stage and not a ramp.
 
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
@@ -295,94 +295,22 @@ class StagePrtclTransWakeInstability(Stage):
         main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
         self.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
         self.main_num_profile = main_num_profile
-        
-
-        # ========== Wake-T simulation and extraction ==========
-        drive_beam_wakeT = copy.deepcopy(drive_beam_ramped)
-        beam0_wakeT = copy.deepcopy(beam0)
-
-        # The drive beam must be centred around r=0 before being used in Wake-T
-        driver_x_offset = drive_beam_ramped.x_offset()
-        driver_y_offset = drive_beam_ramped.y_offset()
-        drive_beam_wakeT_xs = drive_beam_wakeT.xs()
-        drive_beam_wakeT.set_xs(drive_beam_wakeT_xs - driver_x_offset)
-        drive_beam_wakeT_ys = drive_beam_wakeT.ys()
-        drive_beam_wakeT.set_ys(drive_beam_wakeT_ys - driver_y_offset)
-
-        # Also subtract the drive beam offset from the main beam used in Wake-T
-        beam0_wakeT_xs = beam0_wakeT.xs()
-        beam0_wakeT.set_xs(beam0_wakeT_xs - driver_x_offset)
-        beam0_wakeT_ys = beam0_wakeT.ys()
-        beam0_wakeT.set_ys(beam0_wakeT_ys - driver_y_offset)
-        
-        # Construct a Wake-T plasma acceleration stage
-        wakeT_xy_res = 0.1*beam0_wakeT.bunch_length()
-        wakeT_max_box_r = 4/k_p(plasma_density)
-        wakeT_num_cell_xy = int(wakeT_max_box_r/wakeT_xy_res)
-        plasma_stage = plasma_stage_setup(self.plasma_density, drive_beam_wakeT, beam0_wakeT, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy)
-
-        # Make temp folder
-        if not os.path.exists(CONFIG.temp_path):
-            os.mkdir(CONFIG.temp_path)
-        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
-        if not os.path.exists(tmpfolder):
-            os.mkdir(tmpfolder)
-
-        # Convert beams to Wake-T bunches
-        driver0_wake_t = beam2wake_t_bunch(drive_beam_wakeT, name='driver')
-        beam0_wake_t = beam2wake_t_bunch(beam0_wakeT, name='beam')
-
-        plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
-        
-        wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
-        
-        # remove temporary directory
-        shutil.rmtree(tmpfolder)
-
-        # Read the Wake-T simulation data
-        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
-        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
-        rho = wake_t_evolution.initial.plasma.density.rho*-e
-        plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
-        info_rho = wake_t_evolution.initial.plasma.density.metadata
-        zs_rho = info_rho.z
-        
-        # Cut out axial Ez over the ROI
-        Ez_roi, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam0, z_slices)
-        
-        # Extract the plasma bubble radius
-        self.zs_bubble_radius_axial = zs_rho
-        bubble_radius_wakeT = self.trace_bubble_radius_WakeT(plasma_num_density, info_rho.r, zs_rho, threshold=0.8)  # Extracts rb with driver placed on axis.
-
-        # Cut out bubble radius over the ROI
-        R_blowout = blowout_radius(self.plasma_density, drive_beam_ramped.peak_current())
-        self.estm_R_blowout = R_blowout
-        bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam0, z_slices)
-
-        if bubble_radius_wakeT.max() < 0.5 * R_blowout or bubble_radius_roi.any()==0:
-            warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
-
-        import scipy.signal as signal
-        idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
-        if idxs_bubble_peaks.size > 0:
-            warnings.warn("The bubble radius may not be smooth.", UserWarning)
-
-        # Save quantities to the stage
-        self.Ez_fit_obj = Ez_fit
-        self.rb_fit_obj = rb_fit
-        
-        self.Ez_roi = Ez_roi
-        #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
-        #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
-        self.bubble_radius_roi = bubble_radius_roi
-        self.bubble_radius_axial = bubble_radius_wakeT
 
         driver_num_profile, driver_z_slices = self.longitudinal_number_distribution(beam=drive_beam_ramped)
         self.driver_num_profile = driver_num_profile
         self.driver_z_slices = driver_z_slices
         
-        # Make plots for control if necessary
-        #self.plot_Ez_rb_cut()
+
+        # ========== Wake-T simulation and extraction ==========
+        # Extract driver xy-offsets for later use
+        driver_x_offset = drive_beam_ramped.x_offset()
+        driver_y_offset = drive_beam_ramped.y_offset()
+
+        # Perform a single time step Wake-T simulation
+        wake_t_evolution = run_single_step_wake_t(self.plasma_density, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0))
+
+        # Read the Wake-T simulation data
+        self.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0))
 
         
         # ========== Instability tracking ==========
@@ -423,12 +351,12 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             tmpfolder = None
 
-        # Prepare fields from Wake-T for use in drive beam tracking
-        if self.drive_beam_update_period > 0:  # Do drive beam evolution
-            wake_t_fields = plasma_stage.fields[-1]  # Extract the wakefields used for driver tracking.
-            wake_t_fields.r_fld = wake_t_fields.r_fld + np.sqrt(driver_x_offset**2 + driver_y_offset**2)  # Compensate for the drive beam offset.
-        else:
-            wake_t_fields = None
+        # # Prepare fields from Wake-T for use in drive beam tracking # TODO: remove when driver evolution has been implemented.
+        # if self.drive_beam_update_period > 0:  # Do drive beam evolution
+        #     wake_t_fields = plasma_stage.fields[-1]  # Extract the wakefields used for driver tracking.
+        #     wake_t_fields.r_fld = wake_t_fields.r_fld + np.sqrt(driver_x_offset**2 + driver_y_offset**2)  # Compensate for the drive beam offset.
+        # else:
+        #     wake_t_fields = None
 
         # Set up the configuration for the instability model
         trans_wake_config = PrtclTransWakeConfig(
@@ -457,10 +385,10 @@ class StagePrtclTransWakeInstability(Stage):
             driver_y_jitter=self.driver_source.jitter.y, 
             ion_wkfld_update_period=self.ion_wkfld_update_period, 
             drive_beam_update_period=self.drive_beam_update_period, 
-            wake_t_fields=wake_t_fields
+            #wake_t_fields=wake_t_fields  # TODO: remove when driver evolution has been implemented.
         )
         
-        inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, Ez_fit, rb_fit, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
+        inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
@@ -470,16 +398,20 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Add the driver offsets to the Wake-T r-coordinate
         # Changes to info_rho should only be done after the plasma ion bubble radius has been traced and extracted.
+        rho = wake_t_evolution.initial.plasma.density.rho*-e
+        info_rho = wake_t_evolution.initial.plasma.density.metadata
         rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
         info_rho.r = rs_rho
         info_rho.imshow_extent[2] = rs_rho.min()
         info_rho.imshow_extent[3] = rs_rho.max()
 
         # Save the initial step with ramped beams in rotated coordinate system after upramp
+        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
         
-        # Start tracking
-        beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
+        # Perform main tracking
+        beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
 
         self.evolution = evolution
 
@@ -557,7 +489,73 @@ class StagePrtclTransWakeInstability(Stage):
             return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
+        
 
+    # ==================================================
+    def store_rb_Ez_2stage(self, wake_t_evolution, drive_beam, beam):
+        """
+        Traces the longitudinal electric field, bubble radius and store them 
+        inside the stage.
+
+    
+        Parameters
+        ----------
+        wake_t_evolution : ...
+            Contains the 2D plasma density and wakefields for the initial and 
+            final time steps.
+
+        drive_beam : ABEL ``Beam`` object
+            Drive beam.
+
+        beam : ABEL ``Beam`` object
+            Main beam.
+    
+            
+        Returns
+        ----------
+        None
+        """
+
+        # Read the Wake-T simulation data
+        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
+        #rho = wake_t_evolution.initial.plasma.density.rho*-e
+        plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
+        info_rho = wake_t_evolution.initial.plasma.density.metadata
+        zs_rho = info_rho.z
+        
+        # Cut out axial Ez over the region of interest
+        Ez_roi, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam, self.z_slices)
+        
+        # Extract the plasma bubble radius
+        self.zs_bubble_radius_axial = zs_rho
+        bubble_radius_wakeT = self.trace_bubble_radius_WakeT(plasma_num_density, info_rho.r, zs_rho, threshold=0.8)  # Extracts rb with driver coordinates shifted on axis.
+
+        # Cut out bubble radius over the region of interest
+        R_blowout = blowout_radius(self.plasma_density, drive_beam.peak_current())
+        self.estm_R_blowout = R_blowout
+        bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam, self.z_slices)
+
+        if bubble_radius_wakeT.max() < 0.5 * R_blowout or bubble_radius_roi.any()==0:
+            warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
+
+        import scipy.signal as signal
+        idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
+        if idxs_bubble_peaks.size > 0:
+            warnings.warn("The bubble radius may not be smooth.", UserWarning)
+
+        # Save quantities to the stage
+        self.Ez_fit_obj = Ez_fit
+        self.rb_fit_obj = rb_fit
+        
+        self.Ez_roi = Ez_roi
+        #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
+        #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
+        self.bubble_radius_roi = bubble_radius_roi
+        self.bubble_radius_axial = bubble_radius_wakeT
+        
+        # Make plots for control if necessary
+        #self.plot_Ez_rb_cut()
 
 
     # ==================================================
@@ -610,7 +608,6 @@ class StagePrtclTransWakeInstability(Stage):
         self.calculate_beam_current(beam0, driver0) # Saves to self.initial.beam.current.zs and self.initial.beam.current.Is.
 
 
-    
     # ==================================================
     # Save final electric field, plasma and beam quantities
     def __save_final_step(self, Ez_axial, zs_Ez, rho, metadata_rho, driver, beam):
@@ -669,7 +666,6 @@ class StagePrtclTransWakeInstability(Stage):
         self.final.beam.current.Is = Is       
 
 
-        
     # ==================================================
     # May not be needed, as saving evolution to this stage is trivial.
     #def __extract_evolution(self, evolution):
@@ -714,6 +710,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         return stage_copy
     
+
     # ==================================================
     # Filter out particles that collide into bubble
     def bubble_filter(self, beam, sort_zs=True):

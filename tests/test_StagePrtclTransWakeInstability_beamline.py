@@ -84,7 +84,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9):
     return main
 
 
-def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0):
+def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, save_final_step=False):
     
     stage = StagePrtclTransWakeInstability()
     stage.time_step_mod = 0.03                                                      # In units of betatron wavelengths/c.
@@ -109,6 +109,7 @@ def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_sou
     stage.drive_beam_update_period = drive_beam_update_period  # Updates the drive beam every nth time step.
 
     stage.probe_evol_period = 3
+    stage.save_final_step = save_final_step
     stage.make_animations = False
 
     # Set up ramps after the stage is fully configured
@@ -560,7 +561,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=3.0e9)
-    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
+    stage = setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, save_final_step=True)
     interstage = setup_InterstageElegant(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
