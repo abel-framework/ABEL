@@ -492,73 +492,6 @@ class StagePrtclTransWakeInstability(Stage):
         
 
     # ==================================================
-    def store_rb_Ez_2stage(self, wake_t_evolution, drive_beam, beam):
-        """
-        Traces the longitudinal electric field, bubble radius and store them 
-        inside the stage.
-
-    
-        Parameters
-        ----------
-        wake_t_evolution : ...
-            Contains the 2D plasma density and wakefields for the initial and 
-            final time steps.
-
-        drive_beam : ABEL ``Beam`` object
-            Drive beam.
-
-        beam : ABEL ``Beam`` object
-            Main beam.
-    
-            
-        Returns
-        ----------
-        None
-        """
-
-        # Read the Wake-T simulation data
-        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
-        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
-        #rho = wake_t_evolution.initial.plasma.density.rho*-e
-        plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
-        info_rho = wake_t_evolution.initial.plasma.density.metadata
-        zs_rho = info_rho.z
-        
-        # Cut out axial Ez over the region of interest
-        Ez_roi, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam, self.z_slices)
-        
-        # Extract the plasma bubble radius
-        self.zs_bubble_radius_axial = zs_rho
-        bubble_radius_wakeT = self.trace_bubble_radius_WakeT(plasma_num_density, info_rho.r, zs_rho, threshold=0.8)  # Extracts rb with driver coordinates shifted on axis.
-
-        # Cut out bubble radius over the region of interest
-        R_blowout = blowout_radius(self.plasma_density, drive_beam.peak_current())
-        self.estm_R_blowout = R_blowout
-        bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam, self.z_slices)
-
-        if bubble_radius_wakeT.max() < 0.5 * R_blowout or bubble_radius_roi.any()==0:
-            warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
-
-        import scipy.signal as signal
-        idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
-        if idxs_bubble_peaks.size > 0:
-            warnings.warn("The bubble radius may not be smooth.", UserWarning)
-
-        # Save quantities to the stage
-        self.Ez_fit_obj = Ez_fit
-        self.rb_fit_obj = rb_fit
-        
-        self.Ez_roi = Ez_roi
-        #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
-        #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
-        self.bubble_radius_roi = bubble_radius_roi
-        self.bubble_radius_axial = bubble_radius_wakeT
-        
-        # Make plots for control if necessary
-        #self.plot_Ez_rb_cut()
-
-
-    # ==================================================
     # Save initial electric field, plasma and beam quantities
     def __save_initial_step(self, Ez0_axial, zs_Ez0, rho0, metadata_rho0, driver0, beam0):
         
@@ -1124,6 +1057,73 @@ class StagePrtclTransWakeInstability(Stage):
         
         return rb_roi, rb_fit    
         
+
+    # ==================================================
+    def store_rb_Ez_2stage(self, wake_t_evolution, drive_beam, beam):
+        """
+        Traces the longitudinal electric field, bubble radius and store them 
+        inside the stage.
+
+    
+        Parameters
+        ----------
+        wake_t_evolution : ...
+            Contains the 2D plasma density and wakefields for the initial and 
+            final time steps.
+
+        drive_beam : ABEL ``Beam`` object
+            Drive beam.
+
+        beam : ABEL ``Beam`` object
+            Main beam.
+    
+            
+        Returns
+        ----------
+        None
+        """
+
+        # Read the Wake-T simulation data
+        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
+        #rho = wake_t_evolution.initial.plasma.density.rho*-e
+        plasma_num_density = wake_t_evolution.initial.plasma.density.rho/self.plasma_density
+        info_rho = wake_t_evolution.initial.plasma.density.metadata
+        zs_rho = info_rho.z
+        
+        # Cut out axial Ez over the region of interest
+        Ez_roi, Ez_fit = self.Ez_shift_fit(Ez_axis_wakeT, zs_Ez_wakeT, beam, self.z_slices)
+        
+        # Extract the plasma bubble radius
+        self.zs_bubble_radius_axial = zs_rho
+        bubble_radius_wakeT = self.trace_bubble_radius_WakeT(plasma_num_density, info_rho.r, zs_rho, threshold=0.8)  # Extracts rb with driver coordinates shifted on axis.
+
+        # Cut out bubble radius over the region of interest
+        R_blowout = blowout_radius(self.plasma_density, drive_beam.peak_current())
+        self.estm_R_blowout = R_blowout
+        bubble_radius_roi, rb_fit = self.rb_shift_fit(bubble_radius_wakeT, zs_rho, beam, self.z_slices)
+
+        if bubble_radius_wakeT.max() < 0.5 * R_blowout or bubble_radius_roi.any()==0:
+            warnings.warn("The bubble radius may not have been correctly extracted.", UserWarning)
+
+        import scipy.signal as signal
+        idxs_bubble_peaks, _ = signal.find_peaks(bubble_radius_roi, height=None, width=1, prominence=0.1)
+        if idxs_bubble_peaks.size > 0:
+            warnings.warn("The bubble radius may not be smooth.", UserWarning)
+
+        # Save quantities to the stage
+        self.Ez_fit_obj = Ez_fit
+        self.rb_fit_obj = rb_fit
+        
+        self.Ez_roi = Ez_roi
+        #self.Ez_axial = Ez_axis_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
+        #self.zs_Ez_axial = zs_Ez_wakeT  # Moved to self.initial.plasma.wakefield.onaxis.zs
+        self.bubble_radius_roi = bubble_radius_roi
+        self.bubble_radius_axial = bubble_radius_wakeT
+        
+        # Make plots for control if necessary
+        #self.plot_Ez_rb_cut()
+
 
     # ==================================================
     # Determine the number of beam slices based on the Freedman–Diaconis rule
