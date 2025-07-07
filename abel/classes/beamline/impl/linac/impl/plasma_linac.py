@@ -2,7 +2,7 @@ from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.source.source import Source
 from abel.classes.stage.stage import Stage
-from abel.classes.interstage.interstage import Interstage
+from abel.classes.interstage import Interstage
 from abel.classes.bds.bds import BeamDeliverySystem
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.beamline.impl.linac.linac import Linac
@@ -51,7 +51,10 @@ class PlasmaLinac(Linac):
         
         # figure out the nominal energy gain if not set
         if self.nom_energy is None:
-            self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
+            if self.stage is not None:
+                self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
+            else:
+                self.nom_energy = self.source.energy
         else:
             self.stage.nom_energy_gain = (self.nom_energy - self.source.get_nom_energy()) / self.num_stages
         
@@ -146,7 +149,7 @@ class PlasmaLinac(Linac):
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 
-                stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
+                stage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                 
                 # reassign the same driver complex
                 if self.driver_complex is not None:
@@ -163,12 +166,17 @@ class PlasmaLinac(Linac):
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
-                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
+                    interstage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                     
                     if self.alternate_interstage_polarity:
-                        interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
+                        interstage_instance.field_dipole = (2*(i%2)-1)*interstage_instance.field_dipole
                         
                     self.trackables.append(interstage_instance)
+
+        else: # special case where there is only an interstage
+            if self.interstage is not None:
+                self.interstage.nom_energy = self.source.energy
+                self.trackables.append(self.interstage)
 
         
         # add beam delivery system

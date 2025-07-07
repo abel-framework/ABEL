@@ -91,3 +91,6 @@ def energy2gamma(E, unit=defaultUnitE, m=SI.m_e):
 def energy2proper_velocity(E, unit=defaultUnitE, m=SI.m_e):
     return gamma2proper_velocity(energy2gamma(E, unit=unit, m=m))
 
+def energy2momentum(E, unit=defaultUnitE, m=SI.m_e):
+    return gamma2momentum(energy2gamma(E, unit=unit, m=m), m=m)
+

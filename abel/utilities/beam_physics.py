@@ -160,7 +160,7 @@ def Dmat(l, inv_rho=0, k=0):
     
     
 
-def evolve_beta_function(ls, ks, beta0, alpha0=0, fast=False, plot=False):
+def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False):
 
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
@@ -171,6 +171,10 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, fast=False, plot=False):
         evolution = np.empty([3, Nres*len(ls)])
     else:
         evolution = None
+
+    # if given, take into account the weak focusing effect
+    if inv_rhos is not None:
+        ks = ks + inv_rhos**2
     
     # Twiss gamma function
     gamma0 = (1+alpha0**2)/beta0
@@ -581,10 +585,11 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
     ssl = np.append([0.], np.cumulative_sum(ls))
 
     # prepare arrays of effect of nonlinear plasma lens (tau) and sextupole (m)
-    ls_refined = np.empty(0)
-    ks_refined = np.empty(0)
     dks_ddelta_m = np.empty(0)
     dks_ddelta_tau = np.empty(0)
+    ls_refined = np.empty(0)
+    ks_refined = np.empty(0)
+    inv_rhos_refined = np.empty(0)
     for i in range(len(ls)):
         
         if abs(taus[i]) > 0 or abs(ms[i]) > 0:
@@ -596,16 +601,19 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
             dk_ddelta_tau = ks[i]*taus[i]*Dxs_slices
             ls_element = ls[i]/num_slice*np.ones_like(ss_slice)
             ks_element = ks[i]*np.ones_like(ss_slice)
+            inv_rhos_element = inv_rhos[i]*np.ones_like(ss_slice)
         else:
-            ls_element = np.array([ls[i]])
-            ks_element = np.array([ks[i]])
             dk_ddelta_m = np.array([0.0])
             dk_ddelta_tau = np.array([0.0])
+            ls_element = np.array([ls[i]])
+            ks_element = np.array([ks[i]])
+            inv_rhos_element = np.array([inv_rhos[i]])
             
-        ls_refined = np.append(ls_refined, ls_element)
-        ks_refined = np.append(ks_refined, ks_element)
         dks_ddelta_m = np.append(dks_ddelta_m, dk_ddelta_m)
         dks_ddelta_tau = np.append(dks_ddelta_tau, dk_ddelta_tau)
+        ls_refined = np.append(ls_refined, ls_element)
+        ks_refined = np.append(ks_refined, ks_element)
+        inv_rhos_refined = np.append(inv_rhos_refined, inv_rhos_element)
 
     # prepare arrays
     betas = np.empty_like(deltas)
@@ -615,11 +623,12 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
     if not bending_plane:
         ks_refined = -ks_refined
         dks_ddelta_m = -dks_ddelta_m
+        inv_rhos_refined = None
     
     # evolve the beta and alpha for different energies
     for i, delta in enumerate(deltas):
         ks_corrected = (ks_refined + (dks_ddelta_tau + dks_ddelta_m)*delta)/(1+delta)
-        betas[i], alphas[i], evols[i] = evolve_beta_function(ls_refined, ks_corrected, beta0, alpha0=alpha0, fast=fast, plot=False)
+        betas[i], alphas[i], evols[i] = evolve_beta_function(ls_refined, ks_corrected, beta0, alpha0=alpha0, inv_rhos=inv_rhos_refined, fast=fast, plot=False)
     
     # calculate the chromatic amplitude W
     beta = betas[2]
@@ -649,3 +658,5 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
         ax.set_ylabel('W_x')
 
     return W, evolution
+    
+

@@ -7,7 +7,7 @@ from abel.classes.beamline.impl.driver_complex import DriverComplex
 from abel.classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from abel.classes.stage.impl.stage_basic import StageBasic
 from abel.classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
-from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.interstage.plasma_lens.basic import InterstagePlasmaLensBasic
 from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.ip.impl.ip_basic import InteractionPointBasic

@@ -9,7 +9,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=False, do_spin_tracking=False, external_focusing_longitudinal=0, filename_test_particle='empty.h5'):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, external_focusing_radial=0, mesh_refinement=False, do_spin_tracking=False, external_focusing_longitudinal=0, filename_test_particle='empty.h5'):
 
     if output_period is None:
         output_period = int(num_steps)
@@ -53,7 +53,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         num_cell_xy = new_num_cell_xy
 
     # plasma-density profile from file
-    if abs(external_focusing_radial) > 0:
+    if abs(external_focusing_gradient) > 0:
         external_focusing_radial_comment = ''
     else:
         external_focusing_radial_comment = '#'
@@ -123,7 +123,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     
     # set the partition based on the number of nodes and tasks
     # based on LUMI (see https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/partitions/)
-    if num_nodes <= 4 and num_tasks_per_node <= 8:
+    if num_nodes <= 2 and num_tasks_per_node <= 8:
         partition_name = CONFIG.partition_name_small
     elif num_nodes <= 32 and num_tasks_per_node <= 8:
         partition_name = CONFIG.partition_name_devel

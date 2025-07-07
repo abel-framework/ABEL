@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, particle_mass=SI.m_e):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -38,6 +38,8 @@ class Beam():
         # bunch pattern information
         self.num_bunches_in_train = num_bunches_in_train
         self.bunch_separation = bunch_separation # [s]
+
+        self.particle_mass = particle_mass
         
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
@@ -203,16 +205,19 @@ class Beam():
             
             if pzs is not None:
                 if np.any(pzs < pz_thres):
-                    raise ValueError('pzs contains values that are too small.')
+                    print('pzs contains values that are too small.')
+                    #raise ValueError('pzs contains values that are too small.')
                 uzs = momentum2proper_velocity(pzs)
 
             elif Es is not None:
                 if np.any(Es < energy_thres):
-                    raise ValueError('Es contains values that are too small.')
+                    print('Es contains values that are too small.')
+                    #raise ValueError('Es contains values that are too small.')
                 uzs = energy2proper_velocity(Es)
         else:
             if np.any(uzs < uz_thres):
-                raise ValueError('uzs contains values that are too small.')
+                print('uzs contains values that are too small.')
+                #raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
         if uxs is None:
@@ -345,7 +350,8 @@ class Beam():
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
         if np.any(uzs < uz_thres):
-            raise ValueError('uzs contains values that are too small.')
+            print('uzs contains values that are too small.')
+            #raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
     def set_xps(self, xps):
@@ -355,7 +361,8 @@ class Beam():
     def set_Es(self, Es):
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         if np.any(Es < energy_thres):
-            raise ValueError('Es contains values that are too small.')
+            print('Es contains values that are too small.')
+            #raise ValueError('Es contains values that are too small.')
         self.set_uzs(energy2proper_velocity(Es))
         
     def set_qs(self, qs):
@@ -938,6 +945,14 @@ class Beam():
         covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
         return covy[1,1]/np.sqrt(np.linalg.det(covy))
 
+    def dispersion_x(self, clean=False):
+        px = np.polyfit(self.deltas(), self.xs(), 1)
+        return px[0]
+
+    def dispersion_y(self, clean=False):
+        py = np.polyfit(self.deltas(), self.ys(), 1)
+        return py[0]
+
     def intrinsic_emittance(self):
         covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
         return np.sqrt(np.sqrt(np.linalg.det(covxy)))
@@ -953,10 +968,10 @@ class Beam():
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
 
-    def norm_amplitude_x(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
-            beta_x = beta_matched(plasma_density, self.energy())
-            alpha_x = 0
+    def norm_amplitude_x(self, beta_x=None, alpha_x=None, clean=False):
+        if beta_x is not None:
+            if alpha_x is None:
+                alpha_x = 0
         else:
             covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
             emgx = np.sqrt(np.linalg.det(covx))
@@ -964,17 +979,25 @@ class Beam():
             alpha_x = -covx[1,0]/emgx
         return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
         
-    def norm_amplitude_y(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
-            beta_y = beta_matched(plasma_density, self.energy())
-            alpha_y = 0
+    def norm_amplitude_y(self, beta_y=None, alpha_y=None, clean=False):
+        if beta_y is not None:
+            if alpha_y is None:
+                alpha_y = 0
         else:
             covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
             emgy = np.sqrt(np.linalg.det(covy))
             beta_y = covy[0,0]/emgy
             alpha_y = -covy[1,0]/emgy
         return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
-        
+
+    def norm_amplitude_emittance_growth_x(self, beta_x=None, alpha_x=None, clean=False):
+        A_x = self.norm_amplitude_x(beta_x=beta_x, alpha_x=alpha_x, clean=clean) # only works of alpha=0
+        return A_x**2/2
+
+    def norm_amplitude_emittance_growth_y(self, beta_y=None, alpha_y=None, clean=False):
+        A_y = self.norm_amplitude_y(beta_y=beta_y, alpha_y=alpha_y, clean=clean)
+        return A_y**2/2
+    
     def peak_density(self):  # TODO: this is only valid for Gaussian beams.
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
@@ -1220,29 +1243,34 @@ class Beam():
     
     ## phase spaces
     
-    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
+    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None, hlims=None, vlims=None):
         self.remove_nans()
         if hbins is None:
-            hbins = round(np.sqrt(len(self))/2)
+            hbins = round(np.sqrt(len(self))/4)
         if vbins is None:
-            vbins = round(np.sqrt(len(self))/2)
+            vbins = round(np.sqrt(len(self))/4)
+        if hlims is not None:
+            hbins = np.linspace(min(hlims), max(hlims), hbins)
+        if vlims is not None:
+            vbins = np.linspace(min(vlims), max(vlims), vbins)
         counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
         density = (counts/np.diff(vedges)).T/np.diff(hedges)
 
-        #dx = np.diff(hedges)
-        #dy = np.diff(vedges)
-        #bin_areas = dx[:, None] * dy[None, :]
-        #density = counts/bin_areas
-        #print(np.sum(density*np.diff(vedges)*np.diff(hedges))/self.charge())
         return density, hctrs, vctrs
     
-    def density_lps(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
+    def density_lps(self, zbins=None, Ebins=None, zlims=None, Elims=None):
+        return self.phase_space_density(self.zs, self.Es, hbins=zbins, vbins=Ebins, hlims=zlims, vlims=Elims)
     
-    def density_transverse(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)
+    def density_transverse(self, xbins=None, ybins=None, xlims=None, ylims=None):
+        return self.phase_space_density(self.xs, self.ys, hbins=xbins, vbins=ybins, hlims=xlims, vlims=ylims)
+
+    def density_trace_space_x(self, xbins=None, xpbins=None, xlims=None, xplims=None):
+        return self.phase_space_density(self.xs, self.xps, hbins=xbins, vbins=xpbins, hlims=xlims, vlims=xplims)
+        
+    def density_trace_space_y(self, ybins=None, ypbins=None, ylims=None, yplims=None):
+        return self.phase_space_density(self.ys, self.yps, hbins=ybins, vbins=ypbins, hlims=ylims, vlims=yplims)
 
     
     # ==================================================
@@ -1534,63 +1562,151 @@ class Beam():
         fig.set_figwidth(6)
         fig.set_figheight(4)        
         ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
-        ax.set_xlabel('z (um)')
+        ax.set_xlabel('z (μm)')
         ax.set_ylabel('Beam current (kA)')
     
-    def plot_lps(self):
-        dQdzdE, zs, Es = self.density_lps()
-
+    def plot_lps(self, zlims=None, Elims=None, chromatic=False, num_samples=10000, dQdEdzlim=None, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-            
-        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('z (um)')
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5)  
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
+        if not chromatic:
+            dQdzdE, zs, Es = self.density_lps(zlims=zlims, Elims=Elims)
+            p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
+            deltalim = round(4*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.zs()[inds]*1e6, self.Es()[inds]/1e9, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+        if zlims is not None:
+            ax.set_xlim(np.array(zlims)*1e6)
+        if Elims is not None:
+            ax.set_ylim(np.array(Elims)/1e9)
+        ax.set_xlabel('ξ (μm)')
         ax.set_ylabel('E (GeV)')
-        ax.set_title('Longitudinal phase space')
+        ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
         cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
+        if not chromatic:
+            cb.ax.set_ylabel('Charge density (pC/μm/GeV)')
+            if dQdEdzlim is not None:
+                p.set_clim([0, dQdEdzlim*1e15])
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
+           
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
         
-    def plot_trace_space_x(self):
-        dQdxdxp, xs, xps = self.phase_space_density(self.xs, self.xps)
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('x'' (mrad)')
-        ax.set_title('Horizontal trace space')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
         
-    def plot_trace_space_y(self):
-        dQdydyp, ys, yps = self.phase_space_density(self.ys, self.yps)
-
+    def plot_trace_space_x(self, xlims=None, xplims=None, chromatic=False, num_samples=10000, dQdxdxplim=None, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('y (um)')
-        ax.set_ylabel('y'' (mrad)')
-        ax.set_title('Vertical trace space')
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5)  
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
+        if not chromatic:
+            dQdxdxp, xs, xps = self.density_trace_space_x(xlims=xlims, xplims=xplims)
+            p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
+            deltalim = round(4*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.xs()[inds]*1e6, self.xps()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+        if xlims is not None:
+            ax.set_xlim(np.array(xlims)*1e6)
+        if xplims is not None:
+            ax.set_ylim(np.array(xplims)*1e3)
+        ax.set_xlabel('x (μm)')
+        ax.set_ylabel("x' (mrad)")
+        ax.set_title(f'Horizontal trace space (s = {self.location:.2f} m) \n β = {self.beta_x()*1e3:.0f} mm, α = {self.alpha_x():.1f}, εn = {self.norm_emittance_x()*1e6:.2f} mm mrad')
         cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
-
-    def plot_transverse_profile(self):
-        dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys)
-
+        if not chromatic:
+            if dQdxdxplim is not None:
+                p.set_clim([0, dQdxdxplim*1e3])
+            cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
+            
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
+        
+    def plot_trace_space_y(self, ylims=None, yplims=None, chromatic=False, num_samples=10000, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)
-        p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
-        #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
-        #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('y (um)')
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5)  
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
+        if not chromatic:
+            dQdydyp, ys, yps = self.density_trace_space_y(ylims=ylims, yplims=yplims)
+            p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            from abel.utilities.colors import FLASHForward_nowhite as cmap
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
+            deltalim = round(4*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.ys()[inds]*1e6, self.yps()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
+        if ylims is not None:
+            ax.set_xlim(np.array(ylims)*1e6)
+        if yplims is not None:
+            ax.set_ylim(np.array(yplims)*1e3)
+        ax.set_xlabel('y (μm)')
+        ax.set_ylabel("y' (mrad)")
+        ax.set_title(f'Vertical trace space (s = {self.location:.2f} m) \n β = {self.beta_y()*1e3:.0f} mm, α = {self.alpha_y():.1f}, εn = {self.norm_emittance_y()*1e6:.2f} mm mrad')
+        cb = fig.colorbar(p)
+        if not chromatic:
+            cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
+            
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
+
+    def plot_transverse_profile(self, xlims=None, ylims=None, chromatic=False, num_samples=10000, figsize=None, savefig=None):
+        fig, ax = plt.subplots()
+        if figsize is None:
+            fig.set_figwidth(8)
+            fig.set_figheight(5) 
+        else:
+            fig.set_figwidth(figsize[0])
+            fig.set_figheight(figsize[1])
+        if not chromatic:
+            dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys, hlims=xlims, vlims=ylims)
+            p = ax.pcolor(xs*1e3, ys*1e3, -dQdxdy*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        else:
+            #from abel.utilities.colors import FLASHForward_nowhite as cmap
+            from abel.utilities.colors import RGB as cmap
+            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
+            deltalim = round(3*self.rel_energy_spread(), 2)
+            p = ax.scatter(self.xs()[inds]*1e3, self.ys()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2, alpha=0.8)
+        if xlims is not None:
+            ax.set_xlim(np.array(xlims)*1e3)
+        if ylims is not None:
+            ax.set_ylim(np.array(ylims)*1e3)
+        ax.set_xlabel('x (mm)')
+        ax.set_ylabel('y (mm)')
         ax.set_title('Transverse profile')
+        ax.set_title(f"Transverse profile (s = {self.location:.2f} m) \n σx = {self.beam_size_x()*1e6:.1f} μm, σy = {self.beam_size_y()*1e6:.1f} μm")
         cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um^2)')
+        if not chromatic:
+            cb.ax.set_ylabel('Charge density (nC/mm^2)')
+        else:
+            cb.ax.set_ylabel('Rel. energy offset (%)')
+            
+        # save figure to file
+        if savefig is not None:
+            p.set_rasterized(True)
+            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
 
     
     # TODO: unfinished!

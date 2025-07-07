@@ -4,7 +4,35 @@ from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 import scipy.constants as SI
 
-def elegant_read_beam(filename, tmpfolder=None):
+
+def elegant_run(filename, beam0, inputbeamfile, outputbeamfile, verbose=False, tmpfolder=None, runnable=None, save_beams=True):
+
+    # convert incoming beam object to temporary SDDS file
+    elegant_write_beam(beam0, inputbeamfile, tmpfolder=tmpfolder)
+
+    # make evolution folder
+    evolution_folder = tmpfolder + 'evolution' + os.sep
+    os.mkdir(evolution_folder)
+
+    # run system command
+    cmd = CONFIG.elegant_exec + 'elegant ' + filename + CONFIG.elegant_rpnflag
+    if verbose:
+        stdout = subprocess.DEVNULL
+    else:
+        stdout = None
+    subprocess.call(cmd, shell=True, stdout=stdout)
+    
+    # convert SDDS output to beam object
+    beam = elegant_read_beam(outputbeamfile, tmpfolder=tmpfolder, model_beam=beam0)
+    beam.location = beam0.location
+    
+    # save evolution
+    evolution = extract_beams_and_evolution(tmpfolder, evolution_folder, runnable, save_beams=save_beams, model_beam=beam0)
+    
+    return beam, evolution
+
+
+def elegant_read_beam(filename, tmpfolder=None, model_beam=None):
 
     from abel.utilities.relativity import gamma2energy
     
@@ -18,10 +46,8 @@ def elegant_read_beam(filename, tmpfolder=None):
     subprocess.run(CONFIG.elegant_exec + 'sdds2stream ' + filename + ' -columns=x,xp,y,yp,t,p,dt > ' + tmpfile, shell=True)
     
     # extract charge
-    try:
-        Q = float(subprocess.check_output([CONFIG.elegant_exec + 'sdds2stream ' + filename + ' -parameter=Charge'], shell=True))  ######## Charge sign not set correctly?
-    except:
-        return None
+    Qabs = float(subprocess.check_output([CONFIG.elegant_exec + 'sdds2stream ' + filename + ' -parameter=Charge'], shell=True))  ######## Charge sign not set correctly?
+    Q = abs(Qabs)*model_beam.charge_sign()
     
     # load phasespace from CSV file
     phasespace = np.loadtxt(open(tmpfile, "rb"), delimiter=' ')
@@ -41,6 +67,13 @@ def elegant_read_beam(filename, tmpfolder=None):
                        Es=gamma2energy(phasespace[:,5]),
                        Q=Q) # TODO: deal with non-uniform weight particles
     beam.location = np.mean(phasespace[:,4])*SI.c
+    
+    # copy previous beam metadata
+    if model_beam is not None:
+        beam.location += model_beam.location
+        beam.trackable_number = model_beam.trackable_number
+        beam.stage_number = model_beam.stage_number
+        beam.copy_particle_charge(model_beam)
     
     return beam
 
@@ -64,14 +97,15 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
             csvwriter.writerow([M[0,i], M[1,i], M[2,i], M[3,i], M[4,i], M[5,i], M[6,i], int(i+1)])
     
     # convert CSV to SDDS (ascii for now)
-    subprocess.call(CONFIG.elegant_exec + 'csv2sdds ' + tmpfile + ' ' + filename + ' -asciiOutput -columnData=name=x,type=double,units=m' +
-                                                                        ' -columnData=name=xp,type=double' + 
-                                                                        ' -columnData=name=y,type=double,units=m' + 
-                                                                        ' -columnData=name=yp,type=double' + 
-                                                                        ' -columnData=name=t,type=double,units=s' + 
-                                                                        ' -columnData=name=p,type=double,units=\"m\$be\$nc\"' +
-                                                                        ' -columnData=name=dt,type=double,units=s' +
-                                                                        ' -columnData=name=particleID,type=ulong64', shell=True)
+    subprocess.call(CONFIG.elegant_exec + 'csv2sdds ' + tmpfile + ' ' + filename + 
+                        ' -asciiOutput -columnData=name=x,type=double,units=m' +
+                        ' -columnData=name=xp,type=double' + 
+                        ' -columnData=name=y,type=double,units=m' + 
+                        ' -columnData=name=yp,type=double' + 
+                        ' -columnData=name=t,type=double,units=s' + 
+                        ' -columnData=name=p,type=double,units=\"m\$be\$nc\"' +
+                        ' -columnData=name=dt,type=double,units=s' +
+                        ' -columnData=name=particleID,type=ulong64', shell=True)
     
     # add metadata
     with open(filename, 'r') as f:
@@ -107,75 +141,111 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
     return filename
     
     
-def elegant_run(filename, beam0, inputbeamfile, outputbeamfile, envars={}, quiet=False, run_from_container=False, tmpfolder=None):
-
-    # convert incoming beam object to temporary SDDS file
-    elegant_write_beam(beam0, inputbeamfile, tmpfolder=tmpfolder)
-
-    # run system command
-    cmd = CONFIG.elegant_exec + 'elegant ' + filename + CONFIG.elegant_rpnflag
-        
-    if quiet:
-        subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL)
-    else:
-        subprocess.call(cmd, shell=True, stdout=None)
-        
-    # convert SDDS output to beam object
-    beam = elegant_read_beam(outputbeamfile, tmpfolder=tmpfolder)
-        
-    # copy previous beam metadata
-    beam.location = beam0.location
-    beam.trackable_number = beam0.trackable_number
-    beam.stage_number = beam0.stage_number
+# Extract the beams and evolution of various beam parameters as a function of s.
+def extract_beams_and_evolution(tmpfolder, evolution_folder, runnable, save_beams=True, model_beam=None):
     
-    # reset previous macroparticle charge
-    beam.copy_particle_charge(beam0)
+    insitu_path = tmpfolder + 'diags/insitu/'
+
+    # prepare data structure
+    from types import SimpleNamespace
+    evol = SimpleNamespace()
     
-    return beam
+    # run system command for converting .cen file to a .csv file
+    cmd = CONFIG.elegant_exec + '/sdds2stream ' + tmpfolder + '/centroid_vs_s.cen -columns=s,Cx,Cy,Cxp,Cyp,Cs,Cdelta,Particles,pCentral,Charge,ElementName,ElementType,ElementOccurence >' + tmpfolder + '/centroids.csv'
+    subprocess.call(cmd, shell=True)
 
+    # load centroid data from .csv file. All quantities in SI units unless otherwise specified.
+    file = open(tmpfolder + '/centroids.csv', "rb")
+    data = np.loadtxt(file, delimiter=' ', usecols=range(10))  # Avoids extracting the columns containing strings such as ElementName.
+    file.close()
 
-def elegant_apl_fieldmap2D(tau_lens, filename, lensdim_x=5e-3, lensdim_y=1e-3, lens_x_offset=0.0, lens_y_offset=0.0, tmpfolder=None):
+    # make mask to only extract at monitor locations
+    file = open(tmpfolder + '/centroids.csv', "rb")
+    names = np.loadtxt(file, usecols=10, dtype='str')  # Avoids extracting the columns containing strings such as ElementName.
+    file.close()
+    mask = (names=='MONITOR')
+    evol.location = data[mask,0]
+    evol.x = data[mask,1]
+    evol.y = data[mask,2]
+    evol.xp = data[mask,3]
+    evol.yp = data[mask,4]
+    evol.z = data[mask,5]
+    evol.energy = data[mask,8]*(1+data[mask,6])*SI.m_e*SI.c**2/SI.e  # [eV]
+    evol.charge = data[mask,9]
+    
+    # extract from beam
+    evol.beam_size_x = np.empty_like(evol.location)
+    evol.beam_size_y = np.empty_like(evol.location)
+    evol.beta_x = np.empty_like(evol.location)
+    evol.beta_y = np.empty_like(evol.location)
+    evol.dispersion_x = np.empty_like(evol.location)
+    evol.dispersion_y = np.empty_like(evol.location)
+    evol.bunch_length = np.empty_like(evol.location)
+    evol.emit_nx = np.empty_like(evol.location)
+    evol.emit_ny = np.empty_like(evol.location)
+    evol.rel_energy_spread = np.empty_like(evol.location)
+    
+    for i, file in enumerate(sorted(os.listdir(evolution_folder))):
+
+        # extract the beam
+        beam_step = elegant_read_beam(evolution_folder + os.fsdecode(file), tmpfolder=tmpfolder, model_beam=model_beam)
+
+        # save beam parameters
+        evol.beam_size_x[i] = beam_step.beam_size_x()
+        evol.beam_size_y[i] = beam_step.beam_size_y()
+        evol.beta_x[i] = beam_step.beta_x()
+        evol.beta_y[i] = beam_step.beta_y()
+        evol.dispersion_x[i] = beam_step.dispersion_x()
+        evol.dispersion_y[i] = beam_step.dispersion_y()
+        evol.bunch_length[i] = beam_step.bunch_length()
+        evol.emit_nx[i] = beam_step.norm_emittance_x()
+        evol.emit_ny[i] = beam_step.norm_emittance_y()
+        evol.rel_energy_spread[i] = beam_step.rel_energy_spread()
+        
+        # save beams if requested
+        if runnable is not None and save_beams:
+            beam_step.save(runnable=runnable)
+            
+    return evol
+    
+
+def elegant_apl_fieldmap2D(tau_lens, lensdim_x=2e-3, lensdim_y=2e-3, dx=0.0, dy=0.0, tmpfolder=None):
     
     # transverse dimensions
-    #xs = np.linspace(-lensdim_x, lensdim_x, 1001)
-    xs = np.linspace(-lensdim_x, lensdim_x, 2001)
-    ys = np.linspace(-lensdim_y, lensdim_y, 201)
-    
-    make_new_tmpfolder = tmpfolder is None
-    if make_new_tmpfolder:
-        tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
-        os.mkdir(tmpfolder)
-    #tmpfile = tmpfolder + '/map_' + str(uuid.uuid4()) + '.csv'
-    tmpfile = tmpfolder + '/Bmap.csv'
+    xs = np.linspace(-lensdim_x, lensdim_x, 501)
+    ys = np.linspace(-lensdim_y, lensdim_y, 501)
     
     # create map
     Bmap = np.zeros((len(xs)*len(ys), 4));
-    
-    for i in range(len(xs)):
-        x = xs[i]   
-        for j in range(len(ys)):
-            y = ys[j]
-            
-            Bx = ((y+lens_y_offset) + (x+lens_x_offset) * (y+lens_y_offset) * tau_lens)
-            By = -((x+lens_x_offset) + (( (x+lens_x_offset)**2 + (y+lens_y_offset)**2 )/2)*tau_lens)
-            
-            index = i + j*len(xs)
-            Bmap[index,:] = [x, y, Bx, By]
-            
-    # filename
+    for i, x in enumerate(xs):
+        for j, y in enumerate(ys):
+            Bx = (y+dy) + tau_lens*(x+dx)*(y+dy)
+            By = -((x+dx) + tau_lens*(((x+dx)**2 + (y+dy)**2)/2))
+            Bmap[i + j*len(xs),:] = [x, y, Bx, By]
+
+    # make temporary CSV file
+    make_new_tmpfolder = tmpfolder is None
+    if make_new_tmpfolder:
+        tmpfolder = os.path.join(CONFIG.temp_path, str(uuid.uuid4()))
+        os.mkdir(tmpfolder)
+    tmpfile = os.path.join(tmpfolder, 'Bmap.csv')
+       
+    # save map to temp file
     np.savetxt(tmpfile, Bmap, delimiter=',')
     
     # convert SDDS to binary
-    subprocess.call(CONFIG.elegant_exec + 'csv2sdds ' + tmpfile + ' ' + filename + ' -columnData=name=x,type=double,unit=m' +
-                                                                        ' -columnData=name=y,type=double,unit=m' +
-                                                                        ' -columnData=name=Bx,type=double,unit=T' +
-                                                                        ' -columnData=name=By,type=double,unit=T', shell=True)
+    filename = os.path.join(tmpfolder, 'Bmap.sdds')
+    subprocess.call(CONFIG.elegant_exec + 'csv2sdds ' + tmpfile + ' ' + filename + 
+                        ' -columnData=name=x,type=double,unit=m' +
+                        ' -columnData=name=y,type=double,unit=m' +
+                        ' -columnData=name=Bx,type=double,unit=T' +
+                        ' -columnData=name=By,type=double,unit=T', shell=True)
     
     # delete temporary CSV file and folder
-    #os.remove(tmpfile)
-    #if make_new_tmpfolder:
-    #    shutil.rmtree(tmpfolder)
+    if make_new_tmpfolder:
+        shutil.rmtree(tmpfolder)
 
     return filename
 
 
+    

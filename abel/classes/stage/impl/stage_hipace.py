@@ -69,6 +69,17 @@ class StageHipace(Stage):
         # and flattop nominal energy if not already done
         self._prepare_ramps()
 
+        if self.external_focusing == False:
+            self.external_focusing_gradient = 0
+        if self.external_focusing == True and self._external_focusing_gradient is None:
+            num_half_oscillations = 1
+            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2
+        if self.upramp is not None:
+            self.upramp._external_focusing_gradient = self._external_focusing_gradient
+        if self.downramp is not None:
+            self.downramp._external_focusing_gradient = self._external_focusing_gradient
+            
+        
         # plasma-density ramps (de-magnify beta function)
         location_flattop_start = 0
         if self.upramp is not None:
@@ -133,7 +144,10 @@ class StageHipace(Stage):
         
         # calculate number of cells in x to get similar resolution
         dr = box_size_xy/self.num_cell_xy
-        num_cell_z = round((box_max_z-box_min_z)/dr)
+        if self.mesh_refinement:
+            num_cell_z = 2*round((box_max_z-box_min_z)/dr)
+        else:
+            num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # calculate the time step
         beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
@@ -184,7 +198,8 @@ class StageHipace(Stage):
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam_incoming.trackable_number
         beam.stage_number = beam_incoming.stage_number
-        beam.location = location_flattop_start + beam0.location
+        #beam.location = location_flattop_start + beam0.location
+        beam.location = beam0.location
         driver.trackable_number = beam_incoming.trackable_number
         driver.stage_number = beam_incoming.stage_number
         driver.location = beam.location

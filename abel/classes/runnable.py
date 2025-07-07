@@ -359,7 +359,7 @@ class Runnable(ABC):
     ## PLOT FUNCTIONS
 
     # plot value of beam parameters across a scan
-    def plot_function(self, fcns, label=None, scale=1, xscale='linear', yscale='linear', legend=None):
+    def plot_function(self, fcns, label=None, scale=1, xscale='linear', yscale='linear', legend=None, add_scans=None):
 
         from matplotlib import pyplot as plt
         
@@ -368,35 +368,54 @@ class Runnable(ABC):
         
         if not isinstance(legend, list):
             legend = [legend]
-    
+
+        scans = [self]
+        if add_scans is not None:
+            if isinstance(add_scans, list):
+                scans.extend(add_scans)
+            else:
+                scans.append(add_scans)
+        
         # plot evolution
         fig, ax = plt.subplots(1)
         fig.set_figwidth(CONFIG.plot_width_default)
         fig.set_figheight(CONFIG.plot_width_default*0.6)
-        
-        for i, fcn in enumerate(fcns):
-            
-            # extract values
-            val_mean, val_std = self.extract_function(fcn)
-            
-            if not hasattr(self, 'scale'):
-                self.scale = 1
-            if not hasattr(self, 'label'):
-                self.label = ''
-            
-            ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend[i])
-            if legend[i] is not None:
-                ax.legend()
-            
+
+        for j, scan in enumerate(scans):
+                
+            for i, fcn in enumerate(fcns):
+                
+                # extract values
+                val_mean, val_std = scan.extract_function(fcn)
+                
+                if not hasattr(self, 'scale'):
+                    self.scale = 1
+                if not hasattr(self, 'label'):
+                    self.label = ''
+
+                # identify the legend/label
+                if legend is not None and len(legend) > len(fcns)*j+i:
+                    legend_label = legend[len(fcns)*j+i]
+                else:
+                    legend_label = None
+
+                # plot the values (with or without errorbars)
+                if abs(np.sum(val_std)) == 0 or np.isnan(val_std).any():
+                    ax.plot(scan.vals/self.scale, val_mean/scale, ls='-', label=legend_label)
+                else:
+                    ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend_label)
+                
         ax.set_xlabel(self.label)
         ax.set_ylabel(label)
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
+        if legend is not None:
+            ax.legend()
 
     
     # plot value of beam parameters across a scan
-    def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear'):
-        self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale)
+    def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear', legend=None, add_scans=None):
+        self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale, legend=legend, add_scans=add_scans)
 
     def plot_energy(self, index=-1):
         self.plot_beam_function(Beam.energy, scale=1e9, label='Energy [GeV]', index=index)

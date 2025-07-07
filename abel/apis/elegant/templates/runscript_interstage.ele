@@ -2,25 +2,25 @@
 ! by Carl A. Lindstrom (University of Oslo), 13.08.2022
 
 &run_setup
-    lattice             = "$latticefile",
-    use_beamline        = "ACHROMAT",
-    p_central_mev       = "$p_central_mev",
-    random_number_seed  = 0,
-    centroid            = "$path_to_beam_centroid_file",
+    lattice = "$filename_lattice",
+    use_beamline = "ACHROMAT",
+    p_central_mev = "$nom_energy_MeV",
+    random_number_seed = 0,
+    centroid = "$filename_centroid",
 &end
 
 &run_control
 &end
 
 &sdds_beam
-    input               = "$inputbeamfile",
+    input  = "$filename_inputbeam",
 &end
 
 &track
 &end
 
 &twiss_output
-    filename = "$path_to_uncoupled_Twiss_parameter_output_file";
+    filename = "$filename_twiss";
     beta_x = 1;
     alpha_x = 1;
     eta_x = 1;
