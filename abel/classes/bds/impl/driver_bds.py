@@ -94,7 +94,7 @@ class DriverDelaySystem(BeamDeliverySystem):
         if self.use_monitors:
             from abel.apis.impactx.impactx_api import initialize_amrex
             initialize_amrex()
-            monitor = [impactx.elements.BeamMonitor(name="monitor", backend="h5", encoding="g")]
+            monitor = [impactx.elements.BeamMonitor(name='monitor', backend='h5', encoding='g')]
         else:
             monitor=[]
         
@@ -313,7 +313,8 @@ class DriverDelaySystem(BeamDeliverySystem):
         Evolve beta function here
         """
         
-        ls, ks, inverse_rs = self.get_element_attributes(self.lattice)
+        ls, ks, phis = self.get_element_attributes(self.lattice)
+        inverse_rs = self.phi2inv_r(phis)
 
         _, _, evox = evolve_beta_function(ls, ks, beta0=beam0.beta_x(), alpha0=beam0.alpha_x(), plot=True)
         _, _, evoy = evolve_beta_function(ls, -np.array(ks), beta0=beam0.beta_y(), alpha0=beam0.alpha_y(), plot=True)
@@ -338,7 +339,7 @@ class DriverDelaySystem(BeamDeliverySystem):
     def get_element_attributes(self, lattice):
         ls = []
         ks = []
-        inverse_rs = []
+        phis = []
         for element in lattice:
                 if hasattr(element, "l"):
                     ls.append(element.ds)
@@ -348,11 +349,10 @@ class DriverDelaySystem(BeamDeliverySystem):
                     ks.append(0)
                 if hasattr(element, "phi"):
                     phi = element.phi # Given in rad for some reason (although input takes degrees)
-                    inverse_r = phi/self.l_dipole
-                    inverse_rs.append(inverse_r)
+                    phis.append(phi)
                 else:
-                    inverse_rs.append(0)
-        return ls, ks, inverse_rs
+                    phis.append(0)
+        return ls, ks, phis
     
     def plot_evolution(self):
 
