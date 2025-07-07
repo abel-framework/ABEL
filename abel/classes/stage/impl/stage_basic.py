@@ -23,6 +23,8 @@ class StageBasic(Stage):
         
         # get the driver
         driver_incoming = self.driver_source.track()
+
+        print('driver_incoming.ux_offset()', driver_incoming.ux_offset())       ########## TODO: delete
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
@@ -35,6 +37,8 @@ class StageBasic(Stage):
 
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             drive_beam_rotated, beam_rotated = self.rotate_beam_coordinate_systems(driver_incoming, beam_incoming)
+
+            print('drive_beam_rotated.ux_offset()', drive_beam_rotated.ux_offset())       ########## TODO: delete
 
 
         # ========== Prepare ramps ==========
@@ -99,13 +103,17 @@ class StageBasic(Stage):
         if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
 
             # ========== Decelerate the driver with homogeneous energy loss ==========
+
+            print('driver_outgoing.ux_offset() before driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
+
             driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
+
+            print('driver_outgoing.ux_offset() after driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(driver_incoming, driver_outgoing, beam_outgoing)
 
-
-            
+            print('driver_outgoing.ux_offset() after undo_beam_coordinate_systems_rotation:', driver_outgoing.ux_offset())       ########## TODO: delete
 
 
         # ========== Bookkeeping ==========
@@ -162,4 +170,37 @@ class StageBasic(Stage):
         self.plasma_density = plasma_wavenumber**2*SI.m_e*SI.c**2*SI.epsilon_0/SI.e**2
      
         
+    # ==================================================
+    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, transformer_ratio=1, depletion_efficiency=0.0, calc_evolution=False):
+        """
+        Used for copying a predefined stage's settings and configurations to set
+        up flat ramps. Overloads the parent class' method.
+    
+        Parameters
+        ----------
+        ramp_plasma_density : [m^-3] float, optional
+            Plasma density for the ramp.
+
+        ramp_length : [m] float, optional
+            Length of the ramp.
+
+        ...
+    
+            
+        Returns
+        ----------
+        stage_copy : ``Stage`` object
+            A modified deep copy of the original stage.
+        """
+
+        stage_copy = super().stage2ramp(ramp_plasma_density, ramp_length)
+
+        # Additional configurations 
+        stage_copy.transformer_ratio = transformer_ratio
+        stage_copy.depletion_efficiency = depletion_efficiency
+        stage_copy.calc_evolution = calc_evolution
+
+        return stage_copy
+
+    
     
