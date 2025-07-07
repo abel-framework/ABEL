@@ -15,7 +15,6 @@ from types import SimpleNamespace
 import os, copy, warnings, uuid, shutil
 
 from abel.physics_models.particles_transverse_wake_instability import *
-from abel.physics_models.twoD_particles_transverse_wake_instability import *  # TODO: remove
 from abel.utilities.plasma_physics import k_p, beta_matched, wave_breaking_field, blowout_radius
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
 from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, plasma_stage_setup, extract_initial_and_final_Ez_rho
@@ -227,9 +226,6 @@ class StagePrtclTransWakeInstability(Stage):
 
         #if self.parent is not None and self.upramp is not None and self.downramp is not None:
         #    raise ValueError('Currently does not support ramps with both upramp and downramp.')
-
-        from joblib import Parallel, delayed  # Parallel tracking
-        from joblib_progress import joblib_progress  # TODO: remove
 
         # Set the diagnostics directory
         if runnable is not None:
