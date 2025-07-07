@@ -212,7 +212,6 @@ class StagePrtclTransWakeInstability(Stage):
         self.reljitter.plasma_density = 0
 
         self.interstages_enabled = False  # TODO: to be removed.
-        self.parallel_track_2D = False
 
         # internally sampled values (given some jitter)
         self.__n = None 
@@ -246,11 +245,8 @@ class StagePrtclTransWakeInstability(Stage):
         if self.length_flattop is None:
             raise ValueError('length_flattop is not defined.')
         plasma_density = self.plasma_density
-        stage_length = self.length_flattop  # TODO: Remove with the "if self.parallel_track_2D is True: " part
         #gamma0 = beam_incoming.gamma()
-        time_step_mod = self.time_step_mod  # TODO: Remove with the "if self.parallel_track_2D is True: " part
-
-        particle_mass = beam_incoming.particle_mass
+        
         self.stage_number = beam_incoming.stage_number
 
         
@@ -487,38 +483,11 @@ class StagePrtclTransWakeInstability(Stage):
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
         
         # Start tracking
-        if self.parallel_track_2D is True:  # TODO: remove this and associated files
-            
-            with joblib_progress('Tracking x and y in parallel:', 2):
-                results = Parallel(n_jobs=2)([
-                    delayed(twoD_transverse_wake_instability_particles)(beam_filtered, beam_filtered.xs(), beam_filtered.pxs(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None),
-                    delayed(twoD_transverse_wake_instability_particles)(beam_filtered, beam_filtered.ys(), beam_filtered.pys(), plasma_density, Ez_fit, rb_fit, stage_length, time_step_mod, get_centroids=False, s_slices=None, z_slices=None)
-                ])
-                time.sleep(0.1) # hack to allow printing progress
-            
-            xs_sorted, pxs_sorted, zs_sorted, pzs_sorted, weights_sorted, s_slices_table, offset_slices_table, angle_slices_table = results[0]
-            ys_sorted, pys_sorted, _, _, _, _, _, _ = results[1]
+        beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
 
-            # Initialise ABEL Beam object
-            beam = Beam()
-            
-            # Set the phase space of the ABEL beam
-            beam.set_phase_space(Q=np.sum(weights_sorted)*beam0.charge_sign()*e,
-                                 xs=xs_sorted,
-                                 ys=ys_sorted,
-                                 zs=zs_sorted, 
-                                 pxs=pxs_sorted,  # Always use single particle momenta?
-                                 pys=pys_sorted,
-                                 pzs=pzs_sorted,
-                                 weightings=weights_sorted,
-                                 particle_mass=particle_mass)
-        else:
+        self.evolution = evolution
 
-            beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=Ez_fit, rb_fit_obj=rb_fit, trans_wake_config=trans_wake_config)
-
-            self.evolution = evolution
-
-            ## NOTE: beam and driver cannot be changed after this line in order to test for continuity between ramps and stage.
+        ## NOTE: beam and driver cannot be changed after this line in order to test for continuity between ramps and stage.
 
         # Save the final step with ramped beams in rotated coordinate system before downramp
         if self.save_final_step:
