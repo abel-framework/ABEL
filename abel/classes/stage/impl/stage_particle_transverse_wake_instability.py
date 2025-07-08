@@ -240,7 +240,7 @@ class StagePrtclTransWakeInstability(Stage):
         # Extract quantities
         if self.length_flattop is None:
             raise ValueError('length_flattop is not defined.')
-        plasma_density = self.plasma_density
+        #plasma_density = self.plasma_density
         #gamma0 = beam_incoming.gamma()
         
         self.stage_number = beam_incoming.stage_number
@@ -313,7 +313,22 @@ class StagePrtclTransWakeInstability(Stage):
         self.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0))
 
         
-        # ========== Instability tracking ==========
+        # ========== Main tracking sequence ==========
+        # # Set up animations for beam evolution inside the stage
+        # if self.make_animations:
+        #     # Create the temporary folder
+        #     parent_dir = CONFIG.temp_path
+        #     if not os.path.exists(parent_dir):
+        #         os.makedirs(parent_dir)
+        #     tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
+        #     os.mkdir(tmpfolder)
+        # else:
+        #     tmpfolder = None
+
+        # beam, driver = self.main_tracking_procedure(copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
+
+
+
         # Filter out beam particles outside of the plasma bubble
         beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
         beam_filtered.location = beam0.location
@@ -394,7 +409,7 @@ class StagePrtclTransWakeInstability(Stage):
         if some_are_none:
             none_indices = [i for i, x in enumerate(inputs) if x is None]
             print(none_indices)
-            raise ValueError('At least one input is set to None.')
+            raise ValueError('At least one input is set not defined.')
 
         # Add the driver offsets to the Wake-T r-coordinate
         # Changes to info_rho should only be done after the plasma ion bubble radius has been traced and extracted.
@@ -490,6 +505,120 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
         
+
+
+    
+
+
+    # # ==================================================
+    # def track_upramp(self, beam0, driver0):
+    #     """
+    #     Called by an upramp to perform tracking.
+    
+    #     Parameters
+    #     ----------
+    #     ...
+    
+            
+    #     Returns
+    #     ----------
+    #     ...
+    #     """
+
+    #     # set driver
+    #     #self.upramp.driver_source = SourceCapsule(beam=driver0)
+
+    #     # determine density if not already set
+    #     if self.upramp.plasma_density is None:
+    #         self.plasma_density = self.parent.plasma_density/self.parent.ramp_beta_mag
+
+        
+
+    #     if self.ramp_beta_mag is not None:
+
+    #         beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+    #         driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+
+    #     # perform tracking
+    #     #self.upramp._return_tracked_driver = True
+    
+    #     # ========== Record longitudinal number profile ==========
+    #     # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
+    #     main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam0)
+    #     self.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
+    #     self.main_num_profile = main_num_profile
+
+    #     driver_num_profile, driver_z_slices = self.longitudinal_number_distribution(beam=drive_beam_ramped)
+    #     self.driver_num_profile = driver_num_profile
+    #     self.driver_z_slices = driver_z_slices
+        
+
+    #     # ========== Wake-T simulation and extraction ==========
+    #     # Extract driver xy-offsets for later use
+    #     driver_x_offset = drive_beam_ramped.x_offset()
+    #     driver_y_offset = drive_beam_ramped.y_offset()
+
+    #     # Perform a single time step Wake-T simulation
+    #     wake_t_evolution = run_single_step_wake_t(self.plasma_density, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0))
+
+    #     # Read the Wake-T simulation data
+    #     self.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0))
+
+        
+    #     # ========== Instability tracking ==========
+    #     ...
+
+    #     # Save the final step with ramped beams in rotated coordinate system before downramp
+    #     if self.save_final_step:
+    #         self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
+    #     else:
+    #         self.final = None
+
+    #         beam.stage_number -= 1
+    #         driver.stage_number -= 1
+            
+        
+    #     return beam, driver
+
+
+    # ==================================================
+    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, probe_evol_period=1, make_animations=False):
+        """
+        Used for copying a predefined stage's settings and configurations to set
+        up flat ramps. Overloads the parent class' method.
+    
+        Parameters
+        ----------
+        ramp_plasma_density : [m^-3] float, optional
+            Plasma density for the ramp.
+
+        ramp_length : [m] float, optional
+            Length of the ramp.
+
+        probe_evol_period : int, optional
+            Set to larger than 0 to determine the probing period for beam 
+            evolution diagnostics. This is given in units of time steps, so that
+            e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd
+            time step. Default value: 1.
+
+        make_animations : bool, optional
+            Flag for making animations.
+    
+            
+        Returns
+        ----------
+        stage_copy : ``Stage`` object
+            A modified deep copy of the original stage.
+        """
+
+        stage_copy = super().stage2ramp(ramp_plasma_density, ramp_length)
+
+        # Additional configurations 
+        stage_copy.probe_evol_period = probe_evol_period
+        stage_copy.make_animations = make_animations
+
+        return stage_copy
+    
 
     # ==================================================
     # Save initial electric field, plasma and beam quantities
@@ -604,45 +733,6 @@ class StagePrtclTransWakeInstability(Stage):
     #def __extract_evolution(self, evolution):
     #    self.evolution = evolution
 
-
-    # ==================================================
-    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, probe_evol_period=1, make_animations=False):
-        """
-        Used for copying a predefined stage's settings and configurations to set
-        up flat ramps. Overloads the parent class' method.
-    
-        Parameters
-        ----------
-        ramp_plasma_density : [m^-3] float, optional
-            Plasma density for the ramp.
-
-        ramp_length : [m] float, optional
-            Length of the ramp.
-
-        probe_evol_period : int, optional
-            Set to larger than 0 to determine the probing period for beam 
-            evolution diagnostics. This is given in units of time steps, so that
-            e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd
-            time step. Default value: 1.
-
-        make_animations : bool, optional
-            Flag for making animations.
-    
-            
-        Returns
-        ----------
-        stage_copy : ``Stage`` object
-            A modified deep copy of the original stage.
-        """
-
-        stage_copy = super().stage2ramp(ramp_plasma_density, ramp_length)
-
-        # Additional configurations 
-        stage_copy.probe_evol_period = probe_evol_period
-        stage_copy.make_animations = make_animations
-
-        return stage_copy
-    
 
     # ==================================================
     # Filter out particles that collide into bubble
@@ -1062,7 +1152,7 @@ class StagePrtclTransWakeInstability(Stage):
     def store_rb_Ez_2stage(self, wake_t_evolution, drive_beam, beam):
         """
         Traces the longitudinal electric field, bubble radius and store them 
-        inside the stage.
+        as a stage attribute.
 
     
         Parameters
