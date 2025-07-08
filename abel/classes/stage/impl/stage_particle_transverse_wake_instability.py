@@ -314,47 +314,6 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Main tracking sequence ==========
-        # # Set up animations for beam evolution inside the stage
-        # if self.make_animations:
-        #     # Create the temporary folder
-        #     parent_dir = CONFIG.temp_path
-        #     if not os.path.exists(parent_dir):
-        #         os.makedirs(parent_dir)
-        #     tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
-        #     os.mkdir(tmpfolder)
-        # else:
-        #     tmpfolder = None
-
-        # beam, driver = self.main_tracking_procedure(copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
-
-
-
-        # Filter out beam particles outside of the plasma bubble
-        beam_filtered = self.bubble_filter(copy.deepcopy(beam0), sort_zs=True)
-        beam_filtered.location = beam0.location
-
-        # Make plots if all beam particles are outside the bubble.
-        if len(beam_filtered) == 0:
-            zs = beam0.zs()
-            indices = np.argsort(zs)
-            zs_sorted = zs[indices]
-
-            fig, axs = plt.subplots(nrows=1, ncols=2, layout='constrained', figsize=(5*2, 4))
-            axs[0].plot(zs_sorted*1e6, rb_fit(zs_sorted)*1e6, 'r')
-            axs[0].plot(zs_sorted*1e6, -rb_fit(zs_sorted)*1e6, 'r')
-            axs[0].scatter(beam0.zs()*1e6, beam0.xs()*1e6)
-            axs[0].set_xlabel(r'$z$ [µm]')
-            axs[0].set_ylabel(r'$x$ [µm]')
-            axs[1].plot(zs_sorted*1e6, rb_fit(zs_sorted)*1e6, 'r')
-            axs[1].plot(zs_sorted*1e6, -rb_fit(zs_sorted)*1e6, 'r')
-            axs[1].scatter(beam0.zs()*1e6, beam0.ys()*1e6)
-            axs[1].set_xlabel(r'$z$ [µm]')
-            axs[1].set_ylabel(r'$y$ [µm]')
-            raise ValueError('No beam particle left.')
-        
-        if self.num_z_cells_main is None:
-            self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
-        
         # Set up animations for beam evolution inside the stage
         if self.make_animations:
             # Create the temporary folder
@@ -366,77 +325,7 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             tmpfolder = None
 
-        # # Prepare fields from Wake-T for use in drive beam tracking # TODO: remove when driver evolution has been implemented.
-        # if self.drive_beam_update_period > 0:  # Do drive beam evolution
-        #     wake_t_fields = plasma_stage.fields[-1]  # Extract the wakefields used for driver tracking.
-        #     wake_t_fields.r_fld = wake_t_fields.r_fld + np.sqrt(driver_x_offset**2 + driver_y_offset**2)  # Compensate for the drive beam offset.
-        # else:
-        #     wake_t_fields = None
-
-        # Set up the configuration for the instability model
-        trans_wake_config = PrtclTransWakeConfig(
-            plasma_density=self.plasma_density, 
-            stage_length=self.length_flattop, 
-            drive_beam=drive_beam_ramped, 
-            main_beam=beam_filtered, 
-            time_step_mod=self.time_step_mod, 
-            show_prog_bar=self.show_prog_bar,
-            probe_evol_period=self.probe_evol_period, 
-            make_animations=self.make_animations, 
-            tmpfolder=tmpfolder, 
-            shot_path=shot_path, 
-            stage_num=beam_incoming.stage_number, 
-            enable_tr_instability=self.enable_tr_instability, 
-            enable_radiation_reaction=self.enable_radiation_reaction, 
-            enable_ion_motion=self.enable_ion_motion, 
-            ion_charge_num=self.ion_charge_num, 
-            ion_mass=self.ion_mass, 
-            num_z_cells_main=self.num_z_cells_main, 
-            num_x_cells_rft=self.num_x_cells_rft, 
-            num_y_cells_rft=self.num_y_cells_rft, 
-            num_xy_cells_probe=self.num_xy_cells_probe, 
-            uniform_z_grid=self.uniform_z_grid, 
-            driver_x_jitter=self.driver_source.jitter.x, 
-            driver_y_jitter=self.driver_source.jitter.y, 
-            ion_wkfld_update_period=self.ion_wkfld_update_period, 
-            drive_beam_update_period=self.drive_beam_update_period, 
-            #wake_t_fields=wake_t_fields  # TODO: remove when driver evolution has been implemented.
-        )
-        
-        inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
-        some_are_none = any(input is None for input in inputs)
-        
-        if some_are_none:
-            none_indices = [i for i, x in enumerate(inputs) if x is None]
-            print(none_indices)
-            raise ValueError('At least one input is set not defined.')
-
-        # Add the driver offsets to the Wake-T r-coordinate
-        # Changes to info_rho should only be done after the plasma ion bubble radius has been traced and extracted.
-        rho = wake_t_evolution.initial.plasma.density.rho*-e
-        info_rho = wake_t_evolution.initial.plasma.density.metadata
-        rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
-        info_rho.r = rs_rho
-        info_rho.imshow_extent[2] = rs_rho.min()
-        info_rho.imshow_extent[3] = rs_rho.max()
-
-        # Save the initial step with ramped beams in rotated coordinate system after upramp
-        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
-        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
-        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
-        
-        # Perform main tracking
-        beam, driver, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
-
-        self.evolution = evolution
-
-        ## NOTE: beam and driver cannot be changed after this line in order to test for continuity between ramps and stage.
-
-        # Save the final step with ramped beams in rotated coordinate system before downramp
-        if self.save_final_step:
-            self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
-        else:
-            self.final = None
+        beam, driver = self.main_tracking_procedure(copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
 
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
@@ -506,8 +395,132 @@ class StagePrtclTransWakeInstability(Stage):
             return super().track(beam_outgoing, savedepth, runnable, verbose)
         
 
+    # ==================================================
+    def main_tracking_procedure(self, drive_beam_ramped, beam_ramped, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path=None, tmpfolder=None):
+        """
+        Prepares and performs the main reduced model beam tracking.
+        - Filter out beam particles outside of the plasma bubble.
+        - Set up the configuration for the reduced model tracking.
+        - Make corrections to the Wake-T r-coordinate before saving the initial 
+            time step.
+        - Call on the physics model to perform the tracking.
+        - Store beam parameter evolution as a stage attribute.
+        - Save the final time step if desired.
+        
 
-    
+        Parameters
+        ----------
+        drive_beam_ramped : ABEL ``Beam`` object
+            Drive beam.
+
+        beam_ramped : ABEL ``Beam`` object
+            Main beam.
+
+        driver_x_offset : [m] float
+            Drive beam x-offset.
+
+        driver_y_offset : [m] float
+            Drive beam y-offset.
+
+        wake_t_evolution : ...
+            Contains the 2D plasma density and wakefields for the initial and 
+            final time steps.
+
+        shot_path : ``string``, optional
+            The path for the directory of the shot. Default set to None.
+
+        tmpfolder : ``string``, optional
+            The path for the temporary folder for storing beam.h5 files used 
+            for creating animations.
+
+            
+        Returns
+        ----------
+        beam : ABEL ``Beam`` object
+            Main beam after tracking.
+
+        drive_beam : ABEL ``Beam`` object
+            Drive beam after tracking.
+        """
+
+        # Filter out beam particles outside of the plasma bubble
+        beam_filtered = self.bubble_filter(beam_ramped, sort_zs=True)
+        beam_filtered.location = beam_ramped.location
+        
+        if self.num_z_cells_main is None:
+            self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
+
+        # # Prepare fields from Wake-T for use in drive beam tracking # TODO: remove when driver evolution has been implemented.
+        # if self.drive_beam_update_period > 0:  # Do drive beam evolution
+        #     wake_t_fields = plasma_stage.fields[-1]  # Extract the wakefields used for driver tracking.
+        #     wake_t_fields.r_fld = wake_t_fields.r_fld + np.sqrt(driver_x_offset**2 + driver_y_offset**2)  # Compensate for the drive beam offset.
+        # else:
+        #     wake_t_fields = None
+
+        # Set up the configuration for the instability model
+        trans_wake_config = PrtclTransWakeConfig(
+            plasma_density=self.plasma_density, 
+            stage_length=self.length_flattop, 
+            drive_beam=drive_beam_ramped, 
+            main_beam=beam_filtered, 
+            time_step_mod=self.time_step_mod, 
+            show_prog_bar=self.show_prog_bar,
+            probe_evol_period=self.probe_evol_period, 
+            make_animations=self.make_animations, 
+            tmpfolder=tmpfolder, 
+            shot_path=shot_path, 
+            stage_num=beam_ramped.stage_number, 
+            enable_tr_instability=self.enable_tr_instability, 
+            enable_radiation_reaction=self.enable_radiation_reaction, 
+            enable_ion_motion=self.enable_ion_motion, 
+            ion_charge_num=self.ion_charge_num, 
+            ion_mass=self.ion_mass, 
+            num_z_cells_main=self.num_z_cells_main, 
+            num_x_cells_rft=self.num_x_cells_rft, 
+            num_y_cells_rft=self.num_y_cells_rft, 
+            num_xy_cells_probe=self.num_xy_cells_probe, 
+            uniform_z_grid=self.uniform_z_grid, 
+            driver_x_jitter=self.driver_source.jitter.x, 
+            driver_y_jitter=self.driver_source.jitter.y, 
+            ion_wkfld_update_period=self.ion_wkfld_update_period, 
+            drive_beam_update_period=self.drive_beam_update_period, 
+            #wake_t_fields=wake_t_fields  # TODO: remove when driver evolution has been implemented.
+        )
+        
+        inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
+        some_are_none = any(input is None for input in inputs)
+        
+        if some_are_none:
+            raise ValueError('At least one input is not defined.')
+
+        # Add the driver offsets to the Wake-T r-coordinate, as these are incorrectly centered around r=0.
+        # Changes to info_rho should only be done after the plasma ion bubble radius has been traced and extracted.
+        rho = wake_t_evolution.initial.plasma.density.rho*-e
+        info_rho = wake_t_evolution.initial.plasma.density.metadata
+        rs_rho = info_rho.r + np.sqrt(driver_x_offset**2 + driver_y_offset**2)
+        info_rho.r = rs_rho
+        info_rho.imshow_extent[2] = rs_rho.min()
+        info_rho.imshow_extent[3] = rs_rho.max()
+
+        # Save the initial step with ramped beams in rotated coordinate system after upramp
+        Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
+        zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
+        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
+        
+        # Perform main tracking
+        beam, drive_beam, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
+
+        self.evolution = evolution
+
+        ## NOTE: beam and driver cannot be changed after this line in order to test for continuity between ramps and stage.
+
+        # Save the final step with ramped beams in rotated coordinate system before downramp
+        if self.save_final_step:
+            self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, driver, beam)
+        else:
+            self.final = None
+
+        return beam, drive_beam
 
 
     # # ==================================================
@@ -565,8 +578,19 @@ class StagePrtclTransWakeInstability(Stage):
     #     self.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0))
 
         
-    #     # ========== Instability tracking ==========
-    #     ...
+        # # ========== Main tracking sequence ==========
+        # # Set up animations for beam evolution inside the stage
+        # if self.make_animations:
+        #     # Create the temporary folder
+        #     parent_dir = CONFIG.temp_path
+        #     if not os.path.exists(parent_dir):
+        #         os.makedirs(parent_dir)
+        #     tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
+        #     os.mkdir(tmpfolder)
+        # else:
+        #     tmpfolder = None
+
+        # beam, driver = self.main_tracking_procedure(copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
 
     #     # Save the final step with ramped beams in rotated coordinate system before downramp
     #     if self.save_final_step:
@@ -576,6 +600,17 @@ class StagePrtclTransWakeInstability(Stage):
 
     #         beam.stage_number -= 1
     #         driver.stage_number -= 1
+
+
+    # # ==========  Make animations ==========
+    #     if self.probe_evol_period > 0 and self.make_animations:
+    #         self.animate_sideview_x(tmpfolder)
+    #         self.animate_sideview_y(tmpfolder)
+    #         self.animate_phasespace_x(tmpfolder)
+    #         self.animate_phasespace_y(tmpfolder)
+
+    #         # Remove temporary files
+    #         shutil.rmtree(tmpfolder)
             
         
     #     return beam, driver
