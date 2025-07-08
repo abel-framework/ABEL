@@ -132,15 +132,14 @@ def initialize_amrex(verbose=False):
     
     import amrex.space3d as amr
     
-    pp_prof = amr.ParmParse("tiny_profiler")
-    pp_prof.add("enabled", int(verbose))
+    #pp_prof = amr.ParmParse("tiny_profiler")
+    #pp_prof.add("enabled", int(verbose))
     
-    if not amr.initialized():
-        if verbose:
-            amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
-        else:
-            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
-
+    #if not amr.initialized():
+    #    if verbose:
+    #        amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
+    #    else:
+    #        eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
 
 def finalize_amrex(verbose=False):
     
@@ -155,7 +154,7 @@ def finalize_amrex(verbose=False):
 
 def initialize_impactx_sim(verbose=False):
 
-    import amrex.space3d as amr
+    #import amrex.space3d as amr
     from impactx import ImpactX
     
     # set AMReX verbosity
@@ -164,11 +163,17 @@ def initialize_impactx_sim(verbose=False):
     # make simulation object
     sim = ImpactX()
 
+    # serial run on one CPU core
+    sim.omp_threads = 1
+
     # set ImpactX verbosity
     sim.verbose = int(verbose)
+    sim.tiny_profiler = verbose
     
     # enable diagnostics
     sim.diagnostics = True
+    #   Note: Diagnostics in every element's slice steps is verbose.
+    #         Disable for speed if if only beam monitors and final results are needed.
     sim.slice_step_diagnostics = True
 
     # set numerical parameters and IO control
@@ -181,13 +186,12 @@ def initialize_impactx_sim(verbose=False):
 
 
 def finalize_impactx_sim(sim, verbose=False):
-    
-    # finalize and delete the simulation
+    """finalize and delete the simulation"""
+
     sim.finalize()
-    del sim
-    
+
     # finalize AMReX
-    finalize_amrex()
+    #finalize_amrex()
 
 
 def extract_beams(path='', runnable=None, beam0=None):
