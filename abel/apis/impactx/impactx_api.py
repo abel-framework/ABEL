@@ -5,7 +5,8 @@ import scipy.constants as SI
 from types import SimpleNamespace
 
 def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, verbose=False):
-
+    """Run an ImpactX particle-tracking simulation using a given lattice and input beam."""
+    
     # create a new directory
     original_folder = os.getcwd()
     if runnable is not None:
@@ -48,7 +49,7 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     beam = particle_container2beam(sim.particle_container())
 
     # clean shutdown
-    finalize_impactx_sim(sim, verbose=verbose)
+    sim.finalize()
 
     # extract evolution
     evol = extract_evolution();
@@ -78,7 +79,8 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
 
 
 def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, space_charge="2D", runnable=None, keep_data=False, verbose=False):
-
+    """Run an ImpactX envelope-tracking simulation using a given lattice and beam distribution."""
+    
     # create a new directory
     original_folder = os.getcwd()
     if runnable is not None:
@@ -113,7 +115,7 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
         eval('sim.track_envelope()')
     
     # clean shutdown
-    finalize_impactx_sim(sim, verbose=verbose)
+    sim.finalize()
 
     # extract evolution
     evol = extract_evolution();
@@ -128,32 +130,21 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     return evol
 
 
-def initialize_amrex(verbose=False):
+def initialize_amrex(verbose=False, verbose_debug=False):
+    """Initialize AMReX."""
     
     import amrex.space3d as amr
     
-    #pp_prof = amr.ParmParse("tiny_profiler")
-    #pp_prof.add("enabled", int(verbose))
-    
-    #if not amr.initialized():
-    #    if verbose:
-    #        amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
-    #    else:
-    #        eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
-
-def finalize_amrex(verbose=False):
-    
-    import amrex.space3d as amr
-    
-    if amr.initialized():
+    if not amr.initialized():
         if verbose:
-            amr.finalize()
+            amr.initialize(['amrex.omp_threads=1', f'amrex.verbose={int(verbose_debug)}'])
         else:
-            eval('amr.finalize()')
+            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
 
 
 def initialize_impactx_sim(verbose=False):
-
+    """Initialize the ImpactX simulation."""
+    
     #import amrex.space3d as amr
     from impactx import ImpactX
     
@@ -185,17 +176,9 @@ def initialize_impactx_sim(verbose=False):
     return sim
 
 
-def finalize_impactx_sim(sim, verbose=False):
-    """finalize and delete the simulation"""
-
-    sim.finalize()
-
-    # finalize AMReX
-    #finalize_amrex()
-
-
 def extract_beams(path='', runnable=None, beam0=None):
-
+    """Extract the saved beams (from the ImpactX monitors)."""
+    
     from abel.classes.beam import Beam
     import openpmd_api as io
 
@@ -239,7 +222,8 @@ def extract_beams(path='', runnable=None, beam0=None):
     return beams
         
 
-def extract_evolution(path='', second_order=False):
+def extract_evolution(path=''):
+    """Extract the beam evolution from the reduced beam diagnostics."""
     
     from abel.utilities.relativity import gamma2energy
     import pandas as pd
@@ -271,45 +255,13 @@ def extract_evolution(path='', second_order=False):
     evol.dispersion_x = diags["dispersion_x"]
     evol.dispersion_y = diags["dispersion_y"]
     
-    if second_order:
-
-        import openpmd_api as io
-        
-        # load OpenPMD series
-        series = io.Series(path+"diags/openPMD/monitor.h5", io.Access.read_only)
-        steps = list(series.iterations)
-        
-        ss = np.zeros_like(steps, dtype=np.float64)
-        dispx2 = np.zeros_like(steps, dtype=np.float64)
-        
-        for i in range(len(steps)):
-            
-            beam_raw = series.iterations[steps[i]].particles["beam"]
-            
-            ss[i] = beam_raw.get_attribute("s_ref")
-            
-            beam = beam_raw.to_df()
-            x = np.array(beam.position_x)
-            delta = np.array(beam.momentum_t)
-
-            # set the fit order based on the energy spread
-            if np.std(delta) > 0.02:
-                ordermax = 4
-            else:
-                ordermax = 2
-            pfit = np.polyfit(delta, x, ordermax)
-            dispx2[i] = pfit[ordermax-2]*np.math.factorial(2)
-        
-        evol.second_order_dispersion_x = np.interp(evol.location, ss, dispx2)
-    else:
-        evol.second_order_dispersion_x = np.empty_like(evol.location)
-    
     return evol
 
     
 # convert from ImpactX particle container to ABEL beam
 def particle_container2beam(particle_container):
-
+    """Convert from ImpactX particle container to an ABEL beam object."""
+    
     from abel.classes.beam import Beam
     
     beam = Beam()
@@ -336,6 +288,7 @@ def particle_container2beam(particle_container):
     
 # convert from ABEL beam to ImpactX particle container
 def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
+    """Convert from an ABEL beam object to an ImpactX particle container."""
 
     import amrex.space3d as amr
     from impactx import Config
@@ -351,7 +304,7 @@ def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
         
     # reference particle
     ref = sim.particle_container().ref_particle()
-    ref.set_charge_qe(-1.0)
+    ref.set_charge_qe(beam.charge_sign())
     ref.set_mass_MeV(0.510998950)
     ref.set_kin_energy_MeV(nom_energy/1e6)
     ref.s = beam.location
