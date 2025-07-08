@@ -117,6 +117,9 @@ def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y,
     
 # general focusing transfer matrix (quadrupole and drift)
 def Rmat(l, k=0, plasmalens=True):
+    import warnings
+    warnings.filterwarnings("ignore")
+    
     if k == 0:
         return np.matrix([[1,l,0,0],
                           [0,1,0,0],

@@ -25,7 +25,7 @@ dependencies = [
    "ax-platform",
    "CLICopti >= 2.2",
    "RF-Track",
-   "impactx-noacc >= 25.06"
+   "impactx-noacc >= 25.06",
    "pandas"
 ]
 requires-python = ">=3,<3.13"
@@ -56,4 +56,5 @@ markers = [
   "spin: test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
   "beam: Tests for the Beam class",
+  "impactx: Tests of ImpactX implementations.",
 ]

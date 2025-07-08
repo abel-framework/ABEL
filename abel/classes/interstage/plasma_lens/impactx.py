@@ -85,10 +85,16 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         # add another one at the end of the lens
         if self.use_apertures:
             aperture = elements.Aperture(aperture_x=self.lens_radius, aperture_y=self.lens_radius, shape="elliptical")
-            pl = [aperture]
-            pl.extend(plasma_lens)
-            pl.append(aperture)
-            plasma_lens = pl
+            
+            pl1 = [aperture]
+            pl1.extend(plasma_lens1)
+            pl1.append(aperture)
+            plasma_lens1 = pl1
+            
+            pl2 = [aperture]
+            pl2.extend(plasma_lens2)
+            pl2.append(aperture)
+            plasma_lens1 = pl2
 
         # define first chicane dipole
         B_chic1 = self.field_chicane_dipole1
