@@ -467,7 +467,7 @@ def test_rb_Ez_tracing():
 
 
     # ========== Compare the data along the whole simulation box ==========
-    rb = stage.trace_bubble_radius_WakeT(plasma_num_density=plasma_num_density, plasma_tr_coord=rs_rho, plasma_z_coord=zs_rho, threshold=0.8)
+    rb = stage.trace_bubble_radius_WakeT(plasma_num_density=plasma_num_density, plasma_tr_coord=rs_rho, plasma_z_coord=zs_rho, drive_beam_peak_current=drive_beam_ramped.peak_current(), threshold=0.8)
 
     assert np.allclose(zs_rho, zs_ref, rtol=1e-13, atol=0.0)
     RMSE_rb = np.sqrt(np.mean((rb-rb_ref)**2))
