@@ -320,7 +320,7 @@ class Interstage(Trackable, CostModeled):
         # plot beta function
         if show_beta_function:
             n += 1
-            axs[n].plot(ss_beta, self.beta0*np.ones_like(ss_beta), ':', color=col0)
+            axs[n].plot(ss_beta, np.sqrt(self.beta0*np.ones_like(ss_beta)), ':', color=col0)
             if self.uses_plasma_lenses:
                 axs[n].plot(ss_beta, np.sqrt(beta_xs), color=colx1)
             else:
