@@ -444,6 +444,7 @@ class Beam():
 
         if comp_location:
             assert np.allclose(beam1.location, beam2.location, rtol, atol)
+            assert beam1.stage_number == beam2.stage_number
         assert np.allclose(beam1.qs(), beam2.qs(), rtol, atol)
         assert np.allclose(beam1.weightings(), beam2.weightings(), rtol, atol)
         assert np.allclose(beam1.xs(), beam2.xs(), rtol, atol)
