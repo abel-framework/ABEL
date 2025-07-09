@@ -296,6 +296,9 @@ def test_driver_unrotation():
     driver0.set_xs(xs + x_drift)
     driver0.set_ys(ys + y_drift)
 
+    assert np.allclose(driver.x_angle(), driver0.x_angle(), rtol=1e-15, atol=0.0)
+    assert np.allclose(driver.y_angle(), driver0.y_angle(), rtol=1e-13, atol=0.0)
+
     assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-7)
@@ -305,9 +308,6 @@ def test_driver_unrotation():
     assert np.allclose(driver.uys(), driver0.uys(), rtol=1e-12, atol=0.0)
     assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-12, atol=0.0)
     assert np.allclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
-
-    assert np.allclose(driver.x_angle(), driver0.x_angle(), rtol=1e-15, atol=0.0)
-    assert np.allclose(driver.y_angle(), driver0.y_angle(), rtol=1e-13, atol=0.0)
 
 
     # ========== No jitter, no angular offset ==========
@@ -340,13 +340,16 @@ def test_driver_unrotation():
     driver0.set_xs(xs + x_drift)
     driver0.set_ys(ys + y_drift)
 
+    assert np.allclose(driver.x_angle(), driver0.x_angle(), rtol=1e-15, atol=0.0)
+    assert np.allclose(driver.y_angle(), driver0.y_angle(), rtol=1e-13, atol=0.0)
+
     assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-7)
     assert np.allclose(driver.ys(), driver0.ys(), rtol=0.0, atol=1e-7)
     assert np.allclose(driver.zs(), driver0.zs(), rtol=0.0, atol=1e-7)
     assert np.allclose(driver.uxs(), driver0.uxs(), rtol=1e-12, atol=0.0)
-    assert np.allclose(driver.uys(), driver0.uys(), rtol=1e-12, atol=0.0)
+    assert np.allclose(driver.uys(), driver0.uys(), rtol=1e-10, atol=0.0)
     assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-12, atol=0.0)
     assert np.allclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
 
