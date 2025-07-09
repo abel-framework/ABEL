@@ -207,6 +207,7 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
         ax.plot(evolution[0,:], np.sqrt(evolution[1,:]))
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Square root of beta function (m^0.5)]')
+        plt.show()
         
     return beta, alpha, evolution
 
@@ -263,6 +264,8 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
         ax.plot(evolution[0,:], evolution[1,:])
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Dispersion (m)')
+
+        plt.show()
         
     return Dx, Dpx, evolution
 
@@ -364,6 +367,8 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Second-order dispersion (m)')
         
+        plt.show()
+        
     return DDx, DDpx, evolution
 
 
@@ -421,6 +426,8 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res
         ax.plot(evolution[0,:], evolution[1,:])
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Longitudinal dispersion, R56 (m)')
+
+        plt.show()
 
     return R56, evolution
 
