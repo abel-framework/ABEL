@@ -252,8 +252,6 @@ class StagePrtclTransWakeInstability(Stage):
         # Extract quantities
         if self.length_flattop is None:
             raise ValueError('length_flattop is not defined.')
-        #plasma_density = self.plasma_density
-        #gamma0 = beam_incoming.gamma()
         
         self.stage_number = beam_incoming.stage_number
 
@@ -281,24 +279,6 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
-        # if self.upramp is not None:  # if self has an upramp
-
-        #     # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
-        #     beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
-        
-        # else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
-        #     if self.parent is None:  # Just a lone stage
-        #         beam_ramped = copy.deepcopy(beam_rotated)
-        #         drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
-        #     else:
-        #         beam_ramped = copy.deepcopy(beam_incoming)
-        #         drive_beam_ramped = copy.deepcopy(driver_incoming)
-
-        #     if self.ramp_beta_mag is not None:
-
-        #         beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
-        #         drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
-
         if self.upramp is not None:  # if self has an upramp
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
@@ -379,20 +359,12 @@ class StagePrtclTransWakeInstability(Stage):
         
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.test_beam_between_ramps:
-            if self.parent is None:
-                # Store beams for the main stage
-                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # Drive beam after the upramp, before tracking
-                                               beam_before_tracking=beam_ramped,  # Main beam after the upramp, before tracking
-                                               driver_outgoing=driver,  # Drive beam after tracking, before the downramp
-                                               beam_outgoing=beam,  # Main beam after tracking, before the downramp
-                                               driver_incoming=driver_incoming)  # The original drive beam before rotation and ramps
-            else:
-                # Store beams for the ramps
-                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # A deepcopy of the incoming drive beam before tracking.
-                                               beam_before_tracking=beam_ramped,  # A deepcopy of the incoming main beam before tracking.
-                                               driver_outgoing=driver_outgoing,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                               beam_outgoing=beam_outgoing,  # Main beam after tracking through the ramp (has not been un-rotated)
-                                               driver_incoming=None)  # Only the main stage needs to store the original drive beam
+            # Store beams for the main stage
+            self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # Drive beam after the upramp, before tracking
+                                            beam_before_tracking=beam_ramped,  # Main beam after the upramp, before tracking
+                                            driver_outgoing=driver,  # Drive beam after tracking, before the downramp
+                                            beam_outgoing=beam,  # Main beam after tracking, before the downramp
+                                            driver_incoming=driver_incoming)  # The original drive beam before rotation and ramps
 
         # Copy meta data from input beam_outgoing (will be iterated by super)
         beam_outgoing.trackable_number = beam_incoming.trackable_number
@@ -538,18 +510,30 @@ class StagePrtclTransWakeInstability(Stage):
 
 
     # ==================================================
-    def track_upramp(self, beam0, driver0, shot_path=None, tmpfolder=None):
+    def track_upramp(self, beam0, driver0, shot_path=None):
         """
         Called by an upramp to perform tracking.
     
+        
         Parameters
         ----------
-        ...
+        driver0 : ABEL ``Beam`` object
+            Drive beam.
+
+        beam0 : ABEL ``Beam`` object
+            Main beam.
+
+        shot_path : ``string``, optional
+            The path for the directory of the shot. Default set to None.
     
             
         Returns
         ----------
-        ...
+        beam : ABEL ``Beam`` object
+            Main beam after tracking.
+
+        driver : ABEL ``Beam`` object
+            Drive beam after tracking.
         """
 
         # TODO: have a test to test that ``self`` is an upramp
@@ -589,28 +573,54 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Main tracking sequence ==========
-        self._return_tracked_driver = True
-        beam, driver = self.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
+        beam, driver = self.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
+
+
+        # ========== Bookkeeping ==========
+        self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/driver.energy() * beam.abs_charge()/driver.abs_charge()
 
         beam.stage_number -= 1
         driver.stage_number -= 1
+
+        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
+        if self.test_beam_between_ramps:
+            self.store_beams_between_ramps(driver_before_tracking=driver0,  # A deepcopy of the incoming drive beam before tracking.
+                                            beam_before_tracking=beam0,  # A deepcopy of the incoming main beam before tracking.
+                                            driver_outgoing=driver,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                            beam_outgoing=beam,  # Main beam after tracking through the ramp (has not been un-rotated)
+                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
+
+        # Clear some of the attributes to reduce file size of pickled files
+        self.trim_attr_reduce_pickle_size()
             
         return beam, driver
     
 
     # ==================================================
-    def track_downramp(self, beam0, driver0, shot_path=None, tmpfolder=None):
+    def track_downramp(self, beam0, driver0, shot_path=None):
         """
-        Called by an downramp to perform tracking.
+        Called by a downramp to perform tracking.
     
+        
         Parameters
         ----------
-        ...
+        driver0 : ABEL ``Beam`` object
+            Drive beam.
+
+        beam0 : ABEL ``Beam`` object
+            Main beam.
+
+        shot_path : ``string``, optional
+            The path for the directory of the shot. Default set to None.
     
             
         Returns
         ----------
-        ...
+        beam : ABEL ``Beam`` object
+            Main beam after tracking.
+
+        driver : ABEL ``Beam`` object
+            Drive beam after tracking.
         """
 
         # TODO: have a test to test that ``self`` is a downramp
@@ -647,29 +657,32 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Main tracking sequence ==========
-        self._return_tracked_driver = True
-        beam, driver = self.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
+        beam, driver = self.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
 
         if self.ramp_beta_mag is not None:
             beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
             driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
 
-        # if self.downramp is not None:
-        #     beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
-
-        # else:  # Do the following if there are no downramp. 
-        #     beam_outgoing = copy.deepcopy(beam)
-        #     driver_outgoing = copy.deepcopy(driver)
-        #     if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
-
-        #         beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-        #         driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+        # ========== Bookkeeping ==========
+        self.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/driver.energy() * beam.abs_charge()/driver.abs_charge()
 
         beam.stage_number -= 1
         driver.stage_number -= 1
+
+        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
+        if self.test_beam_between_ramps:
+            self.store_beams_between_ramps(driver_before_tracking=driver0,  # A deepcopy of the incoming drive beam before tracking.
+                                            beam_before_tracking=beam0,  # A deepcopy of the incoming main beam before tracking.
+                                            driver_outgoing=driver,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                            beam_outgoing=beam,  # Main beam after tracking through the ramp (has not been un-rotated)
+                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
+
+        # Clear some of the attributes to reduce file size of pickled files
+        self.trim_attr_reduce_pickle_size()
             
         return beam, driver
+    
 
 
     # ==================================================
