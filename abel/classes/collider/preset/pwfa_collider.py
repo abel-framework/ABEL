@@ -106,10 +106,10 @@ class PWFACollider(Collider):
         esource.beta_y = esource.beta_x
         
         # define interstage
-        interstage = InterstageBasic()
+        interstage = InterstagePlasmaLensBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 1.2 * np.sqrt(E/10e9) # [m(eV)]
-        interstage.dipole_field = 0.5 # [T]
+        interstage.length_dipole = lambda E: 1.2 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.field_dipole = 0.5 # [T]
         
         # define electron BDS
         ebds = BeamDeliverySystemBasic()
