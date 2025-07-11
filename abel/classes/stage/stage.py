@@ -19,6 +19,8 @@ class Stage(Trackable, CostModeled):
         super().__init__()
         
         # common variables
+        self.upramp = None
+        self.downramp = None
         self.nom_accel_gradient = nom_accel_gradient
         self.nom_energy_gain = nom_energy_gain
         self.plasma_density = plasma_density
@@ -69,47 +71,98 @@ class Stage(Trackable, CostModeled):
         self.name = 'Plasma stage'
 
 
+    # # ==================================================
+    # ## Define upramp and downramp, if present
+    # @property
+    # def upramp(self) -> Self | None:
+    #     "The upramp of this stage, which also is a Stage"
+    #     return self._upramp
+    # @upramp.setter
+    # def upramp(self, upramp : Self | None):
+    #     if not isinstance(upramp, Stage) and upramp is not None:
+    #         raise StageError("The upramp must be an instance of Stage or None")    
+    #     self._upramp = upramp
+    #     if upramp is not None:
+    #         self._upramp.parent = self
+
+    #     self._resetLengthEnergyGradient()
+    #     self._recalcLengthEnergyGradient()
+    # _upramp = None
+
+
+    # # ==================================================
+    # @property
+    # def downramp(self) -> Self:
+    #     "The downramp of this stage, which also is a Stage"
+    #     return self._downramp
+    # @downramp.setter
+    # def downramp(self, downramp : Self | None):
+    #     if not isinstance(downramp, Stage) and downramp is not None:
+    #         raise StageError("The downramp must be an instance of Stage or None")
+    #     self._downramp = downramp
+    #     if downramp is not None:
+    #         self._downramp.parent = self
+
+    #     self._resetLengthEnergyGradient()
+    #     self._recalcLengthEnergyGradient()
+    # _downramp = None
+
+
     # ==================================================
-    ## Define upramp and downramp, if present
-    @property
-    def upramp(self) -> Self | None:
-        "The upramp of this stage, which also is a Stage"
-        return self._upramp
-    @upramp.setter
-    def upramp(self, upramp : Self | None):
-        if not isinstance(upramp, Stage) and upramp is not None:
-            raise StageError("The upramp must be an instance of Stage or None")    
-        self._upramp = upramp
-        if upramp is not None:
-            self._upramp.parent = self
+    def set_upramp(self, nom_energy_gain=0.0, ramp_length=None, ramp_plasma_density=None, ramp_beta_mag=1.0, ramp_shape='uniform'):
 
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
-    _upramp = None
+        from abel.classes.stage.impl.husk_ramp import HuskRamp
+        from abel.classes.stage.impl.stage_hipace import StageHipace
 
+        if type(self) is not StageHipace and ramp_shape != 'uniform':
+            raise TypeError('Only uniform ramps have been implemented.')  # Only StageHipace supports non-uniform ramps.
+        
+        self.upramp = HuskRamp()
+        ramp = self.upramp
+        
+        if ramp_plasma_density is None:
+            ramp_plasma_density = self.plasma_density/self.ramp_beta_mag
 
-    # ==================================================
-    @property
-    def downramp(self) -> Self:
-        "The downramp of this stage, which also is a Stage"
-        return self._downramp
-    @downramp.setter
-    def downramp(self, downramp : Self | None):
-        if not isinstance(downramp, Stage) and downramp is not None:
-            raise StageError("The downramp must be an instance of Stage or None")
-        self._downramp = downramp
-        if downramp is not None:
-            self._downramp.parent = self
+        ramp.nom_energy_gain = nom_energy_gain
+        ramp.plasma_density = ramp_plasma_density
+        ramp.length = ramp_length  # May need to wait for the nominal energy to be set by e.g. Runnable.track().
+        ramp.ramp_beta_mag = ramp_beta_mag
+        ramp.ramp_shape = ramp_shape
+        #ramp.tracking_obj = None
 
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
-    _downramp = None
+        self._has_ramp = True
 
 
     # ==================================================
-    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None):
+    def set_downramp(self, nom_energy_gain=0.0, ramp_length=None, ramp_plasma_density=None, ramp_beta_mag=1.0, ramp_shape='uniform'):
+
+        from abel.classes.stage.impl.husk_ramp import HuskRamp
+        from abel.classes.stage.impl.stage_hipace import StageHipace
+
+        if type(self) is not StageHipace and ramp_shape != 'uniform':
+            raise TypeError('Only uniform ramps have been implemented.')  # Only StageHipace supports non-uniform ramps.
+        
+        self.downramp = HuskRamp()
+        ramp = self.downramp
+        
+        if ramp_plasma_density is None:
+            ramp_plasma_density = self.plasma_density/self.ramp_beta_mag
+
+        ramp.nom_energy_gain = nom_energy_gain
+        ramp.plasma_density = ramp_plasma_density
+        ramp.length = ramp_length  # May need to wait for the nominal energy to be set by e.g. Runnable.track().
+        ramp.ramp_beta_mag = ramp_beta_mag
+        ramp.ramp_shape = ramp_shape
+        #ramp.tracking_obj = None
+
+        self._has_ramp = True
+
+
+    # ==================================================
+    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, ramp_beta_mag=1.0):
         """
-        Used for copying a predefined stage's settings and configurations to set up flat ramps.
+        Used for copying a predefined stage's settings and configurations to set 
+        up uniform ramps.
     
         Parameters
         ----------
@@ -127,13 +180,14 @@ class Stage(Trackable, CostModeled):
         """
 
         stage_copy = copy.deepcopy(self)
-        stage_copy.ramp_beta_mag = 1.0
+        stage_copy.ramp_beta_mag = ramp_beta_mag
 
         # Delete any upramps and downramps that might be present
         if stage_copy.upramp is not None:
             stage_copy.upramp = None
         if stage_copy.downramp is not None:
             stage_copy.downramp = None
+        stage_copy._has_ramp = False
 
         # Can set energy gain and gradient parameters to None to let track_upramp() and track_downramp() determine these.
         # Do try/except to allow zeroing everything.
@@ -168,7 +222,12 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def _prepare_ramps(self):
-        "Set ramp lengths and nominal energy gains if the ramps exist (both upramp and downramp lengths have to be set up before track_upramp())."
+        """
+        Set ramp lengths and nominal energies and nominal energy gains if the 
+        ramps exist (both upramp and downramp lengths have to be set up before 
+        track_upramp()).
+        """
+        
         if self.nom_energy is None:
             #Should be set in linac.track()
             raise StageError('Stage nominal energy is None.')
@@ -191,6 +250,42 @@ class Stage(Trackable, CostModeled):
                 self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
             if self.downramp.length is None:
                 self.downramp.length = self._calc_ramp_length(self.downramp)
+
+    
+    # ==================================================
+    def is_upramp(self):
+        "Checks if self is an upramp."
+
+        if self.parent is not None:
+            if self.parent.upramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def is_downramp(self):
+        "Checks if self is an downramp."
+
+        if self.parent is not None:
+            if self.parent.downramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def has_ramp(self):
+        "Checks if there are any ramps attached to the stage."
+
+        if self.upramp is not None or self.downramp is not None:
+            return True
+        else:
+            return False
 
 
     # ==================================================
@@ -1556,7 +1651,59 @@ class Stage(Trackable, CostModeled):
         label = 'Plasma stage'
         color = 'red'
         return x_points, y_points, final_angle, label, color
+    
+
+    # ==================================================
+    def print_summary(self):
         
+        print('Type: ', type(self))
+
+        if self.plasma_density  is None:
+            print(f"Plasma density [m^-3]:\t\t\t\t\t Not set")
+        else:
+            print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}")
+        if self.length_flattop  is None:
+            print(f"Stage flattop length [m]:\t\t\t\t Not set")
+        else:
+            print(f"Stage flattop length [m]:\t\t\t\t {self.length_flattop  :.3f}")
+        if self.length  is None:
+            print(f"Stage total length [m]:\t\t\t\t\t Not set")
+        else:
+            print(f"Stage total length [m]:\t\t\t\t\t {self.length  :.3f}")
+
+        if self.nom_energy is None:
+            print(f"Nominal energy [GeV]:\t\t\t\t\t Not set")
+        else:
+            print(f"Nominal energy [GeV]:\t\t\t\t\t {self.nom_energy/1e9 :.3f}")
+
+        if self.nom_energy_flattop is None:
+            print(f"Nominal energy flattop [GeV]:\t\t\t\t Not set")
+        else:
+            print(f"Nominal energy flattop [GeV]:\t\t\t\t {self.nom_energy_flattop/1e9 :.3f}")
+        
+        nom_energy_gain = self.nom_energy_gain 
+        if nom_energy_gain is None:
+            print(f"Nominal energy gain [GeV/m]:\t\t\t\t Not set")
+        else:
+            print(f"Nominal energy gain [GeV/m]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")
+
+        if self.nom_accel_gradient is None:
+            print(f"Nominal acceleration gradient [GV/m]:\t\t\t Not set")
+        else:
+            print(f"Nominal acceleration gradient [GV/m]:\t\t\t {self.nom_accel_gradient/1e9 :.3f}")
+
+        if self.nom_accel_gradient_flattop is None:
+            print(f"Nominal acceleration gradient flattop [GV/m]:\t\t Not set")
+        else:
+            print(f"Nominal acceleration gradient flattop [GV/m]:\t\t {self.nom_accel_gradient_flattop/1e9 :.3f}")
+
+        if self.driver_source is None:
+            print(f"Driver source type:\t\t\t\t\t Not set")
+        else:
+            print(f"Driver source type: {type(self.driver_source)}")
+
+        print('\n')
+
 
 class VariablesOverspecifiedError(Exception):
     "Exception class to throw when trying to set too many overlapping variables."
