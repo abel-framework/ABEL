@@ -576,8 +576,8 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
         fast = False
       
     # use five energy offsets for good accuracy
-    delta = 1e-4
-    deltas = delta * np.arange(-2,3)
+    delta0 = 1e-4
+    deltas = delta0 * np.arange(-2,3)
 
     # get the dispersion for calculation of effect of chromaticity correction)
     _, _, evol_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False)
@@ -631,27 +631,31 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
     # evolve the beta and alpha for different energies
     for i, delta in enumerate(deltas):
         ks_corrected = (ks_refined + (dks_ddelta_tau + dks_ddelta_m)*delta)/(1+delta)
-        betas[i], alphas[i], evols[i] = evolve_beta_function(ls_refined, ks_corrected, beta0, alpha0=alpha0, inv_rhos=inv_rhos_refined, fast=fast, plot=False)
+        if inv_rhos_refined is not None:
+            inv_rhos_corrected = inv_rhos_refined/(1+delta)
+        else:
+            inv_rhos_corrected = inv_rhos_refined
+        betas[i], alphas[i], evols[i] = evolve_beta_function(ls_refined, ks_corrected, beta0, alpha0=alpha0, inv_rhos=inv_rhos_corrected, fast=fast, plot=False)
     
     # calculate the chromatic amplitude W
     beta = betas[2]
     alpha = alphas[2]
-    dbeta_ddelta = (-betas[4] + 8*betas[3] - 8*betas[1] + betas[0])/(12*delta)
-    dalpha_ddelta = (-alphas[4] + 8*alphas[3] - 8*alphas[1] + alphas[0])/(12*delta)
+    dbeta_ddelta = (-betas[4] + 8*betas[3] - 8*betas[1] + betas[0])/(12*delta0)
+    dalpha_ddelta = (-alphas[4] + 8*alphas[3] - 8*alphas[1] + alphas[0])/(12*delta0)
     W = np.sqrt((dalpha_ddelta - (alpha/beta)*dbeta_ddelta)**2 + (dbeta_ddelta/beta)**2)
-
+    
     # save evolution
     if not fast: 
         evolution = np.empty((2,len(evols[2][0,:])))
         evolution[0,:] = evols[2][0,:]
         betas = evols[2][1,:]
         alphas = evols[2][2,:]
-        dbeta_ddeltas = (-evols[4][1,:] + 8*evols[3][1,:] - 8*evols[1][1,:] + evols[0][1,:])/(12*delta)
-        dalpha_ddeltas = (-evols[4][2,:] + 8*evols[3][2,:] - 8*evols[1][2,:] + evols[0][2,:])/(12*delta)        
+        dbeta_ddeltas = (-evols[4][1,:] + 8*evols[3][1,:] - 8*evols[1][1,:] + evols[0][1,:])/(12*delta0)
+        dalpha_ddeltas = (-evols[4][2,:] + 8*evols[3][2,:] - 8*evols[1][2,:] + evols[0][2,:])/(12*delta0)        
         evolution[1,:] = np.sqrt((dalpha_ddeltas - (alphas/betas)*dbeta_ddeltas)**2 + (dbeta_ddeltas/betas)**2)
     else:
         evolution = None
-
+    
     # make plots
     if plot:
         from matplotlib import pyplot as plt

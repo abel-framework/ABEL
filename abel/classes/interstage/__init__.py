@@ -225,7 +225,7 @@ class Interstage(Trackable, CostModeled):
     
     ## PLOTTING OPTICS
 
-    def plot_optics(self, show_beta_function=True, show_dispersion=True, show_R56=True, show_chromaticity=False, add_no_central_sextupole=False, add_no_chrom_correction=False, savefig=None):
+    def plot_optics(self, show_beta_function=True, show_dispersion=True, show_R56=True, show_chromaticity=True, add_no_central_sextupole=False, add_no_chrom_correction=False, savefig=None):
 
         from matplotlib import pyplot as plt
         from matplotlib import patches
@@ -360,7 +360,11 @@ class Interstage(Trackable, CostModeled):
                     axs[n].legend(loc='best', reverse=True, fontsize='small')
                 else:
                     axs[n].plot(ss_W, Wxs, color=colx1)
-                axs[n].set_ylim(np.array([-0.02, 1])*2*self.length_dipole/self.beta0)
+
+                # calculate focal lengths and chromaticity
+                f = 1/max(abs(ls*ks))
+                W = 2*(self.beta0+(self.length_dipole+self.length_gap*2+0.5*self.length_plasma_lens)**2/self.beta0)/f
+                axs[n].set_ylim(np.array([-0.02, 1.1])*W)
             else:
                 axs[n].plot(ss_W, Wys, color=coly, label=r'$y$')
                 axs[n].plot(ss_W, Wxs, color=colx1, label=r'$x$')
