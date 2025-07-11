@@ -78,10 +78,8 @@ class StageHipace(Stage):
             
         
         # plasma-density ramps (de-magnify beta function)
-        location_flattop_start = 0
         if self.upramp is not None:
             beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
-            location_flattop_start = beam0.location
         else:
             # apply plasma-density up ramp (demagnify beta function)
             driver0 = copy.deepcopy(driver_incoming)
@@ -182,8 +180,8 @@ class StageHipace(Stage):
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam_incoming.trackable_number
         beam.stage_number = beam_incoming.stage_number
-        #beam.location = location_flattop_start + beam0.location
-        beam.location = beam0.location
+        beam.location = beam0.location + self.length_flattop
+        #beam.location = beam0.location
         driver.trackable_number = beam_incoming.trackable_number
         driver.stage_number = beam_incoming.stage_number
         driver.location = beam.location
@@ -208,6 +206,9 @@ class StageHipace(Stage):
             driver_outgoing.location = beam_outgoing.location
             driver_outgoing.trackable_number = 1
             self.save_driver_to_file(driver_outgoing, runnable)
+
+        # reset location 
+        beam_outgoing.location = beam_incoming.location
         
         # clean nan particles and extreme outliers
         beam_outgoing.remove_nans()

@@ -275,6 +275,8 @@ class Stage(Trackable, CostModeled):
             beam, driver = self.upramp.track(beam0)
             beam.stage_number -= 1
             driver.stage_number -= 1
+            beam.location = beam0.location + self.upramp.length
+            driver.location = driver0.location + self.upramp.length
             
         else:
             beam = beam0
@@ -301,6 +303,8 @@ class Stage(Trackable, CostModeled):
             beam, driver = self.downramp.track(beam0)
             beam.stage_number -= 1
             driver.stage_number -= 1
+            beam.location = beam0.location + self.upramp.length
+            driver0.location = driver0.location + self.upramp.length
             
         else:
             beam = beam0
