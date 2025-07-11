@@ -134,6 +134,10 @@ def initialize_amrex(verbose=False, verbose_debug=False):
     """Initialize AMReX."""
     
     import amrex.space3d as amr
+
+    # add before the simulation setup
+    pp_prof = amr.ParmParse("tiny_profiler")
+    pp_prof.add("enabled", int(verbose))
     
     if not amr.initialized():
         if verbose:

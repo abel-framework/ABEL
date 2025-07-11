@@ -585,7 +585,7 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
     Dxs = evol_disp[1]
     
     # calculate the average dispersion inside each element to find the effect of nonlinear elements
-    ssl = np.append([0.], np.cumulative_sum(ls))
+    ssl = np.append([0.], np.cumsum(ls))
 
     # prepare arrays of effect of nonlinear plasma lens (tau) and sextupole (m)
     dks_ddelta_m = np.empty(0)

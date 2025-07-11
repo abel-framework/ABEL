@@ -25,8 +25,8 @@ class Interstage(Trackable, CostModeled):
         self._field_dipole = field_dipole
         
         # feature toggles
-        self.cancel_chromaticity = cancel_chromaticity
-        self.cancel_sec_order_dispersion = cancel_sec_order_dispersion
+        self._cancel_chromaticity = cancel_chromaticity
+        self._cancel_sec_order_dispersion = cancel_sec_order_dispersion
         self.use_apertures = use_apertures
 
         # physics flags
@@ -95,6 +95,27 @@ class Interstage(Trackable, CostModeled):
     @length_dipole.setter
     def length_dipole(self, val):
         self._length_dipole = val
+
+    @property
+    def cancel_chromaticity(self) -> float:
+        if callable(self._cancel_chromaticity):
+            return self._cancel_chromaticity(self.nom_energy)
+        else:
+            return self._cancel_chromaticity
+    @cancel_chromaticity.setter
+    def cancel_chromaticity(self, val):
+        self._cancel_chromaticity = val
+
+    
+    @property
+    def cancel_sec_order_dispersion(self) -> float:
+        if callable(self._cancel_sec_order_dispersion):
+            return self._cancel_sec_order_dispersion(self.nom_energy)
+        else:
+            return self._cancel_sec_order_dispersion
+    @cancel_sec_order_dispersion.setter
+    def cancel_sec_order_dispersion(self, val):
+        self._cancel_sec_order_dispersion = val
     
     
     ## MATRIX LATTICE
