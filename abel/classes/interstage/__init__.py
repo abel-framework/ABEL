@@ -293,6 +293,7 @@ class Interstage(Trackable, CostModeled):
         coly = "tab:orange"
         colx2 = "#d7e9f5" # lighter version of tab:blue
         colz = "tab:green"
+        coloff = "#e69596" # lighter version of tab:red
         long_label = 'Location (m)'
         long_limits = [min(ssl), max(ssl)]
 
@@ -335,7 +336,7 @@ class Interstage(Trackable, CostModeled):
             n += 1
             axs[n].plot(ss_disp, np.zeros_like(ss_disp), ':', color=col0)
             if add_no_central_sextupole:
-                axs[n].plot(ss_disp, second_order_dispersion0 / 1e-3, ':', color=colx2, label=r'2$^{\mathrm{nd}}$ order (no central sextupole)')    
+                axs[n].plot(ss_disp, second_order_dispersion0 / 1e-3, ':', color=coloff, label=r'2$^{\mathrm{nd}}$ order (no central sextupole)')    
             axs[n].plot(ss_disp, second_order_dispersion / 1e-3, '-', color=colx2, label=r'2$^{\mathrm{nd}}$ order')
             axs[n].plot(ss_disp, dispersion / 1e-3, '-', color=colx1, label=r'1$^{\mathrm{st}}$ order')
             axs[n].set_ylabel('Horizontal dispersion (mm)')
@@ -355,7 +356,7 @@ class Interstage(Trackable, CostModeled):
             n += 1
             if self.uses_plasma_lenses:
                 if add_no_chrom_correction:
-                    axs[n].plot(ss_W0, Wxs0, ':', color=colx2, label='Linear plasma lenses')
+                    axs[n].plot(ss_W0, Wxs0, ':', color=coloff, label='Linear plasma lenses')
                     axs[n].plot(ss_W, Wxs, color=colx1, label='Nonlinear plasma lenses')
                     axs[n].legend(loc='best', reverse=True, fontsize='small')
                 else:
@@ -364,12 +365,12 @@ class Interstage(Trackable, CostModeled):
                 # calculate focal lengths and chromaticity
                 f = 1/max(abs(ls*ks))
                 W = 2*(self.beta0+(self.length_dipole+self.length_gap*2+0.5*self.length_plasma_lens)**2/self.beta0)/f
-                axs[n].set_ylim(np.array([-0.02, 1.1])*W)
+                axs[n].set_ylim(np.array([-0.01, 1.05])*W)
             else:
                 axs[n].plot(ss_W, Wys, color=coly, label=r'$y$')
                 axs[n].plot(ss_W, Wxs, color=colx1, label=r'$x$')
                 axs[n].legend(loc='best', reverse=True, fontsize='small')
-                axs[n].set_ylim([0, 1.05*max(max(Wys), max(Wxs))])
+                axs[n].set_ylim(np.array([-0.01, 1.05])*max(max(Wys), max(Wxs)))
             axs[n].set_ylabel(r'Chromatic amplitude, $W$')
             axs[n].set_xlim(long_limits)
             
