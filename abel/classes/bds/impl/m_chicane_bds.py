@@ -32,7 +32,7 @@ class DriverDelaySystem(BeamDeliverySystem):
         # Use lengths to get the required B-field
         self.B_dipole = self.get_B_field(E_nom/1e9)
 
-        self.cell_length = self.get_length()/4
+        self.cell_length = self.get_length()
 
         self.initial_focus_plane = focus_at_trough
 
@@ -73,8 +73,7 @@ class DriverDelaySystem(BeamDeliverySystem):
 
     def get_B_field(self, p):
         # p in GeV, B given in Tesla
-        func = lambda B: self.l_quads + self.l_straight*np.cos(self.l_dipole*0.3*B/p)\
-              + 2*p/0.3/B*np.sin(self.l_dipole*0.3*B/p) - self.length_stage
+        func = lambda B: 0 #### To be implemented ####
         
         from scipy.optimize import root_scalar
         res = root_scalar(func, x0=0.5)
@@ -83,10 +82,7 @@ class DriverDelaySystem(BeamDeliverySystem):
         return res.root
 
     def get_lattice_lengths(self, delay):
-        l_dipole = self.fill_factor/2*(SI.c*delay + self.length_stage)
-        l_straight = SI.c*delay + self.length_stage - self.l_quads - 2*l_dipole
-        l_drift = 1/2*(l_straight - self.l_quads)
-        return l_dipole, l_straight, l_drift
+        pass #### To be implemented ####
     
     
     def list2lattice(self, ls: list, ks: list, phis: list):
@@ -103,7 +99,7 @@ class DriverDelaySystem(BeamDeliverySystem):
         ns = 100
         for i, l in enumerate(ls):
             if phis[i]!=0:
-                element = impactx.elements.ExactSbend(ds=l, phi=np.rad2deg(phis[i]), B=self.B_dipole*np.sign(phis[i]), nslice=ns)
+                element = impactx.elements.ExactSbend(ds=l, phi=np.rad2deg(phis[i]), nslice=ns)
             elif ks[i]!=0:
                 element = impactx.elements.ExactQuad(ds=l, k=ks[i], nslice=ns)
             else:
@@ -114,6 +110,30 @@ class DriverDelaySystem(BeamDeliverySystem):
             lattice.extend(monitor)
 
         return lattice
+    
+    def get_ls_n_phis(self):
+        L_tot = self.length_stage + self.delay_per_stage * SI.c
+        L_diag = 3 # m
+        L_gap = 0.5 # m
+        L_kick = 1 # m
+        L_dipoles_guess = (L_tot - L_diag - L_gap/2 - L_kick/2)/5 # the dipoles lengths. guess all but the first to be the same
+        L_dipole_1st = L_dipoles_guess*2
+
+        B_max = 1.4 # T
+        p = self.E_nom/SI.c # eV/c, also: beam rigidity 
+        inv_r = B_max/p # B in Tesla
+        r = 1/inv_r
+        theta = L_dipoles_guess*inv_r
+        thetha_1st = L_dipole_1st*inv_r
+        sines = r*np.sin(theta)
+        
+        # the equation that must be 0 for the projected length to be the same as the lentght of the stage
+        const = lambda thetas: L_kick/2 + r*np.sin(thetha_1st) + 2*sines*np.cos(theta/2) + L_diag*np.cos(thetha_1st-theta) + 2*sines*np.cos(theta/2) + \
+                                sines + L_gap/2 - self.length_stage
+        pass
+
+        ##### TO BE CONTINUED ##### solve this equation with root and see what the initial guesses for theta is. 
+        # Start optimizing for dispersion and R56 under constraint of delay and length to hold
 
     def inv_r2phi(self, inv_rs: list):
         phis=[]
@@ -141,197 +161,28 @@ class DriverDelaySystem(BeamDeliverySystem):
         inv_r = self.B_dipole/p # B in Tesla
         bend_angle = self.l_dipole*inv_r
         bend_angle = np.rad2deg(bend_angle)
-        
+
+        #### To be implemented ####
 
         match self.layoutnr: # Different layouts for the delay chicane
             case 1:
-                # Set lengths
-                ls = [self.l_quads/2, self.l_dipole, self.l_quads, self.l_straight-2*self.l_quads, self.l_quads, self.l_dipole, self.l_quads/2]
-                ls2 = ls.copy()
-                ls2.reverse()
-                ls.extend(ls2)
-
-                # Set the ks in a list
-                ks_full = [ks[0], 0, ks[1], 0, ks[2], 0, ks[3]] # take 4 quads if mirrored, else take 6
-                if self.mirrored:
-                    ks2 = ks_full.copy()
-                    ks2.reverse()
-                    ks_full.extend(ks2)
-                else:
-                    ks_full.extend([ks[3], 0, ks[4], 0, ks[5], 0, ks[0]]) 
-
-                # Set phis
-                phis = [0, bend_angle, 0, 0, 0, -bend_angle, 0]
-                phis2 = phis.copy()
-                phis2.reverse()
-                phis.extend(phis2)
+                pass
 
             case 2:
-                drift = (self.l_straight-3*self.l_quads)/2
-                ls = [self.l_quads/2, self.l_dipole, self.l_quads, drift, self.l_quads, drift, self.l_quads, self.l_dipole, self.l_quads/2]
-                ls2 = ls.copy()
-                ls2.reverse()
-                ls.extend(ls2)
-
-                # Set the ks in a list (1 extra quad in the straight section)
-                ks_full = [ks[0], 0, ks[1], 0, ks[2], 0, ks[3], 0, ks[4]] # take 5 quads if mirrored, else take 8
-                if self.mirrored:
-                    ks2 = ks_full.copy()
-                    ks2.reverse()
-                    ks_full.extend(ks2)
-                else:
-                    ks_full.extend([ks[4], 0, ks[5], 0, ks[6], 0, ks[7], 0, ks[0]])
-
-                # Set phis
-                phis = [0, bend_angle, 0, 0, 0, 0, 0, -bend_angle, 0]
-                phis2 = phis.copy()
-                phis2.reverse()
-                phis.extend(phis2)
+                pass
             case 3:
-                drift = (self.l_straight-3*self.l_quads)/2
-                ls = [self.l_quads/2, drift, self.l_quads, self.l_dipole, self.l_quads, self.l_dipole, self.l_quads, drift, self.l_quads/2]
-                ls2 = ls.copy()
-                ls2.reverse()
-                ls.extend(ls2)
-
-                # Set the ks in a list (1 extra quad in the straight section)
-                ks_full = [ks[0], 0, ks[1], 0, 0, 0, ks[2], 0, ks[3]] # take 4 quads if mirrored, else take 6
-                if self.mirrored:
-                    ks2 = ks_full.copy()
-                    ks2.reverse()
-                    ks_full.extend(ks2)
-                else:
-                    ks_full.extend([ks[3], 0, ks[4], 0, 0, 0, ks[5], 0, ks[0]])
-
-                # Set phis
-                phis = [0, 0, 0, bend_angle, 0, -bend_angle, 0, 0, 0]
-                phis2 = phis.copy()
-                phis2.reverse()
-                phis.extend(phis2)
+                pass
             case _:
                 raise ValueError("Invalid value for attribute: layoutnr")
+        """
         if return_lists:
             return self.list2lattice(ls=ls, ks=ks_full, phis=phis), ls, ks_full, phis
         else:
             return self.list2lattice(ls=ls, ks=ks_full, phis=phis)
-        
-    def get_lattice_1st_half(self, ks, return_lists=False):
-        p = self.E_nom/SI.c # eV/c, also: beam rigidity 
-        inv_r = self.B_dipole/p # B in Tesla
-        bend_angle = self.l_dipole*inv_r
-        bend_angle = np.rad2deg(bend_angle)
-        
-
-        match self.layoutnr: # Different layouts for the delay chicane
-            case 1:
-                # Set lengths
-                ls = [self.l_quads/2, self.l_dipole, self.l_quads, self.l_straight-2*self.l_quads, self.l_quads, self.l_dipole, self.l_quads/2]
-
-                # Set the ks in a list
-                ks = [ks[0], 0, ks[1], 0, ks[2], 0, ks[3]] # take 4 quads if mirrored, else take 6
-
-                # Set phis
-                phis = [0, bend_angle, 0, 0, 0, -bend_angle, 0]
-
-            case 2:
-                drift = (self.l_straight-3*self.l_quads)/2
-                ls = [self.l_quads/2, self.l_dipole, self.l_quads, drift, self.l_quads, drift, self.l_quads, self.l_dipole, self.l_quads/2]
-
-                # Set the ks in a list (1 extra quad in the straight section)
-                ks = [ks[0], 0, ks[1], 0, ks[2], 0, ks[3], 0, ks[4]] # take 5 quads
-
-                # Set phis
-                phis = [0, bend_angle, 0, 0, 0, 0, 0, -bend_angle, 0]
-
-            case _:
-                raise ValueError("Invalid value for attribute: layoutnr")
-        if return_lists:
-            return self.list2lattice(ls=ls, ks=ks, phis=phis), ls, ks, phis
-        else:
-            return self.list2lattice(ls=ls, ks=ks, phis=phis)
+        """
         
     def get_lattice(self, ks):
         return self.get_lattice2stages(ks)*(self.num_stages//2)
-    
-    def match_quads_halfNhalf(self):
-        from abel.utilities.beam_physics import evolve_dispersion, evolve_R56, evolve_beta_function
-        ff = self.l_straight
-        if self.initial_focus_plane=="x":
-            ff=ff
-        elif self.initial_focus_plane=="y":
-            ff=-ff
-        else:
-            raise ValueError("Invalid choice of initial focus plane. Must be x or y (as a string).")
-        fd = -ff
-        kx0 = 1/ff/self.l_quads/2
-        ky0 = 1/fd/self.l_quads/2
-
-        x0 = [kx0, ky0]
-        match self.layoutnr:
-            case 1:
-                x0*=2
-            case 2:
-                x0*=2
-                x0.append(kx0)
-            case _:
-                raise ValueError("Invalid value for attribute: layoutnr")
-            
-        k_bounds = self.get_quad_bounds(mirrored=True)
-
-        def minimize_1st_half(ks1):
-            _, ls, ks, phis = self.get_lattice_1st_half(ks1, return_lists=True)
-            inverse_rs = self.phi2inv_r(np.deg2rad(phis))
-
-            _, Dp, _ = evolve_dispersion(np.array(ls), np.array(inverse_rs), np.array(ks), Dx0=0, Dpx0=0, fast=True, plot=False, high_res=False)
-
-            R56, _ = evolve_R56(np.array(ls), np.array(inverse_rs), np.array(ks), Dx0=0, Dpx0=0, fast=True, plot=False, high_res=False)
-
-            R56_norm = self.E_nom/1e8 / self.cell_length
-            #print(D**2, "  ", (R56*R56_norm)**2)
-            return (R56*R56_norm)**2 + Dp**2
-        res = minimize(minimize_1st_half, x0=x0, bounds=k_bounds, tol=1e-10)
-        print(res)
-        ks1 = res.x # The first 5 quads (in layout 2), now, to match the next 2 or 3
-
-        # Get the dispersion values to use in the next minimization
-        _, ls, ks, phis = self.get_lattice_1st_half(ks1, return_lists=True)
-        inverse_rs = self.phi2inv_r(np.deg2rad(phis))
-        D1, Dp1, _ = evolve_dispersion(np.array(ls), np.array(inverse_rs), np.array(ks), Dx0=0, Dpx0=0, fast=True, plot=False, high_res=False)
-
-        x02 = [kx0, ky0]
-        match self.layoutnr:
-            case 1:
-                pass
-            case 2:
-                x02.append(kx0)
-        match self.layoutnr:
-            case 1:
-                k_bounds2 = k_bounds[1:3]
-            case 2:
-                k_bounds2 = k_bounds[1:4]
-
-        def minimize_2nd_half(ks2):
-            
-            ks = [ks1[-1]]
-            ks.extend(ks2)
-            ks.append(ks1[0])
-
-            _, ls, ks, phis = self.get_lattice_1st_half(ks, return_lists=True)
-            phis.reverse()
-            inverse_rs = self.phi2inv_r(np.deg2rad(phis))
-
-            D, Dp, _ = evolve_dispersion(np.array(ls), np.array(inverse_rs), np.array(ks), Dx0=D1, Dpx0=Dp1, fast=True, plot=False, high_res=False)
-
-            R56, _ = evolve_R56(np.array(ls), np.array(inverse_rs), np.array(ks), Dx0=D1, Dpx0=Dp1, fast=True, plot=False, high_res=False)
-
-            R56_norm = self.E_nom/1e8 / self.cell_length
-            #print(D**2, "  ", (R56*R56_norm)**2)
-            return (R56*R56_norm)**2 + (D/self.cell_length)**2 + Dp**2
-        res = minimize(minimize_2nd_half, x0=x02, bounds=k_bounds2, tol=1e-10)
-        print(res)
-        ks2 = res.x
-        self.ks = np.concatenate((ks1, ks2))
-
     
     def match_quads(self):
         from abel.utilities.beam_physics import evolve_dispersion, evolve_R56
@@ -347,29 +198,8 @@ class DriverDelaySystem(BeamDeliverySystem):
         kx0 = 1/ff/self.l_quads/2
         ky0 = 1/fd/self.l_quads/2
 
-        x0 = [kx0, ky0]
-        match self.layoutnr:
-            case 1:
-                if self.mirrored:
-                    x0*=2
-                else:
-                    x0*=3
-            case 2:
-                if self.mirrored:
-                    x0*=2
-                    x0.append(kx0)
-                else:
-                    x0*=4
-            case 3:
-                if self.mirrored:
-                    x0*=2
-                else:
-                    x0*=3
-            case _:
-                raise ValueError("Invalid value for attribute: layoutnr")
+        x0 = [kx0, ky0] #### To be implemented ####
             
-        k_bounds = self.get_quad_bounds()
-
         def minimize_periodic(params):
             _, ls, ks, phis = self.get_lattice2stages(params, return_lists=True) # phis given in degs, cause that's what the impactx lattice takes
 
@@ -389,9 +219,8 @@ class DriverDelaySystem(BeamDeliverySystem):
             #print(D**2, "  ", (R56*R56_norm)**2)
             return (R56*R56_norm)**2 + (D/self.cell_length)**2 #+ Dp**2
         
-        print(k_bounds)
-        bounds = k_bounds
-        res = minimize(minimize_periodic, x0=x0, bounds=bounds)
+
+        res = minimize(minimize_periodic, x0=x0)
         print(res)
         self.ks = res.x
     
@@ -443,23 +272,8 @@ class DriverDelaySystem(BeamDeliverySystem):
         kx0 = 1/ff/self.l_quads/2
         ky0 = 1/fd/self.l_quads/2
 
-        match self.layoutnr:
-            case 1:
-                if self.mirrored:
-                    init.extend([kx0, ky0]*2)
-                else:
-                    init.extend([kx0, ky0]*3)
-            case 2:
-                if self.mirrored:
-                    init.extend([kx0, ky0]*2)
-                    init.append(kx0)
-                else:
-                    init.extend([kx0, ky0]*4)
-            case 3:
-                if self.mirrored:
-                    init.extend([kx0, ky0]*2)
-                else:
-                    init.extend([kx0, ky0]*3)
+        #### To be implemented ####
+        # init.extend(ks)
 
         def minimize_periodic(params):
             beta_x0 = params[0]
@@ -470,9 +284,6 @@ class DriverDelaySystem(BeamDeliverySystem):
             _, ls, ks, phis = self.get_lattice2stages(ks=ks, return_lists=True) # phis given in degs
 
             phis = np.deg2rad(phis)
-
-            ms = [0]*len(ls)
-            taus = [0]*len(ls)
 
             inverse_rs = self.phi2inv_r(phis)
 
@@ -492,11 +303,8 @@ class DriverDelaySystem(BeamDeliverySystem):
             return (R56*R56_norm)**2  + (D/self.cell_length)**2 + alpha_y**2 + alpha_x**2 + \
                 (beta_x-beta_x0)**2/self.cell_length**2 + (beta_y-beta_y0)**2/self.cell_length**2
         
-        bounds = [(1,200)]*2
-        bound_ks = self.get_quad_bounds()
-        bounds.extend(bound_ks)
-        print("Bounds: ", bounds)
-        res = minimize(minimize_periodic, x0 = init, bounds=bounds, options={"maxiter": 5000})
+
+        res = minimize(minimize_periodic, x0 = [], options={"maxiter": 5000})
         print(res)
         self.ks = res.x[2:]
         return res.x[0], res.x[1]
