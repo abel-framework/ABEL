@@ -1574,6 +1574,8 @@ class Beam():
         ax.set_xlabel('E (GeV)')
         ax.set_ylabel('Spectral density (nC/GeV)')
         ax.set_title('Energy spectrum')
+        ax.set_xlim([min(Es)*1e-9, max(Es)*1e-9])
+        ax.set_ylim([0, abs(np.max(np.abs(dQdE)))*1e18*1.1])
     
     def plot_lps(self, zlims=None, Elims=None, chromatic=False, num_samples=10000, dQdEdzlim=None, figsize=None, savefig=None):
         fig, ax = plt.subplots()
@@ -1597,7 +1599,7 @@ class Beam():
             ax.set_ylim(np.array(Elims)/1e9)
         ax.set_xlabel('ξ (μm)')
         ax.set_ylabel('E (GeV)')
-        ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
+        ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n <E> = {self.energy()/1e9:.1f} GeV, σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
         cb = fig.colorbar(p)
         if not chromatic:
             cb.ax.set_ylabel('Charge density (pC/μm/GeV)')
