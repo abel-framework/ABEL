@@ -1563,6 +1563,17 @@ class Beam():
         ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
         ax.set_xlabel('z (μm)')
         ax.set_ylabel('Beam current (kA)')
+
+    def plot_energy_spectrum(self):
+        dQdE, Es = self.energy_spectrum()
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(6)
+        fig.set_figheight(4)        
+        ax.plot(Es*1e-9, np.abs(dQdE)*1e18)
+        ax.set_xlabel('E (GeV)')
+        ax.set_ylabel('Spectral density (nC/GeV)')
+        ax.set_title('Energy spectrum')
     
     def plot_lps(self, zlims=None, Elims=None, chromatic=False, num_samples=10000, dQdEdzlim=None, figsize=None, savefig=None):
         fig, ax = plt.subplots()
