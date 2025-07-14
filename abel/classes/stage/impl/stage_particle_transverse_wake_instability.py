@@ -283,9 +283,6 @@ class StagePrtclTransWakeInstability(Stage):
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
             beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
-
-            # if type(self.upramp) == dummyStage   
-                # self.track_upramp(beam_rotated, drive_beam_rotated)#
         
         else:  # Do the following if there are no upramp (a lone stage)
             beam_ramped = copy.deepcopy(beam_rotated)
@@ -681,24 +678,6 @@ class StagePrtclTransWakeInstability(Stage):
         self.downramp.trim_attr_reduce_pickle_size()
             
         return beam, driver
-    
-
-    # # ==================================================
-    # def set_upramp(self, nom_energy_gain=0.0, ramp_length=None, ramp_plasma_density=None, ramp_beta_mag=1.0, ramp_shape='uniform'):
-
-    #     if ramp_shape != 'uniform':
-    #          raise TypeError('Only uniform ramps have been implemented.')
-        
-    #     super().set_upramp(nom_energy_gain=nom_energy_gain, ramp_length=ramp_length, ramp_plasma_density=ramp_plasma_density, ramp_beta_mag=ramp_beta_mag, ramp_shape=ramp_shape)
-
-    
-    # # ==================================================
-    # def set_downramp(self, nom_energy_gain=0.0, ramp_length=None, ramp_plasma_density=None, ramp_beta_mag=1.0, ramp_shape='uniform'):
-
-    #     if ramp_shape != 'uniform':
-    #          raise TypeError('Only uniform ramps have been implemented.')
-        
-    #     super().set_downramp(nom_energy_gain=nom_energy_gain, ramp_length=ramp_length, ramp_plasma_density=ramp_plasma_density, ramp_beta_mag=ramp_beta_mag, ramp_shape=ramp_shape)
                    
 
     # ==================================================
