@@ -89,7 +89,8 @@ def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_dens
     stage = StagePrtclTransWakeInstability()
     stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
     stage.length_flattop = length_flattop                                         # [m]
-    stage.nom_energy_gain = length_flattop*1e9                                    # [eV]
+    if length_flattop is not None:
+        stage.nom_energy_gain = length_flattop*1e9                                # [eV]
     stage.plasma_density = plasma_density                                         # [m^-3]
     stage.driver_source = driver_source
     stage.main_source = main_source
@@ -218,7 +219,10 @@ def test_beam_between_ramps():
 
 @pytest.mark.StagePrtclTransWakeInstability
 def test_stage_length_gradient_energyGain():
-    "Tests ensuring that the flattop length and total length of the stage as well as nominal gradient and nominal energy gain are set correctly."
+    """
+    Tests ensuring that the flattop length and total length of the stage as well 
+    as nominal gradient and nominal energy gain are set correctly.
+    """
 
     np.random.seed(42)
 
@@ -234,6 +238,9 @@ def test_stage_length_gradient_energyGain():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
+
+
+    # ========== Set stage length and nominal energy gain ==========
     stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
 
     stage.length_flattop = 7.8                                                    # [m]
@@ -241,13 +248,16 @@ def test_stage_length_gradient_energyGain():
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
+
     assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length_flattop, 7.8, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
+
+    # ========== Set nominal energy gain and flattop nominal acceleration gradient ==========
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False, length_flattop=None)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
