@@ -117,8 +117,7 @@ class Stage(Trackable, CostModeled):
         if type(self) is not StageHipace and ramp_shape != 'uniform':
             raise TypeError('Only uniform ramps have been implemented.')  # Only StageHipace supports non-uniform ramps.
         
-        self.upramp = HuskRamp()
-        ramp = self.upramp
+        ramp = HuskRamp()
         
         if ramp_plasma_density is None:
             ramp_plasma_density = self.plasma_density/self.ramp_beta_mag
@@ -128,9 +127,8 @@ class Stage(Trackable, CostModeled):
         ramp.length = ramp_length  # May need to wait for the nominal energy to be set by e.g. Runnable.track().
         ramp.ramp_beta_mag = ramp_beta_mag
         ramp.ramp_shape = ramp_shape
-        #ramp.tracking_obj = None
 
-        self._has_ramp = True
+        self.upramp = ramp
 
 
     # ==================================================
@@ -142,8 +140,7 @@ class Stage(Trackable, CostModeled):
         if type(self) is not StageHipace and ramp_shape != 'uniform':
             raise TypeError('Only uniform ramps have been implemented.')  # Only StageHipace supports non-uniform ramps.
         
-        self.downramp = HuskRamp()
-        ramp = self.downramp
+        ramp = HuskRamp()
         
         if ramp_plasma_density is None:
             ramp_plasma_density = self.plasma_density/self.ramp_beta_mag
@@ -153,9 +150,8 @@ class Stage(Trackable, CostModeled):
         ramp.length = ramp_length  # May need to wait for the nominal energy to be set by e.g. Runnable.track().
         ramp.ramp_beta_mag = ramp_beta_mag
         ramp.ramp_shape = ramp_shape
-        #ramp.tracking_obj = None
 
-        self._has_ramp = True
+        self.downramp = ramp
 
 
     # ==================================================
@@ -187,7 +183,6 @@ class Stage(Trackable, CostModeled):
             stage_copy.upramp = None
         if stage_copy.downramp is not None:
             stage_copy.downramp = None
-        stage_copy._has_ramp = False
 
         # Can set energy gain and gradient parameters to None to let track_upramp() and track_downramp() determine these.
         # Do try/except to allow zeroing everything.
@@ -225,7 +220,7 @@ class Stage(Trackable, CostModeled):
         """
         Set ramp lengths and nominal energies and nominal energy gains if the 
         ramps exist (both upramp and downramp lengths have to be set up before 
-        track_upramp()).
+        being tracked).
         """
         
         if self.nom_energy is None:
@@ -250,6 +245,9 @@ class Stage(Trackable, CostModeled):
                 self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
             if self.downramp.length is None:
                 self.downramp.length = self._calc_ramp_length(self.downramp)
+
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
 
     
     # ==================================================
@@ -355,7 +353,7 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     # upramp to be tracked before the main tracking
-    def track_upramp(self, beam0, driver0=None):
+    def track_upramp(self, beam0, driver0=None):       # TODO: make this an abstract method
         if self.upramp is not None:
 
             # set driver
@@ -381,7 +379,7 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     # downramp to be tracked after the main tracking
-    def track_downramp(self, beam0, driver0):
+    def track_downramp(self, beam0, driver0):       # TODO: make this an abstract method
         if self.downramp is not None:
 
             # set driver
