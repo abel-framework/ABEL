@@ -14,8 +14,6 @@ class HuskRamp(Stage):
 
         self.ramp_shape = ramp_shape
         self.length = ramp_length
-        self._has_ramp = False
-        #self.tracking_obj = None
 
 
     # ==================================================
