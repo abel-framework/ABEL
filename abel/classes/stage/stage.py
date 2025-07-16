@@ -119,6 +119,9 @@ class Stage(Trackable, CostModeled):
         
         ramp = HuskRamp()
         
+        # TODO: Need code to not allow user to set both ramp_beta_mag and ramp_plasma_density...
+        # TODO: Need code to handle ramp_shape='from_file' ... need to ignore ramp_length, ramp_plasma_density, ramp_beta_mag. These need to be calculated.
+        #  
         if ramp_plasma_density is None:
             ramp_plasma_density = self.plasma_density/self.ramp_beta_mag
 
@@ -232,6 +235,7 @@ class Stage(Trackable, CostModeled):
                 self.upramp.nom_energy_gain = 0.0
             if self.upramp.nom_energy is None:
                 self.upramp.nom_energy = self.nom_energy
+                self.upramp.nom_energy_flattop = self.upramp.nom_energy
                 self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy_gain
             if self.upramp.length is None:
                 self.upramp.length = self._calc_ramp_length(self.upramp)
@@ -243,6 +247,7 @@ class Stage(Trackable, CostModeled):
                 self.downramp.nom_energy_gain = 0.0
             if self.downramp.nom_energy is None:
                 self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
+                self.downramp.nom_energy_flattop = self.downramp.nom_energy
             if self.downramp.length is None:
                 self.downramp.length = self._calc_ramp_length(self.downramp)
 
@@ -1413,7 +1418,8 @@ class Stage(Trackable, CostModeled):
         # extract wakefields and beam currents
         zs0 = self.initial.plasma.wakefield.onaxis.zs
         Ezs0 = self.initial.plasma.wakefield.onaxis.Ezs
-        has_final = hasattr(self.final.plasma.wakefield.onaxis, 'Ezs')
+        has_final = self.final is not None and hasattr(self.final, 'plasma')
+
         if has_final:
             zs = self.final.plasma.wakefield.onaxis.zs
             Ezs = self.final.plasma.wakefield.onaxis.Ezs
@@ -1432,9 +1438,10 @@ class Stage(Trackable, CostModeled):
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
-        if self.driver_source.energy is not None:
-            Ez_driver_max = self.driver_source.energy/self.length_flattop
-            axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
+        if self.driver_source is not None:  # A ramp may not have a driver source
+            if self.driver_source.energy is not None:
+                Ez_driver_max = self.driver_source.energy/self.length_flattop
+                axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
         axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
@@ -1522,19 +1529,25 @@ class Stage(Trackable, CostModeled):
         """
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
+
         Other parameters
         ----------------
         aspect : str
             The aspect ratio of the plots.
-            Defaults to 'equal' which is also the matplotlib default; can also use 'auto'.
-            Set to 'auto' to plot the entire simulation box.
+            Defaults to 'equal' which is also the matplotlib default; can also 
+            use 'auto'. Set to 'auto' to plot the entire simulation box.
+
+        show_beam : bool
+            Flag for including the beam charge densities in the plot
+            
         savefig : str or None
-            If not None, the path to save the figure.
+            If not None, defines the path to save the figure.
             Defaults to None
+
 
         Returns:
         --------
-          None
+        None
         """
 
         from matplotlib import pyplot as plt
@@ -1549,7 +1562,8 @@ class Stage(Trackable, CostModeled):
             return
         
         # make figures
-        has_final_step = hasattr(self.final.plasma.density, 'rho')
+        has_final_step = self.final is not None and hasattr(self.final, 'plasma')
+
         num_plots = 1 + int(has_final_step)
         fig, ax = plt.subplots(num_plots,1)
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
@@ -1619,11 +1633,14 @@ class Stage(Trackable, CostModeled):
             
             # plot beam electrons
             if show_beam:
-                p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
+                p_beam = ax1.imshow(rho0_beam/1e6, extent=data_struct.beam.density.extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
                 p_beam.set_clim(clims/1e6)
                 cb_beam = plt.colorbar(p_beam, cax=cax1)
                 cb_beam.set_ticklabels([])
                 cb_beam.ax.tick_params(axis='y', which='both', direction='in')
+
+            # ensure that the extent is the same as data_struct.plasma.density.extent
+            p_electrons.set_extent(extent*1e6)
             
             # set labels
             if i==(num_plots-1):
