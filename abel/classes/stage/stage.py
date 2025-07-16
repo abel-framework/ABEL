@@ -1398,12 +1398,16 @@ class Stage(Trackable, CostModeled):
 
         from matplotlib import pyplot as plt
         
+        if self.initial is None:
+            print('No data.')
+            return
+        
         # extract wakefield if not already existing
         if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
-            print('No wakefield calculated')
+            print('No wakefield data.')
             return
         if not hasattr(self.initial.beam.current, 'Is'):
-            print('No beam current calculated')
+            print('No beam current data.')
             return
 
         # preprate plot
@@ -1552,6 +1556,10 @@ class Stage(Trackable, CostModeled):
 
         from matplotlib import pyplot as plt
         from matplotlib.colors import LogNorm
+
+        if self.initial is None:
+            print('No data.')
+            return
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):

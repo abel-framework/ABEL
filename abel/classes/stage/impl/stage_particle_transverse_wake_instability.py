@@ -257,11 +257,11 @@ class StagePrtclTransWakeInstability(Stage):
 
         
         # ========== Get the drive beam ==========
-        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    #############################
+        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    # TODO: delete ##################
             driver_incoming = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
         else:
             driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
-            #self.drive_beam = driver_incoming                    ######################
+            #self.drive_beam = driver_incoming                    # TODO: delete ######################
         
         if self.test_beam_between_ramps:
             original_driver = copy.deepcopy(driver_incoming)
@@ -328,7 +328,7 @@ class StagePrtclTransWakeInstability(Stage):
         beam, driver = self.main_tracking_procedure(copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam_ramped), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
 
 
-        # ==========  Apply plasma density down ramp (magnify beta function) ==========
+        # ==========  Apply plasma density downramp (magnify beta function) ==========
         if self.downramp is not None:
             
             # TODO: Temporary "drive beam evolution": Magnify the driver
@@ -1478,6 +1478,12 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Overloads the plot_wakefield method in the Stage class.
     def plot_wakefield(self, saveToFile=None, includeWakeRadius=True):
+
+        assert self.initial is not None, 'No data.'
+        
+        # Extract density if not already existing
+        assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield data.'
+        assert hasattr(self.initial.beam.current, 'Is'), 'No beam current data.'
         
         # Get wakefield
         #Ezs = self.Ez_axial
@@ -1573,10 +1579,12 @@ class StagePrtclTransWakeInstability(Stage):
         """
         
         from matplotlib.colors import LogNorm
+
+        assert self.initial is not None, 'No data.'
         
         # Extract density if not already existing
-        assert hasattr(self.initial.plasma.density, 'rho'), 'No wake'
-        assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield'
+        assert hasattr(self.initial.plasma.density, 'rho'), 'No wake data.'
+        assert hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'), 'No wakefield data.'
         
         # Make figures
         has_final_step = self.final is not None
