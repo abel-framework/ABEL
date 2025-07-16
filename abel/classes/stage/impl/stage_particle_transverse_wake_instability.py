@@ -18,7 +18,7 @@ from abel.physics_models.particles_transverse_wake_instability import *
 from abel.utilities.plasma_physics import beta_matched, blowout_radius
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
 from abel.apis.wake_t.wake_t_api import run_single_step_wake_t
-from abel.classes.stage.stage import Stage
+from abel.classes.stage.stage import Stage, StageError
 from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.classes.beam import Beam
 from abel.CONFIG import CONFIG
@@ -262,6 +262,9 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
             #self.drive_beam = driver_incoming                    ######################
+        
+        if self.test_beam_between_ramps:
+            original_driver = copy.deepcopy(driver_incoming)
 
 
         # ========== Rotate the coordinate system of the beams ==========
@@ -292,7 +295,10 @@ class StagePrtclTransWakeInstability(Stage):
                 beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
 
-        ## NOTE: beam_ramped and drive_beam_ramped should not be changed after this line to check for continuity between ramps and stage.
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            stage_beam_in = copy.deepcopy(beam_ramped)
+            stage_driver_in = copy.deepcopy(drive_beam_ramped)
 
 
         # ========== Record longitudinal number profile ==========
@@ -324,6 +330,17 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
+            
+            # TODO: Temporary "drive beam evolution": Magnify the driver
+            # Needs to be performed before self.track_downramp().
+            if self.downramp.ramp_beta_mag is not None:
+                driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+            
+            # Save beams to check for consistency between ramps and stage
+            if self.test_beam_between_ramps:
+                stage_beam_out = copy.deepcopy(beam)
+                stage_driver_out = copy.deepcopy(driver)
+
             beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
 
         else:  # Do the following if there are no downramp. 
@@ -360,11 +377,11 @@ class StagePrtclTransWakeInstability(Stage):
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.test_beam_between_ramps:
             # Store beams for the main stage
-            self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # Drive beam after the upramp, before tracking
-                                            beam_before_tracking=beam_ramped,  # Main beam after the upramp, before tracking
-                                            driver_outgoing=driver,  # Drive beam after tracking, before the downramp
-                                            beam_outgoing=beam,  # Main beam after tracking, before the downramp
-                                            driver_incoming=driver_incoming)  # The original drive beam before rotation and ramps
+            self.store_beams_between_ramps(driver_before_tracking=stage_driver_in,  # Drive beam after the upramp, before tracking
+                                            beam_before_tracking=stage_beam_in,  # Main beam after the upramp, before tracking
+                                            driver_outgoing=stage_driver_out,  # Drive beam after tracking, before the downramp
+                                            beam_outgoing=stage_beam_out,  # Main beam after tracking, before the downramp
+                                            driver_incoming=original_driver)  # The original drive beam before rotation and ramps
 
         # Copy meta data from input beam_outgoing (will be iterated by super)
         beam_outgoing.trackable_number = beam_incoming.trackable_number
@@ -498,7 +515,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         self.evolution = evolution
 
-        ## NOTE: beam and driver cannot be changed after this line in order to test for continuity between ramps and stage.
+        ## NOTE: beam and driver cannot be changed after this line in order to probe for continuity between ramps and stage.
 
         # Save the final step with ramped beams in rotated coordinate system before downramp
         if self.save_final_step:
@@ -536,26 +553,27 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_in = copy.deepcopy(beam0)
+            ramp_driver_in = copy.deepcopy(driver0)
+
         # Convert HuskRamp to a StagePrtclWakeInstability
         upramp = self.convert_RampHusk(self.upramp)
-        self.upramp = upramp
 
         # set driver
-        self.upramp.driver_source = SourceCapsule(beam=driver0)
-        
-        if self.upramp.ramp_beta_mag is not None:
-            beam0.magnify_beta_function(1/self.upramp.ramp_beta_mag, axis_defining_beam=driver0)
-            driver0.magnify_beta_function(1/self.upramp.ramp_beta_mag, axis_defining_beam=driver0)
+        upramp.driver_source = SourceCapsule(beam=driver0)
+    
     
         # ========== Record longitudinal number profile ==========
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
-        main_num_profile, z_slices = self.upramp.longitudinal_number_distribution(beam=beam0)
-        self.upramp.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
-        self.upramp.main_num_profile = main_num_profile
+        main_num_profile, z_slices = upramp.longitudinal_number_distribution(beam=beam0)
+        upramp.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
+        upramp.main_num_profile = main_num_profile
 
-        driver_num_profile, driver_z_slices = self.upramp.longitudinal_number_distribution(beam=driver0)
-        self.upramp.driver_num_profile = driver_num_profile
-        self.upramp.driver_z_slices = driver_z_slices
+        driver_num_profile, driver_z_slices = upramp.longitudinal_number_distribution(beam=driver0)
+        upramp.driver_num_profile = driver_num_profile
+        upramp.driver_z_slices = driver_z_slices
         
 
         # ========== Wake-T simulation and extraction ==========
@@ -564,14 +582,14 @@ class StagePrtclTransWakeInstability(Stage):
         driver_y_offset = driver0.y_offset()
 
         # Perform a single time step Wake-T simulation
-        wake_t_evolution = run_single_step_wake_t(self.upramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
+        wake_t_evolution = run_single_step_wake_t(upramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
 
         # Read the Wake-T simulation data
-        self.upramp.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(driver0), copy.deepcopy(beam0))
+        upramp.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(driver0), copy.deepcopy(beam0))
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = self.upramp.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
+        beam, driver = upramp.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
 
 
         # ========== Bookkeeping ==========
@@ -580,16 +598,28 @@ class StagePrtclTransWakeInstability(Stage):
         beam.stage_number -= 1
         driver.stage_number -= 1
 
+        # TODO: Temporary "drive beam evolution": Demagnify the driver
+        # Needs to be performed before self.upramp.store_beams_between_ramps().
+        if self.ramp_beta_mag is not None:  
+            driver.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver)
+
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_out = copy.deepcopy(beam)
+            ramp_driver_out = copy.deepcopy(driver)
+
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.test_beam_between_ramps:
-            self.upramp.store_beams_between_ramps(driver_before_tracking=driver0,  # A deepcopy of the incoming drive beam before tracking.
-                                            beam_before_tracking=beam0,  # A deepcopy of the incoming main beam before tracking.
-                                            driver_outgoing=driver,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                            beam_outgoing=beam,  # Main beam after tracking through the ramp (has not been un-rotated)
+            self.upramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
+                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
+                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
                                             driver_incoming=None)  # Only the main stage needs to store the original drive beam
 
-        # Clear some of the attributes to reduce file size of pickled files
-        self.upramp.trim_attr_reduce_pickle_size()
+        # Save parameter evolution, initial and final time steps to the ramp
+        self.upramp.evolution = upramp.evolution  # TODO: save to self instead, but need to change stage diagnostics first.
+        self.upramp.initial = upramp.initial
+        self.upramp.final = upramp.final
             
         return beam, driver
     
@@ -736,10 +766,18 @@ class StagePrtclTransWakeInstability(Stage):
             A uniform ramp that can be used for tracking.
         """
 
+        from abel.classes.stage.impl.husk_ramp import HuskRamp
+
+        if type(ramp) is not HuskRamp:
+            raise StageError('The input ramp needs to by a HuskRamp.')
+
         trackable_ramp = self.stage2ramp(ramp_plasma_density=ramp.plasma_density, ramp_length=ramp.length)
         trackable_ramp.nom_energy = ramp.nom_energy
+        trackable_ramp.nom_energy_flattop = ramp.nom_energy_flattop
         trackable_ramp.nom_energy_gain = ramp.nom_energy_gain
+        #trackable_ramp.nom_energy_gain_flattop = ramp.nom_energy_gain_flattop
         #trackable_ramp.nom_accel_gradient = ramp.nom_accel_gradient
+        #trackable_ramp.nom_accel_gradient_flattop = ramp.nom_accel_gradient_flattop
 
         return trackable_ramp
     
@@ -1450,7 +1488,7 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius = self.bubble_radius_axial
         
         # get current profile
-        has_final_step = self.final is not None
+        has_final_step = self.final.plasma.density is not None
         if has_final_step:
             Is = self.final.beam.current.Is
             zs = self.final.beam.current.zs
@@ -1506,6 +1544,33 @@ class StagePrtclTransWakeInstability(Stage):
     # ==================================================
     # Overloads the plot_wake method in the Stage class.
     def plot_wake(self, show_Ez=True, trace_rb=False, savefig=None, aspect='auto'):
+        """
+        Plot the wake structure (2D plot) as a new pyplot.figure.
+
+        
+        Other parameters
+        ----------------
+        show_Ez : bool
+            Flag for including the axial longitudinal electric field in the 
+            plot.
+
+        trace_rb : bool
+            Flag for including the traced bubble radius in the plot.
+            
+        savefig : str or None
+            If not None, defines the path to save the figure.
+            Defaults to None.
+
+        aspect : str
+            The aspect ratio of the plots.
+            Defaults to 'equal' which is also the matplotlib default; can also 
+            use 'auto'. Set to 'auto' to plot the entire simulation box.
+
+            
+        Returns:
+        --------
+        None
+        """
         
         from matplotlib.colors import LogNorm
         
