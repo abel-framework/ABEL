@@ -188,11 +188,8 @@ class InterstagePlasmaLens(Interstage, ABC):
     def match_dispersion_and_R56(self, high_res=False):
         "Cancelling the dispersion and matchign the R56 by adjusting the chicane dipoles."
         
-        # assume negative R56
-        nom_R56 = -abs(self.R56)
-        if self.R56 > 0:
-            print('Positive R56 given, flipping sign to negative')
-        
+        nom_R56 = self.R56
+            
         # normalizing scale for the merit function
         Dpx_scale = self.length_dipole*self.field_dipole*SI.c/self.nom_energy
         R56_scale = self.length_dipole**3*self.field_dipole**2*SI.c**2/self.nom_energy**2
