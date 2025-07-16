@@ -147,8 +147,9 @@ def test_beam_between_ramps():
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
 
-    # Assert that there has been no significant changes in the beams between parents and its upramp
-    # Between a upramp and main stage
+    ### Assert that there has been no significant changes in the beams between parents and its upramp
+
+    # Between an upramp and main stage
     Beam.comp_beams(stage.upramp.driver_out, stage.driver_in, comp_location=True)
     Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
 
