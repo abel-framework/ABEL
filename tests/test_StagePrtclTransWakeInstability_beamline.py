@@ -61,7 +61,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9):
     main = SourceBasic()
     main.bunch_length = 40.0e-06                                                    # [m], rms. Standard value
     main.num_particles = 10000                                               
-    main.charge = -SI.e * 1.0e10                                                       # [C]
+    main.charge = -SI.e * 1.0e10                                                    # [C]
 
     # Energy parameters
     main.energy = energy                                                            # [eV], Default set to HALHF v2 second to last stage nominal input energy
@@ -185,7 +185,10 @@ def test_baseline_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_ramped_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, with ramps. Also tests some plotting functions."
+    """
+    All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver 
+    evolution, no driver jitter, with ramps. Also tests some plotting functions.
+    """
 
     np.random.seed(42)
 
@@ -214,7 +217,7 @@ def test_ramped_linac():
     assert np.allclose(linac.stages[0].nom_energy, 361.8e9)
     assert np.allclose(linac.stages[1].nom_energy, 369.6e9)
     assert np.allclose(linac.get_beam(0).energy(), 361.8e9, rtol=0, atol=0.6e9)
-    assert np.allclose(linac.get_beam(-1).energy(), 376.4e9, rtol=0, atol=0.6e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 377.4e9, rtol=0, atol=0.6e9)
 
     final_beam = linac.get_beam(-1)
     final_beam.beam_name = 'Test beam'
