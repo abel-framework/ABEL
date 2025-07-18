@@ -8,9 +8,9 @@ from abel.classes.stage.stage import Stage, StageError
 class HuskRamp(Stage):
     
     # ==================================================
-    def __init__(self, ramp_plasma_density=None, ramp_length=None, ramp_beta_mag=1.0, ramp_shape='uniform'):
+    def __init__(self, ramp_plasma_density=None, ramp_length=None, ramp_shape='uniform'):
 
-        super().__init__(nom_accel_gradient=None, nom_energy_gain=None, plasma_density=ramp_plasma_density, driver_source=None, ramp_beta_mag=ramp_beta_mag)
+        super().__init__(nom_accel_gradient=None, nom_energy_gain=None, plasma_density=ramp_plasma_density, driver_source=None, ramp_beta_mag=1.0)
 
         self.ramp_shape = ramp_shape
         self.length = ramp_length
