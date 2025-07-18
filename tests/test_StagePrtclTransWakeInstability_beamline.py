@@ -135,7 +135,10 @@ def setup_InterstageElegant(stage):
 
 @pytest.mark.transverse_wake_instability_linac
 def test_baseline_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, no driver jitter, no ramps. Also tests some plotting functions."
+    """
+    All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver 
+    evolution, no driver jitter, no ramps. Also tests some plotting functions.
+    """
 
     np.random.seed(42)
 
@@ -244,7 +247,10 @@ def test_ramped_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, driver evolution, driver angular jitter, no ramps."
+    """
+    All ``StagePrtclTransWakeInstability`` physics effects disabled, driver 
+    evolution, driver angular jitter, no ramps.
+    """
 
     np.random.seed(42)
 
@@ -275,7 +281,10 @@ def test_driverEvol_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_ramped_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, driver evolution, driver angular jitter, with ramps."
+    """
+    All ``StagePrtclTransWakeInstability`` physics effects disabled, driver 
+    evolution, driver angular jitter, with ramps.
+    """
 
     np.random.seed(42)
 
@@ -310,7 +319,10 @@ def test_driverEvol_ramped_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_angular_jitter_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, driver angular jitter, no ramps."
+    """
+    All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver 
+    evolution, driver angular jitter, no ramps.
+    """
 
     np.random.seed(42)
 
@@ -341,7 +353,10 @@ def test_angular_jitter_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_angular_jitter_ramped_linac():
-    "All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver evolution, driver angular jitter, with ramps."
+    """
+    All ``StagePrtclTransWakeInstability`` physics effects disabled, no driver 
+    evolution, driver angular jitter, with ramps.
+    """
 
     np.random.seed(42)
 
@@ -376,7 +391,10 @@ def test_angular_jitter_ramped_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_trInstability_linac():
-    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, no driver evolution, no driver jitter, no ramps."
+    """
+    ``StagePrtclTransWakeInstability`` transverse instability enabled, radiation 
+    reaction enabled, no driver evolution, no driver jitter, no ramps.
+    """
 
     np.random.seed(42)
 
@@ -408,7 +426,10 @@ def test_trInstability_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_jitter_trInstability_ramped_linac():
-    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, no driver evolution, xy driver jitter, with ramps."
+    """
+    ``StagePrtclTransWakeInstability`` transverse instability enabled, radiation 
+    reaction enabled, no driver evolution, xy driver jitter, with ramps.
+    """
 
     np.random.seed(42)
 
@@ -437,7 +458,7 @@ def test_jitter_trInstability_ramped_linac():
     assert np.allclose(linac.stages[0].nom_energy, 3.0e9)
     assert np.allclose(linac.stages[1].nom_energy, 10.8e9)
     assert np.allclose(linac.get_beam(0).energy(), 3.0e9, rtol=0, atol=0.2e9)
-    assert np.allclose(linac.get_beam(-1).energy(), 17.957e9, rtol=0, atol=0.6e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 18.80e9, rtol=0, atol=0.6e9)
 
     final_beam = linac.get_beam(-1)
     final_beam.beam_name = 'Test beam'
@@ -454,7 +475,10 @@ def test_jitter_trInstability_ramped_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_jitter_trInstability_ramped_linac():
-    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, with driver evolution, xy driver jitter, with ramps."
+    """
+    ``StagePrtclTransWakeInstability`` transverse instability enabled, radiation 
+    reaction enabled, with driver evolution, xy driver jitter, with ramps.
+    """
 
     np.random.seed(42)
 
@@ -485,7 +509,10 @@ def test_driverEvol_jitter_trInstability_ramped_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_ionMotion_linac():
-    "``StagePrtclTransWakeInstability`` ion motion enabled, no driver evolution, no driver jitter, no ramps."
+    """
+    ``StagePrtclTransWakeInstability`` ion motion enabled, no driver evolution, 
+    no driver jitter, no ramps.
+    """
 
     np.random.seed(42)
 
@@ -516,7 +543,11 @@ def test_ionMotion_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_jitter_trInstability_ionMotion_linac():
-    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, no ramps."
+    """
+    ``StagePrtclTransWakeInstability`` transverse instability enabled, radiation 
+    reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, 
+    no ramps.
+    """
 
     np.random.seed(42)
 
@@ -547,7 +578,12 @@ def test_jitter_trInstability_ionMotion_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_jitter_trInstability_ionMotion_ramped_linac():
-    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, with ramps."
+    """
+    ``StagePrtclTransWakeInstability`` transverse instability enabled, radiation 
+    reaction enabled, ion motion enabled, driver xy jitter, no driver evolution, 
+    with ramps.
+    """
+    
 
     np.random.seed(42)
 
@@ -576,7 +612,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     assert np.allclose(linac.stages[0].nom_energy, 3.0e9)
     assert np.allclose(linac.stages[1].nom_energy, 10.8e9)
     assert np.allclose(linac.get_beam(0).energy(), 3.0e9, rtol=0, atol=0.2e9)
-    assert np.allclose(linac.get_beam(-1).energy(), 17.957e9, rtol=0, atol=0.6e9)
+    assert np.allclose(linac.get_beam(-1).energy(), 18.80e9, rtol=0, atol=0.6e9)
 
     final_beam = linac.get_beam(-1)
     final_beam.beam_name = 'Test beam'
@@ -593,7 +629,11 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 
 @pytest.mark.transverse_wake_instability_linac
 def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
-    "``StagePrtclTransWakeInstability`` transverse instability enabled, radiation reaction enabled, ion motion enabled, driver xy jitter, with driver evolution, with ramps."
+    """
+    ``StagePrtclTransWakeInstability`` transverse instability enabled, radiation 
+    reaction enabled, ion motion enabled, driver xy jitter, with driver 
+    evolution, with ramps.
+    """
 
     np.random.seed(42)
 

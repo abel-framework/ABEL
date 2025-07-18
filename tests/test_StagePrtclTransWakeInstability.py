@@ -125,7 +125,10 @@ def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_dens
 
 @pytest.mark.StagePrtclTransWakeInstability
 def test_beam_between_ramps():
-    "Tests for ensuring that the beams are correctly transferred between ramps and stage."
+    """
+    Tests for ensuring that the beams are correctly transferred between ramps 
+    and stage.
+    """
 
     np.random.seed(42)
 
@@ -284,7 +287,10 @@ def test_stage_length_gradient_energyGain():
 
 @pytest.mark.StagePrtclTransWakeInstability
 def test_driver_unrotation():
-    "Tests for checking the driver being correctly un-rotated back to its original coordinate system."
+    """
+    Tests for checking the driver being correctly un-rotated back to its 
+    original coordinate system.
+    """
 
     np.random.seed(42)
 
@@ -417,7 +423,6 @@ def test_stage2ramp():
     assert ramp.drive_beam_update_period == 0
     assert ramp._return_tracked_driver is False
     
-
 
 @pytest.mark.StagePrtclTransWakeInstability
 def test_rb_Ez_tracing():
@@ -579,7 +584,6 @@ def test_matched_beta_function():
     beta_mat = np.sqrt(2*energy2gamma(main_source.energy))/kp * ramp_beta_mag
 
     assert np.allclose(stage.matched_beta_function(main_source.energy), beta_mat, rtol=1e-15, atol=0.0)
-
 
 
 @pytest.mark.StagePrtclTransWakeInstability
