@@ -786,6 +786,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
                              particle_mass=particle_mass)
     
     beam_out.location = initial_beam_location + prop_length
+    beam_out.stage_number = beam.stage_number
     
     # Prepare the drive beam for return
     if use_wake_t_driver:
