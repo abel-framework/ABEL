@@ -157,9 +157,12 @@ def test_beam_between_ramps():
     Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
     Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
-    # Assert that the output beam matches the out beam for the downramp
+    # Assert that the output beam matches the out beam from the downramp after un-rotation
     final_beam = linac[0].get_beam(-1)
-    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+    downramp_beam_out = stage.downramp.beam_out
+    downramp_beam_out.stage_number += 1  # There is a mismatch in stage number, as it is not added until after the stage.
+    _, beam_outgoing = stage.undo_beam_coordinate_systems_rotation(stage.driver_incoming, stage.downramp.driver_out, downramp_beam_out)
+    Beam.comp_beams(final_beam, beam_outgoing, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the propagation length of the output beam matches the total length of the stage
     assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
@@ -184,7 +187,9 @@ def test_beam_between_ramps():
 
     # Assert that the output beam matches the out beam for the downramp
     final_beam = linac[0].get_beam(-1)
-    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+    downramp_beam_out = stage.downramp.beam_out
+    downramp_beam_out.stage_number += 1  # There is a mismatch in stage number, as it is not added until after the stage.
+    Beam.comp_beams(final_beam, downramp_beam_out, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the propagation length of the output beam matches the total length of the stage
     assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
@@ -209,7 +214,10 @@ def test_beam_between_ramps():
 
     # Assert that the output beam matches the out beam for the downramp
     final_beam = linac[0].get_beam(-1)
-    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+    downramp_beam_out = stage.downramp.beam_out
+    downramp_beam_out.stage_number += 1  # There is a mismatch in stage number, as it is not added until after the stage.
+    _, beam_outgoing = stage.undo_beam_coordinate_systems_rotation(stage.driver_incoming, stage.downramp.driver_out, downramp_beam_out)
+    Beam.comp_beams(final_beam, beam_outgoing, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the propagation length of the output beam matches the total length of the stage
     assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
