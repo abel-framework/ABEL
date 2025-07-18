@@ -221,9 +221,9 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def _prepare_ramps(self):
         """
-        Set ramp lengths and nominal energies and nominal energy gains if the 
-        ramps exist (both upramp and downramp lengths have to be set up before 
-        being tracked).
+        Set ramp lengths, nominal energies and nominal energy gains if the ramps 
+        exist (both upramp and downramp lengths have to be set up before being 
+        tracked).
         """
         
         if self.nom_energy is None:
