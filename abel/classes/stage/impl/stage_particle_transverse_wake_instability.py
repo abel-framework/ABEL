@@ -336,7 +336,7 @@ class StagePrtclTransWakeInstability(Stage):
             if self.downramp.ramp_beta_mag is not None:
                 driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
             
-            # Save beams to check for consistency between ramps and stage
+            # Save beams to probe for consistency between ramps and stage
             if self.test_beam_between_ramps:
                 stage_beam_out = copy.deepcopy(beam)
                 stage_driver_out = copy.deepcopy(driver)
@@ -389,7 +389,7 @@ class StagePrtclTransWakeInstability(Stage):
         beam_outgoing.location = beam_incoming.location
 
         # Clear some of the attributes to reduce file size of pickled files
-        self.trim_attr_reduce_pickle_size()
+        self.trim_attr_reduce_pickle_size()  # Remove this line to save wake snapshots in ramps
 
         # Return the beam (and optionally the driver)
         if self._return_tracked_driver:
@@ -449,6 +449,7 @@ class StagePrtclTransWakeInstability(Stage):
         # Filter out beam particles outside of the plasma bubble
         beam_filtered = self.bubble_filter(beam_ramped, sort_zs=True)
         beam_filtered.location = beam_ramped.location
+        beam_filtered.stage_number = beam_ramped.stage_number
         
         if self.num_z_cells_main is None:
             self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
@@ -553,13 +554,20 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
+        from abel.classes.stage.impl.husk_ramp import HuskRamp
+
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
         # Convert HuskRamp to a StagePrtclWakeInstability
-        upramp = self.convert_RampHusk(self.upramp)
+        if type(self.upramp) is HuskRamp:
+            upramp = self.convert_RampHusk(self.upramp)
+        elif type(self.upramp) is Stage:
+            upramp = self.upramp  # Allow for other types of ramps
+        else:
+            raise StageError('Ramp is not an instance of Stage class.')
 
         # set driver
         upramp.driver_source = SourceCapsule(beam=driver0)
@@ -595,9 +603,6 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Bookkeeping ==========
         self.upramp.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/driver.energy() * beam.abs_charge()/driver.abs_charge()
 
-        beam.stage_number -= 1
-        driver.stage_number -= 1
-
         # TODO: Temporary "drive beam evolution": Demagnify the driver
         # Needs to be performed before self.upramp.store_beams_between_ramps().
         if self.ramp_beta_mag is not None:  
@@ -618,8 +623,8 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Save parameter evolution, initial and final time steps to the ramp
         self.upramp.evolution = upramp.evolution  # TODO: save to self instead, but need to change stage diagnostics first.
-        self.upramp.initial = upramp.initial
-        self.upramp.final = upramp.final
+        # self.upramp.initial = upramp.initial
+        # self.upramp.final = upramp.final
             
         return beam, driver
     
@@ -651,23 +656,34 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
+        from abel.classes.stage.impl.husk_ramp import HuskRamp
+
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_in = copy.deepcopy(beam0)
+            ramp_driver_in = copy.deepcopy(driver0)
+
         # Convert HuskRamp to a StagePrtclWakeInstability
-        downramp = self.convert_RampHusk(self.downramp)
-        self.downramp = downramp
+        if type(self.downramp) is HuskRamp:
+            downramp = self.convert_RampHusk(self.downramp)
+        elif type(self.upramp) is Stage:
+            downramp = self.downramp  # Allow for other types of ramps
+        else:
+            raise StageError('Ramp is not an instance of Stage class.')
 
         # set driver
-        self.downramp.driver_source = SourceCapsule(beam=driver0)
-        
+        downramp.driver_source = SourceCapsule(beam=driver0)
+    
     
         # ========== Record longitudinal number profile ==========
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
-        main_num_profile, z_slices = self.downramp.longitudinal_number_distribution(beam=beam0)
-        self.downramp.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
-        self.downramp.main_num_profile = main_num_profile
+        main_num_profile, z_slices = downramp.longitudinal_number_distribution(beam=beam0)
+        downramp.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
+        downramp.main_num_profile = main_num_profile
 
-        driver_num_profile, driver_z_slices = self.downramp.longitudinal_number_distribution(beam=driver0)
-        self.downramp.driver_num_profile = driver_num_profile
-        self.downramp.driver_z_slices = driver_z_slices
+        driver_num_profile, driver_z_slices = downramp.longitudinal_number_distribution(beam=driver0)
+        downramp.driver_num_profile = driver_num_profile
+        downramp.driver_z_slices = driver_z_slices
         
 
         # ========== Wake-T simulation and extraction ==========
@@ -676,36 +692,36 @@ class StagePrtclTransWakeInstability(Stage):
         driver_y_offset = driver0.y_offset()
 
         # Perform a single time step Wake-T simulation
-        wake_t_evolution = run_single_step_wake_t(self.downramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
+        wake_t_evolution = run_single_step_wake_t(downramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
 
         # Read the Wake-T simulation data
-        self.downramp.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(driver0), copy.deepcopy(beam0))
+        downramp.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(driver0), copy.deepcopy(beam0))
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = self.downramp.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
-
-        if self.downramp.ramp_beta_mag is not None:
-            beam.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
-            driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
+        beam, driver = downramp.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
 
 
         # ========== Bookkeeping ==========
         self.downramp.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/driver.energy() * beam.abs_charge()/driver.abs_charge()
 
-        beam.stage_number -= 1
-        driver.stage_number -= 1
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_out = copy.deepcopy(beam)
+            ramp_driver_out = copy.deepcopy(driver)
 
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.test_beam_between_ramps:
-            self.downramp.store_beams_between_ramps(driver_before_tracking=driver0,  # A deepcopy of the incoming drive beam before tracking.
-                                            beam_before_tracking=beam0,  # A deepcopy of the incoming main beam before tracking.
-                                            driver_outgoing=driver,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                            beam_outgoing=beam,  # Main beam after tracking through the ramp (has not been un-rotated)
+            self.downramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
+                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
+                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
                                             driver_incoming=None)  # Only the main stage needs to store the original drive beam
 
-        # Clear some of the attributes to reduce file size of pickled files
-        self.downramp.trim_attr_reduce_pickle_size()
+        # Save parameter evolution, initial and final time steps to the ramp
+        self.downramp.evolution = downramp.evolution  # TODO: save to self instead, but need to change stage diagnostics first.
+        # self.downramp.initial = downramp.initial
+        # self.downramp.final = downramp.final
             
         return beam, driver
                    
@@ -765,11 +781,6 @@ class StagePrtclTransWakeInstability(Stage):
         trackable_ramp : ``StagePrtclTransWakeInstability``object
             A uniform ramp that can be used for tracking.
         """
-
-        from abel.classes.stage.impl.husk_ramp import HuskRamp
-
-        if type(ramp) is not HuskRamp:
-            raise StageError('The input ramp needs to by a HuskRamp.')
 
         trackable_ramp = self.stage2ramp(ramp_plasma_density=ramp.plasma_density, ramp_length=ramp.length)
         trackable_ramp.nom_energy = ramp.nom_energy
@@ -1494,7 +1505,7 @@ class StagePrtclTransWakeInstability(Stage):
         bubble_radius = self.bubble_radius_axial
         
         # get current profile
-        has_final_step = self.final.plasma.density is not None
+        has_final_step = self.final is not None and hasattr(self.final, 'plasma')
         if has_final_step:
             Is = self.final.beam.current.Is
             zs = self.final.beam.current.zs
