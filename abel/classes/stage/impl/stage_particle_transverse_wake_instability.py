@@ -569,7 +569,7 @@ class StagePrtclTransWakeInstability(Stage):
         else:
             raise StageError('Ramp is not an instance of Stage class.')
 
-        # set driver
+        # Set driver
         upramp.driver_source = SourceCapsule(beam=driver0)
     
     
@@ -666,7 +666,7 @@ class StagePrtclTransWakeInstability(Stage):
         # Convert HuskRamp to a StagePrtclWakeInstability
         if type(self.downramp) is HuskRamp:
             downramp = self.convert_RampHusk(self.downramp)
-        elif type(self.upramp) is Stage:
+        elif type(self.downramp) is Stage:
             downramp = self.downramp  # Allow for other types of ramps
         else:
             raise StageError('Ramp is not an instance of Stage class.')
@@ -727,19 +727,13 @@ class StagePrtclTransWakeInstability(Stage):
                    
 
     # ==================================================
-    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, probe_evol_period=1):
+    def stage2ramp(self, probe_evol_period=1):
         """
         Used for copying a predefined stage's settings and configurations to set
         up flat ramps. Overloads the parent class' method.
     
         Parameters
         ----------
-        ramp_plasma_density : [m^-3] float, optional
-            Plasma density for the ramp.
-
-        ramp_length : [m] float, optional
-            Length of the ramp.
-
         probe_evol_period : int, optional
             Set to larger than 0 to determine the probing period for beam 
             evolution diagnostics. This is given in units of time steps, so that
@@ -753,7 +747,7 @@ class StagePrtclTransWakeInstability(Stage):
             A modified deep copy of the original stage.
         """
 
-        stage_copy = super().stage2ramp(ramp_plasma_density, ramp_length)
+        stage_copy = super().stage2ramp()
 
         # Additional configurations 
         stage_copy.probe_evol_period = probe_evol_period
@@ -782,13 +776,32 @@ class StagePrtclTransWakeInstability(Stage):
             A uniform ramp that can be used for tracking.
         """
 
-        trackable_ramp = self.stage2ramp(ramp_plasma_density=ramp.plasma_density, ramp_length=ramp.length)
+        trackable_ramp = self.stage2ramp()
+        trackable_ramp.plasma_density = ramp.plasma_density
+
         trackable_ramp.nom_energy = ramp.nom_energy
         trackable_ramp.nom_energy_flattop = ramp.nom_energy_flattop
+
+        if trackable_ramp.nom_energy != trackable_ramp.nom_energy_flattop:
+            raise StageError('Ramp nominal energy is not equal to ramp flattop nominal energy.')
+
         trackable_ramp.nom_energy_gain = ramp.nom_energy_gain
-        #trackable_ramp.nom_energy_gain_flattop = ramp.nom_energy_gain_flattop
-        #trackable_ramp.nom_accel_gradient = ramp.nom_accel_gradient
-        #trackable_ramp.nom_accel_gradient_flattop = ramp.nom_accel_gradient_flattop
+        # trackable_ramp.nom_energy_gain_flattop = ramp.nom_energy_gain_flattop
+
+        if trackable_ramp.nom_energy_gain != trackable_ramp.nom_energy_gain_flattop:
+            raise StageError('Ramp nominal energy gain is not equal to ramp flattop nominal energy gain.')
+        
+        trackable_ramp.length_flattop = ramp.length_flattop
+        # trackable_ramp.length = ramp.length
+
+        if trackable_ramp.length != trackable_ramp.length_flattop:
+            raise StageError('Ramp length is not equal to ramp flattop length.')
+        
+        # trackable_ramp.nom_accel_gradient = ramp.nom_accel_gradient
+        # trackable_ramp.nom_accel_gradient_flattop = ramp.nom_accel_gradient_flattop
+
+        if trackable_ramp.nom_accel_gradient != trackable_ramp.nom_accel_gradient_flattop:
+            raise StageError('Ramp nominal accereleration gradient is not equal to ramp flattop nominal accereleration gradient.')
 
         return trackable_ramp
     
@@ -2980,7 +2993,10 @@ class StagePrtclTransWakeInstability(Stage):
 
     # ==================================================
     def print_summary(self):
-
+        if self.is_upramp():
+            print('Ramp type: \t\t\t\t\t\t upramp')
+        if self.is_downramp():
+            print('Ramp type: \t\t\t\t\t\t downramp')
         super().print_summary()
 
         print(f"Time step [betatron wavelength/c]:\t\t\t {self.time_step_mod :.3f}")
