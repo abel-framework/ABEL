@@ -111,14 +111,15 @@ def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_dens
 
     stage.probe_evol_period = 3
     stage.make_animations = False
+    stage.save_final_step = False
 
     stage._return_tracked_driver = return_tracked_driver
     stage.test_beam_between_ramps = test_beam_between_ramps
 
     # Set up ramps after the stage is fully configured
     if use_ramps:
-        stage.set_upramp()
-        stage.set_downramp()
+        stage.upramp = HuskRamp()
+        stage.downramp = HuskRamp()
     
     return stage
 
@@ -253,7 +254,7 @@ def test_stage_length_gradient_energyGain():
 
 
     # ========== Set stage length and nominal energy gain ==========
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, test_beam_between_ramps=False)
 
     stage.length_flattop = 7.8                                                    # [m]
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
@@ -269,10 +270,12 @@ def test_stage_length_gradient_energyGain():
 
 
     # ========== Set nominal energy gain and flattop nominal acceleration gradient ==========
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, test_beam_between_ramps=False, length_flattop=None)
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, test_beam_between_ramps=False, length_flattop=None)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
+    stage.nom_energy_gain_flattop = 7.8e9                                         # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
+
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
     assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9, rtol=1e-15, atol=0.0)
@@ -422,6 +425,18 @@ def test_stage2ramp():
     assert ramp.enable_ion_motion is True
     assert ramp.drive_beam_update_period == 0
     assert ramp._return_tracked_driver is False
+
+
+# @pytest.mark.StagePrtclTransWakeInstability
+# def test_convert():
+#     """
+#     Tests for StagePrtclTransWakeInstability.conver...(), i.e. conversion of 
+#     ... .
+
+#     Test whether the output ramp has the same parameters as the input rampHusk and parent stage.
+#     """
+
+#     # 
     
 
 @pytest.mark.StagePrtclTransWakeInstability

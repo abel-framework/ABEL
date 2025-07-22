@@ -114,8 +114,8 @@ def setup_StagePrtclTransWakeInstability(plasma_density, driver_source, main_sou
 
     # Set up ramps after the stage is fully configured
     if use_ramps:
-        stage.set_upramp()
-        stage.set_downramp()
+        stage.upramp = HuskRamp()
+        stage.downramp = HuskRamp()
     
     return stage
 
