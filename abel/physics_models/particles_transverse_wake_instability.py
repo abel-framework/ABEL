@@ -41,12 +41,14 @@ class PrtclTransWakeConfig():
         self.enable_ion_motion = enable_ion_motion
         
         if isinstance(probe_evol_period, int) == False:
-            raise ValueError('probe_evol_period has to be an integer.')
+            raise ValueError('PrtclTransWakeConfig.__init__(): probe_evol_period has to be an integer.')
         self.probe_evol_period = probe_evol_period
         
         if drive_beam_update_period > 0:
             self.enable_driver_evolution = True
             self.drive_beam_update_period = drive_beam_update_period
+            if wake_t_fields is None:
+                raise ValueError('PrtclTransWakeConfig.__init__(): wake_t_fields used for drive beam tracking is not defined.')
             self.wake_t_fields=wake_t_fields
         else:
             self.enable_driver_evolution = False
@@ -59,7 +61,7 @@ class PrtclTransWakeConfig():
 
         if enable_ion_motion:
             if isinstance(ion_wkfld_update_period, int) == False or ion_wkfld_update_period < 1:
-                raise ValueError('ion_wkfld_update_period has to be an integer larger than 0.')
+                raise ValueError('PrtclTransWakeConfig.__init__(): ion_wkfld_update_period has to be an integer larger than 0.')
             self.ion_motion_config = IonMotionConfig(
                 drive_beam=drive_beam, 
                 main_beam=main_beam, 
@@ -141,7 +143,7 @@ class PrtclTransWakeEvolution:
         from abel.utilities.relativity import energy2proper_velocity
 
         if self.index >= len(self.beam.location):
-            raise ValueError('Data recording already completed.')
+            raise ValueError('PrtclTransWakeEvolution.save_evolution(): Data recording already completed.')
             
         self.beam.location[self.index] = beam.location
         self.beam.x[self.index] = beam.x_offset(clean=clean)
