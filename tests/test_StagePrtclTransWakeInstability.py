@@ -385,7 +385,7 @@ def test_driver_unrotation():
 @pytest.mark.StagePrtclTransWakeInstability
 def test_copy_config2blank_stage():
     """
-    Tests for StagePrtclTransWakeInstability.copy_config2blank_stage().
+    Tests for ``StagePrtclTransWakeInstability.copy_config2blank_stage()``.
     """
 
     np.random.seed(42)
@@ -442,7 +442,7 @@ def test_copy_config2blank_stage():
 def test_rb_Ez_tracing():
     """
     Tests for checking correct tracing of bubble radius and axial electric field 
-    by StagePrtclTransWakeInstability methods by comparing against the data in  
+    by ``StagePrtclTransWakeInstability`` methods by comparing against the data in  
     reference files.
     """
 
@@ -545,7 +545,7 @@ def test_rb_Ez_tracing():
 @pytest.mark.StagePrtclTransWakeInstability
 def test_longitudinal_number_distribution():
     """
-    Tests for StagePrtclTransWakeInstability.longitudinal_number_distribution().
+    Tests for ``StagePrtclTransWakeInstability.longitudinal_number_distribution()``.
     """
 
     np.random.seed(42)
@@ -580,7 +580,7 @@ def test_longitudinal_number_distribution():
 @pytest.mark.StagePrtclTransWakeInstability
 def test_matched_beta_function():
     """
-    Tests for StagePrtclTransWakeInstability.matched_beta_function().
+    Tests for ``StagePrtclTransWakeInstability.matched_beta_function()``.
     """
 
     from abel.utilities.relativity import energy2gamma
@@ -603,7 +603,7 @@ def test_matched_beta_function():
 @pytest.mark.StagePrtclTransWakeInstability
 def test_trim_attr_reduce_pickle_size():
     """
-    Tests for StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size().
+    Tests for ``StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size()``.
     """
 
     np.random.seed(42)
@@ -630,3 +630,51 @@ def test_trim_attr_reduce_pickle_size():
     assert stage.downramp.initial is None
     assert stage.downramp.final is None
     assert stage.drive_beam is None
+
+
+@pytest.mark.StagePrtclTransWakeInstability
+def test_plotting_methods():
+    """
+    Tests for various ``StagePrtclTransWakeInstability`` plotting methods.
+    """
+
+    import matplotlib.pyplot as plt
+    np.random.seed(42)
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source()
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, length_flattop=1.0)
+    stage.save_final_step = True
+
+    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac.run('test_plotting_methods', overwrite=True, verbose=False)
+    beam = linac.get_beam(-1)
+
+    linac.stages[-1].plot_wakefield(saveToFile=None, includeWakeRadius=False)
+    linac.stages[-1].plot_wakefield(saveToFile=None, includeWakeRadius=True)
+    linac.stages[-1].plot_wake(show_Ez=False, trace_rb=False, savefig=None, aspect='auto')
+    linac.stages[-1].plot_wake(show_Ez=True, trace_rb=True, savefig=None, aspect='auto')
+    linac.stages[-1].scatter_diags(beam, n_th_particle=10)
+    linac.stages[-1].plot_Ez_rb_cut()
+    linac.stages[-1].plot_flattop_evolution()
+
+    # Close all plots
+    plt.close('all')
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.StagePrtclTransWakeInstability
+def test_print_summary():
+    """
+    Tests for ``StagePrtclTransWakeInstability.print_summary()``.
+    """
+
+    np.random.seed(42)
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source()
+    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True)
+
+    stage.print_summary()
