@@ -554,17 +554,17 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
-        from abel.classes.stage.impl.husk_ramp import HuskRamp
+        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
 
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert HuskRamp to a StagePrtclWakeInstability
-        if type(self.upramp) is HuskRamp:
+        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        if type(self.upramp) is PlasmaRamp:
 
-            upramp = self.convert_RampHusk(self.upramp)
+            upramp = self.convert_PlasmaRamp(self.upramp)
             if type(upramp) is not StagePrtclTransWakeInstability:
                 raise TypeError('upramp is not a StagePrtclTransWakeInstability.')
 
@@ -679,17 +679,17 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
-        from abel.classes.stage.impl.husk_ramp import HuskRamp
+        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
 
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert HuskRamp to a StagePrtclWakeInstability
-        if type(self.downramp) is HuskRamp:
+        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        if type(self.downramp) is PlasmaRamp:
 
-            downramp = self.convert_RampHusk(self.downramp)
+            downramp = self.convert_PlasmaRamp(self.downramp)
             if type(downramp) is not StagePrtclTransWakeInstability:
                 raise TypeError('downramp is not a StagePrtclTransWakeInstability.')
             

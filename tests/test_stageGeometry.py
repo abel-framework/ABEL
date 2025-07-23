@@ -257,8 +257,8 @@ def test_StageGeom_ramps():
     "Test the basic functionality of stage geometry (length/energy gain/gradient); with ramps."
     
     stageTest_L = StageBasic()
-    stageTest_L.upramp = HuskRamp()
-    stageTest_L.downramp = HuskRamp()
+    stageTest_L.upramp = PlasmaRamp()
+    stageTest_L.downramp = PlasmaRamp()
 
     printStuff(stageTest_L)
     printStuff_internal(stageTest_L)
@@ -598,8 +598,8 @@ def test_StageGeom_eGain():
     "Test of energy gain"
 
     stageTest_E = StageBasic()
-    stageTest_E.upramp = HuskRamp()
-    stageTest_E.downramp = HuskRamp()
+    stageTest_E.upramp = PlasmaRamp()
+    stageTest_E.downramp = PlasmaRamp()
     #printStuff(stageTest_G)
 
     stageTest_E.doVerbosePrint_debug = True
@@ -835,8 +835,8 @@ def test_StageGeom_gradient():
     "Test of gradient"
 
     stageTest_G = StageBasic()
-    stageTest_G.upramp = HuskRamp()
-    stageTest_G.downramp = HuskRamp()
+    stageTest_G.upramp = PlasmaRamp()
+    stageTest_G.downramp = PlasmaRamp()
 
     stageTest_G.doVerbosePrint_debug = True
     stageTest_G.upramp.doVerbosePrint_debug = True
@@ -1188,8 +1188,8 @@ def test_StageGeom_sanityCheckLengths2():
     "Testing of stage.sanityCheckLengths logic with ramps"
 
     stageTest_L2 = StageBasic()
-    stageTest_L2.upramp = HuskRamp()
-    stageTest_L2.downramp = HuskRamp()
+    stageTest_L2.upramp = PlasmaRamp()
+    stageTest_L2.downramp = PlasmaRamp()
 
     printStuff(stageTest_L2)
     printStuff_internal(stageTest_L2)

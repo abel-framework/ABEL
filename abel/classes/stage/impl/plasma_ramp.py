@@ -5,7 +5,7 @@ Only meant to store information.
 
 from abel.classes.stage.stage import Stage, StageError
 
-class HuskRamp(Stage):
+class PlasmaRamp(Stage):
     
     # ==================================================
     def __init__(self, nom_energy_gain=None, ramp_plasma_density=None, ramp_length=None, ramp_shape='uniform'):

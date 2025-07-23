@@ -118,8 +118,8 @@ def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_dens
 
     # Set up ramps after the stage is fully configured
     if use_ramps:
-        stage.upramp = HuskRamp()
-        stage.downramp = HuskRamp()
+        stage.upramp = PlasmaRamp()
+        stage.downramp = PlasmaRamp()
     
     return stage
 
@@ -383,10 +383,9 @@ def test_driver_unrotation():
 
     
 @pytest.mark.StagePrtclTransWakeInstability
-def test_stage2ramp():
+def test_copy_config2blank_stage():
     """
-    Tests for StagePrtclTransWakeInstability.stage2ramp(), i.e. conversion of 
-    a stage to ramp.
+    Tests for StagePrtclTransWakeInstability.copy_config2blank_stage().
     """
 
     np.random.seed(42)
@@ -406,7 +405,7 @@ def test_stage2ramp():
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, test_beam_between_ramps=True)
 
-    ramp = stage.stage2ramp()
+    ramp = stage.copy_config2blank_stage()
 
     assert np.allclose(ramp.ramp_beta_mag, 1.0, rtol=1e-15, atol=0.0)  # Always set to 1.0 for ramps.
     assert ramp.upramp is None

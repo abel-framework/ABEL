@@ -187,14 +187,14 @@ class Stage(Trackable, CostModeled):
     
 
     # ==================================================
-    def convert_RampHusk(self, ramp):
+    def convert_PlasmaRamp(self, ramp):
         """
-        Convert a ``HuskRamp`` object to a ``Stage`` object in order to 
+        Convert a ``PlasmaRamp`` object to a ``Stage`` object in order to 
         construct a uniform ramp that can be tracked.
     
         Parameters
         ----------
-        ramp : ``HuskRamp`` object
+        ramp : ``PlasmaRamp`` object
             Contains all parameters for the ramp.
 
 
