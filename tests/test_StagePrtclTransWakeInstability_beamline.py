@@ -660,3 +660,14 @@ def test_driverEvol_jitter_trInstability_ionMotion_ramped_linac():
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
+
+
+def test_remove_run_data_dir():
+    """
+    Not an actual test. Just removes the run_data directory.
+    """
+    import os
+    dir = 'run_data'
+    if os.path.isdir(dir):
+        # Remove output directory
+        shutil.rmtree(dir)
