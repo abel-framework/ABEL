@@ -565,7 +565,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     # Progress bar
     if show_prog_bar is True:
         pbar = tqdm(total=100, bar_format='{desc} {percentage:3.1f}%|{bar}| [{elapsed}, {rate_fmt}{postfix}]')
-        pbar.set_description(f"\t>> Running instability model")
+        pbar.set_description(f"\t>> Running reduced physics models")
         
 
     # ============= Save evolution =============
