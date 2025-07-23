@@ -563,7 +563,7 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Convert HuskRamp to a StagePrtclWakeInstability
         if type(self.upramp) is HuskRamp:
-            
+
             upramp = self.convert_RampHusk(self.upramp)
             if type(upramp) is not StagePrtclTransWakeInstability:
                 raise TypeError('upramp is not a StagePrtclTransWakeInstability.')
@@ -773,27 +773,29 @@ class StagePrtclTransWakeInstability(Stage):
                    
 
     # ==================================================
-    def stage2ramp(self, probe_evol_period=1):
+    def copy_config2blank_stage(self, probe_evol_period=1):
         """
-        Used for copying a predefined stage's settings and configurations to set
-        up flat ramps. Overloads the parent class' method.
+        Makes a deepcopy of the stage to copy the configurations and settings,
+        but most of the parameters in the deepcopy are set to ``None``.
     
         Parameters
         ----------
-        probe_evol_period : int, optional
-            Set to larger than 0 to determine the probing period for beam 
-            evolution diagnostics. This is given in units of time steps, so that
-            e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd
-            time step. Default value: 1.
-    
+        N/A
             
         Returns
         ----------
-        stage_copy : ``Stage`` object
-            A modified deep copy of the original stage.
+        stage_copy : ``StagePrtclTransWakeInstability`` object
+            A modified deep copy of the original stage. 
+            ``stage_copy.plasma_density``, ``stage_copy.length``, 
+            ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
+            ``stage_copy.nom_energy_gain_flattop``, 
+            ``stage_copy.nom_accel_gradient``, 
+            ``stage_copy.nom_accel_gradient_flattop``, 
+            ``stage_copy.driver_source`` and its ramps are all set to ``None``. 
+            All other attributes of the original stage are retained.
         """
 
-        stage_copy = super().stage2ramp()
+        stage_copy = super().copy_config2blank_stage()
 
         # Additional configurations 
         stage_copy.probe_evol_period = probe_evol_period

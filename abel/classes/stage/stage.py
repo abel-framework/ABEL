@@ -121,20 +121,26 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def stage2ramp(self):
+    def copy_config2blank_stage(self):
         """
-        Used for copying a predefined stage's settings and configurations to set 
-        up uniform ramps.
+        Makes a deepcopy of the stage to copy the configurations and settings,
+        but most of the parameters in the deepcopy are set to ``None``.
     
         Parameters
         ----------
         N/A
-    
             
         Returns
         ----------
         stage_copy : ``Stage`` object
-            A modified deep copy of the original stage.
+            A modified deep copy of the original stage. 
+            ``stage_copy.plasma_density``, ``stage_copy.length``, 
+            ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
+            ``stage_copy.nom_energy_gain_flattop``, 
+            ``stage_copy.nom_accel_gradient``, 
+            ``stage_copy.nom_accel_gradient_flattop``, 
+            ``stage_copy.driver_source`` and its ramps are all set to ``None``. 
+            All other attributes of the original stage are retained.
         """
 
         stage_copy = copy.deepcopy(self)
@@ -183,8 +189,8 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def convert_RampHusk(self, ramp):
         """
-        Construct a uniform ramp as a ``Stage`` object.
-
+        Convert a ``HuskRamp`` object to a ``Stage`` object in order to 
+        construct a uniform ramp that can be tracked.
     
         Parameters
         ----------
@@ -198,9 +204,11 @@ class Stage(Trackable, CostModeled):
             A uniform ramp that can be used for tracking.
         """
 
-        trackable_ramp = self.stage2ramp()
-        trackable_ramp.plasma_density = ramp.plasma_density
+        # Construct a ramp of the same type as self
+        trackable_ramp = self.copy_config2blank_stage()
 
+        # Copy the parameters in ramp to trackable_ramp
+        trackable_ramp.plasma_density = ramp.plasma_density
         trackable_ramp.nom_energy = ramp.nom_energy
         trackable_ramp.nom_energy_flattop = ramp.nom_energy_flattop
 
