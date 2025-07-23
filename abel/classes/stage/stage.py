@@ -181,6 +181,54 @@ class Stage(Trackable, CostModeled):
     
 
     # ==================================================
+    def convert_RampHusk(self, ramp):
+        """
+        Construct a uniform ramp as a ``Stage`` object.
+
+    
+        Parameters
+        ----------
+        ramp : ``HuskRamp`` object
+            Contains all parameters for the ramp.
+
+
+        Returns
+        ----------
+        trackable_ramp : ``Stage``object
+            A uniform ramp that can be used for tracking.
+        """
+
+        trackable_ramp = self.stage2ramp()
+        trackable_ramp.plasma_density = ramp.plasma_density
+
+        trackable_ramp.nom_energy = ramp.nom_energy
+        trackable_ramp.nom_energy_flattop = ramp.nom_energy_flattop
+
+        if trackable_ramp.nom_energy != trackable_ramp.nom_energy_flattop:
+            raise StageError('Ramp nominal energy is not equal to ramp flattop nominal energy.')
+
+        trackable_ramp.nom_energy_gain = ramp.nom_energy_gain
+        # trackable_ramp.nom_energy_gain_flattop = ramp.nom_energy_gain_flattop
+
+        if trackable_ramp.nom_energy_gain != trackable_ramp.nom_energy_gain_flattop:
+            raise StageError('Ramp nominal energy gain is not equal to ramp flattop nominal energy gain.')
+        
+        trackable_ramp.length_flattop = ramp.length_flattop
+        # trackable_ramp.length = ramp.length
+
+        if trackable_ramp.length != trackable_ramp.length_flattop:
+            raise StageError('Ramp length is not equal to ramp flattop length.')
+        
+        # trackable_ramp.nom_accel_gradient = ramp.nom_accel_gradient
+        # trackable_ramp.nom_accel_gradient_flattop = ramp.nom_accel_gradient_flattop
+
+        if trackable_ramp.nom_accel_gradient != trackable_ramp.nom_accel_gradient_flattop:
+            raise StageError('Ramp nominal accereleration gradient is not equal to ramp flattop nominal accereleration gradient.')
+
+        return trackable_ramp
+    
+
+    # ==================================================
     def _prepare_ramps(self):
         """
         Set ramp lengths, nominal energies and nominal energy gains if the ramps 
