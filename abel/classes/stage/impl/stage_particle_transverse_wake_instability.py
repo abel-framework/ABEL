@@ -563,7 +563,11 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Convert HuskRamp to a StagePrtclWakeInstability
         if type(self.upramp) is HuskRamp:
+            
             upramp = self.convert_RampHusk(self.upramp)
+            if type(upramp) is not StagePrtclTransWakeInstability:
+                raise TypeError('upramp is not a StagePrtclTransWakeInstability.')
+
         elif type(self.upramp) is Stage:
             upramp = self.upramp  # Allow for other types of ramps
         else:
@@ -684,7 +688,11 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Convert HuskRamp to a StagePrtclWakeInstability
         if type(self.downramp) is HuskRamp:
+
             downramp = self.convert_RampHusk(self.downramp)
+            if type(downramp) is not StagePrtclTransWakeInstability:
+                raise TypeError('downramp is not a StagePrtclTransWakeInstability.')
+            
         elif type(self.downramp) is Stage:
             downramp = self.downramp  # Allow for other types of ramps
         else:
@@ -794,54 +802,6 @@ class StagePrtclTransWakeInstability(Stage):
         stage_copy.show_prog_bar = False
 
         return stage_copy
-    
-
-    # # ==================================================
-    # def convert_RampHusk(self, ramp):
-    #     """
-    #     Construct a uniform ramp as a ``StagePrtclTransWakeInstability`` object.
-
-    
-    #     Parameters
-    #     ----------
-    #     ramp : ``HuskRamp`` object
-    #         Contains all parameters for the ramp.
-
-
-    #     Returns
-    #     ----------
-    #     trackable_ramp : ``StagePrtclTransWakeInstability``object
-    #         A uniform ramp that can be used for tracking.
-    #     """
-
-    #     trackable_ramp = self.stage2ramp()
-    #     trackable_ramp.plasma_density = ramp.plasma_density
-
-    #     trackable_ramp.nom_energy = ramp.nom_energy
-    #     trackable_ramp.nom_energy_flattop = ramp.nom_energy_flattop
-
-    #     if trackable_ramp.nom_energy != trackable_ramp.nom_energy_flattop:
-    #         raise StageError('Ramp nominal energy is not equal to ramp flattop nominal energy.')
-
-    #     trackable_ramp.nom_energy_gain = ramp.nom_energy_gain
-    #     # trackable_ramp.nom_energy_gain_flattop = ramp.nom_energy_gain_flattop
-
-    #     if trackable_ramp.nom_energy_gain != trackable_ramp.nom_energy_gain_flattop:
-    #         raise StageError('Ramp nominal energy gain is not equal to ramp flattop nominal energy gain.')
-        
-    #     trackable_ramp.length_flattop = ramp.length_flattop
-    #     # trackable_ramp.length = ramp.length
-
-    #     if trackable_ramp.length != trackable_ramp.length_flattop:
-    #         raise StageError('Ramp length is not equal to ramp flattop length.')
-        
-    #     # trackable_ramp.nom_accel_gradient = ramp.nom_accel_gradient
-    #     # trackable_ramp.nom_accel_gradient_flattop = ramp.nom_accel_gradient_flattop
-
-    #     if trackable_ramp.nom_accel_gradient != trackable_ramp.nom_accel_gradient_flattop:
-    #         raise StageError('Ramp nominal accereleration gradient is not equal to ramp flattop nominal accereleration gradient.')
-
-    #     return trackable_ramp
     
 
     # ==================================================
