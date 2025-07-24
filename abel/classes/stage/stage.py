@@ -378,57 +378,57 @@ class Stage(Trackable, CostModeled):
         return super().track(beam, savedepth, runnable, verbose)
 
 
-    # ==================================================
-    # upramp to be tracked before the main tracking
-    def track_upramp(self, beam0, driver0=None):       # TODO: make this an abstract method
-        if self.upramp is not None:
+    # # ==================================================
+    # # upramp to be tracked before the main tracking
+    # def track_upramp(self, beam0, driver0=None):       # TODO: make this an abstract method
+    #     if self.upramp is not None:
 
-            # set driver
-            self.upramp.driver_source = SourceCapsule(beam=driver0)
+    #         # set driver
+    #         self.upramp.driver_source = SourceCapsule(beam=driver0)
 
-            # determine density if not already set
-            if self.upramp.plasma_density is None:
-                self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
+    #         # determine density if not already set
+    #         if self.upramp.plasma_density is None:
+    #             self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
 
-            # perform tracking
-            self.upramp._return_tracked_driver = True
-            beam, driver = self.upramp.track(beam0)
+    #         # perform tracking
+    #         self.upramp._return_tracked_driver = True
+    #         beam, driver = self.upramp.track(beam0)
 
-            beam.stage_number -= 1
-            driver.stage_number -= 1
+    #         beam.stage_number -= 1
+    #         driver.stage_number -= 1
             
-        else:
-            beam = beam0
-            driver = driver0
+    #     else:
+    #         beam = beam0
+    #         driver = driver0
         
-        return beam, driver
+    #     return beam, driver
 
 
-    # ==================================================
-    # downramp to be tracked after the main tracking
-    def track_downramp(self, beam0, driver0):       # TODO: make this an abstract method
-        if self.downramp is not None:
+    # # ==================================================
+    # # downramp to be tracked after the main tracking
+    # def track_downramp(self, beam0, driver0):       # TODO: make this an abstract method
+    #     if self.downramp is not None:
 
-            # set driver
-            #print('Inside track_downramp():', driver0.location)
-            self.downramp.driver_source = SourceCapsule(beam=driver0)
+    #         # set driver
+    #         #print('Inside track_downramp():', driver0.location)
+    #         self.downramp.driver_source = SourceCapsule(beam=driver0)
             
-            # determine density if not already set
-            if self.downramp.plasma_density is None:
-                # set ramp density
-                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag           
+    #         # determine density if not already set
+    #         if self.downramp.plasma_density is None:
+    #             # set ramp density
+    #             self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag           
             
-            # perform tracking
-            self.downramp._return_tracked_driver = True
-            beam, driver = self.downramp.track(beam0)
-            beam.stage_number -= 1
-            driver.stage_number -= 1
+    #         # perform tracking
+    #         self.downramp._return_tracked_driver = True
+    #         beam, driver = self.downramp.track(beam0)
+    #         beam.stage_number -= 1
+    #         driver.stage_number -= 1
             
-        else:
-            beam = beam0
-            driver = driver0
+    #     else:
+    #         beam = beam0
+    #         driver = driver0
             
-        return beam, driver
+    #     return beam, driver
 
 
     ## Mutually consistent calculation for length, nom_accel_gradient, nom_energy gain,
@@ -1727,14 +1727,14 @@ class Stage(Trackable, CostModeled):
         
         nom_energy_gain = self.nom_energy_gain 
         if nom_energy_gain is None:
-            print(f"Nominal energy gain [GeV/m]:\t\t\t\t Not set")
+            print(f"Nominal energy gain [GeV]:\t\t\t\t Not set")
         else:
-            print(f"Nominal energy gain [GeV/m]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")
+            print(f"Nominal energy gain [GeV]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")
 
         if self.nom_energy_gain_flattop is None:
-            print(f"Nominal energy gain flattop [GeV/m]:\t\t\t Not set")
+            print(f"Nominal energy gain flattop [GeV]:\t\t\t Not set")
         else:
-            print(f"Nominal energy gain flattop [GeV/m]:\t\t\t {self.nom_energy_gain_flattop/1e9 :.3f}")
+            print(f"Nominal energy gain flattop [GeV]:\t\t\t {self.nom_energy_gain_flattop/1e9 :.3f}")
 
         if self.nom_accel_gradient is None:
             print(f"Nominal acceleration gradient [GV/m]:\t\t\t Not set")
