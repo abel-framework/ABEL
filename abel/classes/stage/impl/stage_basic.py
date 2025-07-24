@@ -1,5 +1,5 @@
-from abel.classes.stage.stage import Stage
-from abel.classes.source.source import Source
+from abel.classes.stage.stage import Stage, StageError
+from abel.classes.source.impl.source_capsule import SourceCapsule
 import numpy as np
 import scipy.constants as SI
 import copy
@@ -24,7 +24,10 @@ class StageBasic(Stage):
         # get the driver
         driver_incoming = self.driver_source.track()
 
-        print('driver_incoming.ux_offset()', driver_incoming.ux_offset())       ########## TODO: delete
+        if self.test_beam_between_ramps:
+            original_driver = copy.deepcopy(driver_incoming)
+
+        #print('driver_incoming.ux_offset()', driver_incoming.ux_offset())       ########## TODO: delete
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
@@ -38,7 +41,7 @@ class StageBasic(Stage):
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             drive_beam_rotated, beam_rotated = self.rotate_beam_coordinate_systems(driver_incoming, beam_incoming)
 
-            print('drive_beam_rotated.ux_offset()', drive_beam_rotated.ux_offset())       ########## TODO: delete
+            #print('drive_beam_rotated.ux_offset()', drive_beam_rotated.ux_offset())       ########## TODO: delete
 
 
         # ========== Prepare ramps ==========
@@ -53,40 +56,36 @@ class StageBasic(Stage):
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
             beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
         
-        else:  # Do the following if there are no upramp (can be either a lone stage or the first upramp)
-            if self.parent is None:  # Just a lone stage
-                beam_ramped = copy.deepcopy(beam_rotated)
-                drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
-            else:
-                beam_ramped = copy.deepcopy(beam_incoming)
-                drive_beam_ramped = copy.deepcopy(driver_incoming)
-
+        else:  # Do the following if there are no upramp (a lone stage)
+            beam_ramped = copy.deepcopy(beam_rotated)
+            drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
+            
             if self.ramp_beta_mag is not None:
-
                 beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
                 drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
 
-                ## NOTE: beam_ramped and drive_beam_ramped should not be changed after this line to check for continuity between ramps and stage. 
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            stage_beam_in = copy.deepcopy(beam_ramped)
+            stage_driver_in = copy.deepcopy(drive_beam_ramped)
 
-        beam = copy.deepcopy(beam_ramped)
-        driver = copy.deepcopy(drive_beam_ramped)
-                
-
-        # ========== Betatron oscillations ==========
-        deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
-        if self.calc_evolution:
-            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset(), calc_evolution=self.calc_evolution)
-            self.evolution.beam = evol
-        else:
-            beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset())
-
-
-        # ========== Accelerate beam with homogeneous energy gain ==========
-        beam.set_Es(beam.Es() + self.nom_energy_gain_flattop)
+        
+        # ========== Main tracking sequence ==========
+        beam, driver = self.main_tracking_procedure(beam_ramped, drive_beam_ramped)
         
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
+            # TODO: Temporary "drive beam evolution": Magnify the driver
+            # Needs to be performed before self.track_downramp().
+            if self.downramp.ramp_beta_mag is not None:
+                driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+
+            # Save beams to probe for consistency between ramps and stage
+            if self.test_beam_between_ramps:
+                stage_beam_out = copy.deepcopy(beam)
+                stage_driver_out = copy.deepcopy(driver)
+
             beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
 
         else:  # Do the following if there are no downramp. 
@@ -102,39 +101,32 @@ class StageBasic(Stage):
         # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
         if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
 
-            # ========== Decelerate the driver with homogeneous energy loss ==========
+            
 
-            print('driver_outgoing.ux_offset() before driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
+            # print('driver_outgoing.ux_offset() before driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
+            
+            # # Decelerate the driver with homogeneous energy loss
+            #driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
 
-            driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
-
-            print('driver_outgoing.ux_offset() after driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
+            # print('driver_outgoing.ux_offset() after driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(driver_incoming, driver_outgoing, beam_outgoing)
 
-            print('driver_outgoing.ux_offset() after undo_beam_coordinate_systems_rotation:', driver_outgoing.ux_offset())       ########## TODO: delete
+            # print('driver_outgoing.ux_offset() after undo_beam_coordinate_systems_rotation:', driver_outgoing.ux_offset())       ########## TODO: delete
 
 
         # ========== Bookkeeping ==========
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         
+        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.test_beam_between_ramps:
-
-            if self.parent is None:
-                # Store beams for the main stage
-                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # Drive beam after the upramp
-                                               beam_before_tracking=beam_ramped,  # Main beam after the upramp
-                                               driver_outgoing=driver,  # Drive beam after tracking, before the downramp
-                                               beam_outgoing=beam,  # Main beam after tracking, before the downramp
-                                               driver_incoming=driver_incoming)  # The original drive beam before rotation and ramps
-            else:
-                # Store beams for the ramps
-                self.store_beams_between_ramps(driver_before_tracking=drive_beam_ramped,  # A deepcopy of the incoming drive beam before tracking.
-                                               beam_before_tracking=beam_ramped,  # A deepcopy of the incoming main beam before tracking.
-                                               driver_outgoing=driver_outgoing,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                               beam_outgoing=beam_outgoing,  # Main beam after tracking through the ramp (has not been un-rotated)
-                                               driver_incoming=None)  # Only the main stage needs to store the original drive beam
+            # Store beams for the main stage
+            self.store_beams_between_ramps(driver_before_tracking=stage_driver_in,  # Drive beam after the upramp, before tracking
+                                            beam_before_tracking=stage_beam_in,  # Main beam after the upramp, before tracking
+                                            driver_outgoing=stage_driver_out,  # Drive beam after tracking, before the downramp
+                                            beam_outgoing=stage_beam_out,  # Main beam after tracking, before the downramp
+                                            driver_incoming=original_driver)  # The original drive beam before rotation and ramps
 
         # calculate efficiency
         self.calculate_efficiency(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
@@ -152,8 +144,246 @@ class StageBasic(Stage):
             return super().track(beam_outgoing, savedepth, runnable, verbose), driver_outgoing
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
+        
 
+    # ==================================================
+    def main_tracking_procedure(self, beam_ramped, drive_beam_ramped):
+        """
+        Prepares and performs the main reduced model beam tracking.
+        
+
+        Parameters
+        ----------
+        beam_ramped : ABEL ``Beam`` object
+            Main beam.
+
+        drive_beam_ramped : ABEL ``Beam`` object
+            Drive beam.
+
+            
+        Returns
+        ----------
+        beam : ABEL ``Beam`` object
+            Main beam after tracking.
+
+        drive_beam : ABEL ``Beam`` object
+            Drive beam after tracking.
+        """
+
+        beam = copy.deepcopy(beam_ramped)
+        drive_beam = copy.deepcopy(drive_beam_ramped)
+
+        # Betatron oscillations
+        deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
+        if self.calc_evolution:
+            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset(), calc_evolution=self.calc_evolution)
+            self.evolution.beam = evol
+        else:
+            beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset())
+
+        # Accelerate beam with homogeneous energy gain
+        beam.set_Es(beam.Es() + self.nom_energy_gain_flattop)
+
+        # Decelerate the driver with homogeneous energy loss
+        drive_beam.set_Es(drive_beam_ramped.Es()*(1-self.depletion_efficiency))
+
+        return beam, drive_beam
     
+
+    # ==================================================
+    def track_upramp(self, beam0, driver0):
+        """
+        Called by a stage to perform upramp tracking.
+    
+        
+        Parameters
+        ----------
+        driver0 : ABEL ``Beam`` object
+            Drive beam.
+
+        beam0 : ABEL ``Beam`` object
+            Main beam.
+    
+            
+        Returns
+        ----------
+        beam : ABEL ``Beam`` object
+            Main beam after tracking.
+
+        driver : ABEL ``Beam`` object
+            Drive beam after tracking.
+        """
+
+        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
+
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_in = copy.deepcopy(beam0)
+            ramp_driver_in = copy.deepcopy(driver0)
+
+        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        if type(self.upramp) is PlasmaRamp:
+
+            upramp = self.convert_PlasmaRamp(self.upramp)
+            if type(upramp) is not StageBasic:
+                raise TypeError('upramp is not a StageBasic.')
+
+        elif type(self.upramp) is Stage:
+            upramp = self.upramp  # Allow for other types of ramps
+        else:
+            raise StageError('Ramp is not an instance of Stage class.')
+        
+        if upramp.plasma_density is None:
+            raise ValueError('Upramp plasma density is invalid.')
+        if upramp.nom_energy is None:
+            raise ValueError('Upramp nominal enegy is invalid.')
+        if upramp.nom_energy_flattop is None:
+            raise ValueError('Upramp flattop nominal energy is invalid.')
+        if upramp.length is None:
+            raise ValueError('Upramp length is invalid.')
+        if upramp.length_flattop is None:
+            raise ValueError('Upramp flattop length is invalid.')
+        if upramp.nom_energy_gain is None:
+            raise ValueError('Upramp nominal enegy gain is invalid.')
+        if upramp.nom_energy_gain_flattop is None:
+            raise ValueError('Upramp flattop nominal energy gain is invalid.')
+        if upramp.nom_accel_gradient is None:
+            raise ValueError('Upramp nominal acceleration gradient is invalid.')
+        if upramp.nom_accel_gradient_flattop is None:
+            raise ValueError('Upramp flattop nominal acceleration gradient is invalid.')
+
+        # Set driver
+        upramp.driver_source = SourceCapsule(beam=driver0)
+
+
+        # ========== Main tracking sequence ==========
+        beam, driver = upramp.main_tracking_procedure(beam0, driver0)
+
+
+        # ========== Bookkeeping ==========
+        # calculate efficiency
+        self.upramp.calculate_efficiency(beam0, driver0, beam, driver)
+        
+        # save current profile
+        self.upramp.calculate_beam_current(beam0, driver0, beam, driver)
+
+        # TODO: Temporary "drive beam evolution": Demagnify the driver
+        # Needs to be performed before self.upramp.store_beams_between_ramps().
+        if self.ramp_beta_mag is not None:  
+            driver.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver)
+
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_out = copy.deepcopy(beam)
+            ramp_driver_out = copy.deepcopy(driver)
+
+        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
+        if self.test_beam_between_ramps:
+            self.upramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
+                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
+                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
+                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
+            
+        return beam, driver
+    
+
+    # ==================================================
+    def track_downramp(self, beam0, driver0):
+        """
+        Called by a stage to perform downramp tracking.
+    
+        
+        Parameters
+        ----------
+        driver0 : ABEL ``Beam`` object
+            Drive beam.
+
+        beam0 : ABEL ``Beam`` object
+            Main beam.
+    
+            
+        Returns
+        ----------
+        beam : ABEL ``Beam`` object
+            Main beam after tracking.
+
+        driver : ABEL ``Beam`` object
+            Drive beam after tracking.
+        """
+
+        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
+
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_in = copy.deepcopy(beam0)
+            ramp_driver_in = copy.deepcopy(driver0)
+
+        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        if type(self.downramp) is PlasmaRamp:
+
+            downramp = self.convert_PlasmaRamp(self.downramp)
+            if type(downramp) is not StageBasic:
+                raise TypeError('downramp is not a StageBasic.')
+
+        elif type(self.downramp) is Stage:
+            downramp = self.downramp  # Allow for other types of ramps
+        else:
+            raise StageError('Ramp is not an instance of Stage class.')
+        
+        if downramp.plasma_density is None:
+            raise ValueError('Downramp plasma density is invalid.')
+        if downramp.nom_energy is None:
+            raise ValueError('Downramp nominal enegy is invalid.')
+        if downramp.nom_energy_flattop is None:
+            raise ValueError('Downramp flattop nominal energy is invalid.')
+        if downramp.length is None:
+            raise ValueError('Downramp length is invalid.')
+        if downramp.length_flattop is None:
+            raise ValueError('Downramp flattop length is invalid.')
+        if downramp.nom_energy_gain is None:
+            raise ValueError('Downramp nominal enegy gain is invalid.')
+        if downramp.nom_energy_gain_flattop is None:
+            raise ValueError('Downramp flattop nominal energy gain is invalid.')
+        if downramp.nom_accel_gradient is None:
+            raise ValueError('Downramp nominal acceleration gradient is invalid.')
+        if downramp.nom_accel_gradient_flattop is None:
+            raise ValueError('Downramp flattop nominal acceleration gradient is invalid.')
+
+        # Set driver
+        downramp.driver_source = SourceCapsule(beam=driver0)
+
+
+        # ========== Main tracking sequence ==========
+        beam, driver = downramp.main_tracking_procedure(beam0, driver0)
+
+
+        # ========== Bookkeeping ==========
+        # calculate efficiency
+        self.downramp.calculate_efficiency(beam0, driver0, beam, driver)
+        
+        # save current profile
+        self.downramp.calculate_beam_current(beam0, driver0, beam, driver)
+
+        # Save beams to check for consistency between ramps and stage
+        if self.test_beam_between_ramps:
+            ramp_beam_out = copy.deepcopy(beam)
+            ramp_driver_out = copy.deepcopy(driver)
+
+        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
+        if self.test_beam_between_ramps:
+            self.downramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
+                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
+                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
+                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
+                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
+            
+        return beam, driver
+
+        
+    
+
+    # ==================================================
     def optimize_plasma_density(self, source):
         
         # approximate extraction efficiency
@@ -171,34 +401,40 @@ class StageBasic(Stage):
      
         
     # ==================================================
-    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None, transformer_ratio=1, depletion_efficiency=0.0, calc_evolution=False):
+    def copy_config2blank_stage(self, transformer_ratio=None, depletion_efficiency=None, calc_evolution=None):
         """
-        Used for copying a predefined stage's settings and configurations to set
-        up flat ramps. Overloads the parent class' method.
+        Makes a deepcopy of the stage to copy the configurations and settings,
+        but most of the parameters in the deepcopy are set to ``None``.
     
         Parameters
         ----------
-        ramp_plasma_density : [m^-3] float, optional
-            Plasma density for the ramp.
-
-        ramp_length : [m] float, optional
-            Length of the ramp.
-
         ...
-    
+
+        calc_evolution : bool, optional
+            Flag for recording the beam parameter evolution. Default set to the
+            same value as ``self``.
             
         Returns
         ----------
         stage_copy : ``Stage`` object
-            A modified deep copy of the original stage.
+            A modified deep copy of the original stage. 
+            ``stage_copy.plasma_density``, ``stage_copy.length``, 
+            ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
+            ``stage_copy.nom_energy_gain_flattop``, 
+            ``stage_copy.nom_accel_gradient``, 
+            ``stage_copy.nom_accel_gradient_flattop``, 
+            ``stage_copy.driver_source`` and its ramps are all set to ``None``.
         """
 
-        stage_copy = super().stage2ramp(ramp_plasma_density, ramp_length)
+        stage_copy = super().copy_config2blank_stage()
 
-        # Additional configurations 
-        stage_copy.transformer_ratio = transformer_ratio
-        stage_copy.depletion_efficiency = depletion_efficiency
-        stage_copy.calc_evolution = calc_evolution
+        # Additional configurations
+        if transformer_ratio is not None:
+            stage_copy.transformer_ratio = transformer_ratio
+        if depletion_efficiency is not None:
+            stage_copy.depletion_efficiency = depletion_efficiency
+        if calc_evolution is not None:
+            stage_copy.calc_evolution = calc_evolution
 
         return stage_copy
 
