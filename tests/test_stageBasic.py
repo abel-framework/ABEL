@@ -121,11 +121,11 @@ def test_stage_length_gradient_energyGain():
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, test_beam_between_ramps=False)
 
     
-    #stage.nom_energy_gain = 0.0                                                  # [eV]
+    #stage.nom_energy_gain = 0.0                                                   # [eV]
     #stage.length_flattop = None                                                   # [m]
     stage._resetLengthEnergyGradient()
 
-    stage.nom_energy_gain_flattop = 31.9e9                                                # [eV]
+    stage.nom_energy_gain_flattop = 31.9e9                                        # [eV]
     stage.length_flattop = 4.82                                                   # [m]
     
 
@@ -157,7 +157,10 @@ def test_stage_length_gradient_energyGain():
 
 @pytest.mark.StageBasic
 def test_beam_between_ramps():
-    "Tests for ensuring that the beams are correctly transferred between ramps and stage."
+    """
+    Tests for ensuring that the beams are correctly transferred between ramps 
+    and stage.
+    """
 
     np.random.seed(42)
 
@@ -175,16 +178,23 @@ def test_beam_between_ramps():
     Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
 
     # Between a main stage and downramp
+    print('stage numbers:', stage.driver_out.stage_number, stage.downramp.driver_in.stage_number) # TODO: delete
+
     Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
     Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the output beam matches the out beam for the downramp
     final_beam = linac[0].get_beam(-1)
-    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+    #Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True) # TODO: delete
+    downramp_beam_out = stage.downramp.beam_out
+    downramp_beam_out.stage_number += 1  # There is a mismatch in stage number, as it is not added until after the stage.
+    #print('stage numbers:', final_beam.stage_number, downramp_beam_out.stage_number) # TODO: delete
+    _, beam_outgoing = stage.undo_beam_coordinate_systems_rotation(stage.driver_incoming, stage.downramp.driver_out, downramp_beam_out)
+    Beam.comp_beams(final_beam, beam_outgoing, comp_location=True, rtol=1e-11, atol=0.0)
 
-    print(stage.length, stage.length_flattop)
-    print(stage.upramp.length, stage.downramp.length, (stage.upramp.length+stage.downramp.length+stage.length_flattop)/stage.length)
-    print(final_beam.location, stage.upramp.beam_in.location)
+    # print(stage.length, stage.length_flattop)  # TODO: delete
+    # print(stage.upramp.length, stage.downramp.length, (stage.upramp.length+stage.downramp.length+stage.length_flattop)/stage.length)  # TODO: delete
+    # print(final_beam.location, stage.upramp.beam_in.location)  # TODO: delete
 
     # Assert that the propagation length of the output beam matches the total length of the stage
     assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
@@ -353,7 +363,7 @@ def test_driver_unrotation():
     # print(driver.x_angle(), driver0.x_angle())
     # print(driver.y_angle(), driver0.y_angle())
     # print(driver.energy()/1e9, driver0.energy()/1e9)
-    print('driver.ux_offset(), driver0.ux_offset():', driver.ux_offset(), driver0.ux_offset())
+    print('driver.ux_offset(), driver0.ux_offset():', driver.ux_offset(), driver0.ux_offset()) # TODO: delete
 
 
 
