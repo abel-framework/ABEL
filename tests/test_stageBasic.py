@@ -102,8 +102,8 @@ def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_ga
 
     # Set up ramps after the stage is fully configured
     if use_ramps:
-        stage.upramp = stage.stage2ramp() 
-        stage.downramp = stage.stage2ramp()
+        stage.upramp = PlasmaRamp() 
+        stage.downramp = PlasmaRamp()
     
     return stage
 
@@ -142,6 +142,7 @@ def test_stage_length_gradient_energyGain():
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=False)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
+    stage.nom_energy_gain_flattop = 7.8e9                                         # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
@@ -178,76 +179,74 @@ def test_beam_between_ramps():
     Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
 
     # Between a main stage and downramp
-    print('stage numbers:', stage.driver_out.stage_number, stage.downramp.driver_in.stage_number) # TODO: delete
-
     Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
     Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the output beam matches the out beam for the downramp
     final_beam = linac[0].get_beam(-1)
-    #Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True) # TODO: delete
     downramp_beam_out = stage.downramp.beam_out
     downramp_beam_out.stage_number += 1  # There is a mismatch in stage number, as it is not added until after the stage.
-    #print('stage numbers:', final_beam.stage_number, downramp_beam_out.stage_number) # TODO: delete
     _, beam_outgoing = stage.undo_beam_coordinate_systems_rotation(stage.driver_incoming, stage.downramp.driver_out, downramp_beam_out)
     Beam.comp_beams(final_beam, beam_outgoing, comp_location=True, rtol=1e-11, atol=0.0)
-
-    # print(stage.length, stage.length_flattop)  # TODO: delete
-    # print(stage.upramp.length, stage.downramp.length, (stage.upramp.length+stage.downramp.length+stage.length_flattop)/stage.length)  # TODO: delete
-    # print(final_beam.location, stage.upramp.beam_in.location)  # TODO: delete
 
     # Assert that the propagation length of the output beam matches the total length of the stage
     assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
 
 
     # ========== No jitter, no angular offset ==========
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
-    main_source = setup_basic_main_source()
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=True)
+    driver_source2 = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    main_source2 = setup_basic_main_source()
+    stage2 = setup_StageBasic(driver_source=driver_source2, use_ramps=True, test_beam_between_ramps=True)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac = PlasmaLinac(source=main_source2, stage=stage2, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
 
     # Assert that there has been no significant changes in the beams between parents and its upramp
     # Between a upramp and main stage
-    Beam.comp_beams(stage.upramp.driver_out, stage.driver_in, comp_location=True)
-    Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
+    Beam.comp_beams(stage2.upramp.driver_out, stage2.driver_in, comp_location=True)
+    Beam.comp_beams(stage2.upramp.beam_out, stage2.beam_in, comp_location=True)
 
     # Between a main stage and downramp
-    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
-    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
+    Beam.comp_beams(stage2.driver_out, stage2.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
+    Beam.comp_beams(stage2.beam_out, stage2.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the output beam matches the out beam for the downramp
     final_beam = linac[0].get_beam(-1)
-    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+    downramp_beam_out = stage2.downramp.beam_out
+    downramp_beam_out.stage_number += 1  # There is a mismatch in stage number, as it is not added until after the stage.
+    _, beam_outgoing = stage2.undo_beam_coordinate_systems_rotation(stage2.driver_incoming, stage2.downramp.driver_out, downramp_beam_out)
+    Beam.comp_beams(final_beam, beam_outgoing, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the propagation length of the output beam matches the total length of the stage
-    assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
+    assert np.allclose(final_beam.location - stage2.upramp.beam_in.location, stage2.length, rtol=1e-15, atol=0.0)
 
 
     # ========== No jitter, large angular offset ==========
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=1e-6, y_angle=1e-5)
-    main_source = setup_basic_main_source()
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=True)
+    driver_source3 = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=1e-6, y_angle=1e-5)
+    main_source3 = setup_basic_main_source()
+    stage3 = setup_StageBasic(driver_source=driver_source3, use_ramps=True, test_beam_between_ramps=True)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac = PlasmaLinac(source=main_source3, stage=stage3, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
 
     # Assert that there has been no significant changes in the beams between parents and its upramp
     # Between a upramp and main stage
-    Beam.comp_beams(stage.upramp.driver_out, stage.driver_in, comp_location=True)
-    Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
+    Beam.comp_beams(stage3.upramp.driver_out, stage3.driver_in, comp_location=True)
+    Beam.comp_beams(stage3.upramp.beam_out, stage3.beam_in, comp_location=True)
 
     # Between a main stage and downramp
-    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
-    Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
+    Beam.comp_beams(stage3.driver_out, stage3.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
+    Beam.comp_beams(stage3.beam_out, stage3.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the output beam matches the out beam for the downramp
     final_beam = linac[0].get_beam(-1)
-    Beam.comp_beams(final_beam, stage.downramp.beam_out, comp_location=True)
+    downramp_beam_out = stage3.downramp.beam_out
+    downramp_beam_out.stage_number += 1  # There is a mismatch in stage number, as it is not added until after the stage.
+    _, beam_outgoing = stage3.undo_beam_coordinate_systems_rotation(stage3.driver_incoming, stage3.downramp.driver_out, downramp_beam_out)
+    Beam.comp_beams(final_beam, beam_outgoing, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the propagation length of the output beam matches the total length of the stage
-    assert np.allclose(final_beam.location - stage.upramp.beam_in.location, stage.length, rtol=1e-15, atol=0.0)
+    assert np.allclose(final_beam.location - stage3.upramp.beam_in.location, stage3.length, rtol=1e-15, atol=0.0)
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
