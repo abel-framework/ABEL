@@ -26,8 +26,6 @@ class StageBasic(Stage):
 
         if self.test_beam_between_ramps:
             original_driver = copy.deepcopy(driver_incoming)
-
-        #print('driver_incoming.ux_offset()', driver_incoming.ux_offset())       ########## TODO: delete
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
@@ -40,8 +38,6 @@ class StageBasic(Stage):
 
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             drive_beam_rotated, beam_rotated = self.rotate_beam_coordinate_systems(driver_incoming, beam_incoming)
-
-            #print('drive_beam_rotated.ux_offset()', drive_beam_rotated.ux_offset())       ########## TODO: delete
 
 
         # ========== Prepare ramps ==========
@@ -78,8 +74,6 @@ class StageBasic(Stage):
         # ========== Main tracking sequence ==========
         beam, driver = self.main_tracking_procedure(beam_ramped, drive_beam_ramped)
 
-        
-        
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
@@ -119,20 +113,9 @@ class StageBasic(Stage):
         # ========== Rotate the coordinate system of the beams back to original ==========
         # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
         if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
-
-            
-
-            # print('driver_outgoing.ux_offset() before driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
-            
-            # # Decelerate the driver with homogeneous energy loss
-            #driver_outgoing.set_Es(driver_outgoing.Es()*(1-self.depletion_efficiency))
-
-            # print('driver_outgoing.ux_offset() after driver_outgoing.set_Es:', driver_outgoing.ux_offset())       ########## TODO: delete
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(driver_incoming, driver_outgoing, beam_outgoing)
-
-            # print('driver_outgoing.ux_offset() after undo_beam_coordinate_systems_rotation:', driver_outgoing.ux_offset())       ########## TODO: delete
 
 
         # ========== Bookkeeping ==========
@@ -403,8 +386,6 @@ class StageBasic(Stage):
             
         return beam, driver
 
-        
-    
 
     # ==================================================
     def optimize_plasma_density(self, source):

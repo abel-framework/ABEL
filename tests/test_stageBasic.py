@@ -262,7 +262,7 @@ def test_driver_unrotation():
     np.random.seed(42)
 
     # ========== No driver jitter, with angular offset, no ramps ==========
-    x_angle = 1.3e-6                                                                # [rad]
+    x_angle = 1.3e-6                                                              # [rad]
     y_angle = 2e-6                                                                # [rad]
     driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
     main_source = setup_basic_main_source()
@@ -279,7 +279,6 @@ def test_driver_unrotation():
     driver0.set_xs(xs + x_drift)
     driver0.set_ys(ys + y_drift)
     
-
     # Cannot compare the whole phase space due to driver evolution
     assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=1e-4, atol=0.0)
     assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-4, atol=0.0)
