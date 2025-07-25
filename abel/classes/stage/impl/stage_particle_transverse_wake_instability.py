@@ -351,6 +351,11 @@ class StagePrtclTransWakeInstability(Stage):
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
 
+                # Save beams to probe for consistency between ramps and stage
+                if self.test_beam_between_ramps:
+                    stage_beam_out = copy.deepcopy(beam_outgoing)
+                    stage_driver_out = copy.deepcopy(driver_outgoing)
+
 
         # ========== Rotate the coordinate system of the beams back to original ==========
         # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
