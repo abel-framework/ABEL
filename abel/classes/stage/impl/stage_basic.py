@@ -77,6 +77,8 @@ class StageBasic(Stage):
         
         # ========== Main tracking sequence ==========
         beam, driver = self.main_tracking_procedure(beam_ramped, drive_beam_ramped)
+
+        
         
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
@@ -107,6 +109,11 @@ class StageBasic(Stage):
 
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+
+                # Save beams to probe for consistency between ramps and stage
+                if self.test_beam_between_ramps:
+                    stage_beam_out = copy.deepcopy(beam_outgoing)
+                    stage_driver_out = copy.deepcopy(driver_outgoing)
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
