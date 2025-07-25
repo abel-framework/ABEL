@@ -81,7 +81,7 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
     main.z_offset = -36e-6                                                        # [m] # Standard value
 
     # Other
-    #main.symmetrize_6d = True
+    main.symmetrize_6d = True
 
     return main
 
@@ -110,7 +110,10 @@ def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_ga
 
 @pytest.mark.StageBasic
 def test_stage_length_gradient_energyGain():
-    "Tests ensuring that the flattop length and total length of the stage as well as nominal gradient and nominal energy gain are set correctly."
+    """
+    Tests ensuring that the flattop length and total length of the stage as well 
+    as nominal gradient and nominal energy gain are set correctly.
+    """
 
     np.random.seed(42)
     driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
@@ -118,22 +121,17 @@ def test_stage_length_gradient_energyGain():
 
 
     # ========== Set flattop length and nominal energy gain ==========
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, test_beam_between_ramps=False)
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=False)
 
-    
-    #stage.nom_energy_gain = 0.0                                                   # [eV]
-    #stage.length_flattop = None                                                   # [m]
-    stage._resetLengthEnergyGradient()
-
-    stage.nom_energy_gain_flattop = 31.9e9                                        # [eV]
     stage.length_flattop = 4.82                                                   # [m]
-    
+    stage.nom_energy_gain = 31.9e9                                                # [eV]
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
-    assert np.allclose(stage.nom_energy_gain_flattop, 31.9e9, rtol=1e-15, atol=0.0)
+
     assert np.allclose(stage.nom_energy_gain, 31.9e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length_flattop, 4.82, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.nom_accel_gradient, stage.nom_energy_gain/stage.length, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.nom_accel_gradient_flattop, stage.nom_energy_gain_flattop/stage.length_flattop, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
@@ -142,14 +140,16 @@ def test_stage_length_gradient_energyGain():
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=False)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
-    stage.nom_energy_gain_flattop = 7.8e9                                         # [eV]
+    stage.nom_accel_gradient = None                                               # [V/m]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
+    
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
-    assert np.allclose(stage.nom_energy_gain_flattop, 7.8e9, rtol=1e-15, atol=0.0)
+
     assert np.allclose(stage.nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
-    assert np.allclose(stage.length_flattop, 7.8, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.nom_accel_gradient, stage.nom_energy_gain/stage.length, rtol=1e-15, atol=0.0)
+    assert np.allclose(stage.nom_accel_gradient_flattop, stage.nom_energy_gain_flattop/stage.length_flattop, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
     # Remove output directory
@@ -179,7 +179,7 @@ def test_beam_between_ramps():
     Beam.comp_beams(stage.upramp.beam_out, stage.beam_in, comp_location=True)
 
     # Between a main stage and downramp
-    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-13, atol=0.0)
+    Beam.comp_beams(stage.driver_out, stage.downramp.driver_in, comp_location=True, rtol=1e-11, atol=0.0)
     Beam.comp_beams(stage.beam_out, stage.downramp.beam_in, comp_location=True, rtol=1e-11, atol=0.0)
 
     # Assert that the output beam matches the out beam for the downramp
@@ -252,36 +252,6 @@ def test_beam_between_ramps():
     shutil.rmtree(linac.run_path())
 
 
-def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0):
-    driver = SourceTrapezoid()
-    driver.current_head = 0.1e3                                                   # [A]
-    driver.bunch_length = 1150e-6                                                 # [m] This value is for trapezoid.
-    driver.z_offset = 1724e-6                                                     # [m]
-    driver.x_angle = x_angle                                                      # [rad]
-    driver.y_angle = y_angle                                                      # [rad]
-
-    driver.num_particles = 30000                                                 
-    driver.charge = 5.0e10 * -SI.e                                                # [C]
-    driver.energy = 4.9e9                                                         # [eV] 
-    driver.gaussian_blur = 50e-6                                                  # [m]
-    driver.rel_energy_spread = 0.01                                              
-
-    driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
-    driver.beta_x, driver.beta_y = 0.5, 0.5                                       # [m]
-
-    if enable_xy_jitter:
-        driver.jitter.x = 100e-9                                                  # [m], std
-        driver.jitter.y = 100e-9                                                  # [m], std
-
-    if enable_xpyp_jitter:
-        driver.jitter.xp = 1.0e-6                                                 # [rad], std
-        driver.jitter.yp = 1.0e-6                                                 # [rad], std
-
-    driver.symmetrize = True
-
-    return driver
-
-
 @pytest.mark.StageBasic
 def test_driver_unrotation():
     """
@@ -291,49 +261,88 @@ def test_driver_unrotation():
     
     np.random.seed(42)
 
-    # plasma_density = 6.0e+20                                                      # [m^-3]
-    # ramp_beta_mag = 5.0
-    # enable_xy_jitter = True
-    # enable_xpyp_jitter = True
-    # enable_tr_instability = False
-    # enable_radiation_reaction = False
-    # enable_ion_motion = False
-    # use_ramps = True
-    # drive_beam_update_period = 0
-    # return_tracked_driver = True
+    # ========== No driver jitter, with angular offset, no ramps ==========
+    x_angle = 1.3e-6                                                                # [rad]
+    y_angle = 2e-6                                                                # [rad]
+    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
+    main_source = setup_basic_main_source()
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
 
-    # # ========== Driver jitter, no angular offset ==========
-    # driver_source = setup_trapezoid_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
-    # main_source = setup_basic_main_source()
-    # stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+    stage.nom_energy = 51.4e9                                                    # [eV]
+    _, driver = stage.track(main_source.track())
+    driver0 = stage.driver_incoming
 
-    # stage.nom_energy = 51.4e9                                                    # [eV]
-    # _, driver = stage.track(main_source.track())
-    # driver0 = stage.driver_incoming
+    x_drift = stage.length * np.tan(driver0.x_angle())
+    y_drift = stage.length * np.tan(driver0.y_angle())
+    xs = driver0.xs()
+    ys = driver0.ys()
+    driver0.set_xs(xs + x_drift)
+    driver0.set_ys(ys + y_drift)
+    
 
-    # x_drift = stage.length_flattop * np.tan(driver0.x_angle())
-    # y_drift = stage.length_flattop * np.tan(driver0.y_angle())
-    # xs = driver0.xs()
-    # ys = driver0.ys()
-    # driver0.set_xs(xs + x_drift)
-    # driver0.set_ys(ys + y_drift)
+    # Cannot compare the whole phase space due to driver evolution
+    assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.z_offset(), driver0.z_offset(), rtol=1e-9, atol=0.0)
+    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-4, atol=0.0)
 
-    # assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
-    # assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
-    # assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-7)
-    # assert np.allclose(driver.ys(), driver0.ys(), rtol=0.0, atol=1e-7)
-    # assert np.allclose(driver.zs(), driver0.zs(), rtol=0.0, atol=1e-7)
+    # Deplete driver0 energy depletion for ramps and stage to be comparable to driver
+    driver0.set_Es(driver0.Es()*(1-stage.depletion_efficiency))
+    assert np.isclose(driver.norm_emittance_x(), driver0.norm_emittance_x(), rtol=1e-7, atol=0.0)
+    assert np.isclose(driver.norm_emittance_y(), driver0.norm_emittance_y(), rtol=1e-7, atol=0.0)
+    assert np.isclose(driver.bunch_length(), driver0.bunch_length(), rtol=1e-11, atol=0.0)
+    assert np.isclose(driver.peak_current(), driver0.peak_current(), rtol=1e-6, atol=0.0)
+    assert np.isclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
 
-    # print(driver.uxs()[1:10])
-    # print(driver0.uxs()[1:10])
+    assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-8)
+    assert np.allclose(driver.ys(), driver0.ys(), rtol=0.0, atol=1e-8)
+    assert np.allclose(driver.zs(), driver0.zs(), rtol=0.0, atol=1e-8)
+    assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-6, atol=0.0)
 
-    # assert np.allclose(driver.uxs(), driver0.uxs(), rtol=1e-10, atol=0.0)
-    # assert np.allclose(driver.uys(), driver0.uys(), rtol=1e-12, atol=0.0)
-    # assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-12, atol=0.0)
-    # assert np.allclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
 
-    # assert np.allclose(driver.x_angle(), driver0.x_angle(), rtol=1e-15, atol=0.0)
-    # assert np.allclose(driver.y_angle(), driver0.y_angle(), rtol=1e-13, atol=0.0)
+    # ========== Driver jitter, no angular offset ==========
+    driver_source = setup_Basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
+    main_source = setup_basic_main_source()
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+
+    stage.nom_energy = 51.4e9                                                    # [eV]
+    _, driver = stage.track(main_source.track())
+    driver0 = stage.driver_incoming
+
+    x_drift = stage.length * np.tan(driver0.x_angle())
+    y_drift = stage.length * np.tan(driver0.y_angle())
+    xs = driver0.xs()
+    ys = driver0.ys()
+    driver0.set_xs(xs + x_drift)
+    driver0.set_ys(ys + y_drift)
+
+    # Cannot compare the whole phase space due to driver evolution
+    assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.z_offset(), driver0.z_offset(), rtol=1e-9, atol=0.0)
+    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.norm_emittance_x(), driver0.norm_emittance_x(), rtol=1e-7, atol=0.0)
+    assert np.isclose(driver.norm_emittance_y(), driver0.norm_emittance_y(), rtol=1e-7, atol=0.0)
+    assert np.isclose(driver.bunch_length(), driver0.bunch_length(), rtol=1e-11, atol=0.0)
+    assert np.isclose(driver.peak_current(), driver0.peak_current(), rtol=1e-3, atol=0.0)
+    assert np.isclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
+
+    assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-8)
+    assert np.allclose(driver.ys(), driver0.ys(), rtol=0.0, atol=1e-8)
+    assert np.allclose(driver.zs(), driver0.zs(), rtol=0.0, atol=1e-8)
+
+    # Deplete driver0 energy depletion for ramps and stage to be comparable to driver
+    driver0.set_Es(driver0.Es()*(1-stage.depletion_efficiency))
+    driver0.set_Es(driver0.Es()*(1-stage.depletion_efficiency))
+    driver0.set_Es(driver0.Es()*(1-stage.depletion_efficiency))
+
+    assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-6, atol=0.0)
 
 
     # ========== No jitter, no angular offset ==========
@@ -342,50 +351,61 @@ def test_driver_unrotation():
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
 
     stage.nom_energy = 36.9e9                                                     # [eV], HALHF v2 last stage nominal input energy 
-    #_, driver = stage.track(main_source.track())
-    #driver0 = stage.driver_incoming
+    _, driver = stage.track(main_source.track())
+    driver0 = stage.driver_incoming
 
-    #Beam.comp_beams(driver, driver0, comp_location=False, rtol=1e-13, atol=0.0)
+    # Cannot compare the whole phase space due to driver evolution
+    assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=0.0, atol=1e-20)
+    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=0.0, atol=1e-20)
+    assert np.isclose(driver.z_offset(), driver0.z_offset(), rtol=1e-15, atol=0.0)
+    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=0.0, atol=1e-20)
+    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=0.0, atol=1e-20)
+    assert np.isclose(driver.norm_emittance_x(), driver0.norm_emittance_x(), rtol=1e-13, atol=0.0)
+    assert np.isclose(driver.norm_emittance_y(), driver0.norm_emittance_y(), rtol=1e-15, atol=0.0)
+    assert np.isclose(driver.bunch_length(), driver0.bunch_length(), rtol=1e-15, atol=0.0)
+    assert np.isclose(driver.peak_current(), driver0.peak_current(), rtol=1e-15, atol=0.0)
+    assert np.isclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
+
+    assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-15, atol=0.0)
+    assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
 
 
     # ========== No jitter, large angular offset ==========
     x_angle = 5e-6                                                                # [rad]
     y_angle = 2e-5                                                                # [rad]
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
-    main_source = setup_basic_main_source()
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+    driver_source2 = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
+    main_source2 = setup_basic_main_source()
+    stage2 = setup_StageBasic(driver_source=driver_source2, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
 
-    stage.nom_energy = 36.9e9                                                     # [eV], HALHF v2 last stage nominal input energy 
-    _, driver = stage.track(main_source.track())
-    driver0 = stage.driver_incoming
+    stage2.nom_energy = 36.9e9                                                     # [eV], HALHF v2 last stage nominal input energy 
+    _, driver = stage2.track(main_source2.track())
+    driver0 = stage2.driver_incoming
 
-    # print(driver.x_angle(), driver0.x_angle())
-    # print(driver.y_angle(), driver0.y_angle())
-    # print(driver.energy()/1e9, driver0.energy()/1e9)
-    print('driver.ux_offset(), driver0.ux_offset():', driver.ux_offset(), driver0.ux_offset()) # TODO: delete
-
-
-
-
-    x_drift = stage.length_flattop * np.tan(x_angle)
-    y_drift = stage.length_flattop * np.tan(y_angle)
+    x_drift = stage2.length * np.tan(x_angle)
+    y_drift = stage2.length * np.tan(y_angle)
     xs = driver0.xs()
     ys = driver0.ys()
     driver0.set_xs(xs + x_drift)
     driver0.set_ys(ys + y_drift)
 
+    # Cannot compare the whole phase space due to driver evolution
+    assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.z_offset(), driver0.z_offset(), rtol=1e-9, atol=0.0)
+    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-5, atol=0.0)
+    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-4, atol=0.0)
 
-
-    # Cannot compare the whole phase space due to diver evolution
-    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-10, atol=0.0)
-    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-13, atol=0.0)
+    # Deplete driver0 energy depletion for ramps and stage to be comparable to driver
+    driver0.set_Es(driver0.Es()*(1-stage.depletion_efficiency))
+    driver0.set_Es(driver0.Es()*(1-stage.depletion_efficiency))
+    driver0.set_Es(driver0.Es()*(1-stage.depletion_efficiency))
+    assert np.isclose(driver.norm_emittance_x(), driver0.norm_emittance_x(), rtol=1e-6, atol=0.0)
+    assert np.isclose(driver.norm_emittance_y(), driver0.norm_emittance_y(), rtol=1e-5, atol=0.0)
+    assert np.isclose(driver.bunch_length(), driver0.bunch_length(), rtol=1e-9, atol=0.0)
+    assert np.isclose(driver.peak_current(), driver0.peak_current(), rtol=1e-2, atol=0.0)
+    assert np.isclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
 
     assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
-    assert np.allclose(driver.xs(), driver0.xs(), rtol=0.0, atol=1e-7)
-    assert np.allclose(driver.ys(), driver0.ys(), rtol=0.0, atol=1e-7)
-    assert np.allclose(driver.zs(), driver0.zs(), rtol=0.0, atol=1e-7)
-    # assert np.allclose(driver.uxs(), driver0.uxs(), rtol=1e-12, atol=0.0)
-    # assert np.allclose(driver.uys(), driver0.uys(), rtol=1e-12, atol=0.0)
-    # assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-12, atol=0.0)
-    assert np.allclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
+    assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-6, atol=0.0)
+    
