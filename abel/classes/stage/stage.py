@@ -1052,8 +1052,8 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def undo_beam_coordinate_systems_rotation(self, driver_incoming, driver_outgoing, beam_outgoing):
         """
-        Undoes the passive coordinate transformation performed on the drive 
-        beam and main beam at the start of the stage. 
+        Undoes the passive coordinate transformation performed on the drive beam
+        and main beam at the start of the stage. Also adds drift to the beams.
 
 
         Parameters
@@ -1101,8 +1101,8 @@ class Stage(Trackable, CostModeled):
             beam_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
             
             # Add drifts to the beam
-            x_drift = self.length_flattop * np.tan(driver_x_angle)
-            y_drift = self.length_flattop * np.tan(driver_y_angle)
+            x_drift = self.length * np.tan(driver_x_angle)
+            y_drift = self.length * np.tan(driver_y_angle)
             xs = beam_outgoing.xs()
             ys = beam_outgoing.ys()
             beam_outgoing.set_xs(xs + x_drift)
