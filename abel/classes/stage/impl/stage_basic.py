@@ -54,8 +54,8 @@ class StageBasic(Stage):
         if self.upramp is not None:  # if self has an upramp
 
             if self.upramp.nom_energy_gain is None or self.upramp.nom_energy_gain == 0:
-                ramp_energy_gain = self.upramp.length * self.nom_accel_gradient_flattop * 0.1*np.sqrt(self.upramp.plasma_density/self.plasma_density)
-                warnings.warn(f"Upramp nominal energy gain for StageBasic cannot zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
+                ramp_energy_gain = self.upramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.upramp.plasma_density/self.plasma_density)
+                warnings.warn(f"Upramp nominal energy gain for StageBasic must be non-zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
                 self.upramp.nom_energy_gain = ramp_energy_gain
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
@@ -83,8 +83,8 @@ class StageBasic(Stage):
         if self.downramp is not None:
 
             if self.downramp.nom_energy_gain is None or self.downramp.nom_energy_gain == 0:
-                ramp_energy_gain = self.downramp.length * self.nom_accel_gradient_flattop * 0.1*np.sqrt(self.downramp.plasma_density/self.plasma_density)
-                warnings.warn(f"Downramp nominal energy gain for StageBasic cannot zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
+                ramp_energy_gain = self.downramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.downramp.plasma_density/self.plasma_density)
+                warnings.warn(f"Downramp nominal energy gain for StageBasic must be non-zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
 
                 self.downramp.nom_energy_gain = ramp_energy_gain
 
@@ -198,6 +198,10 @@ class StageBasic(Stage):
 
         # Decelerate the driver with homogeneous energy loss
         drive_beam.set_Es(drive_beam_ramped.Es()*(1-self.depletion_efficiency))
+
+        # Update the beam locations
+        drive_beam.location = drive_beam_ramped.location + self.length_flattop
+        beam.location = beam_ramped.location + self.length_flattop
 
         return beam, drive_beam
     
