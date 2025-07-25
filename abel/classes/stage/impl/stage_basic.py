@@ -2,7 +2,7 @@ from abel.classes.stage.stage import Stage, StageError
 from abel.classes.source.impl.source_capsule import SourceCapsule
 import numpy as np
 import scipy.constants as SI
-import copy
+import copy, warnings
 
 
 SI.r_e = SI.physical_constants['classical electron radius'][0]
@@ -53,6 +53,11 @@ class StageBasic(Stage):
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:  # if self has an upramp
 
+            if self.upramp.nom_energy_gain is None or self.upramp.nom_energy_gain == 0:
+                ramp_energy_gain = self.upramp.length * self.nom_accel_gradient_flattop * 0.1*np.sqrt(self.upramp.plasma_density/self.plasma_density)
+                warnings.warn(f"Upramp nominal energy gain for StageBasic cannot zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
+                self.upramp.nom_energy_gain = ramp_energy_gain
+
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
             beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
         
@@ -76,6 +81,13 @@ class StageBasic(Stage):
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
+
+            if self.downramp.nom_energy_gain is None or self.downramp.nom_energy_gain == 0:
+                ramp_energy_gain = self.downramp.length * self.nom_accel_gradient_flattop * 0.1*np.sqrt(self.downramp.plasma_density/self.plasma_density)
+                warnings.warn(f"Downramp nominal energy gain for StageBasic cannot zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
+
+                self.downramp.nom_energy_gain = ramp_energy_gain
+
             # TODO: Temporary "drive beam evolution": Magnify the driver
             # Needs to be performed before self.track_downramp().
             if self.downramp.ramp_beta_mag is not None:
@@ -439,4 +451,12 @@ class StageBasic(Stage):
         return stage_copy
 
     
+    
+###################################################
+# Custom formatting that omits the line of source code
+def custom_formatwarning(msg, category, filename, lineno, line=None):
+    return f"{filename}:{lineno}: {category.__name__}: {msg}\n"
+
+# Tell Python to use custom_formatwarning() instead of the default warnings.formatwarning(), so any subsequent warnings will follow this formatting
+warnings.formatwarning = custom_formatwarning
     
