@@ -317,8 +317,8 @@ def test_driver_unrotation():
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
-    x_drift = stage.length_flattop * np.tan(driver0.x_angle())
-    y_drift = stage.length_flattop * np.tan(driver0.y_angle())
+    x_drift = stage.length * np.tan(driver0.x_angle())
+    y_drift = stage.length * np.tan(driver0.y_angle())
     xs = driver0.xs()
     ys = driver0.ys()
     driver0.set_xs(xs + x_drift)
@@ -361,8 +361,8 @@ def test_driver_unrotation():
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
-    x_drift = stage.length_flattop * np.tan(x_angle)
-    y_drift = stage.length_flattop * np.tan(y_angle)
+    x_drift = stage.length * np.tan(x_angle)
+    y_drift = stage.length * np.tan(y_angle)
     xs = driver0.xs()
     ys = driver0.ys()
     driver0.set_xs(xs + x_drift)
