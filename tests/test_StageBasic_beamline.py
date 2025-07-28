@@ -86,7 +86,7 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
 def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
     
     stage = StageBasic()
-        stage.nom_accel_gradient = nom_accel_gradient                               # [GV/m]
+    stage.nom_accel_gradient = nom_accel_gradient                                   # [GV/m]
     stage.nom_energy_gain = nom_energy_gain                                         # [eV]
     stage.plasma_density = plasma_density                                           # [m^-3]
     stage.driver_source = driver_source
@@ -112,3 +112,85 @@ def setup_InterstageBasic(stage):
     interstage.dipole_field = lambda E: np.min([1.0, 100e9/E])                      # [T]
 
     return interstage
+
+
+@pytest.mark.StageBasic_linac
+def test_baseline_linac():
+    """
+    Tests a linac with ``StageBasic`` plasma stages. No driver jitter, no ramps. 
+    Checks whether various linac attributes are correctly set and compares some 
+    output beam parameters against expected values.
+    """
+
+    np.random.seed(42)
+
+    num_stages = 5
+    enable_xt_jitter = False
+    enable_xpyp_jitter = False
+    
+    driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source()
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, calc_evolution=False)
+    interstage = setup_InterstageBasic(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_baseline_linac', overwrite=True, verbose=False)
+    
+    # Check the outputs
+    stages = linac.stages
+    interstages = linac.interstages
+    assert len(stages) == num_stages
+    assert len(interstages) == num_stages - 1
+    assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[1].nom_energy, 36.9e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[2].nom_energy, 68.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[3].nom_energy, 100.7e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[4].nom_energy, 132.6e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[4].nom_energy_gain, 31.9e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].nom_energy, stages[1].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[2].nom_energy, stages[3].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].nom_energy, stages[4].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].beta0, 0.24137835827389, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].dipole_length, 1.9209372712298547, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].dipole_field, 1.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].beta0, 0.45756933131960525, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].dipole_length, 3.641428291206625, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].dipole_field, 0.7541478129713424, rtol=1e-15, atol=0.0)
+
+    final_beam = linac.get_beam(-1)
+    final_beam.beam_name = 'Test beam'
+
+    assert final_beam.stage_number == 5
+    assert np.isclose(linac.get_beam(0).energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
+    assert np.isclose(final_beam.location,  79.30149471158896, rtol=1e-15, atol=0.0)
+    assert np.isclose(final_beam.energy(), stages[4].nom_energy + stages[4].nom_energy_gain, rtol=1e-4, atol=0.0)
+    assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 0.00030271, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_x(), 1.580286797571071e-05, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), 9.331889547894206e-07, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
+
+    
+    #ref_beam = Beam.load('./tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5')
+    #ref_beam.beam_name = 'Reference beam'
+
+    final_beam.print_summary()
+    #ref_beam.print_summary()
+    #Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
+
+    # # plot linac survey
+    # linac.plot_survey()
+
+    # # plot beam evolution
+    # linac.plot_evolution()
+    # linac.plot_waterfalls()
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
+    
