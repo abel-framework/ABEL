@@ -143,7 +143,7 @@ def test_baseline_linac():
     interstages = linac.interstages
     assert len(stages) == num_stages
     assert len(interstages) == num_stages - 1
-    assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.get_length(), 79.30149471158896, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, 36.9e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[2].nom_energy, 68.8e9, rtol=1e-15, atol=0.0)
@@ -165,7 +165,7 @@ def test_baseline_linac():
 
     assert final_beam.stage_number == 5
     assert np.isclose(linac.get_beam(0).energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
-    assert np.isclose(final_beam.location,  79.30149471158896, rtol=1e-15, atol=0.0)
+    assert np.isclose(final_beam.location, linac.get_length(), rtol=1e-15, atol=0.0)
     assert np.isclose(final_beam.energy(), stages[4].nom_energy + stages[4].nom_energy_gain, rtol=1e-4, atol=0.0)
     assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
     assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
@@ -189,6 +189,117 @@ def test_baseline_linac():
     # # plot beam evolution
     # linac.plot_evolution()
     # linac.plot_waterfalls()
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.StageBasic_linac
+def test_ramped_linac():
+    """
+    Tests a linac with ``StageBasic`` plasma stages. No driver jitter, with 
+    ramps. 
+    
+    Checks whether various linac attributes are correctly set and compares some 
+    output beam parameters against expected values.
+    """
+
+    np.random.seed(42)
+
+    num_stages = 5
+    enable_xt_jitter = False
+    enable_xpyp_jitter = False
+    
+    driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source()
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
+    interstage = setup_InterstageBasic(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_ramped_linac', overwrite=True, verbose=False)
+    
+    # Check the outputs
+    stages = linac.stages
+    interstages = linac.interstages
+    assert len(stages) == num_stages
+    assert len(interstages) == num_stages - 1
+    assert np.isclose(linac.get_length(), 79.30149471158896, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[1].nom_energy, 36.9e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[2].nom_energy, 68.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[3].nom_energy, 100.7e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[4].nom_energy, 132.6e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[4].nom_energy_gain, 31.9e9, rtol=1e-15, atol=0.0)
+
+    assert np.isclose(stages[0].upramp.length, 0.04413570063824205, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].upramp.length_flattop, stages[0].upramp.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].upramp.nom_energy, stages[0].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].upramp.nom_energy_flattop, stages[0].upramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].upramp.nom_energy_gain, 4618203.641879139, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].upramp.nom_energy_gain_flattop, stages[0].upramp.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].upramp.nom_accel_gradient, 104636463.79451889, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].upramp.nom_accel_gradient_flattop, stages[0].upramp.nom_accel_gradient, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.length, 0.11989973028624575, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.length_flattop, stages[0].downramp.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.nom_energy, stages[1].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.nom_energy_flattop, stages[0].downramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.nom_energy_gain, 12544067.50348952, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.nom_energy_gain_flattop, stages[0].downramp.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.nom_accel_gradient, 104621315.4403443, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].downramp.nom_accel_gradient_flattop, stages[0].downramp.nom_accel_gradient, rtol=1e-15, atol=0.0)
+
+    assert np.isclose(stages[-1].upramp.length, 0.22728814548579593, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.length_flattop, stages[-1].upramp.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.nom_energy, stages[-1].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.nom_energy_flattop, stages[-1].upramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.nom_energy_gain, 25453396.56685818, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.nom_energy_gain_flattop, stages[-1].upramp.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.nom_accel_gradient, 111987347.65711243, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.nom_accel_gradient_flattop, stages[-1].upramp.nom_accel_gradient, rtol=1e-15, atol=0.0)
+
+    assert np.isclose(stages[-1].downramp.length, 0.2531558538336775, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].downramp.length_flattop, stages[-1].downramp.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].downramp.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].downramp.nom_energy_flattop, stages[-1].downramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].downramp.nom_energy_gain, 28327631.60459319, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].downramp.nom_energy_gain_flattop, stages[-1].downramp.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].downramp.nom_accel_gradient, 111897991.59534484, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].downramp.nom_accel_gradient_flattop, stages[-1].downramp.nom_accel_gradient, rtol=1e-15, atol=0.0)
+
+    assert np.isclose(interstages[0].nom_energy, stages[1].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[2].nom_energy, stages[3].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].nom_energy, stages[4].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].beta0, 0.24137835827389, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].dipole_length, 1.9209372712298547, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].dipole_field, 1.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].beta0, 0.45756933131960525, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].dipole_length, 3.641428291206625, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].dipole_field, 0.7541478129713424, rtol=1e-15, atol=0.0)
+
+    final_beam = linac.get_beam(-1)
+    final_beam.beam_name = 'Test beam'
+
+    assert final_beam.stage_number == 5
+    assert np.isclose(linac.get_beam(0).energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
+    assert np.isclose(final_beam.location, linac.get_length(), rtol=1e-15, atol=0.0)
+    assert np.isclose(final_beam.energy(), stages[-1].nom_energy + stages[-1].nom_energy_gain + stages[-1].upramp.nom_energy_gain + stages[-1].downramp.nom_energy_gain, rtol=1e-3, atol=0.0)
+    assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 0.00030198, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_x(), 1.559091953307779e-05, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), 9.405771185853757e-07, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
+
+    
+    #ref_beam = Beam.load('./tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5')
+    #ref_beam.beam_name = 'Reference beam'
+
+    final_beam.print_summary()
+    #ref_beam.print_summary()
+    #Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
