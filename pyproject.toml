@@ -56,4 +56,5 @@ markers = [
   "sources: Test the various Source subclasses generate beams with desired properties",
   "beam: Tests for the Beam class",
   "StageBasic: Tests for the StageBasic class",
+  "StageBasic_linac: Tests for StageBasic linacs",
 ]
