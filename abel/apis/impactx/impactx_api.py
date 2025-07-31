@@ -121,28 +121,22 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
 
 def initialize_impactx_sim(verbose=False):
 
-    import amrex.space3d as amr
     from impactx import ImpactX
-    
-    # add before the simulation setup
-    pp_prof = amr.ParmParse("tiny_profiler")
-    pp_prof.add("enabled", int(verbose))
-    
-    # set AMReX verbosity
-    if not amr.initialized():
-        if verbose:
-            amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
-        else:
-            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
 
     # make simulation object
     sim = ImpactX()
 
+    # serial run on one CPU core
+    sim.omp_threads = 1
+
     # set ImpactX verbosity
     sim.verbose = int(verbose)
+    sim.tiny_profiler = verbose
     
     # enable diagnostics
     sim.diagnostics = True
+    #   Note: Diagnostics in every element's slice steps is verbose.
+    #         Disable for speed if if only beam monitors and final results are needed.
     sim.slice_step_diagnostics = True
 
     # set numerical parameters and IO control
@@ -155,19 +149,9 @@ def initialize_impactx_sim(verbose=False):
 
 
 def finalize_impactx_sim(sim, verbose=False):
+    """finalize and delete the simulation"""
 
-    import amrex.space3d as amr
-    
-    # finalize and delete the simulation
     sim.finalize()
-    del sim
-    
-    # finalize AMReX
-    if amr.initialized():
-        if verbose:
-            amr.finalize()
-        else:
-            eval('amr.finalize()')
 
 
 def extract_evolution(path='', second_order=False):
