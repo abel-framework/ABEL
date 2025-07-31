@@ -291,6 +291,10 @@ class StageBasic(Stage):
                                             beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
                                             driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
+        # Save parameter evolution to the ramp
+        if self.calc_evolution:
+            self.upramp.evolution = upramp.evolution  # TODO: save to self instead, but need to change stage diagnostics and how this is saved in self.main_tracking_procedure() first.
+            
         return beam, driver
     
 
@@ -384,6 +388,10 @@ class StageBasic(Stage):
                                             beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
                                             driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
+        # Save parameter evolution to the ramp
+        if self.calc_evolution:
+            self.downramp.evolution = downramp.evolution  # TODO: save to self instead, but need to change stage diagnostics and how this is saved in self.main_tracking_procedure() first.
+            
         return beam, driver
 
 
@@ -437,8 +445,8 @@ class StageBasic(Stage):
             stage_copy.transformer_ratio = transformer_ratio
         if depletion_efficiency is not None:
             stage_copy.depletion_efficiency = depletion_efficiency
-        if calc_evolution is not None:
-            stage_copy.calc_evolution = calc_evolution
+        if calc_evolution is None:
+            stage_copy.calc_evolution = self.calc_evolution
 
         return stage_copy
 
