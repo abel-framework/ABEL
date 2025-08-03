@@ -27,7 +27,7 @@ import shutil
 import numpy as np
 
 
-def setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0):
+def setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm__emittance_jitter=False, x_angle=0.0, y_angle=0.0):
     driver = SourceBasic()
     driver.bunch_length = 42e-6                                                     # [m] This value is for trapezoid.
     driver.z_offset = 300e-6                                                        # [m]
@@ -49,6 +49,10 @@ def setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, 
     if enable_xpyp_jitter:
         driver.jitter.xp = 1.0e-6                                                   # [rad], std
         driver.jitter.yp = 1.0e-6                                                   # [rad], std
+
+    if enable_norm__emittance_jitter:
+        driver.norm_jitter_emittance_x = 1e-12                                      # [m rad]
+        driver.norm_jitter_emittance_y = 1e-12                                      # [m rad]
 
     driver.symmetrize = True
 
@@ -374,6 +378,30 @@ def test_ramped_linac():
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.StageBasic_linac
+def test_ramped_norm_emitt_jitter_linac():
+    """
+    Tests a linac with ``StageBasic`` plasma stages. Enabled driver normalised 
+    emittance jitters, with ramps. 
+    
+    Only checks whether the linac can run without crashing.
+    """
+
+    np.random.seed(42)
+
+    num_stages = 3
+    
+    driver_source = setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm__emittance_jitter=True)
+    main_source = setup_basic_main_source()
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
+    interstage = setup_InterstageBasic(stage)
+
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+
+    # Perform tracking
+    linac.run('test_ramped_norm_emitt_jitter_linac', overwrite=True, verbose=False)
 
     
 @pytest.mark.StageBasic_linac
