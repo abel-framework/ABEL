@@ -51,14 +51,16 @@ class Source(Trackable, CostModeled):
         
         # add offsets and angles and jitter (horizontal)
         if self.norm_jitter_emittance_x is not None:
-            x_jitter, xp_jitter = generate_trace_space(self.norm_jitter_emittance_x/beam.gamma(), beam.beta_x(), beam.alpha_x(), 1)         
+            # Sample a value from a jitter phase space
+            x_jitter, xp_jitter = generate_trace_space(self.norm_jitter_emittance_x/beam.gamma(), beam.beta_x(), beam.alpha_x(), N=1, symmetrize=False)
         else:
             x_jitter, xp_jitter = np.random.normal(scale=self.jitter.x), np.random.normal(scale=self.jitter.xp)
         beam.set_xs(beam.xs() + self.x_offset + x_jitter)
         beam.set_xps(beam.xps() + self.x_angle + xp_jitter)
         
         if self.norm_jitter_emittance_y is not None:
-            y_jitter, yp_jitter = generate_trace_space(self.norm_jitter_emittance_y/beam.gamma(), beam.beta_y(), beam.alpha_y(), 1)
+            # Sample a value from a jitter phase space
+            y_jitter, yp_jitter = generate_trace_space(self.norm_jitter_emittance_y/beam.gamma(), beam.beta_y(), beam.alpha_y(), N=1, symmetrize=False)
         else:
             y_jitter, yp_jitter = np.random.normal(scale=self.jitter.y), np.random.normal(scale=self.jitter.yp)
         beam.set_ys(beam.ys() + self.y_offset + y_jitter)
