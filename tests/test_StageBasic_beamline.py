@@ -27,7 +27,7 @@ import shutil
 import numpy as np
 
 
-def setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm__emittance_jitter=False, x_angle=0.0, y_angle=0.0):
+def setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm_emittance_jitter=False, x_angle=0.0, y_angle=0.0):
     driver = SourceBasic()
     driver.bunch_length = 42e-6                                                     # [m] This value is for trapezoid.
     driver.z_offset = 300e-6                                                        # [m]
@@ -50,7 +50,7 @@ def setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, 
         driver.jitter.xp = 1.0e-6                                                   # [rad], std
         driver.jitter.yp = 1.0e-6                                                   # [rad], std
 
-    if enable_norm__emittance_jitter:
+    if enable_norm_emittance_jitter:
         driver.norm_jitter_emittance_x = 1e-12                                      # [m rad]
         driver.norm_jitter_emittance_y = 1e-12                                      # [m rad]
 
@@ -393,7 +393,7 @@ def test_ramped_norm_emitt_jitter_linac():
 
     num_stages = 3
     
-    driver_source = setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm__emittance_jitter=True)
+    driver_source = setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm_emittance_jitter=True)
     main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
     interstage = setup_InterstageBasic(stage)
