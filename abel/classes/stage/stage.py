@@ -2,7 +2,8 @@ from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
-from abel.classes.source.impl.source_capsule import SourceCapsule
+from abel.classes.source.impl.source_capsule import Source
+from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import copy, warnings
 import scipy.constants as SI
@@ -68,7 +69,33 @@ class Stage(Trackable, CostModeled):
 
         self.name = 'Plasma stage'
 
+
+    # ==================================================
+    def get_driver_source(self):
+        """
+        Returns the driver source of the stage or the driver source of the 
+        associated driver complex of the stage.
     
+        Parameters
+        ----------
+        N/A
+
+
+        Returns
+        ----------
+        driver_source : ``Source``object
+        """
+    
+        if isinstance(self.driver_source, DriverComplex):
+            driver_source = self.driver_source.source
+        elif isinstance(self.driver_source, Source):
+            driver_source = self.driver_source
+        else:
+            raise TypeError('Invalid class for the driver source.')
+        
+        return driver_source
+    
+
     
     ## Define upramp and downramp, if present
 
@@ -1010,7 +1037,8 @@ class Stage(Trackable, CostModeled):
         beam_rotated = copy.deepcopy(beam_incoming)
 
         # Check if the driver source of the stage has angular offset
-        has_angular_offset = self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0
+        driver_source = self.get_driver_source()
+        has_angular_offset = driver_source.jitter.xp != 0 or driver_source.x_angle != 0 or driver_source.jitter.yp != 0 or driver_source.y_angle != 0
 
         # Perform rotation if there is angular offset
         if has_angular_offset:
@@ -1082,7 +1110,8 @@ class Stage(Trackable, CostModeled):
         """
 
         # Check if the driver source of the stage has angular offset
-        has_angular_offset = self.driver_source.jitter.xp != 0 or self.driver_source.x_angle != 0 or self.driver_source.jitter.yp != 0 or self.driver_source.y_angle != 0
+        driver_source = self.get_driver_source()
+        has_angular_offset = driver_source.jitter.xp != 0 or driver_source.x_angle != 0 or driver_source.jitter.yp != 0 or driver_source.y_angle != 0
         
         if has_angular_offset:
 
@@ -1465,8 +1494,9 @@ class Stage(Trackable, CostModeled):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source is not None:  # A ramp may not have a driver source
-            if self.driver_source.energy is not None:
-                Ez_driver_max = self.driver_source.energy/self.length_flattop
+            driver_source = self.get_driver_source()
+            if driver_source.energy is not None:
+                Ez_driver_max = driver_source.energy/self.length_flattop
                 axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
@@ -1523,14 +1553,16 @@ class Stage(Trackable, CostModeled):
         z_beam = zs_masked[np.abs(Is[mask]).argmax()]
         Ez_driver = Ezs0[zs0 > z_mid].max()
         Ez_beam = np.interp(z_beam, zs0, Ezs0)
-        
+
         # get wakefield
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
-        if self.driver_source.energy is not None:
-            Ez_driver_max = self.driver_source.energy/self.get_length()
-            axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
+        if self.driver_source is not None:  # A ramp may not have a driver source
+            driver_source = self.get_driver_source()
+            if driver_source.energy is not None:
+                Ez_driver_max = driver_source.energy/self.get_length()
+                axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
         axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
