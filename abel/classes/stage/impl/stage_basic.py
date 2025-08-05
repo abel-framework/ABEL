@@ -49,6 +49,9 @@ class StageBasic(Stage):
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:  # if self has an upramp
 
+            if self.upramp.ramp_shape != 'uniform':
+                raise TypeError('Only uniform ramps have been implemented.') 
+
             if self.upramp.nom_energy_gain is None or self.upramp.nom_energy_gain == 0:
                 ramp_energy_gain = self.upramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.upramp.plasma_density/self.plasma_density)
                 warnings.warn(f"Upramp nominal energy gain for StageBasic must be non-zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
@@ -77,6 +80,9 @@ class StageBasic(Stage):
 
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
+
+            if self.downramp.ramp_shape != 'uniform':
+                raise TypeError('Only uniform ramps have been implemented.') 
 
             if self.downramp.nom_energy_gain is None or self.downramp.nom_energy_gain == 0:
                 ramp_energy_gain = self.downramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.downramp.plasma_density/self.plasma_density)

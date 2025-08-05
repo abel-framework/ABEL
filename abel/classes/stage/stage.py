@@ -109,10 +109,6 @@ class Stage(Trackable, CostModeled):
         if upramp is not None:
             if not isinstance(upramp, Stage):
                 raise StageError("The upramp must be an instance of Stage or None")
-        
-            from abel.classes.stage.impl.stage_hipace import StageHipace
-            if type(self) is not StageHipace and upramp.ramp_shape != 'uniform':
-                raise TypeError('Only uniform ramps have been implemented.')  # Only StageHipace supports non-uniform ramps.
             
         self._upramp = upramp
         if upramp is not None:
@@ -133,10 +129,6 @@ class Stage(Trackable, CostModeled):
         if downramp is not None:
             if not isinstance(downramp, Stage):
                 raise StageError("The downramp must be an instance of Stage or None")
-        
-            from abel.classes.stage.impl.stage_hipace import StageHipace
-            if type(self) is not StageHipace and downramp.ramp_shape != 'uniform':
-                raise TypeError('Only uniform ramps have been implemented.')  # Only StageHipace supports non-uniform ramps.
 
         self._downramp = downramp
         if downramp is not None:
