@@ -381,6 +381,54 @@ def test_ramped_linac():
 
 
 @pytest.mark.StageBasic_linac
+def test_ramped_linac_vs_old_method():
+    """
+    Tests a linac with ``StageBasic`` plasma stages. No driver jitter, with 
+    ramps. 
+    
+    Compares the output beam of linac with ``PlasmRamp``ramps and linac with 
+    ramps defined with ``stage.__class__()``.
+    """
+
+    np.random.seed(42)
+
+    num_stages = 5
+    enable_xt_jitter = False
+    enable_xpyp_jitter = False
+    
+    driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source()
+
+    # Ramps constructed with PlasmRamp
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
+    interstage = setup_InterstageBasic(stage)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac.run('test_baseline_linac', overwrite=True, verbose=False)
+
+    # Ramps constructed with stage.__class__()
+    stage_old = setup_StageBasic(driver_source=driver_source, use_ramps=False, calc_evolution=False)
+    stage_old.upramp = stage_old.__class__()
+    stage_old.downramp = stage_old.__class__()
+    interstage_old = setup_InterstageBasic(stage_old)
+    linac_old = PlasmaLinac(source=main_source, stage=stage_old, interstage=interstage_old, num_stages=num_stages)
+    linac_old.run('test_baseline_linac', overwrite=True, verbose=False)
+    
+    # Check the output beams
+    final_beam = linac.get_beam(-1)
+    final_beam.beam_name = 'Beam from linac with PlasmaRamp ramps'
+    final_beam_old = linac_old.get_beam(-1)
+    final_beam_old.beam_name = 'Beam from linac with stage.__class__() ramps'
+
+    final_beam.print_summary()
+    final_beam_old.print_summary()
+
+    Beam.comp_beams(final_beam, final_beam_old, comp_location=True)
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.StageBasic_linac
 def test_ramped_norm_emitt_jitter_linac():
     """
     Tests a linac with ``StageBasic`` plasma stages. Enabled driver normalised 
