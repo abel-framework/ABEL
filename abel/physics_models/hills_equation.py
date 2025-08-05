@@ -1,9 +1,5 @@
 import numpy as np
-from scipy.integrate import odeint
 import scipy.constants as SI
-from abel.utilities.relativity import gamma2proper_velocity, gamma2energy
-import scipy.special as scispec
-
 
 # damped Hill's equation: x''(s) + gamma'(s)/gamma(s)*x'(s) + k_p^2/(2*gamma(s))*x(s) = 0
 def ode_Hills(u, s, gamma, kp):
@@ -13,6 +9,8 @@ def ode_Hills(u, s, gamma, kp):
 
 # solve Hill's equation
 def evolve_hills_equation_ode(x0, ux0, L, gamma, kp):
+    
+    from scipy.integrate import odeint
     
     # find longitudinal steps
     gamma_min = min(gamma(0), gamma(L))
@@ -34,6 +32,9 @@ def evolve_hills_equation_ode(x0, ux0, L, gamma, kp):
 
 # solve Hill's equation
 def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp=None, g=None):
+
+    import scipy.special as scispec
+    from abel.utilities.relativity import gamma2proper_velocity, gamma2energy
     
     # convert initial proper velocities to angles
     xp0 = ux0 / gamma2proper_velocity(gamma0)

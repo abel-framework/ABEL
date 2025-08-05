@@ -1,10 +1,11 @@
 from abc import abstractmethod
-from abel import CONFIG, Beam, Trackable, Runnable
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
+from abel.classes.trackable import Trackable
+from abel.classes.runnable import Runnable
 from abel.classes.cost_modeled import CostModeled
 import scipy.constants as SI
-import copy, os
-from matplotlib import pyplot as plt
-from datetime import datetime
+import copy
 import numpy as np
 
 class Beamline(Trackable, Runnable, CostModeled):
@@ -20,12 +21,6 @@ class Beamline(Trackable, Runnable, CostModeled):
     
     @abstractmethod
     def assemble_trackables(self):
-        
-        # set bunch pattern for all trackables
-        #for trackable in self.trackables:
-        #    trackable.num_bunches_in_train = self.num_bunches_in_train
-        #    trackable.bunch_separation = self.bunch_separation
-        #    trackable.rep_rate_trains = self.rep_rate_trains
         
         # apply the bunch pattern to all trackables
         for i in range(len(self.trackables)):
@@ -65,6 +60,10 @@ class Beamline(Trackable, Runnable, CostModeled):
             return self.energy_usage() * self.get_rep_rate_average()
         else:
             return None
+
+    @abstractmethod
+    def get_nom_beam_power(self):
+        pass
     
     ## LENGTH
     
@@ -81,7 +80,10 @@ class Beamline(Trackable, Runnable, CostModeled):
     ## COST
 
     def get_cost_breakdown_civil_construction(self):
-        return ('Civil construction', self.get_length() * CostModeled.cost_per_length_tunnel)
+        breakdown = []
+        for trackable in self.trackables:
+            breakdown.append((trackable.name, trackable.get_cost_civil_construction()))
+        return ('Civil construction', breakdown)
 
     
     ## SURVEY
@@ -97,7 +99,10 @@ class Beamline(Trackable, Runnable, CostModeled):
     
     # plot survey    
     def plot_survey(self, save_fig=False):
-         
+
+        from matplotlib import pyplot as plt
+        import os
+        
         # setup figure
         fig, ax = plt.subplots()
         fig.set_figwidth(20)
@@ -118,7 +123,7 @@ class Beamline(Trackable, Runnable, CostModeled):
         # extract secondary objects
         second_objs = None
         connect_to = None
-        if len(objs)==2 and isinstance(objs[1], tuple):
+        if isinstance(objs, tuple) and len(objs)==2 and isinstance(objs[1], tuple):
             second_objs = objs[1][0]
             connect_to = objs[1][1]
             objs = objs[0]
@@ -180,4 +185,9 @@ class Beamline(Trackable, Runnable, CostModeled):
                 os.makedirs(plot_path)
             filename = plot_path + 'survey' + '.png'
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+
+
+class NotAssembledError(Exception):
+    "Exception class for ``Beanline`` to throw if ``self.trackables`` have not been assembled."
+    pass
         
