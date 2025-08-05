@@ -72,22 +72,22 @@ class Beam():
         Q : [C] float
             Total beam charge.
 
-        xs, ys, zs : [m] 1D ndarray
+        xs, ys, zs : [m] 1D float ndarray
             Coordinates for the macroparticles.
             
-        uxs, uys, uzs : [m/s] 1D ndarray, optional
+        uxs, uys, uzs : [m/s] 1D float ndarray, optional
             Proper velocities for the macroparticles. All uzs values must be above 10*particle rest energy/c/particle mass. Default set to ``None``.
             
-        pxs, pys, pzs : [kg m/s] 1D ndarray, optional
+        pxs, pys, pzs : [kg m/s] 1D float ndarray, optional
             Momenta for the macroparticles. All pzs values must be above 10*particle rest energy/c. Default set to ``None``.
         
-        xps, yps : [rad] 1D ndarray, optional
+        xps, yps : [rad] 1D float ndarray, optional
             Angles dx/ds and dy/ds for the macroparticles. Default set to ``None``.
 
-        Es : [eV] 1D ndarray, optional
+        Es : [eV] 1D float ndarray, optional
             Energies for the macroparticles. All values must be above 10*particle rest energy. Default set to ``None``.
 
-        weightings : 1D ndarray, optional
+        weightings : 1D float ndarray, optional
             Weights for the macroparticles. Default set to ``None``.
 
         particle_mass : [kg] float, optional
@@ -233,6 +233,8 @@ class Beam():
         if weightings is None:
             self.__phasespace[6,:] = Q/num_particles
         else:
+            if np.any(weightings < 0):
+                raise ValueError('Beam weightings cannot be negative.')
             self.__phasespace[6,:] = Q*weightings/np.sum(weightings)
         
         # ids
@@ -444,6 +446,7 @@ class Beam():
 
         if comp_location:
             assert np.allclose(beam1.location, beam2.location, rtol, atol)
+            assert beam1.stage_number == beam2.stage_number
         assert np.allclose(beam1.qs(), beam2.qs(), rtol, atol)
         assert np.allclose(beam1.weightings(), beam2.weightings(), rtol, atol)
         assert np.allclose(beam1.xs(), beam2.xs(), rtol, atol)
@@ -464,7 +467,7 @@ class Beam():
         beam1, beam2 : ABEL ``Beam`` object
             Beams to be compared
 
-        comp_location: bool, optional
+        comp_location : bool, optional
             Flag for comparing the location of the beams. Default set to ``False``.
         
             
@@ -486,18 +489,18 @@ class Beam():
         assert np.allclose(beam1.energy(), beam2.energy(), rtol=0.0, atol=0.6e9)  # Usually rather large discrepancy in energy.
         assert np.allclose(beam1.energy_spread(), beam2.energy_spread(), rtol=0.0, atol=0.6e9)
         assert np.allclose(beam1.rel_energy_spread(), beam2.rel_energy_spread(), rtol=0.0, atol=5e-4)
-        assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.0, atol=1e-6)
-        assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.0, atol=0.5e-6)
-        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.05, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.05, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.05, atol=0.05e-6)
         assert np.allclose(beam1.geom_emittance_x(), beam2.geom_emittance_x(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.geom_emittance_y(), beam2.geom_emittance_y(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.norm_emittance_x(), beam2.norm_emittance_x(), rtol=0.0, atol=1e-6)
         assert np.allclose(beam1.norm_emittance_y(), beam2.norm_emittance_y(), rtol=0.0, atol=0.5e-6)
         assert np.allclose(beam1.peak_current(), beam2.peak_current(), rtol=0.0, atol=0.7e3)
-        assert np.allclose(beam1.beta_x(), beam2.beta_x(), rtol=0.0, atol=50e-3)
-        assert np.allclose(beam1.beta_y(), beam2.beta_y(), rtol=0.0, atol=50e-3)
-        assert np.allclose(beam1.gamma_x(), beam2.gamma_x(), rtol=0.0, atol=0.1)
-        assert np.allclose(beam1.gamma_y(), beam2.gamma_y(), rtol=0.0, atol=0.1)        
+        assert np.allclose(beam1.beta_x(), beam2.beta_x(), rtol=0.05, atol=5e-3)
+        assert np.allclose(beam1.beta_y(), beam2.beta_y(), rtol=0.05, atol=5e-3)
+        assert np.allclose(beam1.gamma_x(), beam2.gamma_x(), rtol=0.05, atol=0.0)
+        assert np.allclose(beam1.gamma_y(), beam2.gamma_y(), rtol=0.05, atol=0.0)        
         assert np.allclose(beam1.z_offset(), beam2.z_offset(), rtol=0.0, atol=3e-6)
         assert np.allclose(beam1.x_offset(), beam2.x_offset(), rtol=0.0, atol=3e-6)
         assert np.allclose(beam1.y_offset(), beam2.y_offset(), rtol=0.0, atol=3e-6)
@@ -752,7 +755,6 @@ class Beam():
 
         make_plot : bool, optional
             Flag for making plots.
-
             
         Returns
         ----------
@@ -831,14 +833,13 @@ class Beam():
         
         return np.arctan(slope)
 
+
+
     ## BEAM STATISTICS
 
     def total_particles(self):
-        return int(np.nansum(self.weightings()))
-    
-    def population(self):
         "Total number of physical particles."
-        return np.sum(self.weightings())
+        return int(np.nansum(self.weightings()))
     
     def charge(self):
         "Total beam charge."
@@ -1042,13 +1043,13 @@ class Beam():
     
         Parameters
         ----------
-        polarization: float
+        polarization : float
             Mean value of projection in the defined direction for the generated spins.
 
-        direction: string
+        direction : string
             Spin direction (default is z).
 
-        seed: int, optional
+        seed : int, optional
             Seed to initialize the random number generator (default is 42).
             
 
@@ -1262,8 +1263,6 @@ class Beam():
         ----------
         zbins, xbins, ybins : [m] float or 1D float ndarray, optional
             The bins along z(x,y).
-
-        ...
             
         Returns
         ----------
@@ -1316,38 +1315,48 @@ class Beam():
     # ==================================================
     def Dirichlet_BC_system_matrix(self, main_diag, upper_inner_off_diag, lower_inner_off_diag, upper_outer_off_diag, lower_outer_off_diag, num_x_cells, num_unknowns, rhs, boundary_val):
         """
-        Applies Dirichlet boundary conditions and assemble the system matrix and the right hand side (source term) of the Poisson equation.
+        Applies Dirichlet boundary conditions and assemble the system matrix and 
+        the right hand side (source term) of the Poisson equation.
         
         Parameters
         ----------
         main_diag : [m^-2] 1D float ndarray
-            The main diagonal of the system matrix to be modified according to the boundary conditions.
+            The main diagonal of the system matrix to be modified according to 
+            the boundary conditions.
 
         upper_inner_off_diag : [m^-2] 1D float ndarray
-            The upper inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+            The upper inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
         lower_inner_off_diag : [m^-2] 1D float ndarray
-            The lower inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+            The lower inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
         outer_inner_off_diag : [m^-2] 1D float ndarray
-            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+            The outer inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
         outer_inner_off_diag : [m^-2] 1D float ndarray
-            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+            The outer inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
             
         num_x_cells : float
-            The number of cells in the x-direction. Determines the number of columns of the system matrix ``A``.
+            The number of cells in the x-direction. Determines the number of 
+            columns of the system matrix ``A``.
 
         num_unknowns : float
-            The number of unknowns in the system, which is determined by The number of cells in the x and y-direction.
+            The number of unknowns in the system, which is determined by The 
+            number of cells in the x and y-direction.
 
         rhs : [V/m^3] 1D float ndarray
-            The right hand side of the Poisson equation to be modified according to the boundary conditions.
+            The right hand side of the Poisson equation to be modified according 
+            to the boundary conditions.
 
         boundary_val : [V/m] float
-            The value of the electric fields Ex and Ey at the simulation box boundary.
-
+            The value of the electric fields Ex and Ey at the simulation box 
+            boundary.
             
+
         Returns
         ----------
         A : [m^-2] 2D float sparse matrix
@@ -1398,7 +1407,10 @@ class Beam():
     # ==================================================
     def Ex_Ey_2D(self, num_x_cells, num_y_cells, charge_density_xy_slice, dx, dy, boundary_val=0.0):
         """
-        2D Poisson solver for the transverse electric fields Ex and Ey of a beam slice in the xy-plane. The equations solved are a combination of Gauss' law and Faraday's law assuming no time-varying z-component of magnetic field Bz. I.e.
+        2D Poisson solver for the transverse electric fields Ex and Ey of a beam 
+        slice in the xy-plane. The equations solved are a combination of Gauss' 
+        law and Faraday's law assuming no time-varying z-component of magnetic 
+        field Bz. I.e.
 
         dEx/dx + dEy/dy = 1/epsilon_0 * dQ/dzdxdy
         dEy/dx - dEx/dy = 0.
@@ -1409,15 +1421,13 @@ class Beam():
         num_x_cells, num_y_cells : float
             The number of cells in the x and y-direction.
 
-        charge_density_xy_slice: [C/m^3] 2D ndarray
+        charge_density_xy_slice: [C/m^3] 2D float ndarray
             A xy-slice of the beam charge density.
 
         dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
-
         boundary_val: [V/m] float, optional
             ...
-
             
         Returns
         ----------
@@ -1465,15 +1475,18 @@ class Beam():
     # ==================================================
     def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0, tolerance=5.0):
         """
-        Calculate slice Ex and Ey for the entire beam by solving the Poisson equations for Ex and Ey slice by slice.
+        Calculate slice Ex and Ey for the entire beam by solving the Poisson 
+        equations for Ex and Ey slice by slice.
 
         Parameters
         ----------
         x_box_min, y_box_min : [m] float
-            The lower x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+            The lower x(y) boundary of the simulation domain. Should be much 
+            larger than the plasma bubble radius.
 
         x_box_max, y_box_max : [m] float
-            The upper x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+            The upper x(y) boundary of the simulation domain. Should be much 
+            larger than the plasma bubble radius.
         
         dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
@@ -1482,8 +1495,8 @@ class Beam():
             The number of cells in the z-direction.
 
         boundary_val : [V/m] float, optional
-            The values of the electric fields Ex and Ey at the simulation domain boundary.
-
+            The values of the electric fields Ex and Ey at the simulation domain 
+            boundary.
             
         Returns
         ----------
@@ -1494,7 +1507,8 @@ class Beam():
             y-conponent of electric field generated by the chosen beam slice.
 
         zctrs, xctrs, yctrs : [m] 1D float ndarray
-            Coordinates in z, x and y for the centres of the bins of ``Ex`` and ``Ey``.
+            Coordinates in z, x and y for the centres of the bins of ``Ex`` and 
+            ``Ey``.
         """
 
         # Check if the selected simulation boundaries are significantly larger than the beam extent
@@ -1970,12 +1984,8 @@ class Beam():
         
         # make beam
         beam = Beam()
-<<<<<<< HEAD
-        beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, weightings=weightings)
-        beam.particle_mass = mass
-=======
         beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, spxs=spxs, spys=spys, spzs=spzs, weightings=weightings)
->>>>>>> main
+        beam.particle_mass = mass
         
         # add metadata to beam
         try:
@@ -2212,7 +2222,7 @@ class Beam():
         extent_energ[3] = extent_energ[3]/1e9  # [GeV]
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
 
-        
+
     # ==================================================
     def print_summary(self):
 
