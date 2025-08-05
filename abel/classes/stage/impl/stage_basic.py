@@ -1,4 +1,5 @@
 from abel.classes.stage.stage import Stage, StageError
+from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
 from abel.classes.source.impl.source_capsule import SourceCapsule
 import numpy as np
 import scipy.constants as SI
@@ -49,8 +50,8 @@ class StageBasic(Stage):
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:  # if self has an upramp
 
-            if self.upramp.ramp_shape != 'uniform':
-                raise TypeError('Only uniform ramps have been implemented.') 
+            if type(self.upramp) is PlasmaRamp and self.upramp.ramp_shape != 'uniform':
+                raise TypeError('Only uniform ramps have been implemented.')
 
             if self.upramp.nom_energy_gain is None or self.upramp.nom_energy_gain == 0:
                 ramp_energy_gain = self.upramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.upramp.plasma_density/self.plasma_density)
@@ -81,8 +82,8 @@ class StageBasic(Stage):
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
 
-            if self.downramp.ramp_shape != 'uniform':
-                raise TypeError('Only uniform ramps have been implemented.') 
+            if type(self.downramp) is PlasmaRamp and self.downramp.ramp_shape != 'uniform':
+                raise TypeError('Only uniform ramps have been implemented.')
 
             if self.downramp.nom_energy_gain is None or self.downramp.nom_energy_gain == 0:
                 ramp_energy_gain = self.downramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.downramp.plasma_density/self.plasma_density)
@@ -226,8 +227,6 @@ class StageBasic(Stage):
             Drive beam after tracking.
         """
 
-        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
-
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
             ramp_beam_in = copy.deepcopy(beam0)
@@ -240,7 +239,7 @@ class StageBasic(Stage):
             if type(upramp) is not StageBasic:
                 raise TypeError('upramp is not a StageBasic.')
 
-        elif type(self.upramp) is Stage:
+        elif isinstance(self.upramp, Stage):
             upramp = self.upramp  # Allow for other types of ramps
         else:
             raise StageError('Ramp is not an instance of Stage class.')
@@ -328,8 +327,6 @@ class StageBasic(Stage):
             Drive beam after tracking.
         """
 
-        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
-
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
             ramp_beam_in = copy.deepcopy(beam0)
@@ -342,7 +339,7 @@ class StageBasic(Stage):
             if type(downramp) is not StageBasic:
                 raise TypeError('downramp is not a StageBasic.')
 
-        elif type(self.downramp) is Stage:
+        elif isinstance(self.downramp, Stage):
             downramp = self.downramp  # Allow for other types of ramps
         else:
             raise StageError('Ramp is not an instance of Stage class.')
