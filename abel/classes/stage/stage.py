@@ -217,8 +217,14 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def convert_PlasmaRamp(self, ramp):
         """
-        Convert a ``PlasmaRamp`` object to a ``Stage`` object in order to 
-        construct a uniform ramp that can be tracked.
+        Convert a ``PlasmaRamp`` object to a ``Stage`` subclass object of the 
+        same type as ``self`` in order to construct a uniform ramp that can be 
+        tracked.
+
+        Needed in most ``Stage`` subclasses as these do not track the 
+        ``PlasmaRamps`` internally, but actually construct another stage of the 
+        same type with the same configurations on tracking time and use that for 
+        tracking.
     
         Parameters
         ----------
