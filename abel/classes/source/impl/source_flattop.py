@@ -55,7 +55,7 @@ class SourceFlatTop(Source):
         # longitudinal positions
         zs = np.random.uniform(low=self.z_offset-self.bunch_length, high=self.z_offset, size=num_particles_actual)
 
-        weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+        weightings = np.ones(zs.shape)*self.charge/(np.sign(self.charge) * SI.e * self.num_particles)
         
         # symmetrize
         if self.symmetrize:
