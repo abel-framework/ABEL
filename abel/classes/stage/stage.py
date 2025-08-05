@@ -289,7 +289,7 @@ class Stage(Trackable, CostModeled):
                 self.upramp.nom_energy_gain = 0.0  # Default energy gain in the ramps is zero.
             if self.upramp.nom_energy is None:
                 self.upramp.nom_energy = self.nom_energy
-                self.upramp.nom_energy_flattop = self.upramp.nom_energy
+                self.upramp.nom_energy_flattop = self.nom_energy
                 self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy_gain
             if self.upramp.length is None:
                 self.upramp.length = self._calc_ramp_length(self.upramp)
