@@ -97,7 +97,7 @@ class SourceTrapezoid(Source):
             weightings[mask_triangle] = weightings[mask_triangle]/(np.sum(weightings[mask_triangle])/(np.abs(self.charge)/SI.e) )*np.sum(mask_triangle)/len(zs)
             
         else:
-            weightings = np.ones(zs.shape)*np.abs(self.charge)/(self.charge * SI.e * self.num_particles)
+            weightings = np.ones(zs.shape)*np.abs(self.charge)/(SI.e * self.num_particles)
         
         # energies
         Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
