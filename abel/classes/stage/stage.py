@@ -23,7 +23,7 @@ class Stage(Trackable, CostModeled):
         self.nom_accel_gradient = nom_accel_gradient
         self.nom_energy_gain = nom_energy_gain
         self.plasma_density = plasma_density
-        self.driver_source = driver_source
+        self._driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
         
         self.stage_number = None
@@ -71,6 +71,17 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
+    @property
+    def driver_source(self) -> Source | DriverComplex | None:
+        "Returns the driver source or the driver complex of the stage."
+        return self._driver_source
+    @driver_source.setter
+    def driver_source(self, source : Source | DriverComplex | None):
+        if source is not None and not isinstance(source, (Source, DriverComplex)):
+            raise TypeError("driver_source must be a Source, DriverComplex, or None")
+        self._driver_source = source
+
+
     def get_driver_source(self):
         """
         Returns the driver source of the stage or the driver source of the 
@@ -90,8 +101,6 @@ class Stage(Trackable, CostModeled):
             driver_source = self.driver_source.source
         elif isinstance(self.driver_source, Source):
             driver_source = self.driver_source
-        else:
-            raise TypeError('Invalid class for the driver source.')
         
         return driver_source
     
