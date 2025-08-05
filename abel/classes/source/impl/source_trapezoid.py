@@ -90,14 +90,14 @@ class SourceTrapezoid(Source):
             zs = zmax - (zmax-zmin)*zs_norm_redist
 
             # recalculate weightings (lower where there are more particles)
-            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+            weightings = np.ones(zs.shape)*np.abs(self.charge)/( SI.e * self.num_particles )
             weightings[mask_uniform] = (1+front_heaviness*zs_norm_redist[mask_uniform])**2
-            weightings[mask_uniform] = weightings[mask_uniform]/(np.sum(weightings[mask_uniform])/(self.charge/SI.e))*np.sum(mask_uniform)/len(zs)
+            weightings[mask_uniform] = weightings[mask_uniform]/(np.sum(weightings[mask_uniform])/(np.abs(self.charge)/SI.e) )*np.sum(mask_uniform)/len(zs)
             weightings[mask_triangle] = (1+front_heaviness*zs_norm_redist[mask_triangle])**3
-            weightings[mask_triangle] = weightings[mask_triangle]/(np.sum(weightings[mask_triangle])/(self.charge/SI.e))*np.sum(mask_triangle)/len(zs)
+            weightings[mask_triangle] = weightings[mask_triangle]/(np.sum(weightings[mask_triangle])/(np.abs(self.charge)/SI.e) )*np.sum(mask_triangle)/len(zs)
             
         else:
-            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+            weightings = np.ones(zs.shape)*np.abs(self.charge)/(self.charge * SI.e * self.num_particles)
         
         # energies
         Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
