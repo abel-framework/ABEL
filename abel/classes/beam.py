@@ -65,7 +65,8 @@ class Beam():
     # set phase space
     def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, spxs=None, spys=None, spzs=None, weightings=None, particle_mass=SI.m_e):
         """
-        Set the phase space of the beam. All input arrays must have the same lengths.
+        Set the phase space of the beam. All input arrays must have the same 
+        lengths.
 
         Parameters
         ----------
@@ -76,16 +77,21 @@ class Beam():
             Coordinates for the macroparticles.
             
         uxs, uys, uzs : [m/s] 1D float ndarray, optional
-            Proper velocities for the macroparticles. All uzs values must be above 10*particle rest energy/c/particle mass. Default set to ``None``.
+            Proper velocities for the macroparticles. All uzs values must be 
+            above 10*particle rest energy/c/particle mass. Default set to 
+            ``None``.
             
         pxs, pys, pzs : [kg m/s] 1D float ndarray, optional
-            Momenta for the macroparticles. All pzs values must be above 10*particle rest energy/c. Default set to ``None``.
+            Momenta for the macroparticles. All pzs values must be above 
+            10*particle rest energy/c. Default set to ``None``.
         
         xps, yps : [rad] 1D float ndarray, optional
-            Angles dx/ds and dy/ds for the macroparticles. Default set to ``None``.
+            Angles dx/ds and dy/ds for the macroparticles. Default set to 
+            ``None``.
 
         Es : [eV] 1D float ndarray, optional
-            Energies for the macroparticles. All values must be above 10*particle rest energy. Default set to ``None``.
+            Energies for the macroparticles. All values must be above 
+            10*particle rest energy. Default set to ``None``.
 
         weightings : 1D float ndarray, optional
             Weights for the macroparticles. Default set to ``None``.
@@ -417,7 +423,8 @@ class Beam():
 
     def comp_beams(beam1, beam2, comp_location=False, rtol=1e-15, atol=0.0):
         """
-        Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within given tolerances.
+        Compare the phase spaces of two beams. Chekcks if all arrays are 
+        element-wise equal within given tolerances.
 
         Parameters
         ----------
@@ -425,7 +432,8 @@ class Beam():
             Beams to be compared
 
         comp_location : bool, optional
-            Flag for comparing the location of the beams. Default set to ``False``.
+            Flag for comparing the location of the beams. Default set to 
+            ``False``.
             
         rtol : float, optional
             The relative tolerance parameter (see [1]_). Default set to 1e-15.
@@ -460,7 +468,8 @@ class Beam():
 
     def comp_beam_params(beam1, beam2, comp_location=False):
         """
-        Compare the parameters of two beams to see if they are equal within given tolerances.
+        Compare the parameters of two beams to see if they are equal within 
+        given tolerances.
 
         Parameters
         ----------
@@ -468,7 +477,8 @@ class Beam():
             Beams to be compared
 
         comp_location : bool, optional
-            Flag for comparing the location of the beams. Default set to ``False``.
+            Flag for comparing the location of the beams. Default set to 
+            ``False``.
         
             
         Returns
@@ -538,7 +548,9 @@ class Beam():
     # ==================================================
     def rotate_coord_sys_3D(self, axis1, angle1, axis2=np.array([0, 1, 0]), angle2=0.0, axis3=np.array([1, 0, 0]), angle3=0.0, invert=False):
         """
-        Rotates the coordinate system (passive transformation) of the beam first with ``angle1`` around ``axis1``, then with ``angle2`` around ``axis2`` and lastly with ``angle3`` around ``axis3``.
+        Rotates the coordinate system (passive transformation) of the beam first 
+        with ``angle1`` around ``axis1``, then with ``angle2`` around ``axis2`` 
+        and lastly with ``angle3`` around ``axis3``.
         
         Parameters
         ----------
@@ -546,16 +558,20 @@ class Beam():
             Unit vector specifying the rotation axes.
         
         angle1 : [rad] float
-            Angle used for rotation of the beam's coordinate system around the respective axes.
+            Angle used for rotation of the beam's coordinate system around the 
+            respective axes.
 
         axis2, axis3 : 1x3 float ndarrays, optional
             Additional unit vectors specifying the rotation axes.
 
         angle2, angle3 : [rad] float, optional
-            Additional angles used for rotation of the beam's coordinate system around the respective axes.
+            Additional angles used for rotation of the beam's coordinate system 
+            around the respective axes.
 
         invert : bool, optional
-            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+            Performs a standard passive transformation when False. If True, will 
+            perform an active transformation and can thus be used to invert the 
+            passive transformation.
             
         Returns
         ----------
@@ -606,7 +622,8 @@ class Beam():
     # ==================================================
     def beam_alignment_angles(self):
         """
-        Calculates the angles for rotation around the y- and x-axis to align the z-axis to the beam proper velocity.
+        Calculates the angles for rotation around the y- and x-axis to align the 
+        z-axis to the beam proper velocity.
         
         Parameters
         ----------
@@ -619,7 +636,10 @@ class Beam():
             Used for rotating the beam's frame around the y-axis.
         
         y_angle : [rad] float
-            Used for rotating the beam's frame around the x-axis. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+            Used for rotating the beam's frame around the x-axis. Note that due 
+            to the right hand rule, a positive rotation angle in the zy-plane 
+            corresponds to rotation from z-axis towards negative y. I.e. the 
+            opposite sign convention of beam.yps().
         """
 
         # Get the mean proper velocity component offsets
@@ -655,18 +675,26 @@ class Beam():
     # ==================================================
     def xy_rotate_coord_sys(self, x_angle=None, y_angle=None, invert=False):
         """
-        Rotates the coordinate system of the beam first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis.
+        Rotates the coordinate system of the beam first with ``x_angle`` around 
+        the y-axis then with ``y_angle`` around the x-axis.
         
         Parameters
         ----------
         x_angle : [rad] float, optional
-            Angle to rotate the coordinate system with in the zx-plane. Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
+            Angle to rotate the coordinate system with in the zx-plane. Calls 
+            ``Beam.beam_alignment_angles()`` by default if no angle is provided.
         
         y_angle : [rad] float, optional
-            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps(). Calls ``Beam.beam_alignment_angles()`` by default if no angle is provided.
+            Angle to rotate the coordinate system with in the zy-plane. Note 
+            that due to the right hand rule, a positive rotation angle in the 
+            zy-plane corresponds to rotation from z-axis towards negative y. 
+            I.e. the opposite sign convention of beam.yps(). Calls 
+            ``Beam.beam_alignment_angles()`` by default if no angle is provided.
 
         invert : bool, optional
-            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+            Performs a standard passive transformation when False. If True, will 
+            perform an active transformation and can thus be used to invert the 
+            passive transformation.
         
             
         Returns
@@ -694,10 +722,15 @@ class Beam():
         Parameters
         ----------
         align_x_angle : [rad] float, optional
-            Beam coordinates in the zx-plane are rotated with this angle. If ``None``, will align the beam using its angular offset.
+            Beam coordinates in the zx-plane are rotated with this angle. If 
+            ``None``, will align the beam using its angular offset.
         
         align_y_angle : [rad] float, optional
-            Beam coordinates in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of ``beam.yps()``. If ``None``, will align the beam using its angular offset.
+            Beam coordinates in the zy-plane are rotated with this angle. Note 
+            that due to the right hand rule, a positive rotation angle in the 
+            zy-plane corresponds to rotation from z-axis towards negative y. 
+            I.e. the opposite sign convention of ``beam.yps()``. If ``None``, 
+            will align the beam using its angular offset.
         
             
         Returns
@@ -745,13 +778,16 @@ class Beam():
         Parameters
         ----------
         beam_quant : 1D float array
-            Beam quantity to be binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+            Beam quantity to be binned into bins/slices defined by z_centroids. 
+            The mean is calculated for the quantity for all particles in the 
+            z-bins. Includes e.g. beam.xs(), beam.Es() etc.
 
         bin_number : float, optional
             Number of beam slices.
 
         cut_off : float, optional
-            Determines the longitudinal coordinates inside the region of interest
+            Determines the longitudinal coordinates inside the region of 
+            interest.
 
         make_plot : bool, optional
             Flag for making plots.
@@ -759,7 +795,9 @@ class Beam():
         Returns
         ----------
         beam_quant_slices : 1D float array
-            beam_quant binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+            beam_quant binned into bins/slices defined by z_centroids. The mean 
+            is calculated for the quantity for all particles in the z-bins. 
+            Includes e.g. beam.xs(), beam.Es() etc.
 
         z_centroids : [m] 1D float array
             z-coordinates of the beam slices.
@@ -1037,14 +1075,17 @@ class Beam():
 
     def set_arbitrary_spin_polarization(self, polarization, direction='z', seed=None):
         """
-        Generates a random distribution of points on the surface of a sphere of radius 1, with the mean along a defined 'direction' is 
+        Generates a random distribution of points on the surface of a sphere of 
+        radius 1, with the mean along a defined 'direction' is 
         'polarization'.
-        For polarization=0, points are uniformly distributed on the surface of the sphere.
+        For polarization=0, points are uniformly distributed on the surface of 
+        the sphere.
     
         Parameters
         ----------
         polarization : float
-            Mean value of projection in the defined direction for the generated spins.
+            Mean value of projection in the defined direction for the generated 
+            spins.
 
         direction : string
             Spin direction (default is z).
@@ -1740,7 +1781,8 @@ class Beam():
             The final energies for all macroparticles.
         
         evol : SimpleNamespace object
-            only returns when ``calc_evolution=True``. Contains beam parameter evolution data.
+            only returns when ``calc_evolution=True``. Contains beam parameter 
+            evolution data.
         """
         
         # remove particles with subzero and Nan energy
