@@ -232,7 +232,7 @@ class StageBasic(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        # Convert PlasmaRamp to a StageBasic
         if type(self.upramp) is PlasmaRamp:
 
             upramp = self.convert_PlasmaRamp(self.upramp)
@@ -241,8 +241,6 @@ class StageBasic(Stage):
 
         elif isinstance(self.upramp, Stage):
             upramp = self.upramp  # Allow for other types of ramps
-        else:
-            raise StageError('Ramp is not an instance of Stage class.')
         
         if upramp.plasma_density is None:
             raise ValueError('Upramp plasma density is invalid.')
@@ -332,7 +330,7 @@ class StageBasic(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        # Convert PlasmaRamp to a StageBasic
         if type(self.downramp) is PlasmaRamp:
 
             downramp = self.convert_PlasmaRamp(self.downramp)
@@ -341,8 +339,6 @@ class StageBasic(Stage):
 
         elif isinstance(self.downramp, Stage):
             downramp = self.downramp  # Allow for other types of ramps
-        else:
-            raise StageError('Ramp is not an instance of Stage class.')
         
         if downramp.plasma_density is None:
             raise ValueError('Downramp plasma density is invalid.')
