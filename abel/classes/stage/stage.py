@@ -307,8 +307,8 @@ class Stage(Trackable, CostModeled):
             if self.downramp.length is None:
                 self.downramp.length = self._calc_ramp_length(self.downramp)
 
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
+        #self._resetLengthEnergyGradient()
+        #self._recalcLengthEnergyGradient()
 
     
     # ==================================================
