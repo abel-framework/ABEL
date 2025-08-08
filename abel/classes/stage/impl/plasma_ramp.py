@@ -12,10 +12,10 @@ class PlasmaRamp(Stage):
 
         super().__init__(nom_accel_gradient=None, nom_energy_gain=nom_energy_gain, plasma_density=ramp_plasma_density, driver_source=None, ramp_beta_mag=1.0)
 
-        # TODO: Need code to handle ramp_shape='from_file' ... need to ignore ramp_length, ramp_plasma_density. These need to be calculated.
-
-        if ramp_length is not 'uniform' or ramp_length is not 'from_file':
+        if ramp_shape != 'uniform' and ramp_shape != 'from_file':
             raise StageError('Invalid ramp shape.')
+        
+        # TODO: Need code to handle ramp_shape='from_file' ... need to ignore ramp_length, ramp_plasma_density. These need to be calculated.
 
         self.ramp_shape = ramp_shape
         self.length = ramp_length
