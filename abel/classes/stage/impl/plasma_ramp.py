@@ -14,6 +14,9 @@ class PlasmaRamp(Stage):
 
         # TODO: Need code to handle ramp_shape='from_file' ... need to ignore ramp_length, ramp_plasma_density. These need to be calculated.
 
+        if ramp_length is not 'uniform' or ramp_length is not 'from_file':
+            raise StageError('Invalid ramp shape.')
+
         self.ramp_shape = ramp_shape
         self.length = ramp_length
 
