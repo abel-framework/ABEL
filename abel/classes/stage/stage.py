@@ -204,9 +204,6 @@ class Stage(Trackable, CostModeled):
         stage_copy.length_flattop = None
         stage_copy.length = None
         stage_copy.plasma_density = None
-
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
          
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
         stage_copy.driver_source = None
