@@ -282,27 +282,29 @@ class Stage(Trackable, CostModeled):
         if self.upramp is not None:
             if self.upramp.plasma_density is None and self.plasma_density is not None and self.ramp_beta_mag is not None:
                 self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
-            if self.upramp.nom_energy_gain is None:
-                self.upramp.nom_energy_gain = 0.0  # Default energy gain in the ramps is zero.
+            if self.upramp.nom_energy_gain_flattop is None:
+                self.upramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.upramp.nom_energy is None:
                 self.upramp.nom_energy = self.nom_energy
                 self.upramp.nom_energy_flattop = self.nom_energy
                 self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy_gain
-            if self.upramp.length is None:
-                self.upramp.length = self._calc_ramp_length(self.upramp)
+            # Can calculate and set the ramp length after the nominal energy of the ramp is determined
+            if self.upramp.length_flattop is None:
+                self.upramp.length_flattop = self._calc_ramp_length(self.upramp)
         else:
             self.nom_energy_flattop = self.nom_energy
             
         if self.downramp is not None:
             if self.downramp.plasma_density is None and self.plasma_density is not None and self.ramp_beta_mag is not None:
                 self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
-            if self.downramp.nom_energy_gain is None:
-                self.downramp.nom_energy_gain = 0.0  # Default energy gain in the ramps is zero.
+            if self.downramp.nom_energy_gain_flattop is None:
+                self.downramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.downramp.nom_energy is None:
                 self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
                 self.downramp.nom_energy_flattop = self.downramp.nom_energy
-            if self.downramp.length is None:
-                self.downramp.length = self._calc_ramp_length(self.downramp)
+            # Can calculate and set the ramp length after the nominal energy of the ramp is determined
+            if self.downramp.length_flattop is None:
+                self.downramp.length_flattop = self._calc_ramp_length(self.downramp)
 
         #self._resetLengthEnergyGradient()
         #self._recalcLengthEnergyGradient()

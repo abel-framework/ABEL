@@ -87,10 +87,10 @@ class StageBasic(Stage):
             if type(self.upramp) is PlasmaRamp and self.upramp.ramp_shape != 'uniform':
                 raise TypeError('Only uniform ramps have been implemented.')
 
-            if self.upramp.nom_energy_gain is None or self.upramp.nom_energy_gain == 0:
-                ramp_energy_gain = self.upramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.upramp.plasma_density/self.plasma_density)
-                warnings.warn(f"Upramp nominal energy gain for StageBasic must be non-zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
-                self.upramp.nom_energy_gain = ramp_energy_gain
+            if self.upramp.nom_energy_gain_flattop is None or self.upramp.nom_energy_gain_flattop == 0:
+                ramp_energy_gain_flattop = self.upramp.length_flattop * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.upramp.plasma_density/self.plasma_density)
+                warnings.warn(f"Upramp nominal energy gain for StageBasic must be non-zero. Setting this to {ramp_energy_gain_flattop/1e9  :.3f} GeV.")
+                self.upramp.nom_energy_gain_flattop = ramp_energy_gain_flattop
 
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
             beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
@@ -119,11 +119,11 @@ class StageBasic(Stage):
             if type(self.downramp) is PlasmaRamp and self.downramp.ramp_shape != 'uniform':
                 raise TypeError('Only uniform ramps have been implemented.')
 
-            if self.downramp.nom_energy_gain is None or self.downramp.nom_energy_gain == 0:
-                ramp_energy_gain = self.downramp.length * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.downramp.plasma_density/self.plasma_density)
-                warnings.warn(f"Downramp nominal energy gain for StageBasic must be non-zero. Setting this to {ramp_energy_gain/1e9  :.3f} GeV.")
+            if self.downramp.nom_energy_gain_flattop is None or self.downramp.nom_energy_gain_flattop == 0:
+                ramp_energy_gain_flattop = self.downramp.length_flattop * self.nom_accel_gradient_flattop * 0.05*np.sqrt(self.downramp.plasma_density/self.plasma_density)
+                warnings.warn(f"Downramp nominal energy gain for StageBasic must be non-zero. Setting this to {ramp_energy_gain_flattop/1e9  :.3f} GeV.")
 
-                self.downramp.nom_energy_gain = ramp_energy_gain
+                self.downramp.nom_energy_gain_flattop = ramp_energy_gain_flattop
 
             # TODO: Temporary "drive beam evolution": Magnify the driver
             # Needs to be performed before self.track_downramp().
