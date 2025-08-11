@@ -465,8 +465,8 @@ def test_ramped_jitter_linac():
     np.random.seed(42)
 
     num_stages = 16
-    enable_xt_jitter = False
-    enable_xpyp_jitter = False
+    enable_xt_jitter = True
+    enable_xpyp_jitter = True
     
     driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source()
@@ -529,11 +529,11 @@ def test_ramped_jitter_linac():
     assert np.isclose(final_beam.energy(), stages[-1].nom_energy + stages[-1].nom_energy_gain + stages[-1].upramp.nom_energy_gain + stages[-1].downramp.nom_energy_gain, rtol=1e-3, atol=0.0)
     assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
     assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
-    assert np.isclose(final_beam.rel_energy_spread(), 9.58138609874687e-05, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_x(), 1.2067293735339788e-05, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), 7.112683504953016e-07, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 9.814428930580644e-05, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_x(), 1.200476051599518e-05, rtol=1e-4, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), 8.076947036056956e-07, rtol=1e-4, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), 6.962732406044078e-07, rtol=1e-4, atol=0.0)
 
     #ref_beam = Beam.load('./tests/data/')
     #ref_beam.beam_name = 'Reference beam'
