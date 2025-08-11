@@ -39,9 +39,6 @@ def setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, 
     driver.energy = 31.25e9                                                       # [eV]
     driver.rel_energy_spread = 0.01                                               # Relative rms energy spread
 
-    #driver.emit_nx, driver.emit_ny = 80e-6, 80e-6                                 # [m rad]
-    #driver.beta_x, driver.beta_y = 0.2, 0.2                                       # [m]
-
     driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
     driver.beta_x, driver.beta_y = 0.5, 0.5                                       # [m]
 
@@ -89,7 +86,7 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
 def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
     
     stage = StageBasic()
-    stage.nom_accel_gradient = nom_accel_gradient                                 # [GV/m]
+    stage.nom_accel_gradient = nom_accel_gradient                                 # [V/m]
     stage.nom_energy_gain = nom_energy_gain                                       # [eV]
     stage.plasma_density = plasma_density                                         # [m^-3]
     stage.driver_source = driver_source
