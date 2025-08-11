@@ -1209,7 +1209,7 @@ class Stage(Trackable, CostModeled):
             
         # extract wakefield if not already existing
         if not hasattr(evol, 'location'):
-            print('No evolution calculated')
+            print('Stage::plot_evolution(): No evolution calculated.')
             return
 
         # add upramp evolution
@@ -1348,11 +1348,11 @@ class Stage(Trackable, CostModeled):
             
         # extract wakefield if not already existing
         if not hasattr(evol, 'location'):
-            print('No evolution calculated')
+            print('Stage::plot_spin_evolution(): No evolution calculated.')
             return
 
         if not hasattr(evol, 'spin_x') or evol.spin_x is None:
-            print('No spin evolution calculated')
+            print('Stage::plot_spin_evolution(): No spin evolution calculated.')
             return
         
         # add upramp evolution
@@ -1410,15 +1410,15 @@ class Stage(Trackable, CostModeled):
         from matplotlib import pyplot as plt
         
         if self.initial is None:
-            print('No data.')
+            print('Stage::plot_wakefield(): No data.')
             return
         
         # extract wakefield if not already existing
         if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
-            print('No wakefield data.')
+            print('Stage::plot_wakefield(): No wakefield data.')
             return
         if not hasattr(self.initial.beam.current, 'Is'):
-            print('No beam current data.')
+            print('Stage::plot_wakefield(): No beam current data.')
             return
 
         # preprate plot
@@ -1481,10 +1481,10 @@ class Stage(Trackable, CostModeled):
         
         # extract wakefield if not already existing
         if not hasattr(self.final.plasma.wakefield.onaxis, 'Ezs'):
-            print('No wakefield calculated')
+            print('Stage::plot_final_wakefield(): No wakefield calculated.')
             return
         if not hasattr(self.final.beam.current, 'Is'):
-            print('No beam current calculated')
+            print('Stage::plot_final_wakefield(): No beam current calculated.')
             return
 
         # preprate plot
@@ -1572,15 +1572,15 @@ class Stage(Trackable, CostModeled):
         from matplotlib.colors import LogNorm
 
         if self.initial is None:
-            print('No data.')
+            print('Stage::plot_wake(): No data.')
             return
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
-            print('No wake calculated')
+            print('Stage::plot_wake(): No wake calculated.')
             return
         if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
-            print('No wakefield calculated')
+            print('Stage::plot_wake(): No wakefield calculated.')
             return
         
         # make figures
