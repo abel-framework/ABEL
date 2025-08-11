@@ -987,13 +987,15 @@ class Stage(Trackable, CostModeled):
             source of the stage does not have neither angular jitter nor angular 
             offset.
         """
+        import sys
+        machine_zero = sys.float_info.epsilon
 
         drive_beam_rotated = driver_incoming
         beam_rotated = beam_incoming
 
         # Check if the driver source of the stage has angular offset
         driver_source = self.get_driver_source()
-        has_angular_offset = driver_source.jitter.xp != 0 or driver_source.x_angle != 0 or driver_source.jitter.yp != 0 or driver_source.y_angle != 0
+        has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
 
         # Perform rotation if there is angular offset
         if has_angular_offset:
@@ -1064,9 +1066,12 @@ class Stage(Trackable, CostModeled):
             the stage does not have neither angular jitter nor angular offset.
         """
 
+        import sys
+        machine_zero = sys.float_info.epsilon
+
         # Check if the driver source of the stage has angular offset
         driver_source = self.get_driver_source()
-        has_angular_offset = driver_source.jitter.xp != 0 or driver_source.x_angle != 0 or driver_source.jitter.yp != 0 or driver_source.y_angle != 0
+        has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
         
         if has_angular_offset:
 
@@ -1098,10 +1103,10 @@ class Stage(Trackable, CostModeled):
             
             #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
         
-            if driver_incoming.x_angle() != 0 and np.abs( (beam_outgoing.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+            if np.abs(driver_incoming.x_angle()) > machine_zero and np.abs( (beam_outgoing.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
                 
-            if driver_incoming.y_angle() != 0 and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+            if np.abs(driver_incoming.y_angle()) > machine_zero and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
                 warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
 
         return driver_outgoing, beam_outgoing
