@@ -25,8 +25,8 @@ class StageBasic(Stage):
         # get the driver
         driver_incoming = self.driver_source.track()
 
-        if self.test_beam_between_ramps:
-            original_driver = copy.deepcopy(driver_incoming)
+        original_driver = copy.deepcopy(driver_incoming)
+        beam_incoming_location = beam_incoming.location
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
@@ -62,8 +62,8 @@ class StageBasic(Stage):
             beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
         
         else:  # Do the following if there are no upramp (a lone stage)
-            beam_ramped = copy.deepcopy(beam_rotated)
-            drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
+            beam_ramped = beam_rotated
+            drive_beam_ramped = drive_beam_rotated
             
             if self.ramp_beta_mag is not None:
                 beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
@@ -100,12 +100,12 @@ class StageBasic(Stage):
             if self.test_beam_between_ramps:
                 stage_beam_out = copy.deepcopy(beam)
                 stage_driver_out = copy.deepcopy(driver)
+            
+            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
 
-            beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
-
-        else:  # Do the following if there are no downramp. 
-            beam_outgoing = copy.deepcopy(beam)
-            driver_outgoing = copy.deepcopy(driver)
+        else:  # Do the following if there are no downramp.
+            beam_outgoing = beam
+            driver_outgoing = driver
             if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
 
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
@@ -122,12 +122,10 @@ class StageBasic(Stage):
         if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
-            driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(driver_incoming, driver_outgoing, beam_outgoing)
+            driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(original_driver, driver_outgoing, beam_outgoing)
 
 
         # ========== Bookkeeping ==========
-        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.test_beam_between_ramps:
             # Store beams for the main stage
@@ -146,7 +144,7 @@ class StageBasic(Stage):
         # Copy meta data from input beam_outgoing (will be iterated by super)
         beam_outgoing.trackable_number = beam_incoming.trackable_number
         beam_outgoing.stage_number = beam_incoming.stage_number
-        beam_outgoing.location = beam_incoming.location
+        beam_outgoing.location = beam_incoming_location
 
         # return the beam (and optionally the driver)
         if self._return_tracked_driver:
@@ -179,8 +177,10 @@ class StageBasic(Stage):
             Drive beam after tracking.
         """
 
-        beam = copy.deepcopy(beam_ramped)
-        drive_beam = copy.deepcopy(drive_beam_ramped)
+        beam = beam_ramped
+        drive_beam = drive_beam_ramped
+        drive_beam_ramped_location = drive_beam_ramped.location
+        beam_ramped_location = beam_ramped.location
 
         # Betatron oscillations
         deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
@@ -197,8 +197,8 @@ class StageBasic(Stage):
         drive_beam.set_Es(drive_beam_ramped.Es()*(1-self.depletion_efficiency))
 
         # Update the beam locations
-        drive_beam.location = drive_beam_ramped.location + self.length_flattop
-        beam.location = beam_ramped.location + self.length_flattop
+        drive_beam.location = drive_beam_ramped_location + self.length_flattop
+        beam.location = beam_ramped_location + self.length_flattop
 
         return beam, drive_beam
     

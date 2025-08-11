@@ -412,58 +412,6 @@ class Stage(Trackable, CostModeled):
         return super().track(beam, savedepth, runnable, verbose)
 
 
-    # # ==================================================
-    # # upramp to be tracked before the main tracking
-    # def track_upramp(self, beam0, driver0=None):       # TODO: make this an abstract method
-    #     if self.upramp is not None:
-
-    #         # set driver
-    #         self.upramp.driver_source = SourceCapsule(beam=driver0)
-
-    #         # determine density if not already set
-    #         if self.upramp.plasma_density is None:
-    #             self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
-
-    #         # perform tracking
-    #         self.upramp._return_tracked_driver = True
-    #         beam, driver = self.upramp.track(beam0)
-
-    #         beam.stage_number -= 1
-    #         driver.stage_number -= 1
-            
-    #     else:
-    #         beam = beam0
-    #         driver = driver0
-        
-    #     return beam, driver
-
-
-    # # ==================================================
-    # # downramp to be tracked after the main tracking
-    # def track_downramp(self, beam0, driver0):       # TODO: make this an abstract method
-    #     if self.downramp is not None:
-
-    #         # set driver
-    #         #print('Inside track_downramp():', driver0.location)
-    #         self.downramp.driver_source = SourceCapsule(beam=driver0)
-            
-    #         # determine density if not already set
-    #         if self.downramp.plasma_density is None:
-    #             # set ramp density
-    #             self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag           
-            
-    #         # perform tracking
-    #         self.downramp._return_tracked_driver = True
-    #         beam, driver = self.downramp.track(beam0)
-    #         beam.stage_number -= 1
-    #         driver.stage_number -= 1
-            
-    #     else:
-    #         beam = beam0
-    #         driver = driver0
-            
-    #     return beam, driver
-
 
     ## Mutually consistent calculation for length, nom_accel_gradient, nom_energy gain,
     #  their flattop counterparts, and (if existing) their stage counterparts.
@@ -1030,18 +978,18 @@ class Stage(Trackable, CostModeled):
         Returns
         ----------
         drive_beam_rotated : ``Beam`` object
-            Rotated drive beam. Returns a deepcopy of the input 
-            ``driver_incoming`` if the driver source of the stage does not have 
-            neither angular jitter nor angular offset.
+            Rotated drive beam. Returns the input ``driver_incoming`` if the 
+            driver source of the stage does not have neither angular jitter nor 
+            angular offset.
 
         beam_rotated : ``Beam`` object
-            Rotated main beam. Returns a deepcopy of the input ``beam_incoming`` 
-            if the driver source of the stage does not have neither angular 
-            jitter nor angular offset.
+            Rotated main beam. Returns the input ``beam_incoming`` if the driver 
+            source of the stage does not have neither angular jitter nor angular 
+            offset.
         """
 
-        drive_beam_rotated = copy.deepcopy(driver_incoming)  # Make a deep copy to not affect the original drive beam.
-        beam_rotated = copy.deepcopy(beam_incoming)
+        drive_beam_rotated = driver_incoming
+        beam_rotated = beam_incoming
 
         # Check if the driver source of the stage has angular offset
         driver_source = self.get_driver_source()
