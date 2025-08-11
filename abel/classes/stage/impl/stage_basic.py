@@ -10,7 +10,41 @@ SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False, test_beam_between_ramps=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1.0, depletion_efficiency=0.75, calc_evolution=False, test_beam_between_ramps=False):
+        """
+        Parameters
+        ----------
+        nom_accel_gradient : [V/m], float
+            Nominal acceleration gradient of the acceleration stage.
+        
+        nom_energy_gain : [eV] float
+            Nominal/target energy gain of the acceleration stage.
+        
+        plasma_density : [m^-3] float
+            Plasma density.
+
+        driver_source : ``Source`` object
+            Driver source for the acceleration stage.
+
+        ramp_beta_mag : float, optional
+            Used for demagnifying and magnifying beams passing through entrance 
+            and exit plasma ramps. Default set to ``None``.
+
+        transformer_ratio : float, optional
+            Transformer ratio. Default set to 1.0.
+
+        depletion_efficiency : float, optional
+            Energy depletion efficiency for the drive beam. Default set to 0.75.
+
+        calc_evolution : bool, optional
+            Flag for storing the beam parameter evolution data. Default set to 
+            ``False``.
+
+        test_beam_between_ramps : bool, optional
+            Flag for storing the beams between ramps and stage in order to 
+            perform tests for assuring beams being correctly transferred. 
+            Default set to ``False``.
+        """
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
