@@ -4,8 +4,8 @@ ABEL : StagePrtclTransWakeInstability tests
 =======================================
 
 This file is a part of ABEL.
-Copyright 2022– C.A.Lindstrøm, B.Chen, O.G. Finnerud,
-D. Kallvik, E. Hørlyk, K.N. Sjobak, E.Adli, University of Oslo
+Copyright 2022– C.A.Lindstrøm, J.B.B.Chen, O.G.Finnerud,
+D.Kallvik, E.Hørlyk, K.N.Sjobak, E.Adli, University of Oslo
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
