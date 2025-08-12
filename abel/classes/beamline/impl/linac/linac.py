@@ -97,6 +97,6 @@ class Linac(Beamline):
         
         # cost of the civil construction
         for trackable in self.trackables:
-            breakdown.append(trackables.get_cost_breakdown())
+            breakdown.append(trackable.get_cost_breakdown())
 
         return (self.name, breakdown)
