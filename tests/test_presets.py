@@ -36,7 +36,7 @@ def test_C3():
     np.random.seed(42)
 
     cool_copper_collider = C3()
-    cool_copper_collider.run('test_C3', overwrite=True)
+    cool_copper_collider.run('test_C3', overwrite=True, verbose=False)
 
     my_rtol = 1e-5  # Standard relative tolerance
 
@@ -122,11 +122,11 @@ def test_C3():
     assert np.isclose(cool_copper_collider.wallplug_power(), 111094069.06107412, rtol=my_rtol, atol=0.0)
 
     #cool_copper_collider.final_beam
-    #cool_copper_collider.plot_survey()
+    cool_copper_collider.plot_survey()
     
-    #cool_copper_collider.print_cost()
-    #cool_copper_collider.print_emissions()
-    #cool_copper_collider.print_power()
+    cool_copper_collider.print_cost()
+    cool_copper_collider.print_emissions()
+    cool_copper_collider.print_power()
 
     # Remove output directory
     shutil.rmtree(cool_copper_collider.run_path())
@@ -141,7 +141,7 @@ def test_HALHFv1():
     np.random.seed(42)
 
     halhf1 = HALHFv1()
-    halhf1.run('test_HALHFv1', overwrite=True)
+    halhf1.run('test_HALHFv1', overwrite=True, verbose=False)
 
     my_rtol = 1e-5  # Standard relative tolerance
 
@@ -224,11 +224,113 @@ def test_HALHFv1():
     assert np.isclose(halhf1.wallplug_power(), 85960065.40508494, rtol=my_rtol, atol=0.0)
 
     #halhf1.final_beam
-    #halhf1.plot_survey()
+    halhf1.plot_survey()
     
-    #halhf1.print_cost()
-    #halhf1.print_emissions()
-    #halhf1.print_power()
+    halhf1.print_cost()
+    halhf1.print_emissions()
+    halhf1.print_power()
 
     # Remove output directory
     shutil.rmtree(halhf1.run_path())
+
+
+@pytest.mark.presets
+def test_HALHFv2():
+    """
+    Test for the HALHFv2 collider preset.
+    """
+
+    np.random.seed(42)
+
+    halhf2 = HALHFv2()
+    halhf2.run('test_HALHFv2', overwrite=True, verbose=False)
+
+    my_rtol = 1e-5  # Standard relative tolerance
+
+    # Tests
+    assert np.isclose(halhf2.bunch_separation, 1.6e-8, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.carbon_tax_cost(), 228303479.8060721, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.collision_rate(), 16000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.com_energy, 250e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.construction_cost(), 2906407959.1288686, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.construction_emissions(), 157057.12228970297, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_carbon_tax_per_emissions, 800, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_eu_accounting(), 2906407959.1288686, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_factor_infrastructure_and_services, 0.13530999999999999, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_per_energy, 1.388888888888889e-08, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_per_ip, 76762820.51282051, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_bds, 40440.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_combiner_ring, 79000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_damping_ring, 260000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_interstage, 40440.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_plasma_stage, 46200.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_rf_structure_normalconducting, 115000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_rf_structure_superconducting, 106000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_surfacebuilding, 33258.01282051282, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_transfer_line, 15400.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_tunnel_large, 41207.961149999996, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_per_length_turnaround, 40440.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_power_beam_dump, 2.392857142857143, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.cost_per_power_reliquification_plant_nitrogen, 13.5, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_source, 10000000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_source_polarized_electrons, 82000000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_per_source_polarized_positrons, 178000000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.cost_snowmass_itf_accounting(), 3545817710.1372194, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.emissions_per_energy_usage, 5.5555555555555555e-12, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.energy_asymmetry, 3.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.energy_cost(), 320805568.66971785, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.energy_emissions(), 128322.22746788713, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.energy_usage(), 6631.594455276813, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.enhancement_factor(), 1.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.full_luminosity(), 9.187419425660911e+37, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.full_luminosity_per_crossing(), 5.74213714103807e+33, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.full_luminosity_per_power(), 8.658757980094825e+29, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.full_programme_cost(), 4295552465.998911, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.geometric_luminosity_per_crossing(), 5.74213714103807e+33, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.get_com_energy(), 250e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.get_cost(), 4360200281.107528, rtol=my_rtol, atol=0.0)
+    
+    assert np.isclose(halhf2.get_energy_asymmetry(), 3.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.integrated_energy_usage(), 2.3098000944219684e+16, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.integrated_runtime(), 217688983.96147043, rtol=my_rtol, atol=0.0)
+    assert halhf2.is_scan() is False
+    assert np.isclose(halhf2.learning_curve_klystrons, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.length_end_to_end(), 4929.176582547312, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.maintenance_cost(), 200625636.794811, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.maintenance_labor(), 290.64079591288686, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.maintenance_labor_per_construction_cost, 1e-7, rtol=1e-15, atol=0.0)
+    #halhf2.maximum_upsilon()  # TODO: why does this give FALSE?
+    assert halhf2.num_bunches_in_train == 160
+    # #halhf2.num_coherent_pairs()  # TODO: why does this give FALSE?
+    # #halhf2.num_photons_beam1()  # TODO: why does this give FALSE?
+    # #halhf2.num_photons_beam2()  # TODO: why does this give FALSE?
+    assert halhf2.num_shots == 1
+    assert halhf2.num_shots_per_step == 1
+    assert halhf2.num_steps == 1
+    assert np.isclose(halhf2.overhead_cost(), 639409751.0083511, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.overhead_cost_design_and_development(), 290640795.91288686, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.overhead_cost_management_inspection(), 348768955.0954642, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.peak_luminosity(), 9.187419425660911e+37, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.peak_luminosity_per_crossing(), 5.74213714103807e+33, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.peak_luminosity_per_power(), 8.658757980094825e+29, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.power_overhead(), 21221102.256885804, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.programme_duration(), 310984262.8021006, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.rep_rate_trains, 100.0, rtol=1e-15, atol=0.0)
+    assert halhf2.run_name == 'test_HALHFv2'
+    assert np.isclose(halhf2.target_integrated_luminosity, 2e46, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.target_integrated_luminosity_250GeV, 2e46, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.target_integrated_luminosity_550GeV, 4e46, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.total_emissions(), 285379.3497575901, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.total_tunnel_length(), 14229.539772926864, rtol=my_rtol, atol=0.0)
+    assert np.isclose(halhf2.uptime_percentage, 0.7, rtol=1e-15, atol=0.0)
+    assert np.isclose(halhf2.wallplug_power(), 106105511.28442901, rtol=my_rtol, atol=0.0)
+
+    #halhf2.final_beam
+    halhf2.plot_survey()
+    
+    halhf2.print_cost()
+    halhf2.print_emissions()
+    halhf2.print_power()
+
+    # Remove output directory
+    shutil.rmtree(halhf2.run_path())
