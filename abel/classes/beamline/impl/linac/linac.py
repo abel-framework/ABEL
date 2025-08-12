@@ -26,8 +26,54 @@ class Linac(Beamline):
         super().assemble_trackables()
     
 
-    def get_nom_energy(self):
+    @property
+    def nom_energy(self) -> float | None:
+        "The nominal energy [eV] of the linac."
         return self.nom_energy
+    @nom_energy.setter
+    def nom_energy(self, energy : float | None):
+        if energy < 0.0:
+            raise ValueError('Nominal energy cannot be negative.')
+        self.nom_energy = energy
+
+
+    def get_nom_energy(self):
+        "Alias of linac nominal energy."
+        return self.nom_energy
+    
+
+    @property
+    def num_bunches_in_train(self) -> int | None:
+        "The number of bunches in a bunch train."
+        return self.num_bunches_in_train
+    @num_bunches_in_train.setter
+    def num_bunches_in_train(self, num : int | None):
+        if num < 0.0:
+            raise ValueError('Number of bunches cannot be negative.')
+        self.num_bunches_in_train = num
+
+
+    @property
+    def bunch_separation(self) -> float | None:
+        "The bunch separation."
+        return self.bunch_separation
+    @bunch_separation.setter
+    def bunch_separation(self, separation : float | None):
+        if separation < 0.0:
+            raise ValueError('Bunch separation cannot be negative.')
+        self.bunch_separation = separation
+
+    
+    @property
+    def rep_rate_trains(self) -> float | None:
+        "The bunch train repetition rate [Hz]."
+        return self.rep_rate_trains
+    @rep_rate_trains.setter
+    def rep_rate_trains(self, rep_rate : float | None):
+        if rep_rate < 0.0:
+            raise ValueError('Repetition rate cannot be negative.')
+        self.rep_rate_trains = rep_rate
+
 
     def get_nom_beam_power(self):
         return abs(self.nom_energy * self.source.get_charge() * self.get_rep_rate_average())
