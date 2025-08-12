@@ -21,5 +21,17 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-import os
 import pytest
+from abel.classes.beamline.impl.linac.linac import Linac
+
+
+@pytest.mark.linac_unit_test
+def test_init():
+    "Tests for ``Linac.__init__()``."
+
+    linac = Linac()
+    assert linac.source is None
+    assert linac.nom_energy is None
+    assert linac.num_bunches_in_train is None
+    assert linac.bunch_separation is None
+    assert linac.rep_rate_trains is None
