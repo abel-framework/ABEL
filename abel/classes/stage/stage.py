@@ -23,7 +23,7 @@ class Stage(Trackable, CostModeled):
         self.nom_accel_gradient = nom_accel_gradient
         self.nom_energy_gain = nom_energy_gain
         self.plasma_density = plasma_density
-        self._driver_source = driver_source
+        self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
         
         self.stage_number = None
@@ -80,7 +80,7 @@ class Stage(Trackable, CostModeled):
         if source is not None and not isinstance(source, (Source, DriverComplex)):
             raise TypeError("driver_source must be a Source, DriverComplex, or None")
         self._driver_source = source
-
+    _driver_source = None
 
     def get_driver_source(self):
         """
@@ -241,7 +241,6 @@ class Stage(Trackable, CostModeled):
         # Copy the parameters in ramp to trackable_ramp
         trackable_ramp.plasma_density = ramp.plasma_density
         trackable_ramp.nom_energy = ramp.nom_energy
-        trackable_ramp.nom_energy_flattop = ramp.nom_energy_flattop
 
         if trackable_ramp.nom_energy != trackable_ramp.nom_energy_flattop:
             raise StageError('Ramp nominal energy is not equal to ramp flattop nominal energy.')
@@ -286,13 +285,11 @@ class Stage(Trackable, CostModeled):
                 self.upramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.upramp.nom_energy is None:
                 self.upramp.nom_energy = self.nom_energy
-                self.upramp.nom_energy_flattop = self.nom_energy
                 self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy_gain
+
             # Can calculate and set the ramp length after the nominal energy of the ramp is determined
             if self.upramp.length_flattop is None:
                 self.upramp.length_flattop = self._calc_ramp_length(self.upramp)
-        else:
-            self.nom_energy_flattop = self.nom_energy
             
         if self.downramp is not None:
             if self.downramp.plasma_density is None and self.plasma_density is not None and self.ramp_beta_mag is not None:
@@ -301,13 +298,10 @@ class Stage(Trackable, CostModeled):
                 self.downramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.downramp.nom_energy is None:
                 self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
-                self.downramp.nom_energy_flattop = self.downramp.nom_energy
+                
             # Can calculate and set the ramp length after the nominal energy of the ramp is determined
             if self.downramp.length_flattop is None:
                 self.downramp.length_flattop = self._calc_ramp_length(self.downramp)
-
-        #self._resetLengthEnergyGradient()
-        #self._recalcLengthEnergyGradient()
 
     
     # ==================================================
@@ -491,6 +485,7 @@ class Stage(Trackable, CostModeled):
         "Alias of length"
         return self.length
 
+
     # ==================================================
     @property
     def nom_energy_gain(self) -> float:
@@ -518,6 +513,7 @@ class Stage(Trackable, CostModeled):
     def get_nom_energy_gain(self):
         "Alias of nom_energy_gain"
         return self.nom_energy_gain
+
 
     # ==================================================
     @property
@@ -569,6 +565,7 @@ class Stage(Trackable, CostModeled):
     _length_flattop      = None
     _length_flattop_calc = None
 
+
     # ==================================================
     @property
     def nom_energy_gain_flattop(self) -> float:
@@ -616,8 +613,63 @@ class Stage(Trackable, CostModeled):
     _nom_accel_gradient_flattop      = None
     _nom_accel_gradient_flattop_calc = None
 
-    ## Recalculation methods
 
+    # ==================================================
+    @property
+    def nom_energy(self) -> float:
+        "Nominal energy for the tracking [eV], or None if not set/calculateable"
+        return self._nom_energy_calc
+    @nom_energy.setter
+    def nom_energy(self, nom_energy : float):
+        if self._nom_energy_calc is not None and self._nom_energy is None:
+            raise VariablesOverspecifiedError("nom_energy already known/calculateable, cannot set")
+        if nom_energy is not None:
+            if nom_energy < 0.0:
+                raise VariablesOutOfRangeError(f"Setting nom_energy = {nom_energy} < 0; check variables.")
+        
+        nom_energy_old = self._nom_energy
+        try:
+            self._nom_energy = nom_energy
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._nom_energy = nom_energy_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
+    _nom_energy      = None
+    _nom_energy_calc = None
+
+
+    # ==================================================
+    @property
+    def nom_energy_flattop(self) -> float:
+        "Nominal energy in the flattop for the tracking [eV], or None if not set/calculateable"
+        return self._nom_energy_flattop_calc
+    @nom_energy_flattop.setter
+    def nom_energy_flattop(self, nom_energy_flattop : float):
+        if self._nom_energy_flattop_calc is not None and self._nom_energy_flattop is None:
+            raise VariablesOverspecifiedError("nom_energy_flattop already known/calculateable, cannot set")
+        if nom_energy_flattop is not None:
+            if nom_energy_flattop < 0.0:
+                raise VariablesOutOfRangeError(f"Setting nom_energy_flattop = {nom_energy_flattop} < 0; check variables.")
+        
+        nom_energy_flattop_old = self._nom_energy_flattop
+        try:
+            self._nom_energy_flattop = nom_energy_flattop
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._nom_energy_flattop = nom_energy_flattop_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
+    _nom_energy_flattop      = None
+    _nom_energy_flattop_calc = None
+
+
+    # ==================================================
+    ## Recalculation methods
     # ==================================================
     def _resetLengthEnergyGradient(self):
         "Reset all the calculated values in the current Stage hierarchy"
@@ -636,12 +688,17 @@ class Stage(Trackable, CostModeled):
         self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
         self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
 
+        self._nom_energy_calc         = self._nom_energy
+        self._nom_energy_flattop_calc = self._nom_energy_flattop
+
         self._printVerb("length                     (1)>", self.length)
         self._printVerb("nom_energy_gain            (1)>", self.nom_energy_gain)
         self._printVerb("nom_accel_gradient         (1)>", self.nom_accel_gradient)
         self._printVerb("length_flattop             (1)>", self.length_flattop)
         self._printVerb("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
         self._printVerb("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
+        self._printVerb("nom_energy                 (1)>", self.nom_energy)
+        self._printVerb("nom_energy_flattop         (1)>", self.nom_energy_flattop)
 
         if self.upramp is not None:
             self._printVerb("Upramp:")
@@ -792,6 +849,53 @@ class Stage(Trackable, CostModeled):
                         self._printVerb("nom_energy_gain_flattop    (3)>",dE)
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
+            
+            # Try to set self._nom_energy_flattop_calc using self.nom_energy + self.upramp.nom_energy_gain
+            if self.nom_energy_flattop is None:
+                if self.nom_energy is not None:
+                    E0 = self.nom_energy
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            E0 += self.upramp.nom_energy_gain
+                    if isDef:
+                        self._printVerb("nom_energy_gain_flattop   (3)>",E0)
+                        self._nom_energy_flattop_calc = E0
+                        updateCounter += 1
+            
+            # Try to set self._nom_energy_calc using self.upramp.nom_energy_flattop - self.upramp.nom_energy_gain
+            if self.nom_energy is None:
+                if self.nom_energy_flattop is not None:
+                    E1 = self.nom_energy_flattop
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            E1 -= self.upramp.nom_energy_gain
+                    if isDef:
+                        self._printVerb("nom_energy_gain           (3)>", E1)
+                        self._nom_energy_calc = E1
+                        updateCounter += 1
+
+            # Try to set the nominal energy to be equal to the upramp nominal energy
+            if self.nom_energy is None:
+                if self.upramp is not None:
+                    if self.upramp.nom_energy is not None:
+                        self._printVerb("nom_energy                (3)>", self.nom_energy)
+                        self._nom_energy_calc = self.upramp.nom_energy
+                        updateCounter += 1
+            
+            # Try to set the nominal flattop energy by subtracting the nominal flattop energy gain from the downramp nominal energy
+            if self.nom_energy_flattop is None:
+                if self.downramp is not None:
+                    if self.downramp.nom_energy is not None:
+                        if self.nom_energy_gain_flattop is not None:
+                            self._nom_energy_flattop_calc = self.downramp.nom_energy - self.nom_energy_gain_flattop
+                            self._printVerb("nom_energy_flattop        (3)>", self.nom_energy_flattop)
+                            updateCounter += 1
 
             #Note:
             #   Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
@@ -839,6 +943,30 @@ class Stage(Trackable, CostModeled):
                                 self._nom_energy_gain_calc = self.parent.nom_energy_gain - self.parent.nom_energy_gain_flattop - otherRamp.nom_energy_gain
                                 self._printVerb("nom_energy_gain (4)>", self.nom_energy_gain)
                                 updateCounter += 1
+                
+                # Try to set the upramp nominal energy gain using self.parent.nom_energy_flattop - self.parent.nom_energy
+                if self.nom_energy_gain is None and self.is_upramp():
+                    if self.parent.nom_energy is not None and \
+                       self.parent.nom_energy_flattop is not None:
+                        self._nom_energy_gain_calc = self.parent.nom_energy_flattop - self.parent.nom_energy
+                        self._printVerb("nom_energy_gain (4)>", self.nom_energy_gain)
+                        updateCounter += 1
+                
+                # Try to set the upramp nominal energy using self.parent.nom_energy
+                if self.nom_energy is None and self.is_upramp():
+                    if self.parent.nom_energy is not None:
+                        self._nom_energy_calc = self.parent.nom_energy
+                        self._printVerb("nom_energy.    (4)>", self.nom_energy)
+                        updateCounter += 1
+                
+                # Try to set the downramp nominal energy using self.parent.nom_energy_flattop + self.parent.nom_energy_gain_flattop
+                if self.nom_energy is None and self.is_downramp():
+                    if self.parent.nom_energy_flattop is not None and \
+                       self.parent.nom_energy_gain_flattop is not None:
+                        self.nom_energy = self.parent.nom_energy_flattop + self.parent.nom_energy_gain_flattop
+                        self._printVerb("nom_energy     (4)>", self.nom_energy)
+                        updateCounter += 1
+
 
             #Dig down and try to calculate more
             if self.upramp is not None:
