@@ -879,6 +879,10 @@ class Beam():
         "Total number of physical particles."
         return int(np.nansum(self.weightings()))
     
+    def particle_charge(self):
+        "The charge of a physical particle."
+        return self.charge()/self.total_particles()
+    
     def charge(self):
         "Total beam charge."
         return np.nansum(self.qs())
@@ -1752,7 +1756,8 @@ class Beam():
         
     def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False):
         """
-        Evolve the beam by solving Hill's equation.
+        Evolve the beam by solving Hill's equation in the x- and y direction 
+        separately.
 
         Parameters
         ----------
