@@ -31,9 +31,11 @@ def evolve_hills_equation_ode(x0, ux0, L, gamma, kp):
 
 
 # solve Hill's equation
-def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp, m=SI.m_e, q=-SI.e):
+def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp):
     """
-    Solves Hill's equation in 1D.
+    Solves Hill's equation in 1D homogeneous plasma with wavenumber kp. 
+    Assuming positive ions and the charge of a physical particle in the 
+    beam is -e.
 
     Parameters
     ----------
@@ -49,7 +51,7 @@ def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp, m=SI.m_e, 
     gamma0 : 1D float ndarray
         The initial Lorentz factors of the macroparticles.
     
-    dgamma_ds : 1D float ndarray
+    dgamma_ds : float or 1D float ndarray
         The average changes of Lorentz factor over distance ``L``.
 
     kp : [m^-1] float or 1D float ndarray
@@ -64,32 +66,30 @@ def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp, m=SI.m_e, 
     ux0 : [m/s] 1D float ndarray
         The final proper velocities of macroparticles.
     """
-    
-    # TODO: cannot set both kp and g??
 
     import scipy.special as scispec
-    from abel.utilities.relativity import gamma2proper_velocity, gamma2energy
+    from abel.utilities.relativity import gamma2proper_velocity
+
+    x = np.empty(len(x0))
+    xp = np.empty(len(x0))
     
     # convert initial proper velocities to angles
     xp0 = ux0 / gamma2proper_velocity(gamma0)
     
-    if dgamma_ds.any() == 0:  # True when ALL elements are 0.
-        
-        # convert to g if not given
-        # if g is None:
-        #     g = kp**2*m*SI.c/(2*q)
+    if np.all(np.asarray(dgamma_ds) == 0):  # True when ALL elements are 0. Handles both a float and an ndarray.
 
         # convert to focusing strength
-        #k = np.sqrt(g*SI.c * q/SI.e / gamma2energy(gamma0))
         k = kp/np.sqrt(2*gamma0)
 
-        # calculate evolution (pure sinusoids)
-        if k.any() == 0:  # True when ALL elements are 0.
-            x = x0 + xp0*L
-            xp = xp0
-        else:
-            x = np.real(x0*np.cos(k*L) + (xp0/k)*np.sin(k*L))
-            xp = np.real(xp0*np.cos(k*L) - x0*k*np.sin(k*L))
+        # calculate evolution (drift or pure sinusoids)
+        # special case for k ≈ 0. Drift only
+        zero_indices = np.abs(k) == 0.0
+        x[zero_indices] = x0[zero_indices] + xp0[zero_indices]*L
+        xp[zero_indices] = xp0[zero_indices]
+
+        # sinusoid
+        x[~zero_indices] = np.real(x0[~zero_indices]*np.cos(k[~zero_indices]*L) + (xp0[~zero_indices]/k[~zero_indices])*np.sin(k[~zero_indices]*L))
+        xp[~zero_indices] = np.real(xp0[~zero_indices]*np.cos(k[~zero_indices]*L) - x0[~zero_indices]*k[~zero_indices]*np.sin(k[~zero_indices]*L))
 
         # no acceleration
         gamma = gamma0
