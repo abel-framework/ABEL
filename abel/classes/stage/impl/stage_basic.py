@@ -59,7 +59,7 @@ class StageBasic(Stage):
         driver_incoming = self.driver_source.track()
 
         original_driver = copy.deepcopy(driver_incoming)
-        beam_incoming_location = beam_incoming.location
+        original_beam = copy.deepcopy(beam_incoming)
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
@@ -158,15 +158,15 @@ class StageBasic(Stage):
                                             driver_incoming=original_driver)  # The original drive beam before rotation and ramps
 
         # calculate efficiency
-        self.calculate_efficiency(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
+        self.calculate_efficiency(original_beam, original_driver, beam_outgoing, driver_outgoing)
         
         # save current profile
-        self.calculate_beam_current(beam_incoming, driver_incoming, beam_outgoing, driver_outgoing)
+        self.calculate_beam_current(original_beam, original_driver, beam_outgoing, driver_outgoing)
 
         # Copy meta data from input beam_outgoing (will be iterated by super)
-        beam_outgoing.trackable_number = beam_incoming.trackable_number
-        beam_outgoing.stage_number = beam_incoming.stage_number
-        beam_outgoing.location = beam_incoming_location
+        beam_outgoing.trackable_number = original_beam.trackable_number
+        beam_outgoing.stage_number = original_beam.stage_number
+        beam_outgoing.location = original_beam.location
 
         # return the beam (and optionally the driver)
         if self._return_tracked_driver:
