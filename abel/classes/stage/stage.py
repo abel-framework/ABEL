@@ -160,7 +160,7 @@ class Stage(Trackable, CostModeled):
     def ramp_beta_mag(self, ramp_beta_mag : float | None):
         if ramp_beta_mag is not None:
             if not isinstance(ramp_beta_mag, (float, int)) or ramp_beta_mag < 0.0:
-                raise StageError("ramp_beta_mag must be a positive number.")
+                raise VariablesOutOfRangeError("ramp_beta_mag must be a positive number.")
 
         self._ramp_beta_mag = ramp_beta_mag
     _ramp_beta_mag = None
@@ -297,8 +297,14 @@ class Stage(Trackable, CostModeled):
             raise StageError('Stage nominal energy is None.')
 
         if self.upramp is not None:
-            if self.upramp.plasma_density is None and self.plasma_density is not None and self.ramp_beta_mag is not None:
-                self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
+            if self.upramp.plasma_density is None and self.plasma_density is not None:
+                if self.upramp.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.upramp.ramp_beta_mag
+                elif self.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.ramp_beta_mag
+                else:
+                    raise ValueError('No ramp_beta_mag defined.')
+                self.upramp.plasma_density = self.plasma_density/ramp_beta_mag
             if self.upramp.nom_energy_gain_flattop is None:
                 self.upramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.upramp.nom_energy is None:
@@ -310,7 +316,13 @@ class Stage(Trackable, CostModeled):
                 self.upramp.length_flattop = self._calc_ramp_length(self.upramp)
             
         if self.downramp is not None:
-            if self.downramp.plasma_density is None and self.plasma_density is not None and self.ramp_beta_mag is not None:
+            if self.downramp.plasma_density is None and self.plasma_density is not None:
+                if self.downramp.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.downramp.ramp_beta_mag
+                elif self.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.ramp_beta_mag
+                else:
+                    raise ValueError('No ramp_beta_mag defined.')
                 self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
             if self.downramp.nom_energy_gain_flattop is None:
                 self.downramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
@@ -1960,9 +1972,9 @@ class PlasmaRamp(Stage):
     """
     
     # ==================================================
-    def __init__(self, nom_energy_gain=None, ramp_plasma_density=None, ramp_length=None, ramp_shape='uniform'):
+    def __init__(self, nom_energy_gain=None, ramp_beta_mag=None, ramp_length=None, ramp_shape='uniform'):
 
-        super().__init__(nom_accel_gradient=None, nom_energy_gain=nom_energy_gain, plasma_density=ramp_plasma_density, driver_source=None, ramp_beta_mag=1.0)
+        super().__init__(nom_accel_gradient=None, nom_energy_gain=nom_energy_gain, plasma_density=None, driver_source=None, ramp_beta_mag=ramp_beta_mag)
 
         if ramp_shape != 'uniform' and ramp_shape != 'from_file':
             raise StageError('Invalid ramp shape.')
