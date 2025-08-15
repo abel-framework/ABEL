@@ -1,5 +1,4 @@
-from abel.classes.stage.stage import Stage, StageError
-from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
+from abel.classes.stage.stage import Stage, PlasmaRamp
 from abel.classes.source.impl.source_capsule import SourceCapsule
 import numpy as np
 import scipy.constants as SI
