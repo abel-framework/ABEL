@@ -149,6 +149,24 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
+    @property
+    def ramp_beta_mag(self) -> Self:
+        """
+        The betatron magnification used to define ramp plasma densities. Can be 
+        overriden with the ramps' own ramp_beta_mag.
+        """
+        return self._ramp_beta_mag
+    @ramp_beta_mag.setter
+    def ramp_beta_mag(self, ramp_beta_mag : float | None):
+        if ramp_beta_mag is not None:
+            if not isinstance(ramp_beta_mag, (float, int)) or ramp_beta_mag < 0.0:
+                raise StageError("ramp_beta_mag must be a positive number.")
+
+        self._ramp_beta_mag = ramp_beta_mag
+    _ramp_beta_mag = None
+
+
+    # ==================================================
     def copy_config2blank_stage(self):
         """
         Makes a deepcopy of the stage to copy the configurations and settings,
@@ -886,6 +904,7 @@ class Stage(Trackable, CostModeled):
             if self.nom_energy_flattop is None:
                 if self.nom_energy is not None:
                     E0 = self.nom_energy
+                    E1 = E0
                     isDef = True
                     if self.upramp is not None:
                         if self.upramp.nom_energy_gain is None:
@@ -904,6 +923,7 @@ class Stage(Trackable, CostModeled):
             if self.nom_energy is None:
                 if self.nom_energy_flattop is not None:
                     E1 = self.nom_energy_flattop
+                    E0 = E1
                     isDef = True
                     if self.upramp is not None:
                         if self.upramp.nom_energy_gain is None:
@@ -933,6 +953,7 @@ class Stage(Trackable, CostModeled):
                 if self.downramp is not None:
                     if self.downramp.nom_energy is not None:
                         E2 = self.downramp.nom_energy
+                        E1 = E2
                         if self.nom_energy_gain_flattop is not None:
                             dE1 = self.nom_energy_gain_flattop
                             E1 = E2 - dE1
@@ -1957,17 +1978,17 @@ class PlasmaRamp(Stage):
 
     # ==================================================
     def track(self):
-        raise StageError('track() is not implemented for StageRamp. Use track_upramp() or track_downramp() from the Stage class instead.')
+        raise StageError('track() is not implemented for PlasmaRamp. Use track_upramp() or track_downramp() from the Stage class instead.')
     
 
     # ==================================================
     def set_upramp(self):
-        raise StageError('Cannot add a ramp to StageRamp.')
+        raise StageError('Cannot add a ramp to PlasmaRamp.')
     
 
     # ==================================================
     def set_downramp(self):
-        raise StageError('Cannot add a ramp to StageRamp.')
+        raise StageError('Cannot add a ramp to PlasmaRamp.')
     
 
     # ==================================================
