@@ -1946,7 +1946,7 @@ def test_StageGeom_gradient_PlasmaRamps():
 
 @pytest.mark.stageGeometry
 def test_StageGeom_sanityCheckLengths1():
-    "Testing of stage.sanityCheckLengths logic without ramps"
+    "Testing of Stage.sanityCheckLengths logic without ramps"
 
     stageTest_L1 = StageBasic()
 
@@ -2037,7 +2037,7 @@ def test_StageGeom_sanityCheckLengths1():
 
 @pytest.mark.stageGeometry
 def test_StageGeom_sanityCheckLengths2():
-    "Testing of stage.sanityCheckLengths logic with ramps"
+    "Testing of Stage.sanityCheckLengths logic with ramps"
 
     stageTest_L2 = StageBasic()
     stageTest_L2.upramp = stageTest_L2.__class__()
@@ -2253,7 +2253,7 @@ def test_StageGeom_sanityCheckLengths2():
 
 @pytest.mark.stageGeometry
 def test_StageGeom_sanityCheckLengths2_PlasmaRamps():
-    "Testing of stage.sanityCheckLengths logic with ``PlasmaRamp``ramps."
+    "Testing of Stage.sanityCheckLengths logic with ``PlasmaRamp``ramps."
 
     stageTest_L2 = StageBasic()
     stageTest_L2.upramp = PlasmaRamp()
@@ -2465,3 +2465,42 @@ def test_StageGeom_sanityCheckLengths2_PlasmaRamps():
 
     #Trigger a test failure and printout
     #assert False
+
+
+@pytest.mark.stageGeometry
+def test_StageGeom_ramp_beta_mag_PlasmaRamps():
+    "Testing ``Stage.ramp_beta_mag`` and ``PlasmaRamp.ramp_beta_mag``."
+
+    stage = StageBasic()
+    stage.ramp_beta_mag = 10.0
+    stage.upramp = PlasmaRamp()
+    stage.downramp = PlasmaRamp()
+
+    assert np.isclose(stage.ramp_beta_mag, 10.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.ramp_beta_mag, 10.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.ramp_beta_mag, 10.0, rtol=1e-15, atol=0.0)
+
+    stage.upramp.ramp_beta_mag = 5.0
+    stage.downramp.ramp_beta_mag = 4.0
+    assert np.isclose(stage.ramp_beta_mag, 10.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.ramp_beta_mag, 5.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.ramp_beta_mag, 4.0, rtol=1e-15, atol=0.0)
+
+    stage2 = StageBasic()
+    stage2.upramp = PlasmaRamp()
+    stage2.downramp = PlasmaRamp()
+
+    assert stage2.ramp_beta_mag is None
+    assert stage2.upramp.ramp_beta_mag is None
+    assert stage2.downramp.ramp_beta_mag is None
+
+    stage2.upramp.ramp_beta_mag = 9.0
+    stage2.downramp.ramp_beta_mag = 8.0
+    assert stage2.ramp_beta_mag is None
+    assert np.isclose(stage2.upramp.ramp_beta_mag, 9.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.ramp_beta_mag, 8.0, rtol=1e-15, atol=0.0)
+
+    stage2.ramp_beta_mag = 11.0
+    assert np.isclose(stage2.ramp_beta_mag, 11.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.ramp_beta_mag, 9.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.ramp_beta_mag, 8.0, rtol=1e-15, atol=0.0)
