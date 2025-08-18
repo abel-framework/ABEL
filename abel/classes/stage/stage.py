@@ -162,6 +162,13 @@ class Stage(Trackable, CostModeled):
             if not isinstance(ramp_beta_mag, (float, int)) or ramp_beta_mag < 0.0:
                 raise VariablesOutOfRangeError("ramp_beta_mag must be a positive number.")
 
+            # Check if upramp or downramp already has defined ramp_beta_mag
+            if self.has_ramp():
+                if self.upramp.ramp_beta_mag is not None:
+                    warnings.warn('ramp_beta_mag for the upramp is already defined.')
+                if self.downramp.ramp_beta_mag is not None:
+                    warnings.warn('ramp_beta_mag for the downramp is already defined.')
+
         self._ramp_beta_mag = ramp_beta_mag
     _ramp_beta_mag = None
 
@@ -190,7 +197,7 @@ class Stage(Trackable, CostModeled):
         """
 
         stage_copy = copy.deepcopy(self)
-        stage_copy.ramp_beta_mag = 1.0
+        stage_copy.ramp_beta_mag = None
 
         # Delete any upramps and downramps that might be present
         if stage_copy.upramp is not None:
@@ -323,7 +330,7 @@ class Stage(Trackable, CostModeled):
                     ramp_beta_mag = self.ramp_beta_mag
                 else:
                     raise ValueError('No ramp_beta_mag defined.')
-                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag
+                self.downramp.plasma_density = self.plasma_density/ramp_beta_mag
             if self.downramp.nom_energy_gain_flattop is None:
                 self.downramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.downramp.nom_energy is None:
@@ -332,7 +339,6 @@ class Stage(Trackable, CostModeled):
             # Can calculate and set the ramp length after the nominal energy of the ramp is determined
             if self.downramp.length_flattop is None:
                 self.downramp.length_flattop = self._calc_ramp_length(self.downramp)
-
     
     # ==================================================
     def is_upramp(self):
@@ -375,7 +381,15 @@ class Stage(Trackable, CostModeled):
         "Calculate and set the up/down ramp (uniform step ramp) length [m] based on stage nominal energy."
         if ramp.nom_energy is None:
             raise StageError('Ramp nominal energy is None.')
-        ramp_length = beta_matched(self.plasma_density, ramp.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+        
+        if ramp.ramp_beta_mag is not None:
+            ramp_beta_mag = ramp.ramp_beta_mag
+        elif self.ramp_beta_mag is not None:
+            ramp_beta_mag = self.ramp_beta_mag
+        else:
+            raise ValueError('No ramp_beta_mag defined.')
+        
+        ramp_length = beta_matched(self.plasma_density, ramp.nom_energy)*np.pi/(2*np.sqrt(1/ramp_beta_mag))
         if ramp_length < 0.0:
             raise ValueError(f"ramp_length = {ramp_length} [m] < 0.0")
         return ramp_length
@@ -1117,11 +1131,38 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def matched_beta_function(self, energy_incoming):
-        if self.ramp_beta_mag is not None:
-            return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
+    def matched_beta_function(self, energy_incoming, match_entrance=True):
+        '''
+        Calculates the matched beta function of the stage. If there is an 
+        upramp, the beta function is matched to the upramp by default.
+    
+        
+        Parameters
+        ----------
+        energy_incoming : [eV] float
+            The energy used for matching.
+
+        match_entrance : bool, optional
+            Matches the beta function to the upramp or the stage entrance if 
+            `True`. Otherwise, will match the beta function to the downramp. 
+            Default set to `True`.
+            
+        Returns
+        ----------
+        beta_function : [m], float
+            The matched beta function.
+        '''
+
+        if match_entrance:
+            if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
+                return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
+            else:
+                return beta_matched(self.plasma_density, energy_incoming)
         else:
-            return beta_matched(self.plasma_density, energy_incoming)
+            if self.downramp.ramp_beta_mag is not None:
+                return beta_matched(self.plasma_density, energy_incoming)*self.downramp.ramp_beta_mag
+            else:
+                raise ValueError('Downramp ramp_beta_mag not defined.')
 
     
     # ==================================================
@@ -2004,14 +2045,45 @@ class PlasmaRamp(Stage):
         raise StageError('track() is not implemented for PlasmaRamp. Use track_upramp() or track_downramp() from the Stage class instead.')
     
 
+     # ==================================================
+    @property
+    def upramp(self) -> Self | None:
+        return None
+    @upramp.setter
+    def upramp(self, upramp : Self | None):
+        raise StageError('Cannot add a ramp to PlasmaRamp.')
+
+
     # ==================================================
-    def set_upramp(self):
+    @property
+    def downramp(self) -> Self:
+        return None
+    @downramp.setter
+    def downramp(self, downramp : Self | None):
         raise StageError('Cannot add a ramp to PlasmaRamp.')
     
 
     # ==================================================
-    def set_downramp(self):
-        raise StageError('Cannot add a ramp to PlasmaRamp.')
+    @property
+    def ramp_beta_mag(self) -> Self:
+        """
+        The betatron magnification used to define ramp plasma densities. 
+        Overrides the ramp_beta_mag of the parent stage.
+        """
+        if self._ramp_beta_mag is not None:
+            ramp_beta_mag = self._ramp_beta_mag
+        elif self.parent.ramp_beta_mag is not None:
+            ramp_beta_mag = self.parent.ramp_beta_mag
+        else:
+            ramp_beta_mag = None
+        return ramp_beta_mag
+    @ramp_beta_mag.setter
+    def ramp_beta_mag(self, ramp_beta_mag : float | None):
+        if ramp_beta_mag is not None:
+            if not isinstance(ramp_beta_mag, (float, int)) or ramp_beta_mag < 0.0:
+                raise VariablesOutOfRangeError("ramp_beta_mag must be a positive number.")
+        self._ramp_beta_mag = ramp_beta_mag
+    _ramp_beta_mag = None
     
 
     # ==================================================
