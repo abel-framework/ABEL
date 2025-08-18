@@ -92,10 +92,6 @@ class StageBasic(Stage):
         else:  # Do the following if there are no upramp (a lone stage)
             beam_ramped = beam_rotated
             drive_beam_ramped = drive_beam_rotated
-            
-            if self.ramp_beta_mag is not None:
-                beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
-                drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
 
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
@@ -115,8 +111,7 @@ class StageBasic(Stage):
 
             # TODO: Temporary "drive beam evolution": Magnify the driver
             # Needs to be performed before self.track_downramp().
-            if self.downramp.ramp_beta_mag is not None:
-                driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+            driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
 
             # Save beams to probe for consistency between ramps and stage
             if self.test_beam_between_ramps:
@@ -128,15 +123,10 @@ class StageBasic(Stage):
         else:  # Do the following if there are no downramp.
             beam_outgoing = beam
             driver_outgoing = driver
-            if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
 
-                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-
-                # Save beams to probe for consistency between ramps and stage
-                if self.test_beam_between_ramps:
-                    stage_beam_out = copy.deepcopy(beam_outgoing)
-                    stage_driver_out = copy.deepcopy(driver_outgoing)
+            if self.test_beam_between_ramps:
+                stage_beam_out = copy.deepcopy(beam_outgoing)
+                stage_driver_out = copy.deepcopy(driver_outgoing)
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -300,8 +290,7 @@ class StageBasic(Stage):
 
         # TODO: Temporary "drive beam evolution": Demagnify the driver
         # Needs to be performed before self.upramp.store_beams_between_ramps().
-        if self.ramp_beta_mag is not None:  
-            driver.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver)
+        driver.magnify_beta_function(1/self.upramp.ramp_beta_mag, axis_defining_beam=driver)
 
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
