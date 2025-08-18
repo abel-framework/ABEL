@@ -2507,6 +2507,65 @@ def test_StageGeom_ramp_beta_mag_PlasmaRamps():
 
 
 @pytest.mark.stageGeometry
+def test_Stage_geom_nom_energy():
+    """
+    Tests for various ways to set the stage and ramp nominal energies and energy 
+    gains.
+    """
+
+    stage = StageBasic()
+    nom_energy = 10.0e9                                                             # [eV]
+    stage.nom_energy = nom_energy                                                   # [eV]
+
+    # Check stage.nom_energy = stage.nom_energy_flattop
+    assert stage.length is None
+    assert stage.length_flattop is None
+    assert np.isclose(stage.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert stage.nom_energy_gain is None
+    assert stage.nom_energy_gain_flattop is None
+    assert stage.nom_accel_gradient is None
+    assert stage.nom_accel_gradient_flattop is None
+    assert stage.has_ramp() is False
+
+    # Set total nominal energy gain and check stage.nom_energy_gain = stage.nom_energy_gain_flattop
+    nom_energy_gain_flattop = 5.0e9                                                         # [eV]
+    stage.nom_energy_gain_flattop = nom_energy_gain_flattop
+    assert np.isclose(stage.nom_energy_gain, nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+
+    # Check nom_energy_gain = nom_energy_gain_flattop + upramp.nom_energy_gain
+    stage.upramp = PlasmaRamp()
+    upramp_nom_energy_gain = 1.0e9 
+    stage.upramp.nom_energy_gain = upramp_nom_energy_gain                                           # [eV]
+    assert np.isclose(stage.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain, nom_energy_gain_flattop + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+
+    # Check nom_energy_gain = nom_energy_gain_flattop + upramp.nom_energy_gain + downramp.nom_energy_gain
+    stage.downramp = PlasmaRamp()
+    downramp_nom_energy_gain = 2.0e9 
+    stage.downramp.nom_energy_gain = downramp_nom_energy_gain                                          # [eV]
+    assert np.isclose(stage.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy, nom_energy + upramp_nom_energy_gain + nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy_flattop, stage.downramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy_gain_flattop, downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy_gain, downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain, nom_energy_gain_flattop + upramp_nom_energy_gain + downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.stageGeometry
 def test_Stage__prepare_ramps():
     "Testing ``Stage._prepare_ramps()``."
 
