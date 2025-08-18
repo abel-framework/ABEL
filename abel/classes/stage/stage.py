@@ -854,6 +854,27 @@ class Stage(Trackable, CostModeled):
                         self._length_flattop_calc = L
                         updateCounter += 1
 
+
+            #  dE, total energy gain
+            # <------------------------------------------------------------------------->
+            #
+            #                dE1, flattop energy gain of stage
+            #               <-------------------------------------->
+            #                _______________________________________
+            #   dE0         |                                       | dE2
+            #  <----------->|                                       |<------------------>
+            #  _____________|                                       |____________________
+            # |                                                                          |
+            # E0            E1                                      E2
+            # 
+            # E0 = stage.nom_energy
+            # E1 = stage.nom_energy_flattop 
+            # E1 = E0 + dE0 = stage.nom_energy + stage.upramp.nom_energy_gain
+            # E2 = stage.downramp.nom_energy
+            # E2 = E1 + dE1 = stage.nom_energy_flattop + stage.energy_gain_flattop
+            # dE = dE0 + dE1 +dE2
+
+            # Try to calculate nom_energy_gain = nom_energy_gain_flattop (+upramp.nom_energy_gain) (+downramp.nom_energy_gain)
             if self.nom_energy_gain is None:
                 if self.nom_energy_gain_flattop is not None:
                     dE = self.nom_energy_gain_flattop
@@ -873,6 +894,7 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_gain_calc = dE
                         updateCounter += 1
 
+            # Try to calculate nom_energy_gain_flattop = nom_energy_gain (-upramp.nom_energy_gain) (-downramp.nom_energy_gain)
             if self.nom_energy_gain_flattop is None:
                 if self.nom_energy_gain is not None:
                     dE = self.nom_energy_gain
@@ -891,26 +913,6 @@ class Stage(Trackable, CostModeled):
                         self._printVerb("nom_energy_gain_flattop    (3)>",dE)
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
-
-
-            #  dE, total energy gain
-            # <------------------------------------------------------------------------->
-            #
-            #                dE1, flattop energy gain of stage
-            #               <-------------------------------------->
-            #                _______________________________________
-            #   dE0         |                                       | dE2
-            #  <----------->|                                       |<------------------>
-            #  _____________|                                       |____________________
-            # |                                                                          |
-            # E0            E1                                      E2
-            # 
-            # E0 = stage.nom_energy
-            # E1 = stage.nom_energy_flattop 
-            # E1 = E0 + dE0 = stage.nom_energy + stage.upramp.nom_energy_gain
-            # E2 = stage.downramp.nom_energy
-            # E2 = E1 + dE1 = stage.nom_energy_flattop + stage.energy_gain_flattop
-            
 
             # Try to calculate nom_energy_flattop = nom_energy (+upramp.nom_energy_gain)
             if self.nom_energy_flattop is None:
@@ -974,6 +976,15 @@ class Stage(Trackable, CostModeled):
                             self._nom_energy_flattop_calc = E1
                             self._printVerb("nom_energy_flattop        (3)>", self.nom_energy_flattop)
                             updateCounter += 1
+
+            # Try to set the nom_energy_gain_flattop using self.downramp.nom_energy - self.nom_energy_flattop
+            # dE1 = E2-E1
+            if self.nom_energy_gain_flattop is None and self.downramp is not None:
+                if self.downramp.nom_energy is not None and self.nom_energy_flattop is not None:
+                    self._nom_energy_gain_flattop_calc = self.downramp.nom_energy - self.nom_energy_flattop
+                    self._printVerb("nom_energy_gain_flattop (4)>", self.nom_energy_gain_flattop)
+                    updateCounter += 1
+                
 
             #Note:
             #   Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
