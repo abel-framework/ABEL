@@ -2504,3 +2504,149 @@ def test_StageGeom_ramp_beta_mag_PlasmaRamps():
     assert np.isclose(stage2.ramp_beta_mag, 11.0, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.upramp.ramp_beta_mag, 9.0, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.downramp.ramp_beta_mag, 8.0, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.stageGeometry
+def test_Stage__prepare_ramps():
+    "Testing ``Stage._prepare_ramps()``."
+
+    # TODO: move to a separate file test_Stage.py.
+
+    from abel.utilities.plasma_physics import beta_matched
+
+    stage = StageBasic()
+    stage.upramp = PlasmaRamp()
+    stage.downramp = PlasmaRamp()
+
+    # Trigger exception for nominal energy is not set
+    with pytest.raises(StageError):
+        stage._prepare_ramps()
+
+    stage.nom_energy = 5e9                                                          # [eV]
+    stage.plasma_density = 7e21                                                     # [m^-3]
+    stage.nom_energy_gain = 31.9e9                                                  # [eV]
+    stage.nom_accel_gradient = 6.4e9                                                # [GV/m]
+
+    # Trigger exception for not setting any ramp_beta_mag
+    with pytest.raises(ValueError):
+        stage._prepare_ramps()
+
+    # ========== Set different values for ramp_beta_mag in stage and ramps ==========
+    stage.ramp_beta_mag = 10.0
+    stage.upramp.ramp_beta_mag = 5.0
+    stage.downramp.ramp_beta_mag = 4.0
+
+    assert stage.upramp.plasma_density is None
+    assert stage.upramp.length is None
+    assert stage.upramp.length_flattop is None
+    assert np.isclose(stage.upramp.nom_energy, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_flattop, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert stage.upramp.nom_energy_gain is None
+    assert stage.upramp.nom_energy_gain_flattop is None
+    assert stage.upramp.nom_accel_gradient is None
+    assert stage.upramp.nom_accel_gradient_flattop is None
+    assert stage.upramp.driver_source is None
+    assert stage.upramp.has_ramp() is False
+
+    assert stage.downramp.plasma_density is None
+    assert stage.downramp.length is None
+    assert stage.downramp.length_flattop is None
+    assert stage.downramp.nom_energy is None
+    assert stage.downramp.nom_energy_flattop is None
+    assert stage.downramp.nom_energy_gain is None
+    assert stage.downramp.nom_energy_gain_flattop is None
+    assert stage.downramp.nom_accel_gradient is None
+    assert stage.downramp.nom_accel_gradient_flattop is None
+    assert stage.downramp.driver_source is None
+    assert stage.downramp.has_ramp() is False
+
+    stage._prepare_ramps()
+
+    assert np.isclose(stage.nom_energy_flattop, stage.nom_energy + stage.upramp.nom_energy_gain, rtol=1e-15, atol=0.0)
+
+    assert np.isclose(stage.upramp.plasma_density, stage.plasma_density/stage.upramp.ramp_beta_mag, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.length, stage.upramp.length_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.length_flattop, beta_matched(stage.plasma_density, stage.upramp.nom_energy)*np.pi/(2*np.sqrt(1/stage.upramp.ramp_beta_mag)), rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_flattop, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_gain, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_energy_gain_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_accel_gradient, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.upramp.nom_accel_gradient_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert stage.upramp.driver_source is None
+    assert stage.upramp.has_ramp() is False
+
+    assert np.isclose(stage.downramp.plasma_density, stage.plasma_density/stage.downramp.ramp_beta_mag, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.length, stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.length_flattop, beta_matched(stage.plasma_density, stage.downramp.nom_energy)*np.pi/(2*np.sqrt(1/stage.downramp.ramp_beta_mag)), rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy, stage.nom_energy_flattop + stage.nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy_flattop, stage.downramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy_gain, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_energy_gain_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_accel_gradient, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.downramp.nom_accel_gradient_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert stage.downramp.driver_source is None
+    assert stage.downramp.has_ramp() is False
+
+
+    # ========== Only set ramp_beta_mag in stage ==========
+    stage2 = StageBasic()
+    stage2.nom_energy = 5e9                                                         # [eV]
+    stage2.plasma_density = 7e21                                                    # [m^-3]
+    stage2.nom_energy_gain = 31.9e9                                                 # [eV]
+    stage2.nom_accel_gradient = 6.4e9                                               # [GV/m]
+    stage2.upramp = PlasmaRamp()
+    stage2.downramp = PlasmaRamp()
+    stage2.ramp_beta_mag = 11.0
+
+    assert stage2.upramp.plasma_density is None
+    assert stage2.upramp.length is None
+    assert stage2.upramp.length_flattop is None
+    assert np.isclose(stage2.upramp.nom_energy, stage2.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.nom_energy_flattop, stage2.nom_energy, rtol=1e-15, atol=0.0)
+    assert stage2.upramp.nom_energy_gain is None
+    assert stage2.upramp.nom_energy_gain_flattop is None
+    assert stage2.upramp.nom_accel_gradient is None
+    assert stage2.upramp.nom_accel_gradient_flattop is None
+    assert stage2.upramp.driver_source is None
+    assert stage2.upramp.has_ramp() is False
+
+    assert stage2.downramp.plasma_density is None
+    assert stage2.downramp.length is None
+    assert stage2.downramp.length_flattop is None
+    assert stage2.downramp.nom_energy is None
+    assert stage2.downramp.nom_energy_flattop is None
+    assert stage2.downramp.nom_energy_gain is None
+    assert stage2.downramp.nom_energy_gain_flattop is None
+    assert stage2.downramp.nom_accel_gradient is None
+    assert stage2.downramp.nom_accel_gradient_flattop is None
+    assert stage2.downramp.driver_source is None
+    assert stage2.downramp.has_ramp() is False
+
+    stage2._prepare_ramps()
+
+    assert np.isclose(stage2.nom_energy_flattop, stage2.nom_energy + stage2.upramp.nom_energy_gain, rtol=1e-15, atol=0.0)
+
+    assert np.isclose(stage2.upramp.plasma_density, stage2.plasma_density/stage2.ramp_beta_mag, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.length, stage2.upramp.length_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.length_flattop, beta_matched(stage2.plasma_density, stage2.upramp.nom_energy)*np.pi/(2*np.sqrt(1/stage2.ramp_beta_mag)), rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.nom_energy, stage2.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.nom_energy_flattop, stage2.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.nom_energy_gain, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.nom_energy_gain_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.nom_accel_gradient, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.upramp.nom_accel_gradient_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert stage2.upramp.driver_source is None
+    assert stage2.upramp.has_ramp() is False
+
+    assert np.isclose(stage2.downramp.plasma_density, stage2.plasma_density/stage2.ramp_beta_mag, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.length, stage2.downramp.length_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.length_flattop, beta_matched(stage2.plasma_density, stage2.downramp.nom_energy)*np.pi/(2*np.sqrt(1/stage2.ramp_beta_mag)), rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.nom_energy, stage2.nom_energy_flattop + stage2.nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.nom_energy_flattop, stage2.downramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.nom_energy_gain, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.nom_energy_gain_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.nom_accel_gradient, 0.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage2.downramp.nom_accel_gradient_flattop, 0.0, rtol=1e-15, atol=0.0)
+    assert stage2.downramp.driver_source is None
+    assert stage2.downramp.has_ramp() is False
