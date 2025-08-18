@@ -133,7 +133,7 @@ def test_baseline_linac():
     enable_xpyp_jitter = False
     
     driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
-    main_source = setup_basic_main_source()
+    main_source = setup_basic_main_source(ramp_beta_mag=1.0)
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, calc_evolution=False)
     interstage = setup_InterstageBasic(stage)
 
@@ -176,8 +176,9 @@ def test_baseline_linac():
     assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
     assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
     assert np.isclose(final_beam.rel_energy_spread(), 0.00030271, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_x(), 1.580286797571071e-05, rtol=1e-2, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), 9.331889547894206e-07, rtol=1e-1, atol=0.0)
+
+    assert np.isclose(final_beam.beam_size_x(), 5.044830114627564e-06, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), 2.9971604537343797e-07, rtol=1e-1, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
 
@@ -409,6 +410,8 @@ def test_ramped_linac_vs_old_method():
     stage_old = setup_StageBasic(driver_source=driver_source, use_ramps=False, calc_evolution=False)
     stage_old.upramp = stage_old.__class__()
     stage_old.downramp = stage_old.__class__()
+    stage_old.upramp.ramp_beta_mag = 10.0
+    stage_old.downramp.ramp_beta_mag = 10.0
     interstage_old = setup_InterstageBasic(stage_old)
     linac_old = PlasmaLinac(source=main_source, stage=stage_old, interstage=interstage_old, num_stages=num_stages)
     linac_old.run('test_baseline_linac', overwrite=True, verbose=False)
