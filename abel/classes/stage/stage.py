@@ -487,10 +487,10 @@ class Stage(Trackable, CostModeled):
     # Helper methods _getOtherRamp() and _getOverallestStage() are used to traverse the hierarchy.
 
     #  self.nom_energy_gain, self.length, self.nom_accel_gradient
-    # <------------------------------------------------------------------------->
+    # <-------------------------------------------------------------------------->
     #
     #                           stage flattop
-    #               <-------------------------------------->
+    #               <--------------------------------------->
     #                _______________________________________
     #   upramp      |                                       | downramp
     #  <----------->|                                       |<------------------>
@@ -870,10 +870,10 @@ class Stage(Trackable, CostModeled):
 
 
             #  dE, total energy gain
-            # <------------------------------------------------------------------------->
+            # <-------------------------------------------------------------------------->
             #
             #                dE1, flattop energy gain of stage
-            #               <-------------------------------------->
+            #               <--------------------------------------->
             #                _______________________________________
             #   dE0         |                                       | dE2
             #  <----------->|                                       |<------------------>
@@ -888,7 +888,7 @@ class Stage(Trackable, CostModeled):
             # E2 = E1 + dE1 = stage.nom_energy_flattop + stage.energy_gain_flattop
             # dE = dE0 + dE1 +dE2
 
-            # Try to calculate nom_energy_gain = nom_energy_gain_flattop (+upramp.nom_energy_gain) (+downramp.nom_energy_gain)
+            # Try to calculate nom_energy_gain = nom_energy_gain_flattop +(upramp.nom_energy_gain) +(downramp.nom_energy_gain)
             if self.nom_energy_gain is None:
                 if self.nom_energy_gain_flattop is not None:
                     dE = self.nom_energy_gain_flattop
@@ -908,7 +908,7 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_gain_calc = dE
                         updateCounter += 1
 
-            # Try to calculate nom_energy_gain_flattop = nom_energy_gain (-upramp.nom_energy_gain) (-downramp.nom_energy_gain)
+            # Try to calculate nom_energy_gain_flattop = nom_energy_gain -(upramp.nom_energy_gain) -(downramp.nom_energy_gain)
             if self.nom_energy_gain_flattop is None:
                 if self.nom_energy_gain is not None:
                     dE = self.nom_energy_gain
@@ -928,7 +928,7 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
 
-            # Try to calculate nom_energy_flattop = nom_energy (+upramp.nom_energy_gain)
+            # Try to calculate nom_energy_flattop = nom_energy +(upramp.nom_energy_gain)
             if self.nom_energy_flattop is None:
                 if self.nom_energy is not None:
                     E0 = self.nom_energy
@@ -947,7 +947,7 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_flattop_calc = E1
                         updateCounter += 1
 
-            # Try to calculate nom_energy = nom_energy_flattop (-upramp.nom_energy_gain)
+            # Try to calculate nom_energy = nom_energy_flattop -(upramp.nom_energy_gain)
             if self.nom_energy is None:
                 if self.nom_energy_flattop is not None:
                     E1 = self.nom_energy_flattop
@@ -976,7 +976,7 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_calc = self.upramp.nom_energy
                         updateCounter += 1
             
-            # Try to calculate nom_energy_flattop = downramp.nom_energy (-nom_energy_gain_flattop)
+            # Try to calculate nom_energy_flattop = downramp.nom_energy -(nom_energy_gain_flattop)
             if self.nom_energy_flattop is None:
                 if self.downramp is not None:
                     if self.downramp.nom_energy is not None:
