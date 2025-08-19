@@ -2513,16 +2513,14 @@ def test_Stage_geom_nom_energy():
     gains.
     """
 
-    # ========== Starting from stage and adding ramps ==========
+    # ========== Check nom_energy_gain = nom_energy_gain_flattop +(upramp.nom_energy_gain) +(downramp.nom_energy_gain) ==========
     stage = StageBasic()
-    nom_energy = 10.0e9                                                             # [eV]
-    stage.nom_energy = nom_energy                                                   # [eV]
 
-    # Check stage.nom_energy = stage.nom_energy_flattop
+    # Check that nothing has been set
     assert stage.length is None
     assert stage.length_flattop is None
-    assert np.isclose(stage.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert stage.nom_energy is None
+    assert stage.nom_energy_flattop is None
     assert stage.nom_energy_gain is None
     assert stage.nom_energy_gain_flattop is None
     assert stage.nom_accel_gradient is None
@@ -2539,12 +2537,12 @@ def test_Stage_geom_nom_energy():
     stage.upramp = PlasmaRamp()
     upramp_nom_energy_gain = 1.0e9                                                  # [eV]
     stage.upramp.nom_energy_gain = upramp_nom_energy_gain
-    assert np.isclose(stage.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert stage.upramp.nom_energy is None
+    assert stage.upramp.nom_energy_flattop is None
     assert np.isclose(stage.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert stage.nom_energy is None
+    assert stage.nom_energy_flattop is None
     assert np.isclose(stage.nom_energy_gain, nom_energy_gain_flattop + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage.nom_energy_gain_flattop, nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
 
@@ -2552,27 +2550,46 @@ def test_Stage_geom_nom_energy():
     stage.downramp = PlasmaRamp()
     downramp_nom_energy_gain = 2.0e9                                                # [eV]
     stage.downramp.nom_energy_gain = downramp_nom_energy_gain
-    assert np.isclose(stage.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+
+    assert stage.upramp.length is None
+    assert stage.upramp.length_flattop is None
+    assert stage.upramp.nom_energy is None
+    assert stage.upramp.nom_energy_flattop is None
     assert np.isclose(stage.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.downramp.nom_energy, nom_energy + upramp_nom_energy_gain + nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.downramp.nom_energy_flattop, stage.downramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert stage.upramp.nom_accel_gradient is None
+    assert stage.upramp.nom_accel_gradient_flattop is None
+    assert stage.upramp.has_ramp() is False
+
+    assert stage.downramp.length is None
+    assert stage.downramp.length_flattop is None
+    assert stage.downramp.nom_energy is None
+    assert stage.downramp.nom_energy_flattop is None
     assert np.isclose(stage.downramp.nom_energy_gain_flattop, downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage.downramp.nom_energy_gain, downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert stage.downramp.nom_accel_gradient is None
+    assert stage.downramp.nom_accel_gradient_flattop is None
+    assert stage.downramp.has_ramp() is False
+
+    assert stage.length is None
+    assert stage.length_flattop is None
+    assert stage.nom_energy is None
+    assert stage.nom_energy_flattop is None
     assert np.isclose(stage.nom_energy_gain, nom_energy_gain_flattop + upramp_nom_energy_gain + downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage.nom_energy_gain_flattop, nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+    assert stage.nom_accel_gradient is None
+    assert stage.nom_accel_gradient_flattop is None
+    assert stage.has_ramp() is True
 
+
+    # ========== Check nom_energy_gain_flattop = nom_energy_gain -(upramp.nom_energy_gain) -(downramp.nom_energy_gain) ==========
     stage2 = StageBasic()
-    stage2.nom_energy = nom_energy                                                  # [eV]
 
-    # Check stage.nom_energy = stage.nom_energy_flattop
+    # Check that nothing has been set
     assert stage2.length is None
     assert stage2.length_flattop is None
-    assert np.isclose(stage2.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert stage2.nom_energy is None
+    assert stage2.nom_energy_flattop is None
     assert stage2.nom_energy_gain is None
     assert stage2.nom_energy_gain_flattop is None
     assert stage2.nom_accel_gradient is None
@@ -2588,30 +2605,151 @@ def test_Stage_geom_nom_energy():
     # Check nom_energy_gain_flattop = nom_energy_gain - upramp.nom_energy_gain
     stage2.upramp = PlasmaRamp()
     stage2.upramp.nom_energy_gain = upramp_nom_energy_gain
-    assert np.isclose(stage2.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    #assert np.isclose(stage2.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    #assert np.isclose(stage2.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+
+    #assert np.isclose(stage2.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    #assert np.isclose(stage2.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.nom_energy_gain, nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.nom_energy_gain_flattop, nom_energy_gain - upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
 
     # Check nom_energy_gain_flattop = nom_energy_gain - upramp.nom_energy_gain - downramp.nom_energy_gain
     stage2.downramp = PlasmaRamp()
     stage2.downramp.nom_energy_gain = downramp_nom_energy_gain
-    assert np.isclose(stage2.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert stage2.upramp.nom_energy is None
+    assert stage2.upramp.nom_energy_flattop is None
     assert np.isclose(stage2.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.downramp.nom_energy, nom_energy + upramp_nom_energy_gain + stage2.nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.downramp.nom_energy_flattop, stage2.downramp.nom_energy, rtol=1e-15, atol=0.0)
+
+    #assert np.isclose(stage2.downramp.nom_energy, nom_energy + upramp_nom_energy_gain + stage2.nom_energy_gain_flattop, rtol=1e-15, atol=0.0)
+    #assert np.isclose(stage2.downramp.nom_energy_flattop, stage2.downramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert stage2.downramp.nom_energy is None
+    assert stage2.downramp.nom_energy_flattop is None
     assert np.isclose(stage2.downramp.nom_energy_gain_flattop, downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.downramp.nom_energy_gain, downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
-    assert np.isclose(stage2.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+
+    # assert np.isclose(stage2.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    # assert np.isclose(stage2.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert stage2.nom_energy is None
+    assert stage2.nom_energy_flattop is None
     assert np.isclose(stage2.nom_energy_gain, nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stage2.nom_energy_gain_flattop, nom_energy_gain - upramp_nom_energy_gain - downramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+
+
+    # ========== Check nom_energy_flattop = nom_energy +(upramp.nom_energy_gain) ==========
+    stage3 = StageBasic()
+    nom_energy = 10.0e9                                                             # [eV]
+    stage3.nom_energy = nom_energy                                                  # [eV]
+
+    # Check stage.nom_energy_flattop = stage.nom_energy
+    assert stage3.length is None
+    assert stage3.length_flattop is None
+    assert np.isclose(stage3.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage3.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert stage3.nom_energy_gain is None
+    assert stage3.nom_energy_gain_flattop is None
+    assert stage3.nom_accel_gradient is None
+    assert stage3.nom_accel_gradient_flattop is None
+    assert stage3.has_ramp() is False
+
+    # Check nom_energy_flattop = nom_energy + upramp.nom_energy_gain
+    stage3.upramp = PlasmaRamp()
+    stage3.upramp.nom_energy_gain = upramp_nom_energy_gain
+    assert stage3.upramp.length is None
+    assert stage3.upramp.length_flattop is None
+    assert np.isclose(stage3.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage3.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage3.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage3.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert stage3.upramp.nom_accel_gradient is None
+    assert stage3.upramp.nom_accel_gradient_flattop is None
+    assert stage3.upramp.has_ramp() is False
+
+    assert stage3.length is None
+    assert stage3.length_flattop is None
+    assert np.isclose(stage3.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage3.nom_energy_flattop, nom_energy + upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert stage3.nom_energy_gain is None
+    assert stage3.nom_energy_gain_flattop is None
+    assert stage3.nom_accel_gradient is None
+    assert stage3.nom_accel_gradient_flattop is None
+    assert stage3.has_ramp() is True
+    
+
+    # ========== Check nom_energy = nom_energy_flattop -(upramp.nom_energy_gain) ==========
+    stage4 = StageBasic()
+    nom_energy_flattop = 11.0e9                                                     # [eV]
+    stage4.nom_energy_flattop = nom_energy_flattop                                  # [eV]
+
+    # Check stage.nom_energy = stage.nom_energy_flattop
+    assert stage4.length is None
+    assert stage4.length_flattop is None
+    assert np.isclose(stage4.nom_energy, nom_energy_flattop, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage4.nom_energy_flattop, nom_energy_flattop, rtol=1e-15, atol=0.0)
+    assert stage4.nom_energy_gain is None
+    assert stage4.nom_energy_gain_flattop is None
+    assert stage4.nom_accel_gradient is None
+    assert stage4.nom_accel_gradient_flattop is None
+    assert stage4.has_ramp() is False
+
+    # Check nom_energy = nom_energy_flattop - upramp.nom_energy_gain
+    stage4.upramp = PlasmaRamp()
+    stage4.upramp.nom_energy_gain = upramp_nom_energy_gain
+    assert stage4.upramp.length is None
+    assert stage4.upramp.length_flattop is None
+    assert np.isclose(stage4.upramp.nom_energy, stage4.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage4.upramp.nom_energy_flattop, stage4.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage4.upramp.nom_energy_gain, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage4.upramp.nom_energy_gain_flattop, upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert stage4.upramp.nom_accel_gradient is None
+    assert stage4.upramp.nom_accel_gradient_flattop is None
+    assert stage4.upramp.has_ramp() is False
+
+    assert stage4.length is None
+    assert stage4.length_flattop is None
+    assert np.isclose(stage4.nom_energy, nom_energy_flattop - upramp_nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage4.nom_energy_flattop, nom_energy_flattop, rtol=1e-15, atol=0.0)
+    assert stage4.nom_energy_gain is None
+    assert stage4.nom_energy_gain_flattop is None
+    assert stage4.nom_accel_gradient is None
+    assert stage4.nom_accel_gradient_flattop is None
+    assert stage4.has_ramp() is True
+
+
+    # ========== Set the stage nominal energy using the upramp nominal energy ==========
+    stage5 = StageBasic()
+    stage5.upramp = PlasmaRamp()
+    stage5.upramp.nom_energy = nom_energy
+
+    assert stage5.upramp.length is None
+    assert stage5.upramp.length_flattop is None
+    assert np.isclose(stage5.upramp.nom_energy, nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage5.upramp.nom_energy_flattop, nom_energy, rtol=1e-15, atol=0.0)
+    assert stage5.upramp.nom_energy_gain is None
+    assert stage5.upramp.nom_energy_gain_flattop is None
+    assert stage5.upramp.nom_accel_gradient is None
+    assert stage5.upramp.nom_accel_gradient_flattop is None
+    assert stage5.upramp.has_ramp() is False
+
+    assert stage5.length is None
+    assert stage5.length_flattop is None
+    assert np.isclose(stage5.nom_energy, stage5.upramp.nom_energy, rtol=1e-15, atol=0.0)
+    assert stage5.nom_energy_flattop is None
+    assert stage5.nom_energy_gain is None
+    assert stage5.nom_energy_gain_flattop is None
+    assert stage5.nom_accel_gradient is None
+    assert stage5.nom_accel_gradient_flattop is None
+    assert stage5.has_ramp() is True
+
+    ## Try to calculate nom_energy_flattop = downramp.nom_energy -(nom_energy_gain_flattop)...
+
+
+
+
+
+
 
 
 @pytest.mark.stageGeometry
