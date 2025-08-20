@@ -9,7 +9,7 @@ class Linac(Beamline):
         super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
 
         self.source = source
-        self._nom_energy = nom_energy
+        self.nom_energy = nom_energy
 
     
     def assemble_trackables(self):
@@ -35,6 +35,7 @@ class Linac(Beamline):
         if energy is not None and energy < 0.0:
             raise ValueError('Nominal energy cannot be negative.')
         self._nom_energy = energy
+    _nom_energy = None
 
 
     def get_nom_energy(self):
