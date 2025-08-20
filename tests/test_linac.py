@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : Stage Geometry calculation tests
+ABEL : unit tests for the Linac class
 =======================================
 
 This file is a part of ABEL.
