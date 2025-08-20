@@ -976,20 +976,20 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_calc = self.upramp.nom_energy
                         updateCounter += 1
             
-            # Try to calculate nom_energy_flattop = downramp.nom_energy -(nom_energy_gain_flattop)
+            # Try to calculate nom_energy_flattop = downramp.nom_energy - nom_energy_gain_flattop
             if self.nom_energy_flattop is None:
                 if self.downramp is not None:
-                    if self.downramp.nom_energy is not None:
+                    if self.downramp.nom_energy is not None and self.nom_energy_gain_flattop is not None:
                         E2 = self.downramp.nom_energy
-                        E1 = E2
-                        if self.nom_energy_gain_flattop is not None:
-                            dE1 = self.nom_energy_gain_flattop
-                            E1 = E2 - dE1
-                            if E1 < 0.0:
-                                raise VariablesOutOfRangeError(f"Calculated nominal energy = {E1} < 0; check variables.")
-                            self._nom_energy_flattop_calc = E1
-                            self._printVerb("nom_energy_flattop        (3)>", self.nom_energy_flattop)
-                            updateCounter += 1
+                        dE1 = self.nom_energy_gain_flattop
+                        E1 = E2 - dE1
+                        self._printVerb("nom_energy_flattop           (3)>", E1)
+                        if E1 < 0.0:
+                            raise VariablesOutOfRangeError(f"Calculated nominal energy = {E1} < 0; check variables.")
+                        self._nom_energy_flattop_calc = E1
+                        self._printVerb("nom_energy_flattop        (3)>", self.nom_energy_flattop)
+                        updateCounter += 1
+
 
             # Try to set the nom_energy_gain_flattop using self.downramp.nom_energy - self.nom_energy_flattop
             # dE1 = E2-E1
