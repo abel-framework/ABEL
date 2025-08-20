@@ -51,8 +51,28 @@ def test_init():
     assert type(linac.source) is SourceBasic
     assert np.isclose(linac.nom_energy, 5e9, rtol=1e-15, atol=0.0)
     assert linac.num_bunches_in_train == 2
-    assert np.isclose(linac.bunch_separation, 2e-6,rtol=1e-15, atol=0.0)
-    assert np.isclose(linac.rep_rate_trains, 1e3,rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.bunch_separation, 2e-6, rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.rep_rate_trains, 1e3, rtol=1e-15, atol=0.0)
+
+    # Setting a negative nominal energy should raise an exception
+    with pytest.raises(ValueError):
+        linac = Linac(nom_energy=-5e9)
+
+    # Setting a negative num_bunches_in_train should raise an exception
+    with pytest.raises(ValueError):
+        linac = Linac(num_bunches_in_train=-1)
+
+    # Setting a float num_bunches_in_train should raise an exception
+    with pytest.raises(TypeError):
+        linac = Linac(num_bunches_in_train=1.0)
+
+    # Setting a negative bunch_separation should raise an exception
+    with pytest.raises(ValueError):
+        linac = Linac(bunch_separation=-0.2)
+
+    # Setting a negative rep_rate_trains should raise an exception
+    with pytest.raises(ValueError):
+        linac = Linac(rep_rate_trains=-0.2)
 
 
 @pytest.mark.linac_unit_test
