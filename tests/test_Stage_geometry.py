@@ -2676,6 +2676,13 @@ def test_Stage_geom_nom_energy():
     assert stage3.nom_accel_gradient is None
     assert stage3.nom_accel_gradient_flattop is None
     assert stage3.has_ramp() is True
+
+    # Trigger an exception by making nom_energy_flattop negative
+    stage3 = StageBasic()
+    stage3.nom_energy = nom_energy
+    stage3.upramp = PlasmaRamp()
+    with pytest.raises(VariablesOutOfRangeError):
+        stage3.upramp.nom_energy_gain = -2*nom_energy
     
 
     # ========== Check nom_energy = nom_energy_flattop -(upramp.nom_energy_gain) ==========
@@ -2717,6 +2724,13 @@ def test_Stage_geom_nom_energy():
     assert stage4.nom_accel_gradient_flattop is None
     assert stage4.has_ramp() is True
 
+    # Trigger an exception by setting nom_energy_flattop < upramp.nom_energy_gain
+    stage4 = StageBasic()
+    stage4.upramp = PlasmaRamp()
+    stage4.nom_energy_flattop = nom_energy_flattop
+    with pytest.raises(VariablesOutOfRangeError):
+        stage4.upramp.nom_energy_gain = nom_energy_flattop + 1
+
 
     # ========== Set the stage nominal energy using the upramp nominal energy ==========
     stage5 = StageBasic()
@@ -2742,6 +2756,13 @@ def test_Stage_geom_nom_energy():
     assert stage5.nom_accel_gradient is None
     assert stage5.nom_accel_gradient_flattop is None
     assert stage5.has_ramp() is True
+
+    # Trigger an exception by setting a negative upramp.nom_energy
+    stage5 = StageBasic()
+    stage5.upramp = PlasmaRamp()
+    stage5.upramp.nom_energy = nom_energy
+    with pytest.raises(VariablesOutOfRangeError):
+        stage5.upramp.nom_energy = -1
 
 
     # ========== Check nom_energy_flattop = downramp.nom_energy - nom_energy_gain_flattop ==========
@@ -2773,6 +2794,18 @@ def test_Stage_geom_nom_energy():
     assert stage6.nom_accel_gradient is None
     assert stage6.nom_accel_gradient_flattop is None
     assert stage6.has_ramp() is True
+
+    # Trigger an exception by setting nom_energy_gain_flattop > downramp.nom_energy
+    stage6 = StageBasic()
+    stage6.downramp = PlasmaRamp()
+    stage6.downramp.nom_energy = 20e9                                               # [eV]
+    with pytest.raises(VariablesOutOfRangeError):
+        stage6.nom_energy_gain_flattop = stage6.downramp.nom_energy+1               # [eV]
+
+
+
+
+    
 
 
 
