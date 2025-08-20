@@ -113,16 +113,80 @@ def test_get_nom_beam_power():
     source = SourceBasic()
     linac.source = source
     source.charge = charge
-    source.num_bunches_in_train = num_bunches_in_train
-    source.rep_rate_trains = rep_rate_trains
+    linac.num_bunches_in_train = num_bunches_in_train
+    linac.rep_rate_trains = rep_rate_trains
 
     get_rep_rate_average = num_bunches_in_train * rep_rate_trains
-    nom_beam_power = nom_energy * charge * get_rep_rate_average
+    nom_beam_power = nom_energy * np.abs(charge) * get_rep_rate_average
 
     assert np.isclose(linac.get_nom_beam_power(), nom_beam_power, rtol=1e-15, atol=0.0)
 
 
+@pytest.mark.linac_unit_test
+def test_get_effective_gradient():
+    """
+    Tests for ``Linac.get_effective_gradient()``.
+    """
+
+    linac = Linac()
+    linac.nom_energy = 5e9
+    stage = StageBasic()
+    stage.length = 1.0
+    linac.trackables = []
+    linac.trackables.append(stage)
+
+    assert np.isclose(linac.get_effective_gradient(), 5e9, rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.linac_unit_test
+def test_energy_usage():
+    """
+    Tests for ``Linac.energy_usage()``.
+    """
+
+    linac = Linac()
+    source = SourceBasic()
+    source.energy = 1e9
+    driver_source = SourceBasic()
+    driver_source.energy = 1e9
+    stage = StageBasic()
+    stage.driver_source = driver_source
+    linac.source = source
+    linac.trackables = []
+    linac.trackables.append(source)
+    linac.trackables.append(stage)
+
+    assert np.isclose(linac.energy_usage(), source.energy_usage() + stage.energy_usage(), rtol=1e-15, atol=0.0)
     
+
+@pytest.mark.linac_unit_test
+def test_get_cost_breakdown():
+    """
+    Tests for ``Linac.get_cost_breakdown()``.
+    """
+
+    linac = Linac()
+    source = SourceBasic()
+    source.energy = 1e9
+    driver_source = SourceBasic()
+    driver_source.energy = 1e9
+    stage = StageBasic()
+    stage.length = 1.0
+    stage.driver_source = driver_source
+    linac.source = source
+    linac.trackables = []
+    linac.trackables.append(source)
+    linac.trackables.append(stage)
+
+    cost_breakdown = linac.get_cost_breakdown()
+
+    assert cost_breakdown[0] == 'Linac'
+    assert cost_breakdown[1][0][0] == 'Source'
+    assert np.isclose(cost_breakdown[1][0][1], 10000000.0, rtol=1e-15, atol=0.0)
+    assert cost_breakdown[1][1][0] == 'Plasma stage'
+    assert cost_breakdown[1][1][1][0][0] == 'Plasma cell'
+    assert np.isclose(cost_breakdown[1][1][1][0][1], 46200.0, rtol=1e-15, atol=0.0)
+
 
 
 
