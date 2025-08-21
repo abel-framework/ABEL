@@ -194,10 +194,13 @@ def test_get_cost_breakdown():
     stage = StageBasic()
     stage.length = 1.0
     stage.driver_source = driver_source
+    interstage = InterstageBasic()
+    interstage.length = 2.1
     linac.source = source
     linac.trackables = []
     linac.trackables.append(source)
     linac.trackables.append(stage)
+    linac.trackables.append(interstage)
 
     cost_breakdown = linac.get_cost_breakdown()
 
@@ -207,6 +210,8 @@ def test_get_cost_breakdown():
     assert cost_breakdown[1][1][0] == 'Plasma stage'
     assert cost_breakdown[1][1][1][0][0] == 'Plasma cell'
     assert np.isclose(cost_breakdown[1][1][1][0][1], 46200.0, rtol=1e-15, atol=0.0)
+    assert cost_breakdown[1][2][0] == 'Interstage'
+    assert np.isclose(cost_breakdown[1][2][1], 84924.0, rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.linac_unit_test
@@ -250,11 +255,47 @@ def test_get_length():
 
     linac.trackables = []
     assert np.isclose(linac.get_length(), 0.0, rtol=1e-15, atol=0.0)
-    
+
     linac.trackables.append(source)
     linac.trackables.append(stage)
     linac.trackables.append(interstage)
     linac.trackables.append(stage)
 
     assert np.isclose(linac.get_length(), 1.0*2 + 2.1, rtol=1e-15, atol=0.0)
-    assert np.isclose(linac.get_length(), stage.get_length()*2 + interstage.get_length(), rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.get_length(), source.get_length() + stage.get_length()*2 + interstage.get_length(), rtol=1e-15, atol=0.0)
+
+
+@pytest.mark.linac_unit_test
+def test_get_cost_breakdown_civil_construction():
+    """
+    Tests for ``Beamline.get_cost_breakdown_civil_construction()``.
+    """
+
+    linac = Linac()
+    source = SourceBasic()
+    source.energy = 1e9
+    driver_source = SourceBasic()
+    driver_source.energy = 1e9
+    stage = StageBasic()
+    stage.length = 1.0
+    stage.driver_source = driver_source
+    interstage = InterstageBasic()
+    interstage.length = 2.1
+    linac.source = source
+    linac.trackables = []
+    linac.trackables.append(source)
+    linac.trackables.append(stage)
+    linac.trackables.append(interstage)
+
+    cost_breakdown = linac.get_cost_breakdown()
+
+    assert cost_breakdown[0] == 'Linac'
+    assert cost_breakdown[1][0][0] == 'Source'
+    assert np.isclose(cost_breakdown[1][0][1], 10000000.0, rtol=1e-15, atol=0.0)
+    assert cost_breakdown[1][1][0] == 'Plasma stage'
+    assert cost_breakdown[1][1][1][0][0] == 'Plasma cell'
+    assert np.isclose(cost_breakdown[1][1][1][0][1], 46200.0, rtol=1e-15, atol=0.0)
+    assert cost_breakdown[1][2][0] == 'Interstage'
+    assert np.isclose(cost_breakdown[1][2][1], 84924.0, rtol=1e-15, atol=0.0)
+
+    
