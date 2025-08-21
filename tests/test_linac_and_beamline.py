@@ -327,7 +327,6 @@ def test_surveys():
     linac.trackables.append(stage)
     linac.trackables.append(interstage)
     linac.trackables.append(stage)
-    #linac.assemble_trackables()
 
     objs = linac.survey_object()
 
