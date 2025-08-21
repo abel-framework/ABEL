@@ -327,6 +327,8 @@ def test_HALHFv2():
 
     #halhf2.final_beam
     halhf2.plot_survey()
+    halhf2.plot_luminosity_per_power()
+    halhf2.plot_luminosity()
     
     halhf2.print_cost()
     halhf2.print_emissions()
