@@ -204,6 +204,7 @@ def test_linac_plots():
     """
 
     np.random.seed(42)
+    from matplotlib import pyplot as plt
 
     num_stages = 5
     
@@ -264,14 +265,15 @@ def test_linac_plots():
     assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
 
     # Plot evolution in a stage
+    plt.ion()
     linac.stages[1].plot_evolution()  # Need to set plt.show(block=False)
 
-    # # Plot linac survey
-    # linac.plot_survey()
+    # Plot linac survey
+    linac.plot_survey()
 
-    # # Plot beam evolution
-    # linac.plot_evolution()
-    # linac.plot_waterfalls()
+    # Plot beam evolution
+    linac.plot_evolution()
+    linac.plot_waterfalls()
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
