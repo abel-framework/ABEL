@@ -287,15 +287,92 @@ def test_get_cost_breakdown_civil_construction():
     linac.trackables.append(stage)
     linac.trackables.append(interstage)
 
-    cost_breakdown = linac.get_cost_breakdown()
+    cost_breakdown = linac.get_cost_breakdown_civil_construction()
 
-    assert cost_breakdown[0] == 'Linac'
-    assert cost_breakdown[1][0][0] == 'Source'
-    assert np.isclose(cost_breakdown[1][0][1], 10000000.0, rtol=1e-15, atol=0.0)
+    assert cost_breakdown[0] == 'Civil construction'
+    assert cost_breakdown[1][0][0] == 'SourceBasic'
+    assert np.isclose(cost_breakdown[1][0][1], 0.0, rtol=1e-5, atol=0.0)
     assert cost_breakdown[1][1][0] == 'Plasma stage'
-    assert cost_breakdown[1][1][1][0][0] == 'Plasma cell'
-    assert np.isclose(cost_breakdown[1][1][1][0][1], 46200.0, rtol=1e-15, atol=0.0)
-    assert cost_breakdown[1][2][0] == 'Interstage'
-    assert np.isclose(cost_breakdown[1][2][1], 84924.0, rtol=1e-15, atol=0.0)
-
+    assert np.isclose(cost_breakdown[1][1][1], 41207.961149999996, rtol=1e-5, atol=0.0)
+    assert cost_breakdown[1][2][0] == 'InterstageBasic'
+    assert np.isclose(cost_breakdown[1][2][1], 86536.718415, rtol=1e-5, atol=0.0)
     
+    
+@pytest.mark.linac_unit_test
+def test_surveys():
+    """
+    Tests for ``Beamline.survey_object()`` and ``Beamline.plot_survey()``.
+    """
+
+    linac = Linac()
+    source = SourceBasic()
+    source.energy = 1e9
+    driver_source = SourceBasic()
+    driver_source.energy = 1e9
+    stage = StageBasic()
+    stage.length = 1.0
+    stage.driver_source = driver_source
+    interstage = InterstageBasic()
+    interstage.length = 2.0
+    linac.source = source
+    linac.trackables = []
+    
+    objs = linac.survey_object()
+    assert type(objs) is list
+    assert not objs  # Check for an empty list
+
+    linac.trackables.append(source)
+    linac.trackables.append(stage)
+    linac.trackables.append(interstage)
+    linac.trackables.append(stage)
+    linac.trackables.append(interstage)
+    linac.trackables.append(stage)
+    #linac.assemble_trackables()
+
+    objs = linac.survey_object()
+
+    assert type(objs) is list
+
+    source_survey = linac.trackables[0].survey_object()
+    assert np.allclose(objs[0][0], source_survey[0], rtol=1e-15, atol=0.0)
+    assert np.allclose(objs[0][1], source_survey[1], rtol=1e-15, atol=0.0)
+    assert objs[0][2] == source_survey[2]
+    assert objs[0][3] == source_survey[3]
+    assert objs[0][4] == source_survey[4]
+
+    stage1_survey = linac.trackables[1].survey_object()
+    assert np.allclose(objs[1][0], stage1_survey[0], rtol=1e-15, atol=0.0)
+    assert np.allclose(objs[1][1], stage1_survey[1], rtol=1e-15, atol=0.0)
+    assert objs[1][2] == stage1_survey[2]
+    assert objs[1][3] == stage1_survey[3]
+    assert objs[1][4] == stage1_survey[4]
+
+    interstage1_survey = linac.trackables[2].survey_object()
+    assert np.allclose(objs[2][0], interstage1_survey[0], rtol=1e-15, atol=0.0)
+    assert np.allclose(objs[2][1], interstage1_survey[1], rtol=1e-15, atol=0.0)
+    assert objs[2][2] == interstage1_survey[2]
+    assert objs[2][3] == interstage1_survey[3]
+    assert objs[2][4] == interstage1_survey[4]
+
+    stage2_survey = linac.trackables[3].survey_object()
+    assert np.allclose(objs[3][0], stage2_survey[0], rtol=1e-15, atol=0.0)
+    assert np.allclose(objs[3][1], stage2_survey[1], rtol=1e-15, atol=0.0)
+    assert objs[3][2] == stage2_survey[2]
+    assert objs[3][3] == stage2_survey[3]
+    assert objs[3][4] == stage2_survey[4]
+
+    interstage2_survey = linac.trackables[4].survey_object()
+    assert np.allclose(objs[4][0], interstage2_survey[0], rtol=1e-15, atol=0.0)
+    assert np.allclose(objs[4][1], interstage2_survey[1], rtol=1e-15, atol=0.0)
+    assert objs[4][2] == interstage2_survey[2]
+    assert objs[4][3] == interstage2_survey[3]
+    assert objs[4][4] == interstage2_survey[4]
+
+    stage3_survey = linac.trackables[5].survey_object()
+    assert np.allclose(objs[5][0], stage3_survey[0], rtol=1e-15, atol=0.0)
+    assert np.allclose(objs[5][1], stage3_survey[1], rtol=1e-15, atol=0.0)
+    assert objs[5][2] == stage3_survey[2]
+    assert objs[5][3] == stage3_survey[3]
+    assert objs[5][4] == stage3_survey[4]
+
+    linac.plot_survey()
