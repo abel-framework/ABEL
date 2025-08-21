@@ -401,4 +401,100 @@ def test_driver_unrotation():
     assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.uzs(), driver0.uzs(), rtol=1e-5, atol=0.0)
+
+
+@pytest.mark.StageBasic
+def test_optimize_plasma_density():
+    """
+    Tests for ``StageBasic.optimize_plasma_density()``.
+    """
+
+    np.random.seed(42)
+
+    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    main_source = setup_basic_main_source()
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
+
+    stage.optimize_plasma_density(main_source)
+    assert np.isclose(stage.plasma_density, 6.592382486466319e+21, rtol=1e-5, atol=0.0)
+
+
+@pytest.mark.StageBasic
+def test_copy_config2blank_stage():
+    """
+    Tests for ``StageBasic.copy_config2blank_stage()``.
+    """
+
+    np.random.seed(42)
+
+    stage = setup_StageBasic(driver_source=None, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
+
+    stage_copy = stage.copy_config2blank_stage()
+
+    assert stage_copy.plasma_density is None
+    assert stage_copy.ramp_beta_mag is None
+    assert stage_copy.length is None
+    assert stage_copy.length_flattop is None
+    assert stage_copy.nom_energy_gain is None
+    assert stage_copy.nom_energy_gain_flattop is None
+    assert stage_copy.nom_energy is None
+    assert stage_copy.nom_energy_flattop is None
+    assert stage_copy.nom_accel_gradient is None
+    assert stage_copy.nom_accel_gradient_flattop is None
+
+    assert stage_copy._length_calc is None
+    assert stage_copy._length_flattop_calc is None
+    assert stage_copy._nom_energy_gain_calc is None
+    assert stage_copy._nom_energy_gain_flattop_calc is None
+    assert stage_copy._nom_energy_calc is None
+    assert stage_copy._nom_energy_flattop_calc is None
+    assert stage_copy._nom_accel_gradient_calc is None
+    assert stage_copy._nom_accel_gradient_flattop_calc is None
+
+    assert stage_copy.driver_source is None
+    assert stage_copy.has_ramp() is False
+    assert stage_copy.is_upramp() is False
+    assert stage_copy.is_downramp() is False
+    
+    assert np.isclose(stage_copy.transformer_ratio, stage.transformer_ratio, rtol=1e-5, atol=0.0)
+    assert np.isclose(stage_copy.depletion_efficiency, stage.depletion_efficiency, rtol=1e-5, atol=0.0)
+    assert np.isclose(stage_copy.calc_evolution, stage.calc_evolution, rtol=1e-5, atol=0.0)
+
+
+    stage = setup_StageBasic(driver_source=None, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
+    stage.transformer_ratio = 1.74
+    stage.depletion_efficiency = 0.5354
+    stage.calc_evolution = True
+    stage_copy = stage.copy_config2blank_stage()
+
+    assert stage_copy.plasma_density is None
+    assert stage_copy.ramp_beta_mag is None
+    assert stage_copy.length is None
+    assert stage_copy.length_flattop is None
+    assert stage_copy.nom_energy_gain is None
+    assert stage_copy.nom_energy_gain_flattop is None
+    assert stage_copy.nom_energy is None
+    assert stage_copy.nom_energy_flattop is None
+    assert stage_copy.nom_accel_gradient is None
+    assert stage_copy.nom_accel_gradient_flattop is None
+
+    assert stage_copy._length_calc is None
+    assert stage_copy._length_flattop_calc is None
+    assert stage_copy._nom_energy_gain_calc is None
+    assert stage_copy._nom_energy_gain_flattop_calc is None
+    assert stage_copy._nom_energy_calc is None
+    assert stage_copy._nom_energy_flattop_calc is None
+    assert stage_copy._nom_accel_gradient_calc is None
+    assert stage_copy._nom_accel_gradient_flattop_calc is None
+
+    assert stage_copy.driver_source is None
+    assert stage_copy.has_ramp() is False
+    assert stage_copy.is_upramp() is False
+    assert stage_copy.is_downramp() is False
+    
+    assert np.isclose(stage_copy.transformer_ratio, stage.transformer_ratio, rtol=1e-5, atol=0.0)
+    assert np.isclose(stage_copy.depletion_efficiency, stage.depletion_efficiency, rtol=1e-5, atol=0.0)
+    assert np.isclose(stage_copy.calc_evolution, stage.calc_evolution, rtol=1e-5, atol=0.0)
+
+
     

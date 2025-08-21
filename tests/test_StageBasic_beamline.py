@@ -219,7 +219,7 @@ def test_linac_plots():
     # Perform tracking
     linac.run('test_linac_plots', overwrite=True, verbose=False)
 
-        # Check the outputs
+    # Check the outputs
     stages = linac.stages
     interstages = linac.interstages
     assert len(stages) == num_stages
