@@ -22,9 +22,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pytest
-from abel import *
+from abel.classes.collider.preset.c3 import C3
+from abel.classes.collider.preset.halhf_v1 import HALHFv1
+from abel.classes.collider.preset.halhf_v2 import HALHFv2
 import shutil
-#import numpy as np
+import numpy as np
+from matplotlib import pyplot as plt
 
 
 @pytest.mark.presets
@@ -122,6 +125,9 @@ def test_C3():
     assert np.isclose(cool_copper_collider.wallplug_power(), 111094069.06107412, rtol=my_rtol, atol=0.0)
 
     #cool_copper_collider.final_beam
+
+    # Test plotting and printing
+    plt.ion()
     cool_copper_collider.plot_survey()
     
     cool_copper_collider.print_cost()
@@ -224,6 +230,9 @@ def test_HALHFv1():
     assert np.isclose(halhf1.wallplug_power(), 85960065.40508494, rtol=my_rtol, atol=0.0)
 
     #halhf1.final_beam
+
+    # Test plotting and printing
+    plt.ion()
     halhf1.plot_survey()
     
     halhf1.print_cost()
@@ -326,6 +335,9 @@ def test_HALHFv2():
     assert np.isclose(halhf2.wallplug_power(), 106105511.28442901, rtol=my_rtol, atol=0.0)
 
     #halhf2.final_beam
+    
+    # Test plotting and printing
+    plt.ion()
     halhf2.plot_survey()
     halhf2.plot_luminosity_per_power()
     halhf2.plot_luminosity()
