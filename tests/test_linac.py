@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : unit tests for the Linac class
+ABEL : unit tests for the Linac and Beamline class
 =======================================
 
 This file is a part of ABEL.
@@ -27,6 +27,7 @@ import scipy.constants as SI
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.stage.impl.stage_basic import StageBasic
+from abel.classes.interstage.impl.interstage_basic import InterstageBasic
 
 
 @pytest.mark.linac_unit_test
@@ -136,8 +137,8 @@ def test_get_nom_beam_power():
     linac.num_bunches_in_train = num_bunches_in_train
     linac.rep_rate_trains = rep_rate_trains
 
-    get_rep_rate_average = num_bunches_in_train * rep_rate_trains
-    nom_beam_power = nom_energy * np.abs(charge) * get_rep_rate_average
+    rep_rate_average = num_bunches_in_train * rep_rate_trains
+    nom_beam_power = nom_energy * np.abs(charge) * rep_rate_average
 
     assert np.isclose(linac.get_nom_beam_power(), nom_beam_power, rtol=1e-15, atol=0.0)
 
@@ -208,5 +209,52 @@ def test_get_cost_breakdown():
     assert np.isclose(cost_breakdown[1][1][1][0][1], 46200.0, rtol=1e-15, atol=0.0)
 
 
+@pytest.mark.linac_unit_test
+def test_wallplug_power():
+    """
+    Tests for ``Beamline.wallplug_power()``.
+    """
 
+    linac = Linac()
+    assert linac.wallplug_power() is None
+    
+    linac.num_bunches_in_train = 2
+    linac.rep_rate_trains = 1e3
+    driver_source = SourceBasic()
+    driver_source.energy = 1e9
+    driver_source.rep_rate_trains = 1e3
+    stage = StageBasic()
+    stage.driver_source = driver_source
+    linac.trackables = []
+    linac.trackables.append(stage)
+    assert np.isclose(linac.wallplug_power(), linac.energy_usage() * linac.get_rep_rate_average(), rtol=1e-15, atol=0.0)
 
+    
+@pytest.mark.linac_unit_test
+def test_get_length():
+    """
+    Tests for ``Beamline.get_length()``.
+    """
+
+    linac = Linac()
+    source = SourceBasic()
+    source.energy = 1e9
+    driver_source = SourceBasic()
+    driver_source.energy = 1e9
+    stage = StageBasic()
+    stage.length = 1.0
+    stage.driver_source = driver_source
+    interstage = InterstageBasic()
+    interstage.length = 2.1
+    linac.source = source
+
+    linac.trackables = []
+    assert np.isclose(linac.get_length(), 0.0, rtol=1e-15, atol=0.0)
+    
+    linac.trackables.append(source)
+    linac.trackables.append(stage)
+    linac.trackables.append(interstage)
+    linac.trackables.append(stage)
+
+    assert np.isclose(linac.get_length(), 1.0*2 + 2.1, rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.get_length(), stage.get_length()*2 + interstage.get_length(), rtol=1e-15, atol=0.0)
