@@ -25,7 +25,7 @@ dependencies = [
    "ax-platform",
    "CLICopti >= 2.2",
    "RF-Track",
-   "impactx-noacc"
+   "impactx-noacc >= 25.06"
 ]
 requires-python = ">=3,<3.13"
 
@@ -54,9 +54,10 @@ addopts = [
 markers = [
   "core: Test core functionality",
   "stageGeometry: Test stage geometry calculation functionality",
-  "transverse_wake_instability_linac: Test linacs based on StagePrtclTransWakeInstability",
-  "StagePrtclTransWakeInstability: Tests on StagePrtclTransWakeInstability",
-  "spin: test spin and polarization functionality",
+  "spin: Test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
   "beam: Tests for the Beam class",
+  "transverse_wake_instability_linac: Test linacs based on StagePrtclTransWakeInstability",
+  "StagePrtclTransWakeInstability: Tests on StagePrtclTransWakeInstability",
+  "linac_unit_test: Unit tests for the Linac class",
 ]
