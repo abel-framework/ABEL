@@ -27,22 +27,22 @@ import scipy.constants as SI
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.beam import Beam
 
-def setup_basic_driver_source():
-    driver = SourceBasic()
-    driver.bunch_length = 42e-6                                                   # [m] This value is for trapezoid.
-    driver.z_offset = 300e-6                                                      # [m]
+# def setup_basic_driver_source():
+#     driver = SourceBasic()
+#     driver.bunch_length = 42e-6                                                   # [m] This value is for trapezoid.
+#     driver.z_offset = 300e-6                                                      # [m]
 
-    driver.num_particles = 100000                                                 
-    driver.charge = -2.7e10 * SI.e                                                # [C]
-    driver.energy = 31.25e9                                                       # [eV]
-    driver.rel_energy_spread = 0.01                                               # Relative rms energy spread
+#     driver.num_particles = 100000                                                 
+#     driver.charge = -2.7e10 * SI.e                                                # [C]
+#     driver.energy = 31.25e9                                                       # [eV]
+#     driver.rel_energy_spread = 0.01                                               # Relative rms energy spread
 
-    driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
-    driver.beta_x, driver.beta_y = 0.5, 0.5                                       # [m]
+#     driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
+#     driver.beta_x, driver.beta_y = 0.5, 0.5                                       # [m]
 
-    driver.symmetrize = True
+#     driver.symmetrize = True
 
-    return driver
+#     return driver
 
 
 def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
@@ -73,7 +73,7 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     return main
 
 
-@pytest.mark.linac_unit_test
+@pytest.mark.rft_api_unit_test
 def test_abel_beam2rft_beam():
     """
     Tests for ``abel_beam2rft_beam()``.
@@ -87,8 +87,19 @@ def test_abel_beam2rft_beam():
 
 
     # ========== Single beam, homogeneous charge ==========
-    # Get the RF-Track beam phase space using functions from RF-Track
-    phase_space_rft = beam_rft.get_phase_space()  # RFT units and in the format [ X Px Y Py Z Pz ]
+    # Get the RF-Track beam phase space using get_phase_space() from RF-Track (see the RF-Track reference manual for updated reference) 
+    # get_phase_space('%X %Px %Y %Py %Z %Pz %m %Q %N') returns the phase where the columns are
+    #   X : [mm], column vector of the horizontal coordinates.
+    #   Px : [MeV/c], column vector of the horizontal momenta.
+    #   Y : [mm], column vector of the vertical coordinates.
+    #   Py : [MeV/c], column vector of the vertical momenta.
+    #   Z : [mm], column vector of the longitudinal coordinates.
+    #   Pz : [MeV/c], column vector of the longitudinal momenta.
+    #   m : [MeV/c^2], column vector of masses.
+    #   Q : [e], column vector of single-particle charges.
+    #   N : column vector of numbers of single particles per macro particle.
+
+    phase_space_rft = beam_rft.get_phase_space('%X %Px %Y %Py %Z %Pz %m %Q %N') 
 
     assert np.allclose(phase_space_rft[:,0], beam.xs()*1e3, rtol=1e-15, atol=0.0)
     assert np.allclose(phase_space_rft[:,1], beam.pxs()*SI.c/SI.e/1e6, rtol=1e-15, atol=0.0)
@@ -96,6 +107,12 @@ def test_abel_beam2rft_beam():
     assert np.allclose(phase_space_rft[:,3], beam.pys()*SI.c/SI.e/1e6, rtol=1e-15, atol=0.0)
     assert np.allclose(phase_space_rft[:,4], beam.zs()*1e3, rtol=1e-15, atol=0.0)
     assert np.allclose(phase_space_rft[:,5], beam.pzs()*SI.c/SI.e/1e6, rtol=1e-15, atol=0.0)
+    assert np.all(phase_space_rft[:,6] == phase_space_rft[:,6][0])
+    assert np.allclose(phase_space_rft[:,6][0], beam.particle_mass*SI.c**2/SI.e/1e6 , rtol=1e-15, atol=0.0)
+    assert np.all(phase_space_rft[:,7] == phase_space_rft[:,7][0])
+    assert np.allclose(phase_space_rft[:,7], beam.qs()/beam.weightings()/SI.e , rtol=1e-15, atol=0.0)
+    assert np.all(phase_space_rft[:,8] == phase_space_rft[:,8][0])
+    assert np.allclose(phase_space_rft[:,8], beam.weightings() , rtol=1e-15, atol=0.0)
 
 
     # ========== Slightly enlarge the transverse region by adding chargeless ghost particles ==========
@@ -118,14 +135,20 @@ def test_abel_beam2rft_beam():
                                weightings=np.ones_like(X.flatten())*beam.weightings()[0],
                                particle_mass=beam.particle_mass)
     
+    assert len(empty_beam) == 8
+
     comb_beam = beam + empty_beam
     comb_beam.particle_mass = beam.particle_mass
 
-    assert len(empty_beam) == 8
-
+    qs_abel = comb_beam.qs()
+    weightings_abel = comb_beam.weightings()
+    zero_mask = qs_abel == 0
+    if sum(zero_mask) != 0:
+        weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
+    
+    #comb_beam_rft = abel_beam2rft_beam(comb_beam, homogen_beam_charge=False)
     comb_beam_rft = abel_beam2rft_beam(comb_beam)
-
-    phase_space_rft = comb_beam_rft.get_phase_space()  # RFT units and in the format [ X Px Y Py Z Pz ]
+    phase_space_rft = comb_beam_rft.get_phase_space('%X %Px %Y %Py %Z %Pz %m %Q %N')
 
     assert np.allclose(phase_space_rft[:,0], comb_beam.xs()*1e3, rtol=1e-15, atol=0.0)
     assert np.allclose(phase_space_rft[:,1], comb_beam.pxs()*SI.c/SI.e/1e6, rtol=1e-15, atol=0.0)
@@ -133,10 +156,15 @@ def test_abel_beam2rft_beam():
     assert np.allclose(phase_space_rft[:,3], comb_beam.pys()*SI.c/SI.e/1e6, rtol=1e-15, atol=0.0)
     assert np.allclose(phase_space_rft[:,4], comb_beam.zs()*1e3, rtol=1e-15, atol=0.0)
     assert np.allclose(phase_space_rft[:,5], comb_beam.pzs()*SI.c/SI.e/1e6, rtol=1e-15, atol=0.0)
+    
     assert phase_space_rft.shape[0] == len(empty_beam) + len(beam)
-    #assert np.isclose(, beam.charge(), rtol=1e-15, atol=0.0)
-    #assert np.isclose(, beam.particle_mass, rtol=1e-15, atol=0.0)
-    #assert np.isclose(, beam.weightings(), rtol=1e-15, atol=0.0)
+    assert np.all(phase_space_rft[:,6] == phase_space_rft[:,6][0])
+    assert np.allclose(phase_space_rft[:,6][0], comb_beam.particle_mass*SI.c**2/SI.e/1e6 , rtol=1e-15, atol=0.0)
+    assert not np.all(phase_space_rft[:,7] == phase_space_rft[:,7][0])
+    assert np.allclose(phase_space_rft[:,7], comb_beam.qs()/weightings_abel/SI.e , rtol=1e-15, atol=0.0)
+    assert np.all(phase_space_rft[:,8] == phase_space_rft[:,8][0])
+    assert np.allclose(phase_space_rft[:,8], weightings_abel , rtol=1e-15, atol=0.0)
+
     assert np.isclose(phase_space_rft[:,0].max(), x_max*1e3, rtol=1e-15, atol=0.0)
     assert np.isclose(phase_space_rft[:,0].min(), x_min*1e3, rtol=1e-15, atol=0.0)
     assert np.isclose(phase_space_rft[:,2].max(), y_max*1e3, rtol=1e-15, atol=0.0)
