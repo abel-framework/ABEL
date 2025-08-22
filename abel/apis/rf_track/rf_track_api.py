@@ -3,7 +3,7 @@ import numpy as np
 
 
 # ==================================================
-def abel_beam2rft_beam(beam, homogen_beam_charge=True):
+def abel_beam2rft_beam(beam):
     """
     Converts an ABEL ``Beam`` object to a RF-Track ``Bunch6dT`` object.
 
@@ -12,10 +12,10 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
     beam : ABEL ``Beam`` object
         The beam to be converted.
 
-    homogen_beam_charge : bool, optional
-        Flag for indicating the whether the macroparticles of ``beam`` all have 
-        the same charges. Defaults to ``True``, which allows for using a faster 
-        version of the ``Bunch6dT`` constructor.
+    # homogen_beam_charge : bool, optional
+    #     Flag for indicating the whether the macroparticles of ``beam`` all have 
+    #     the same charges. Defaults to ``True``, which allows for using a faster 
+    #     version of the ``Bunch6dT`` constructor.
 
 
     Returns
@@ -34,12 +34,16 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
     qs_abel = beam.qs()
     weightings_abel = beam.weightings()
 
-    # Hack for setting the weight for macroparticles with 0 charge. This hack is used in ion_motion_wakefield_perturbation.py to add "ghost particles" in order to enlarge the box for calculating the beam fields using RF-Track.
+    # Hack for setting the weight for macroparticles with 0 charge. This hack is used in ion_motion_wakefield_perturbation.py to add "ghost particles" in order to enlarge the box for calculating the beam fields using RF-Track. I.e. need to force the weightings for the 0 charge particles to be non-zero for later calculations.
     zero_mask = qs_abel == 0
     if sum(zero_mask) != 0:
         weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
 
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
+
+    homogen_beam_charge = True
+    if not np.all(qs_abel == qs_abel[0]):
+        homogen_beam_charge = False
     
     if not homogen_beam_charge:   
         # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ] (see the RF-Track reference manual for updated reference) 
@@ -133,7 +137,7 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
 
     # Convert ABEL beam to RF-Track beam
-    beam_rft = abel_beam2rft_beam(abel_beam, homogen_beam_charge=True)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
+    beam_rft = abel_beam2rft_beam(abel_beam)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
         
     # Set the solver resolution and calculate fields
     sc_fields_obj = SpaceCharge_Field(beam_rft, num_x_cells, num_y_cells, num_z_cells, num_t_bins)  # num_x_cells, num_y_cells, num_z_cells, number of velocity slices
