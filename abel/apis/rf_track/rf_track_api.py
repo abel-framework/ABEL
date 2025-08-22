@@ -13,7 +13,9 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
         The beam to be converted.
 
     homogen_beam_charge : bool, optional
-        Flag for indicating the whether the macroparticles of ``beam`` all have the same charges. Defaults to ``True``, which allows for using a faster version of the ``Bunch6dT`` constructor.
+        Flag for indicating the whether the macroparticles of ``beam`` all have 
+        the same charges. Defaults to ``True``, which allows for using a faster 
+        version of the ``Bunch6dT`` constructor.
 
 
     Returns
@@ -166,7 +168,9 @@ def wake_t_bunch2rft_beam(wake_t_bunch, homogen_beam_charge=True):
         The beam to be converted.
 
     homogen_beam_charge : bool, optional
-        Flag for indicating the whether the macroparticles of ``wake_t_bunch`` all have the same charges. Defaults to ``True``, which allows for using a faster version of the ``Bunch6dT`` constructor.
+        Flag for indicating the whether the macroparticles of ``wake_t_bunch`` 
+        all have the same charges. Defaults to ``True``, which allows for using 
+        a faster version of the ``Bunch6dT`` constructor.
 
 
     Returns
