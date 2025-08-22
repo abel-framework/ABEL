@@ -51,6 +51,7 @@ addopts = [
 ]
 markers = [
   "core: Test core functionality",
+  "rft_api_unit_test: Unit tests for the RF-Track API.",
   "stageGeometry: Test stage geometry calculation functionality",
   "spin: Test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
