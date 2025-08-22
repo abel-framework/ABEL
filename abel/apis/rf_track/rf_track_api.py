@@ -42,7 +42,17 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
     
     if not homogen_beam_charge:   
-        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ]
+        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ] (see the RF-Track reference manual for updated reference) 
+        #   X : [mm], column vector of the horizontal coordinates.
+        #   Px : [MeV/c], column vector of the horizontal momenta.
+        #   Y : [mm], column vector of the vertical coordinates.
+        #   Py : [MeV/c], column vector of the vertical momenta.
+        #   Z : [mm], column vector of the longitudinal coordinates.
+        #   Pz : [MeV/c], column vector of the longitudinal momenta.
+        #   MASS : [MeV/c^2], column vector of single-particle masses.
+        #   Q : [e], column vector of single-particle charges.
+        #   N : column vector of numbers of single particles per macro particle.
+
         ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
         phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
                                         ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
@@ -59,7 +69,17 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
                                         ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
                                         zs_abel*1e3, pzs_abel*SI.c/SI.e/1e6))
         
-        # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] )
+        # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] ) (see the RF-Track reference manual for updated reference)
+        #   mass : [MeV/c^2], the mass of the single particle.
+        #   population : the total number of real particles in the bunch.
+        #   charge : [e], charge of the single particle.
+        #   X : [mm], column vector of the horizontal coordinates.
+        #   Px : [MeV/c], column vector of the horizontal momenta.
+        #   Y : [mm], column vector of the vertical coordinates.
+        #   Py : [MeV/c], column vector of the vertical momenta.
+        #   Z : [mm], column vector of the longitudinal coordinates.
+        #   Pz : [MeV/c], column vector of the longitudinal momenta.
+
         single_particle_charge = qs_abel[0]/SI.e/weightings_abel[0]  # Charge of a single physical particle [e].
         beam_rft = Bunch6dT(particle_mass, beam.population(), single_particle_charge, phase_space_rft)
     
