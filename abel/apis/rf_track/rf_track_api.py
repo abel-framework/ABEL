@@ -3,7 +3,7 @@ import numpy as np
 
 
 # ==================================================
-def abel_beam2rft_beam(beam, homogen_beam_charge=True):
+def abel_beam2rft_beam(beam):
     """
     Converts an ABEL ``Beam`` object to a RF-Track ``Bunch6dT`` object.
 
@@ -12,8 +12,10 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
     beam : ABEL ``Beam`` object
         The beam to be converted.
 
-    homogen_beam_charge : bool, optional
-        Flag for indicating the whether the macroparticles of ``beam`` all have the same charges. Defaults to ``True``, which allows for using a faster version of the ``Bunch6dT`` constructor.
+    # homogen_beam_charge : bool, optional
+    #     Flag for indicating the whether the macroparticles of ``beam`` all have 
+    #     the same charges. Defaults to ``True``, which allows for using a faster 
+    #     version of the ``Bunch6dT`` constructor.
 
 
     Returns
@@ -32,15 +34,29 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
     qs_abel = beam.qs()
     weightings_abel = beam.weightings()
 
-    # Hack for setting the weight for macroparticles with 0 charge. This hack is used in ion_motion_wakefield_perturbation.py to add "ghost particles" in order to enlarge the box for calculating the beam fields using RF-Track.
+    # Hack for setting the weight for macroparticles with 0 charge. This hack is used in ion_motion_wakefield_perturbation.py to add "ghost particles" in order to enlarge the box for calculating the beam fields using RF-Track. I.e. need to force the weightings for the 0 charge particles to be non-zero for later calculations.
     zero_mask = qs_abel == 0
     if sum(zero_mask) != 0:
         weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
 
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
+
+    homogen_beam_charge = True
+    if not np.all(qs_abel == qs_abel[0]):
+        homogen_beam_charge = False
     
     if not homogen_beam_charge:   
-        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ]
+        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ] (see the RF-Track reference manual for updated reference) 
+        #   X : [mm], column vector of the horizontal coordinates.
+        #   Px : [MeV/c], column vector of the horizontal momenta.
+        #   Y : [mm], column vector of the vertical coordinates.
+        #   Py : [MeV/c], column vector of the vertical momenta.
+        #   Z : [mm], column vector of the longitudinal coordinates.
+        #   Pz : [MeV/c], column vector of the longitudinal momenta.
+        #   MASS : [MeV/c^2], column vector of single-particle masses.
+        #   Q : [e], column vector of single-particle charges.
+        #   N : column vector of numbers of single particles per macro particle.
+
         ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
         phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
                                         ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
@@ -57,7 +73,17 @@ def abel_beam2rft_beam(beam, homogen_beam_charge=True):
                                         ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
                                         zs_abel*1e3, pzs_abel*SI.c/SI.e/1e6))
         
-        # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] )
+        # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] ) (see the RF-Track reference manual for updated reference)
+        #   mass : [MeV/c^2], the mass of the single particle.
+        #   population : the total number of real particles in the bunch.
+        #   charge : [e], charge of the single particle.
+        #   X : [mm], column vector of the horizontal coordinates.
+        #   Px : [MeV/c], column vector of the horizontal momenta.
+        #   Y : [mm], column vector of the vertical coordinates.
+        #   Py : [MeV/c], column vector of the vertical momenta.
+        #   Z : [mm], column vector of the longitudinal coordinates.
+        #   Pz : [MeV/c], column vector of the longitudinal momenta.
+
         single_particle_charge = qs_abel[0]/SI.e/weightings_abel[0]  # Charge of a single physical particle [e].
         beam_rft = Bunch6dT(particle_mass, beam.population(), single_particle_charge, phase_space_rft)
     
@@ -111,7 +137,7 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
         num_z_cells = round(np.sqrt(len(abel_beam))/2)
 
     # Convert ABEL beam to RF-Track beam
-    beam_rft = abel_beam2rft_beam(abel_beam, homogen_beam_charge=True)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
+    beam_rft = abel_beam2rft_beam(abel_beam)  # Add a flag and edit this so that it is also compatible with Wake-T ParticleBunch
         
     # Set the solver resolution and calculate fields
     sc_fields_obj = SpaceCharge_Field(beam_rft, num_x_cells, num_y_cells, num_z_cells, num_t_bins)  # num_x_cells, num_y_cells, num_z_cells, number of velocity slices
@@ -166,7 +192,9 @@ def wake_t_bunch2rft_beam(wake_t_bunch, homogen_beam_charge=True):
         The beam to be converted.
 
     homogen_beam_charge : bool, optional
-        Flag for indicating the whether the macroparticles of ``wake_t_bunch`` all have the same charges. Defaults to ``True``, which allows for using a faster version of the ``Bunch6dT`` constructor.
+        Flag for indicating whether the macroparticles of ``wake_t_bunch`` all 
+        have the same charges. Defaults to ``True``, which allows for using 
+        a faster version of the ``Bunch6dT`` constructor.
 
 
     Returns
