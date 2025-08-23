@@ -130,6 +130,29 @@ def rft_beam2abel_beam(beam_rft):
     
 # ==================================================
 def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1):
+    """
+    Creates a RF-Track ``SpaceCharge_Field`` object.
+
+    Parameters
+    ----------
+    abel_beam : ABEL ``Beam`` object
+
+    num_x_cells, num_y_cells : int
+        Number of grid cells along x and y used in RF-Track for calculating 
+        beam electric fields. Default set to 50.
+
+    num_z_cells : int, optional
+        Number of grid cells along z. If set to ``None``, the value is 
+        calculated from the ``abel_beam`` properties. 
+
+    num_t_bins : int, optional
+        Number of velovity slices. Default set to 1.
+    
+    
+    Returns
+    ----------
+    RF-Track ``SpaceCharge_Field`` object
+    """
 
     from RF_Track import SpaceCharge_Field
     
