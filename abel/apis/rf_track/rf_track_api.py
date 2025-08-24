@@ -34,10 +34,6 @@ def abel_beam2rft_beam(beam):
     qs_abel = beam.qs()
     weightings_abel = beam.weightings()
 
-    # Hack for setting the weight for macroparticles with 0 charge. This hack is used in ion_motion_wakefield_perturbation.py to add "ghost particles" in order to enlarge the box for calculating the beam fields using RF-Track. I.e. need to force the weightings for the 0 charge particles to be non-zero for later calculations.
-    zero_mask = qs_abel == 0
-    if sum(zero_mask) != 0:
-        weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
 
     particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
 
@@ -57,12 +53,23 @@ def abel_beam2rft_beam(beam):
         #   Q : [e], column vector of single-particle charges.
         #   N : column vector of numbers of single particles per macro particle.
 
+
+        # In order to avoid extrapolations when probing a RF-Track ``SpaceCharge_Field`` object, ion_motion_wakefield_perturbation.py::assemble_driver_sc_fields_obj adds eight "ghost particles" with zero charge in order to artificially enlarge the simulation box when constructing a RF-Track ``SpaceCharge_Field`` object (the range of a ``SpaceCharge_Field`` object only spands the particle coordinates of the particles).
+        # 
+        #  Hack for setting the weight for macroparticles with 0 charge. This hack is used in ion_motion_wakefield_perturbation.py to add "ghost particles" in order to enlarge the box for calculating the beam fields using RF-Track. I.e. need to force the weightings for the 0 charge particles to be non-zero for later calculations.
+        zero_mask = qs_abel == 0
+        if sum(zero_mask) != 0:
+            weightings_abel[zero_mask] = 1.0
+
         ms_abel = particle_mass * np.ones(len(beam))  # [MeV/c^2] single particle masses.
         phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
                                         ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
                                         zs_abel*1e3, pzs_abel*SI.c/SI.e/1e6, 
                                         ms_abel, qs_abel/SI.e/weightings_abel, 
                                         weightings_abel))
+        
+        if np.any(qs_abel[zero_mask]/SI.e/weightings_abel[zero_mask]) != 0:
+            raise ValueError('Wrong weights for the ghost particles.')
 
         # Construct a RFT beam
         beam_rft = Bunch6dT(phase_space_rft)
@@ -146,7 +153,7 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
         calculated from the ``abel_beam`` properties. 
 
     num_t_bins : int, optional
-        Number of velovity slices. Default set to 1.
+        Number of velocity slices. Default set to 1.
     
     
     Returns
