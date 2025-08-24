@@ -196,3 +196,85 @@ def test_rft_beam2abel_beam():
 
     
 
+@pytest.mark.rft_api_unit_test
+def test_sc_fields_obj_and_beam_fields():
+    """
+    Tests for ``calc_sc_fields_obj()`` and ``rft_beam_fields()``.
+    """
+    
+    from abel.apis.rf_track.rf_track_api import rft_beam_fields, calc_sc_fields_obj
+    np.random.seed(42)
+    
+    # Parameters
+    N_electrons = 1e6                                                               # Number of particles in the distribution
+    Q = -1 * SI.e                                                                   # [C], charge of one electron
+    N = 1000000                                                                     # Number of simulated macro particles
+
+    radius = 1e-3                                                                   # [m], radius of the sphere
+    rvals = 2 * np.random.rand(N) - 1
+    elevation = np.arcsin(rvals)                                                    # [rad]
+    azimuth = 2 * np.pi * np.random.rand(N)                                         # [rad]
+    radii = radius * np.random.rand(N) ** (1/3)                                     # [m]
+
+    # Convert spherical to Cartesian coordinates
+    xs = radii * np.cos(elevation) * np.cos(azimuth)
+    ys = radii * np.cos(elevation) * np.sin(azimuth)
+    zs = radii * np.sin(elevation)
+    
+    # Create a beam
+    O = np.zeros(N)
+    beam = Beam()
+    beam.allow_low_energy_particles = True
+    beam.set_phase_space(Q=Q*N_electrons, xs=xs, ys=ys, zs=zs, uxs=O, uys=O, uzs=O, particle_mass=SI.m_e)
+
+    # Assemble a RFT SpaceCharge_Field object
+    sc_fields_obj = calc_sc_fields_obj(beam, num_x_cells=50, num_y_cells=50, num_z_cells=50, num_t_bins=1)
+
+    # Evaluate the electric field in 1D
+    x_lin = np.linspace(xs.min(), xs.max(), 100)                                    # [m]
+    O = np.zeros(100)
+    E_1d, B = sc_fields_obj.get_field(x_lin*1e3, O, O, O)
+
+    # Compute the analytic solution
+    Er = []
+    rmax = radius                                                                   # [m]
+    rs = np.linspace(-rmax, rmax, 100)                                              # [m]
+    for r in rs:
+        if r < radius:
+            E = 1/(4*SI.pi*SI.epsilon_0) * Q * N_electrons * r / radius**3          # [V/m]
+        else:
+            E = 1/(4*SI.pi*SI.epsilon_0) * Q * N_electrons / r**2                   # [V/m]
+        Er.append(E)
+    Er = np.array(Er)
+
+    # Compare the two arrays
+    assert np.allclose(E_1d[:, 0], Er, rtol=0.0, atol=70.0)
+    assert np.allclose(B[:, 0], 0.0, rtol=1e-15, atol=0.0)
+
+
+    # Compute the fields at the location of the macroparticles
+    E_fields_beam, B_fields_beam, xs_sorted, ys_sorted, zs_sorted = rft_beam_fields(beam, num_x_cells=50, num_y_cells=50, 
+                                                                                    num_z_cells=50, num_t_bins=1, sort_zs=False)
+
+    Exs = E_fields_beam[:,0]
+    Eys = E_fields_beam[:,1]
+    Ezs = E_fields_beam[:,2]
+
+    Es = np.sqrt(Exs**2 + Eys**2 + Ezs**2)  # Field magnitude
+
+    # Compute fields for comparison
+    rs_sorted = np.sqrt(xs_sorted**2 + ys_sorted**2 + zs_sorted**2)
+    Er_3d = []
+    for r in rs_sorted:
+        if r < radius:
+            E = 1/(4*SI.pi*SI.epsilon_0) * Q * N_electrons * r / radius**3          # [V/m]
+        else:
+            E = 1/(4*SI.pi*SI.epsilon_0) * Q * N_electrons / r**2                   # [V/m]
+        Er_3d.append(E)
+    Er_3d = np.abs(np.array(Er_3d))
+
+    # Compare the two arrays
+    assert np.allclose(Es, Er_3d, rtol=0.0, atol=80.0)
+    assert np.allclose(B_fields_beam[:, 0], 0.0, rtol=1e-15, atol=0.0)
+    assert np.allclose(B_fields_beam[:, 1], 0.0, rtol=1e-15, atol=0.0)
+    assert np.allclose(B_fields_beam[:, 2], 0.0, rtol=1e-15, atol=0.0)
