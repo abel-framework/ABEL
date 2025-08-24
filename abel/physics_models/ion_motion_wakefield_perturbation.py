@@ -135,7 +135,7 @@ class IonMotionConfig():
         self.ion_wkfld_update_period = ion_wkfld_update_period
         self.update_ion_wakefield = True  # Internal variable that is True when it is time to update the ion wakefield perturbation.
 
-        # Drive beam evolution quantities
+        # Drive beam evolution quantities TODO: replace with new drive beam evolution modelling
         self.drive_beam_update_period = drive_beam_update_period
         self.wake_t_fields = wake_t_fields
         
@@ -154,6 +154,10 @@ class IonMotionConfig():
         """
         Sets the coordinates used to probe the beam fields of the drive beam 
         and main beam. Has to be called at every ion wakefield calculation step.
+
+        The probing xy-coordinates are determined by the ``main_beam`` 
+        xy-coordinates, while the probing longitudinal coordinates span both the 
+        drive beam, main beam and the separation region between them.
 
         Parameters
         ----------
@@ -234,7 +238,7 @@ class IonMotionConfig():
         self.ys_probe = ys_probe
 
         if self.xs_probe.min() < self.xlims_driver_sc.min() or self.xs_probe.max() > self.xlims_driver_sc.max() or self.ys_probe.min() < self.ylims_driver_sc.min() or self.ys_probe.max() > self.ylims_driver_sc.max():
-            print('xs_probe.min:', self.xs_probe.min(), 'xlims_driver_sc.min:', self.xlims_driver_sc.min(), 'xs_probe.max:', self.xs_probe.max(), 'ys_probe.min:', self.ys_probe.min(), 'ylims_driver_sc.min:', self.ylims_driver_sc.min(), 'ys_probe.max:', self.ys_probe.max())
+            #print('xs_probe.min:', self.xs_probe.min(), 'xlims_driver_sc.min:', self.xlims_driver_sc.min(), 'xs_probe.max:', self.xs_probe.max(), 'ys_probe.min:', self.ys_probe.min(), 'ylims_driver_sc.min:', self.ylims_driver_sc.min(), 'ys_probe.max:', self.ys_probe.max())
             warnings.warn("The range of the probing coordinates is larger than the driver probing coordinates. This may lead to a slower performance due to extrapolations when extracting the driver beam fields.", UserWarning)
 
         # Set the z-coordinates used to probe beam electric fields from RF-Track
@@ -289,7 +293,8 @@ class IonMotionConfig():
         
         X, Y, Z = np.meshgrid([x_min, x_max], [y_min, y_max], [z_start, z_end], indexing='ij')
 
-        # Set up a beam with 0 charge consisting of 8 particles to enlarge region of the RF-Track SpaceCharge_Field object to avoid extrapolation later
+
+        # In order to avoid extrapolations when probing a RF-Track ``SpaceCharge_Field`` object, need to add eight "ghost particles" with zero charge in order to artificially enlarge the simulation box when constructing a RF-Track ``SpaceCharge_Field`` object (the range of a ``SpaceCharge_Field`` object only spands the particle coordinates of the particles).
         empty_beam = Beam()
         empty_beam.set_phase_space(Q=0,
                                    xs=X.flatten(),
@@ -298,7 +303,6 @@ class IonMotionConfig():
                                    uxs=np.ones_like(X.flatten())*drive_beam.uxs()[0],
                                    uys=np.ones_like(X.flatten())*drive_beam.uys()[0],
                                    uzs=np.ones_like(X.flatten())*drive_beam.uzs()[0],
-                                   weightings=np.ones_like(X.flatten())*drive_beam.weightings()[0],
                                    particle_mass=drive_beam.particle_mass)
         
         combined_beam = drive_beam + empty_beam
@@ -426,31 +430,7 @@ def assemble_main_sc_fields_obj(ion_motion_config, main_beam):
     RF-Track ``SpaceCharge_Field`` object
     """
     
-    # Slightly enlarge the transverse region by constructing empty_beam to avoid extrapolation when evaluating the beam fields.
-    x_min = pad_downwards(ion_motion_config.xs_probe.min(), padding=0.05)
-    x_max = pad_upwards(ion_motion_config.xs_probe.max(), padding=0.05)
-    y_min = pad_downwards(ion_motion_config.ys_probe.min(), padding=0.05)
-    y_max = pad_upwards(ion_motion_config.ys_probe.max(), padding=0.05)
-    z_end = main_beam.zs().min()
-    z_start = main_beam.zs().max()
-    
-    X, Y, Z = np.meshgrid([x_min, x_max], [y_min, y_max], [z_start, z_end], indexing='ij')
-    
-    empty_beam = Beam()
-    empty_beam.set_phase_space(Q=0,
-                               xs=X.flatten(),
-                               ys=Y.flatten(),
-                               zs=Z.flatten(), 
-                               uxs=np.ones_like(X.flatten())*main_beam.uxs()[0],
-                               uys=np.ones_like(X.flatten())*main_beam.uys()[0],
-                               uzs=np.ones_like(X.flatten())*main_beam.uzs()[0],
-                               weightings=np.ones_like(X.flatten())*main_beam.weightings()[0],
-                               particle_mass=main_beam.particle_mass)
-    
-    combined_beam = main_beam + empty_beam
-    combined_beam.particle_mass = main_beam.particle_mass
-    
-    return calc_sc_fields_obj(combined_beam, ion_motion_config.num_x_cells_rft, ion_motion_config.num_y_cells_rft, ion_motion_config.num_z_cells_main, num_t_bins=1)
+    return calc_sc_fields_obj(main_beam, ion_motion_config.num_x_cells_rft, ion_motion_config.num_y_cells_rft, ion_motion_config.num_z_cells_main, num_t_bins=1)
 
 
 
