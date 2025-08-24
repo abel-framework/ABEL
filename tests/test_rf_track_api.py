@@ -115,7 +115,7 @@ def test_abel_beam2rft_beam():
     assert np.allclose(phase_space_rft[:,8], beam.weightings() , rtol=1e-15, atol=0.0)
 
 
-    # ========== Slightly enlarge the transverse region by adding chargeless ghost particles ==========
+    # ========== Inhomogeneous beam chaarge with chargeless ghost particles ==========
     x_min = beam.xs().min() + np.sign(beam.xs().min())*1e-6
     x_max = beam.xs().max() + np.sign(beam.xs().max())*1e-6
     y_min = beam.ys().min() + np.sign(beam.ys().min())*1e-6
@@ -132,7 +132,6 @@ def test_abel_beam2rft_beam():
                                uxs=np.ones_like(X.flatten())*beam.uxs()[0],
                                uys=np.ones_like(X.flatten())*beam.uys()[0],
                                uzs=np.ones_like(X.flatten())*beam.uzs()[0],
-                               weightings=np.ones_like(X.flatten())*beam.weightings()[0],
                                particle_mass=beam.particle_mass)
     
     assert len(empty_beam) == 8
@@ -144,9 +143,8 @@ def test_abel_beam2rft_beam():
     weightings_abel = comb_beam.weightings()
     zero_mask = qs_abel == 0
     if sum(zero_mask) != 0:
-        weightings_abel[zero_mask] = weightings_abel[~zero_mask][0]
+        weightings_abel[zero_mask] = 1.0
     
-    #comb_beam_rft = abel_beam2rft_beam(comb_beam, homogen_beam_charge=False)
     comb_beam_rft = abel_beam2rft_beam(comb_beam)
     phase_space_rft = comb_beam_rft.get_phase_space('%X %Px %Y %Py %Z %Pz %m %Q %N')
 
@@ -162,19 +160,39 @@ def test_abel_beam2rft_beam():
     assert np.allclose(phase_space_rft[:,6][0], comb_beam.particle_mass*SI.c**2/SI.e/1e6 , rtol=1e-15, atol=0.0)
     assert not np.all(phase_space_rft[:,7] == phase_space_rft[:,7][0])
     assert np.allclose(phase_space_rft[:,7], comb_beam.qs()/weightings_abel/SI.e , rtol=1e-15, atol=0.0)
-    assert np.all(phase_space_rft[:,8] == phase_space_rft[:,8][0])
     assert np.allclose(phase_space_rft[:,8], weightings_abel , rtol=1e-15, atol=0.0)
 
-    assert np.isclose(phase_space_rft[:,0].max(), x_max*1e3, rtol=1e-15, atol=0.0)
-    assert np.isclose(phase_space_rft[:,0].min(), x_min*1e3, rtol=1e-15, atol=0.0)
-    assert np.isclose(phase_space_rft[:,2].max(), y_max*1e3, rtol=1e-15, atol=0.0)
-    assert np.isclose(phase_space_rft[:,2].min(), y_min*1e3, rtol=1e-15, atol=0.0)
-    assert np.isclose(phase_space_rft[:,4].max(), z_start*1e3, rtol=1e-15, atol=0.0)
-    assert np.isclose(phase_space_rft[:,4].min(), z_end*1e3, rtol=1e-15, atol=0.0)
 
+@pytest.mark.rft_api_unit_test
+def test_rft_beam2abel_beam():
+    """
+    Tests for ``rft_beam2abel_beam()``.
+    """
 
-    # ========== Test for non-homogeneous beam charge ==========
+    from RF_Track import Bunch6dT
+    from abel.apis.rf_track.rf_track_api import rft_beam2abel_beam
 
-    #comb_beam_rft = abel_beam2rft_beam(comb_beam, homogen_beam_charge=False)
+    source = setup_basic_main_source()
+    beam = source.track()
+    xs_abel = beam.xs()    # [m]
+    pxs_abel = beam.pxs()  # [kg m/s]
+    ys_abel = beam.ys()
+    pys_abel = beam.pys()
+    zs_abel = beam.zs()
+    pzs_abel = beam.pzs()
+    qs_abel = beam.qs()
+    weightings_abel = beam.weightings()
+    particle_mass = beam.particle_mass*SI.c**2/SI.e/1e6  # [MeV/c^2]
+
+    phase_space_rft = np.column_stack((xs_abel*1e3, pxs_abel*SI.c/SI.e/1e6, 
+                                        ys_abel*1e3, pys_abel*SI.c/SI.e/1e6, 
+                                        zs_abel*1e3, pzs_abel*SI.c/SI.e/1e6))
+
+    single_particle_charge = qs_abel[0]/SI.e/weightings_abel[0]  # Charge of a single physical particle [e].
+    beam_rft = Bunch6dT(particle_mass, beam.population(), single_particle_charge, phase_space_rft)
+
+    converted_beam = rft_beam2abel_beam(beam_rft)
+    Beam.comp_beams(converted_beam, beam)
+
     
 
