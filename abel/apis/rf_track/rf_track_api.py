@@ -174,10 +174,6 @@ def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t
     sc_fields_obj = calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells, num_t_bins)
 
     # Extract beam coordinates
-    #phase_space_rft = beam_rft.get_phase_space('%X %Y %Z', 'good')
-    #xs = phase_space_rft[:,0]  # [mm]
-    #ys = phase_space_rft[:,1]
-    #zs = phase_space_rft[:,2]
     xs = abel_beam.xs()*1e3  # [mm]
     ys = abel_beam.ys()*1e3  # [mm]
     zs = abel_beam.zs()*1e3  # [mm]
