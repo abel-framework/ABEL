@@ -204,7 +204,7 @@ def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t
 
 
 # ==================================================
-def wake_t_bunch2rft_beam(wake_t_bunch, homogen_beam_charge=True):
+def wake_t_bunch2rft_beam(wake_t_bunch):
     """
     Converts a Wake-T ``ParticleBunch`` to a RF-Track ``Bunch6dT`` object.
 
@@ -212,12 +212,6 @@ def wake_t_bunch2rft_beam(wake_t_bunch, homogen_beam_charge=True):
     ----------
     wake_t_bunch : Wake-T ``ParticleBunch``
         The beam to be converted.
-
-    homogen_beam_charge : bool, optional
-        Flag for indicating whether the macroparticles of ``wake_t_bunch`` all 
-        have the same charges. Defaults to ``True``, which allows for using 
-        a faster version of the ``Bunch6dT`` constructor.
-
 
     Returns
     ----------
@@ -236,11 +230,27 @@ def wake_t_bunch2rft_beam(wake_t_bunch, homogen_beam_charge=True):
 
     particle_mass = wake_t_bunch.m_species * SI.c**2 / SI.e / 1e6  # [MeV/c^2], also the same as the conversion factor from Wake-T momenta to RF-Track momenta.
     particle_charge = wake_t_bunch.q_species  # [C] single particle charge
+
+    qs_wt = wake_t_bunch.w * particle_charge
+
+    homogen_beam_charge = True
+    if not np.all(qs_wt == qs_wt[0]):
+        homogen_beam_charge = False
     
-    if not homogen_beam_charge:   
-        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ]
-        ms = particle_mass * np.ones(len(xs_wt))  # [MeV/c^2] single particle masses.
-        qs = particle_charge/SI.e * np.ones(len(xs_wt))  # [e] single particle charges.
+    if not homogen_beam_charge:
+        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz MASS Q N ] (see the RF-Track reference manual for updated reference) 
+        #   X : [mm], column vector of the horizontal coordinates.
+        #   Px : [MeV/c], column vector of the horizontal momenta.
+        #   Y : [mm], column vector of the vertical coordinates.
+        #   Py : [MeV/c], column vector of the vertical momenta.
+        #   Z : [mm], column vector of the longitudinal coordinates.
+        #   Pz : [MeV/c], column vector of the longitudinal momenta.
+        #   MASS : [MeV/c^2], column vector of single-particle masses.
+        #   Q : [e], column vector of single-particle charges.
+        #   N : column vector of numbers of single particles per macro particle.
+
+        ms = particle_mass * np.ones(len(xs_wt))                                    # [MeV/c^2] single particle masses.
+        qs = qs_wt/SI.e                                                             # [e] single particle charges.
         
         phase_space_rft = np.column_stack((xs_wt*1e3, pxs_wt*particle_mass, 
                                         ys_wt*1e3, pys_wt*particle_mass, 
@@ -252,7 +262,17 @@ def wake_t_bunch2rft_beam(wake_t_bunch, homogen_beam_charge=True):
         beam_rft = Bunch6dT(phase_space_rft)
 
     else:
-        # Convert the phase space to RFT units and in the format [ X Px Y Py Z Pz ] 
+        # Construct a RFT beam using Bunch6dT(mass, population, charge, [ X Px Y Py Z Pz ] ) (see the RF-Track reference manual for updated reference)
+        #   mass : [MeV/c^2], the mass of the single particle.
+        #   population : the total number of real particles in the bunch.
+        #   charge : [e], charge of the single particle.
+        #   X : [mm], column vector of the horizontal coordinates.
+        #   Px : [MeV/c], column vector of the horizontal momenta.
+        #   Y : [mm], column vector of the vertical coordinates.
+        #   Py : [MeV/c], column vector of the vertical momenta.
+        #   Z : [mm], column vector of the longitudinal coordinates.
+        #   Pz : [MeV/c], column vector of the longitudinal momenta.
+
         phase_space_rft = np.column_stack((xs_wt*1e3, pxs_wt*particle_mass, 
                                         ys_wt*1e3, pys_wt*particle_mass, 
                                         zs_wt*1e3, pzs_wt*particle_mass))
