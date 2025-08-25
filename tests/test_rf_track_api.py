@@ -27,23 +27,6 @@ import scipy.constants as SI
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.beam import Beam
 
-# def setup_basic_driver_source():
-#     driver = SourceBasic()
-#     driver.bunch_length = 42e-6                                                   # [m] This value is for trapezoid.
-#     driver.z_offset = 300e-6                                                      # [m]
-
-#     driver.num_particles = 100000                                                 
-#     driver.charge = -2.7e10 * SI.e                                                # [C]
-#     driver.energy = 31.25e9                                                       # [eV]
-#     driver.rel_energy_spread = 0.01                                               # Relative rms energy spread
-
-#     driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
-#     driver.beta_x, driver.beta_y = 0.5, 0.5                                       # [m]
-
-#     driver.symmetrize = True
-
-#     return driver
-
 
 def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     from abel.utilities.plasma_physics import beta_matched
