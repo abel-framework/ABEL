@@ -107,7 +107,8 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
     tmpfile = tmpfolder + 'beam_' + str(uuid.uuid4()) + '.csv'
     
     # write beam phasespace to CSV (note: z/t is flipped)
-    M = np.matrix([beam.xs(),beam.xps(),beam.ys(),beam.yps(),-1*beam.ts(),beam.gammas(),beam.ts()])
+    M = np.matrix([beam.xs(),beam.xps(),beam.ys(),beam.yps(),-1*beam.ts(),beam.gammas(),beam.ts()])  # TODO: the matrix subclass is not the recommended way to represent matrices or deal with linear algebra (see https://docs.scipy.org/doc/numpy/user/numpy-for-matlab-users.html). Adjust the code to use regular ndarray.
+
     with open(tmpfile, 'w') as f:
         csvwriter = csv.writer(f, delimiter=',')
         for i in range(int(len(beam))):
