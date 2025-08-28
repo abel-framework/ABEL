@@ -1308,4 +1308,8 @@ class VariablesOutOfRangeError(Exception):
 class StageError(Exception):
     "Exception class for ``Stage`` to throw in other cases."
 
+class SimulationDomainSizeError(Exception):
+    "Exception class to throw when the simulation domain size is too small."
+    pass
+
     
