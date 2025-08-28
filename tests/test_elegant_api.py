@@ -137,7 +137,7 @@ def test_elegant_write_read_beam():
     beam = elegant_read_beam(inputbeamfile, tmpfolder=tmpfolder)
     beam.set_zs(-1*beam.zs()) # TODO: Seems like there is an inconsistency in the definition of z in the ELEGANT api. is this really correct?
 
-    Beam.comp_beams(beam0, beam)
+    Beam.comp_beams(beam0, beam, comp_location=True)
     
     # Remove temporary files
     shutil.rmtree(tmpfolder)
