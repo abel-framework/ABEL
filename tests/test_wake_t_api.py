@@ -104,6 +104,72 @@ def test_wake_t_bunch2beam():
 
 
 @pytest.mark.wake_t_api_unit_test
+def test_plasma_stage_setup():
+    """
+    Test for ``plasma_stage_setup()``.
+    """
+
+    import wake_t
+    from abel.utilities.plasma_physics import k_p
+    
+    driver_source = setup_basic_source()
+    driver_source.charge = -SI.e * 5.0e10 
+    driver_source.z_offset = 1000e-6
+    drive_beam = driver_source.track()
+
+    source = setup_basic_source()
+    beam = source.track()
+
+    # ========== Single beam, default parameters only ==========
+    plasma_density = 6.0e20
+
+    # Set up a Wake-T PlasmaStage object
+    plasma = plasma_stage_setup(plasma_density=plasma_density, abel_drive_beam=drive_beam, abel_main_beam=None, stage_length=None, dz_fields=None, 
+                                num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None)
+    
+    k_beta = k_p(plasma_density)/np.sqrt(2*drive_beam.gamma())
+    lambda_betatron = 2*np.pi/k_beta
+    length = 0.05*lambda_betatron
+    
+    assert np.isclose(plasma.density(0), plasma_density, rtol=1e-15, atol=0.0)
+    assert isinstance(plasma.fields[0], wake_t.physics_models.plasma_wakefields.qs_rz_baxevanis.wakefield.Quasistatic2DWakefield)
+    assert np.isclose(plasma.length, length, rtol=1e-15, atol=0.0)
+    assert plasma.n_out == 1
+    assert isinstance(plasma.wakefield, wake_t.physics_models.plasma_wakefields.qs_rz_baxevanis.wakefield.Quasistatic2DWakefield)
+
+
+    # ========== Drive beam and main beam, default parameters only ==========
+    plasma_density = 6.0e20
+
+    plasma2 = plasma_stage_setup(plasma_density=plasma_density, abel_drive_beam=drive_beam, abel_main_beam=beam, stage_length=None, dz_fields=None, 
+                                num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None)
+    
+    k_beta2 = k_p(plasma_density)/np.sqrt(2*min(beam.gamma(), drive_beam.gamma()/2))
+    lambda_betatron2 = 2*np.pi/k_beta2
+    length2 = 0.05*lambda_betatron2
+
+    assert np.isclose(plasma2.density(0), plasma_density, rtol=1e-15, atol=0.0)
+    assert isinstance(plasma2.fields[0], wake_t.physics_models.plasma_wakefields.qs_rz_baxevanis.wakefield.Quasistatic2DWakefield)
+    assert np.isclose(plasma2.length, length2, rtol=1e-15, atol=0.0)
+    assert plasma2.n_out == 1
+    assert isinstance(plasma2.wakefield, wake_t.physics_models.plasma_wakefields.qs_rz_baxevanis.wakefield.Quasistatic2DWakefield)
+
+
+    # ========== Drive beam and main beam==========
+    plasma_density3 = 5.0e20
+    length3 = 1e-3
+
+    plasma3 = plasma_stage_setup(plasma_density=plasma_density3, abel_drive_beam=drive_beam, abel_main_beam=beam, stage_length=length3, dz_fields=None, 
+                                num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None)
+
+    assert np.isclose(plasma3.density(0), plasma_density3, rtol=1e-15, atol=0.0)
+    assert isinstance(plasma3.fields[0], wake_t.physics_models.plasma_wakefields.qs_rz_baxevanis.wakefield.Quasistatic2DWakefield)
+    assert np.isclose(plasma3.length, length3, rtol=1e-15, atol=0.0)
+    assert plasma3.n_out == 1
+    assert isinstance(plasma3.wakefield, wake_t.physics_models.plasma_wakefields.qs_rz_baxevanis.wakefield.Quasistatic2DWakefield)
+
+
+@pytest.mark.wake_t_api_unit_test
 def test_wake_t_hdf5_load():
     """
     Test for ``wake_t_hdf5_load()``.
@@ -116,13 +182,14 @@ def test_wake_t_hdf5_load():
     tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
     os.mkdir(tmpfolder)
 
-    # Set up a Wake-T tracking
+    # Set up a Wake-T PlasmaStage object
     source = setup_basic_source()
     beam = source.track()
 
     plasma = plasma_stage_setup(plasma_density=6.0e20, abel_drive_beam=beam, abel_main_beam=None, stage_length=None, dz_fields=None, 
                                 num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None)
     
+    # Perform tracking
     bunch_list = plasma.track(beam2wake_t_bunch(beam, name='beam'), opmd_diag=True, diag_dir=tmpfolder)
 
     # Also retrieve the initial beam from plasma.track() output
