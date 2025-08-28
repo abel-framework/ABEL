@@ -123,7 +123,12 @@ def test_wake_t_hdf5_load():
     plasma = plasma_stage_setup(plasma_density=6.0e20, abel_drive_beam=beam, abel_main_beam=None, stage_length=None, dz_fields=None, 
                                 num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None)
     
-    plasma.track(beam2wake_t_bunch(beam, name='beam'), opmd_diag=True, diag_dir=tmpfolder)
+    bunch_list = plasma.track(beam2wake_t_bunch(beam, name='beam'), opmd_diag=True, diag_dir=tmpfolder)
+
+    # Also retrieve the initial beam from plasma.track() output
+    bunch = bunch_list[0]
+    beam_init = wake_t_bunch2beam(bunch)
+    #Beam.comp_beams(beam_init, beam, comp_location=True, rtol=1e-5, atol=0.0)
 
     # Extract the initial beam from the hdf5 file
     data_dir = tmpfolder + 'hdf5' + os.sep
@@ -132,7 +137,8 @@ def test_wake_t_hdf5_load():
     beam_test = wake_t_hdf5_load(file_path=file_path, species='beam')
 
     # Compare the beam to the original
-    Beam.comp_beam_params(beam_test, beam, comp_location=False)
+    Beam.comp_beam_params(beam_test, beam, comp_location=False)  # The beam in file_path may not be exactly the same as the original beam.
+    Beam.comp_beams(beam_test, beam_init, comp_location=False, rtol=1e-12, atol=0.0)
 
     # Remove temporary files
     shutil.rmtree(tmpfolder)
