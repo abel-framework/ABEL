@@ -24,6 +24,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import pytest, os
 import numpy as np
 import scipy.constants as SI
+from abel.classes.beam import Beam
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.apis.wake_t.wake_t_api import *
 
@@ -65,7 +66,7 @@ def test_beam2wake_t_bunch():
     source = setup_basic_source()
     beam = source.track()
 
-    # Convert to a Wake-T particle bunch with beam2wake_t_bunch() 
+    # Convert to a Wake-T particle bunch using beam2wake_t_bunch() 
     wake_t_bunch = beam2wake_t_bunch(beam)
 
     # Extract the phase space
@@ -82,4 +83,22 @@ def test_beam2wake_t_bunch():
     assert np.allclose(beam.pzs(), phasespace[5]*SI.c*SI.m_e, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.location, wake_t_bunch.prop_distance, rtol=1e-15, atol=0.0)
 
+
+@pytest.mark.wake_t_api_unit_test
+def test_wake_t_bunch2beam():
+    """
+    Test for ``wake_t_bunch2beam()``.
+    """
+
+    source = setup_basic_source()
+    beam = source.track()
+
+    # Convert to a Wake-T particle bunch using beam2wake_t_bunch() 
+    wake_t_bunch = beam2wake_t_bunch(beam)
+
+    # Convert back to an ABEL beam
+    beam_test = wake_t_bunch2beam(wake_t_bunch)
+    
+    # Compare the beam to the original
+    Beam.comp_beams(beam_test, beam, comp_location=True, rtol=1e-12, atol=0.0)
 
