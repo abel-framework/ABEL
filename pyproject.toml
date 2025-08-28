@@ -53,6 +53,7 @@ markers = [
   "core: Test core functionality",
   "rft_api_unit_test: Unit tests for the RF-Track API",
   "elegant_api_unit_test: Unit tests for the ELEGANT API",
+  "wake_t_api_unit_test : Unit tests for the Wake-T API",
   "stageGeometry: Test stage geometry calculation functionality",
   "spin: Test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
