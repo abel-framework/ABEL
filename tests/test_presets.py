@@ -23,8 +23,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel.classes.collider.preset.c3 import C3
+from abel.classes.collider.preset.clic import CLIC
+from abel.classes.collider.preset.halhf_gg import HALHFgg
 from abel.classes.collider.preset.halhf_v1 import HALHFv1
 from abel.classes.collider.preset.halhf_v2 import HALHFv2
+from abel.classes.collider.preset.ilc import ILC
+from abel.classes.collider.preset.pwfa_collider import PWFACollider
 import shutil
 import numpy as np
 from matplotlib import pyplot as plt
@@ -33,7 +37,7 @@ from matplotlib import pyplot as plt
 @pytest.mark.presets
 def test_C3():
     """
-    Test for the C3 collider preset.
+    Test for the ``C3`` collider preset.
     """
 
     np.random.seed(42)
@@ -139,7 +143,7 @@ def test_C3():
 @pytest.mark.presets
 def test_HALHFv1():
     """
-    Test for the HALHFv1 collider preset.
+    Test for the ``HALHFv1`` collider preset.
     """
 
     np.random.seed(42)
@@ -241,7 +245,7 @@ def test_HALHFv1():
 @pytest.mark.presets
 def test_HALHFv2():
     """
-    Test for the HALHFv2 collider preset.
+    Test for the ``HALHFv2`` collider preset.
     """
 
     np.random.seed(42)
@@ -340,3 +344,63 @@ def test_HALHFv2():
 
     # Remove output directory
     shutil.rmtree(halhf2.run_path())
+
+
+@pytest.mark.presets
+def test_HALHFgg():
+    """
+    Test for the ``HALHFgg`` collider preset.
+    """
+
+    np.random.seed(42)
+
+    halhfgg = HALHFgg()
+    halhfgg.run('test_HALHFgg', overwrite=True, verbose=False)
+
+    # Remove output directory
+    shutil.rmtree(halhfgg.run_path())
+
+
+# @pytest.mark.presets
+# def test_CLIC():
+#     """
+#     Test for the ``CLIC`` collider preset.
+#     """
+
+#     np.random.seed(42)
+
+#     clic = CLIC()
+#     clic.run('test_CLIC', overwrite=True, verbose=False)
+
+#     # Remove output directory
+#     shutil.rmtree(clic.run_path())
+
+
+# @pytest.mark.presets
+# def test_ILC():
+    # """
+    # Test for the ``ILC`` collider preset.
+    # """
+
+    # np.random.seed(42)
+
+    # ilc = ILC()
+    # ilc.run('test_ILC', overwrite=True, verbose=False)
+
+    # # Remove output directory
+    # shutil.rmtree(ilc.run_path())
+
+
+@pytest.mark.presets
+def test_PWFACollider():
+    """
+    Test for the ``PWFACollider`` collider preset.
+    """
+
+    np.random.seed(42)
+
+    pwfa_collider = PWFACollider()
+    pwfa_collider.run('test_PWFACollider', overwrite=True, verbose=False)
+
+    # Remove output directory
+    shutil.rmtree(pwfa_collider.run_path())
