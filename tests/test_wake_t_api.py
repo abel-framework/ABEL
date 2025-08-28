@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-import pytest, os
+import pytest, os, uuid, shutil
 import numpy as np
 import scipy.constants as SI
 from abel.classes.beam import Beam
@@ -98,7 +98,41 @@ def test_wake_t_bunch2beam():
 
     # Convert back to an ABEL beam
     beam_test = wake_t_bunch2beam(wake_t_bunch)
-    
+
     # Compare the beam to the original
     Beam.comp_beams(beam_test, beam, comp_location=True, rtol=1e-12, atol=0.0)
 
+
+@pytest.mark.wake_t_api_unit_test
+def test_wake_t_hdf5_load():
+    """
+    Test for ``wake_t_hdf5_load()``.
+    """
+
+    # Create a temporary folder
+    parent_dir = '.' + os.sep + 'tests' + os.sep + 'run_data' + os.sep + 'temp' + os.sep
+    if not os.path.exists(parent_dir):
+        os.makedirs(parent_dir)
+    tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
+    os.mkdir(tmpfolder)
+
+    # Set up a Wake-T tracking
+    source = setup_basic_source()
+    beam = source.track()
+
+    plasma = plasma_stage_setup(plasma_density=6.0e20, abel_drive_beam=beam, abel_main_beam=None, stage_length=None, dz_fields=None, 
+                                num_cell_xy=256, n_out=1, box_size_r=None, box_min_z=None, box_max_z=None)
+    
+    plasma.track(beam2wake_t_bunch(beam, name='beam'), opmd_diag=True, diag_dir=tmpfolder)
+
+    # Extract the initial beam from the hdf5 file
+    data_dir = tmpfolder + 'hdf5' + os.sep
+    files = sorted(os.listdir(data_dir))
+    file_path = data_dir + files[0]
+    beam_test = wake_t_hdf5_load(file_path=file_path, species='beam')
+
+    # Compare the beam to the original
+    Beam.comp_beam_params(beam_test, beam, comp_location=False)
+
+    # Remove temporary files
+    shutil.rmtree(tmpfolder)
