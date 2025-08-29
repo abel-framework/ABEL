@@ -90,6 +90,9 @@ class SourceBasic(Source):
         pxs = beam.pxs()
         pys = beam.pys()
         pzs = beam.pzs()
+        spxs = beam.spxs()
+        spys = beam.spys()
+        spzs = beam.spzs()
         weights = beam.weightings()
 
         # Apply the filter
@@ -100,19 +103,27 @@ class SourceBasic(Source):
         pxs_filtered = pxs[bool_indices]
         pys_filtered = pys[bool_indices]
         pzs_filtered = pzs[bool_indices]
+        spxs_filtered = spxs[bool_indices]
+        spys_filtered = spys[bool_indices]
+        spzs_filtered = spzs[bool_indices]
         weights_filtered = weights[bool_indices]
 
         # Initialise ABEL Beam object
         beam_out = Beam()
         
         # Set the phase space of the ABEL beam
-        beam_out.set_phase_space(Q=np.sum(weights_filtered)*-SI.e,
+        beam_out.set_phase_space(Q=np.sum(weights_filtered)*np.sign(self.charge)*SI.e,
                              xs=xs_filtered,
                              ys=ys_filtered,
                              zs=zs_filtered, 
                              pxs=pxs_filtered,  # Always use single particle momenta?
                              pys=pys_filtered,
-                             pzs=pzs_filtered)
+                             pzs=pzs_filtered,
+                             spxs=spxs_filtered,
+                             spys=spys_filtered,
+                             spzs=spzs_filtered,
+                             particle_mass=beam.particle_mass
+                             )
 
         return beam_out
     

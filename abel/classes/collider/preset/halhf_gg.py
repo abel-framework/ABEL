@@ -13,6 +13,7 @@ from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.ip.impl.ip_basic import InteractionPointBasic
 import scipy.constants as SI
 import numpy as np
+import copy
 
 class HALHFgg(Collider):
 

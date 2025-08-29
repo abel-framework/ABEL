@@ -166,7 +166,7 @@ class HALHFv1(Collider):
         self.energy_asymmetry = 4
         self.bunch_separation = 80e-9 # [s]
         self.num_bunches_in_train = 100
-        self.rep_rate_trains = 100 # [Hz]
+        self.rep_rate_trains = 100.0 # [Hz]
 
         # assemble everything
         self.assemble_trackables()

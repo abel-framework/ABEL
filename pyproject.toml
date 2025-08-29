@@ -25,8 +25,7 @@ dependencies = [
    "ax-platform",
    "CLICopti >= 2.2",
    "RF-Track",
-   "impactx-noacc >= 25.06",
-   "pandas"
+   "impactx-noacc >= 25.06"
 ]
 requires-python = ">=3,<3.13"
 
@@ -53,8 +52,9 @@ addopts = [
 markers = [
   "core: Test core functionality",
   "stageGeometry: Test stage geometry calculation functionality",
-  "spin: test spin and polarization functionality",
+  "spin: Test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
   "beam: Tests for the Beam class",
-  "impactx: Tests of ImpactX implementations.",
+  "linac_unit_test: Unit tests for the Linac class",
+  "presets: Tests for collider presets",
 ]

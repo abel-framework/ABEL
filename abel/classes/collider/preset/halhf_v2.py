@@ -14,6 +14,7 @@ from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
 from abel.classes.ip.impl.ip_basic import InteractionPointBasic
+from abel.classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
 import scipy.constants as SI
 import numpy as np
 
@@ -68,6 +69,8 @@ class HALHFv2(Collider):
         self.positron_ip_bunch_length = 150e-6#100e-6
         self.enable_waist_shift = True
         self.waist_shift_frac = 0.5
+
+        self.use_guineapig = False
 
         self.num_bds = 2
         
@@ -272,8 +275,10 @@ class HALHFv2(Collider):
         
         
         # define interaction point
-        ip = InteractionPointBasic()
-        #ip = InteractionPointGuineaPig()
+        if self.use_guineapig:
+            ip = InteractionPointGuineaPig()
+        else:
+            ip = InteractionPointBasic()
         ip.num_ips = self.num_bds
         ip.enable_waist_shift = self.enable_waist_shift
         ip.waist_shift_frac = self.waist_shift_frac
