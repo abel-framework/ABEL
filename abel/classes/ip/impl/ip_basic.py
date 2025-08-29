@@ -22,9 +22,14 @@ class InteractionPointBasic(InteractionPoint):
         # get charge
         N1 = abs(beam1.charge()/SI.e)
         N2 = abs(beam2.charge()/SI.e)
-        
+            
         # calculate the geometric luminosity (per crossing)
         lumi = H_D / (4*np.pi) * N1 * N2 / (sigx * sigy)
+
+        # if gamma-gamma collision, reduce by conversion factor squared
+        if self.gamma_gamma:
+            compton_conversion_efficiency = 0.45
+            lumi = lumi * compton_conversion_efficiency**2
         
         # create event
         event = Event()
