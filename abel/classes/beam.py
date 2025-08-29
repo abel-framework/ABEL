@@ -1608,8 +1608,12 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
+
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
             
-        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
+        p = ax.pcolor(zs*1e6, Es/1e9, dQdzdE*1e15, cmap=cmap, shading='auto')
         ax.set_xlabel('z (um)')
         ax.set_ylabel('E (GeV)')
         ax.set_title('Longitudinal phase space')
@@ -1621,8 +1625,13 @@ class Beam():
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        fig.set_figheight(5)
+        
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(xs*1e6, xps*1e3, dQdxdxp*1e3, cmap=cmap, shading='auto')
         ax.set_xlabel('x (um)')
         ax.set_ylabel('x'' (mrad)')
         ax.set_title('Horizontal trace space')
@@ -1635,7 +1644,12 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(ys*1e6, yps*1e3, dQdydyp*1e3, cmap=cmap, shading='auto')
         ax.set_xlabel('y (um)')
         ax.set_ylabel('y'' (mrad)')
         ax.set_title('Vertical trace space')
@@ -1648,7 +1662,12 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)
-        p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
+
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(xs*1e6, ys*1e6, dQdxdy, cmap=cmap, shading='auto')
         #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
         #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
         ax.set_xlabel('x (um)')
