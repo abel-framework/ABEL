@@ -10,6 +10,8 @@ $$ACCELERATOR:: default
     espread.1 = $espread1;
     offset_x.1 = $offset_x1;
     offset_y.1 = $offset_y1;
+    angle_x.1 = $angle_x1;
+    angle_y.1 = $angle_y1;
     waist_x.1 = $waist_x1;
     waist_y.1 = $waist_y1;
     
@@ -23,6 +25,8 @@ $$ACCELERATOR:: default
     espread.2 = $espread2;
     offset_x.2 = $offset_x2;
     offset_y.2 = $offset_y2;
+    angle_x.2 = $angle_x2;
+    angle_y.2 = $angle_y2;
     waist_x.2 = $waist_x2;
     waist_y.2 = $waist_y2;
     
@@ -50,9 +54,9 @@ $$PARAMETERS:: default
     electron_ratio = 0.5;
     do_espread = 1;
     do_photons = 0;
-    store_beam = 0;
+    store_beam = 1;
     photon_ratio = 0.2;
-    do_coherent = 1;
+    do_coherent = 0;
     do_pairs = 1;
     rndm_load = 0;
     rndm_save = 0;

@@ -14,6 +14,8 @@ class ILC(Collider):
 
         super().__init__()
         
+        self.com_energy = 500e9
+        self.energy_asymmetry = 1.0
         
         # define positron source
         esource = SourceBasic()
@@ -91,10 +93,9 @@ class ILC(Collider):
         self.linac1 = elinac
         self.linac2 = plinac
         self.ip = ip
-        self.com_energy = 500e9
         self.bunch_separation = 554e-9 # [s]
         self.num_bunches_in_train = 1312
-        self.rep_rate_trains = 5 # [Hz]
+        self.rep_rate_trains = 5.0 # [Hz]
 
         
         # assemble everything

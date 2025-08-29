@@ -40,6 +40,9 @@ class Source(Trackable, CostModeled):
         self.jitter.yp = 0
         self.jitter.E = 0
 
+        self.spin_polarization = 0
+        self.spin_polarization_direction = 'z'
+
         self.is_polarized = False
     
     
@@ -76,6 +79,9 @@ class Source(Trackable, CostModeled):
             beam.num_bunches_in_train = self.num_bunches_in_train
         if self.bunch_separation is not None:
             beam.bunch_separation = self.bunch_separation
+
+        # set spin polarization
+        beam.set_arbitrary_spin_polarization(self.spin_polarization, direction=self.spin_polarization_direction)
         
         # set metadata
         beam.location = 0

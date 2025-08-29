@@ -44,7 +44,7 @@ class Collider(Runnable, CostModeled):
         # emissions
         self.emissions_per_tunnel_length = 6.38*1.73 # [ton CO2e/m] from 6.38 kton/km (CLIC estimate) plus additional structures
         self.emissions_per_energy_usage = 20/(1e9*3600) # [ton CO2e/J] from 20 ton/GWh
-        self.cost_carbon_tax_per_emissions = 800 # [ILCU per ton CO2e] 800 from European Investment Bank estimate for 2050
+        self.cost_carbon_tax_per_emissions = 800.0 # [ILCU per ton CO2e] 800 from European Investment Bank estimate for 2050
 
     
     def __str__(self):
@@ -135,7 +135,7 @@ class Collider(Runnable, CostModeled):
         
     
     def get_event(self, load_beams=False):
-        return Event.load(self.ip.shot_path(shot1=self.linac1.shot, shot2=self.linac2.shot) + 'event.h5', load_beams=False)
+        return Event.load(self.ip.shot_path(shot1=self.linac1.shot, shot2=self.linac2.shot) + 'event.h5', load_beams=load_beams)
         
     # full luminosity per crossing [m^-2]
     def full_luminosity_per_crossing(self):
@@ -457,12 +457,12 @@ class Collider(Runnable, CostModeled):
             # run first linac arm
             if self.verbose:
                 print(">> LINAC #1")
-            self.linac1.scan(self.run_name + "/linac1", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            self.linac1.scan(self.run_name + "/linac1", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=self.overwrite)
             
             # run second linac arm
             if self.verbose:
                 print(">> LINAC #2")
-            self.linac2.scan(self.run_name + "/linac2", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=False)
+            self.linac2.scan(self.run_name + "/linac2", fcn=lambda obj, val: obj, vals=self.vals, num_shots_per_step=self.num_shots_per_step, shot_filter=shot, savedepth=self.savedepth, verbose=self.verbose, overwrite=self.overwrite)
             
             # simulate collisions
             if self.verbose:
