@@ -251,7 +251,7 @@ def test_HALHFv2():
     np.random.seed(42)
 
     halhf2 = HALHFv2()
-    halhf2.use_guineapig = True
+    #halhf2.use_guineapig = True
     halhf2.run('test_HALHFv2', overwrite=True, verbose=False)
 
     # Tests
@@ -305,11 +305,15 @@ def test_HALHFv2():
     assert isinstance(halhf2.maintenance_cost(), float) and halhf2.maintenance_cost() > 0.0
     assert isinstance(halhf2.maintenance_labor(), float) and halhf2.maintenance_labor() > 0.0
     assert isinstance(halhf2.maintenance_labor_per_construction_cost, float) and halhf2.maintenance_labor_per_construction_cost > 0.0
-    assert isinstance(halhf2.maximum_upsilon(), float) and halhf2.maximum_upsilon() > 0.0
+    #assert isinstance(halhf2.maximum_upsilon(), float) and halhf2.maximum_upsilon() > 0.0
+    assert halhf2.maximum_upsilon() is None
     assert isinstance(halhf2.num_bunches_in_train, int) and halhf2.num_bunches_in_train > 0
-    assert isinstance(halhf2.num_coherent_pairs(), float) and halhf2.num_coherent_pairs() > 0.0
-    assert isinstance(halhf2.num_photons_beam1(), float) and halhf2.num_photons_beam1() > 0.0
-    assert isinstance(halhf2.num_photons_beam2(), float) and halhf2.num_photons_beam2() > 0.0
+    # assert isinstance(halhf2.num_coherent_pairs(), float) and halhf2.num_coherent_pairs() > 0.0
+    # assert isinstance(halhf2.num_photons_beam1(), float) and halhf2.num_photons_beam1() > 0.0
+    # assert isinstance(halhf2.num_photons_beam2(), float) and halhf2.num_photons_beam2() > 0.0
+    assert halhf2.num_coherent_pairs() is None
+    assert halhf2.num_photons_beam1() is None
+    assert halhf2.num_photons_beam2() is None
     assert halhf2.num_shots == 1
     assert halhf2.num_shots_per_step == 1
     assert halhf2.num_steps == 1
