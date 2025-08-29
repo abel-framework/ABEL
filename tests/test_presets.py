@@ -100,11 +100,11 @@ def test_C3():
     assert isinstance(cool_copper_collider.maintenance_cost(), float) and cool_copper_collider.maintenance_cost() > 0.0
     assert isinstance(cool_copper_collider.maintenance_labor(), float) and cool_copper_collider.maintenance_labor() > 0.0
     assert isinstance(cool_copper_collider.maintenance_labor_per_construction_cost, float) and cool_copper_collider.maintenance_labor_per_construction_cost > 0.0
-    #cool_copper_collider.maximum_upsilon()  # TODO: why does this give FALSE?
+    assert cool_copper_collider.maximum_upsilon() is None
     assert isinstance(cool_copper_collider.num_bunches_in_train, int) and cool_copper_collider.num_bunches_in_train > 0
-    #cool_copper_collider.num_coherent_pairs()  # TODO: why does this give FALSE?
-    #cool_copper_collider.num_photons_beam1()  # TODO: why does this give FALSE?
-    #cool_copper_collider.num_photons_beam2()  # TODO: why does this give FALSE?
+    assert cool_copper_collider.num_coherent_pairs() is None
+    assert cool_copper_collider.num_photons_beam1() is None
+    assert cool_copper_collider.num_photons_beam2() is None
     assert cool_copper_collider.num_shots == 1
     assert cool_copper_collider.num_shots_per_step == 1
     assert cool_copper_collider.num_steps == 1
@@ -202,11 +202,11 @@ def test_HALHFv1():
     assert isinstance(halhf1.maintenance_cost(), float) and halhf1.maintenance_cost() > 0.0
     assert isinstance(halhf1.maintenance_labor(), float) and halhf1.maintenance_labor() > 0.0
     assert isinstance(halhf1.maintenance_labor_per_construction_cost, float) and halhf1.maintenance_labor_per_construction_cost > 0.0
-    #halhf1.maximum_upsilon()  # TODO: why does this give FALSE?
+    assert halhf1.maximum_upsilon() is None
     assert isinstance(halhf1.num_bunches_in_train, int) and halhf1.num_bunches_in_train > 0
-    #halhf1.num_coherent_pairs()  # TODO: why does this give FALSE?
-    #halhf1.num_photons_beam1()  # TODO: why does this give FALSE?
-    #halhf1.num_photons_beam2()  # TODO: why does this give FALSE?
+    assert halhf1.num_coherent_pairs() is None
+    assert halhf1.num_photons_beam1() is None
+    assert halhf1.num_photons_beam2() is None
     assert halhf1.num_shots == 1
     assert halhf1.num_shots_per_step == 1
     assert halhf1.num_steps == 1
@@ -251,6 +251,7 @@ def test_HALHFv2():
     np.random.seed(42)
 
     halhf2 = HALHFv2()
+    halhf2.use_guineapig = True
     halhf2.run('test_HALHFv2', overwrite=True, verbose=False)
 
     # Tests
@@ -304,11 +305,11 @@ def test_HALHFv2():
     assert isinstance(halhf2.maintenance_cost(), float) and halhf2.maintenance_cost() > 0.0
     assert isinstance(halhf2.maintenance_labor(), float) and halhf2.maintenance_labor() > 0.0
     assert isinstance(halhf2.maintenance_labor_per_construction_cost, float) and halhf2.maintenance_labor_per_construction_cost > 0.0
-    halhf2.maximum_upsilon()  # TODO: why does this give FALSE?
+    assert isinstance(halhf2.maximum_upsilon(), float) and halhf2.maximum_upsilon() > 0.0
     assert isinstance(halhf2.num_bunches_in_train, int) and halhf2.num_bunches_in_train > 0
-    #halhf2.num_coherent_pairs()  # TODO: why does this give FALSE?
-    #halhf2.num_photons_beam1()  # TODO: why does this give FALSE?
-    #halhf2.num_photons_beam2()  # TODO: why does this give FALSE?
+    assert isinstance(halhf2.num_coherent_pairs(), float) and halhf2.num_coherent_pairs() > 0.0
+    assert isinstance(halhf2.num_photons_beam1(), float) and halhf2.num_photons_beam1() > 0.0
+    assert isinstance(halhf2.num_photons_beam2(), float) and halhf2.num_photons_beam2() > 0.0
     assert halhf2.num_shots == 1
     assert halhf2.num_shots_per_step == 1
     assert halhf2.num_steps == 1
@@ -341,6 +342,7 @@ def test_HALHFv2():
     halhf2.print_cost()
     halhf2.print_emissions()
     halhf2.print_power()
+
 
     # Remove output directory
     shutil.rmtree(halhf2.run_path())
