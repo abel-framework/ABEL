@@ -35,8 +35,6 @@ class Interstage(Trackable, CostModeled):
         self.enable_space_charge = enable_space_charge
         
         # lens alignment and jitter
-        self.lens_offset_x = 0
-        self.lens_offset_y = 0
         self.jitter = SimpleNamespace()
         self.jitter.lens_offset_x = 0
         self.jitter.lens_offset_y = 0
@@ -404,7 +402,7 @@ class Interstage(Trackable, CostModeled):
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
     
-    def plot_layout(self, delta=0.25, axes_equal=False, use_second_order_dispersion=False, savefig=None):
+    def plot_layout(self, delta=0.25, axes_equal=False, use_second_order_dispersion=False, savefig=None, figsize=[12,2]):
         "Plot the layout with beam orbit and dispersion."
         
         from matplotlib import pyplot as plt
@@ -420,8 +418,8 @@ class Interstage(Trackable, CostModeled):
         
         # prepare plots
         fig, ax = plt.subplots(1)
-        fig.set_figwidth(12)
-        fig.set_figheight(2)
+        fig.set_figwidth(figsize[0])
+        fig.set_figheight(figsize[1])
 
         # get the orbit
         theta, _ = evolve_orbit(ls, inv_rhos)

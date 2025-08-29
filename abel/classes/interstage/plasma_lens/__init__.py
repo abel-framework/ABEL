@@ -14,6 +14,10 @@ class InterstagePlasmaLens(Interstage, ABC):
 
         # lens parameters
         self.lens_radius = lens_radius
+        self.lens1_offset_x = 0
+        self.lens2_offset_x = 0
+        self.lens1_offset_y = 0
+        self.lens2_offset_y = 0
         
         # length ratios
         self.length_ratio_gap = 0.025

@@ -71,9 +71,9 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         plasma_lens2 = [drift_slice_pl]
         kl_lens = self.strength_plasma_lens
         tau_lens = self.nonlinearity_plasma_lens
-        dxs = np.random.normal(loc=self.lens_offset_x, scale=self.jitter.lens_offset_x, size=2)
+        dxs = np.array([self.lens1_offset_x, self.lens2_offset_x]) + np.random.normal(scale=self.jitter.lens_offset_x, size=2)
         dxps = np.random.normal(scale=self.jitter.lens_angle_x, size=2)
-        dys = np.random.normal(loc=self.lens_offset_y, scale=self.jitter.lens_offset_y, size=2)
+        dys = np.array([self.lens1_offset_y, self.lens2_offset_y]) + np.random.normal(scale=self.jitter.lens_offset_y, size=2)
         dyps = np.random.normal(scale=self.jitter.lens_angle_y, size=2)
         for i in range(self.num_slices):
             dl = ds_pl*(i+1) - self.length_plasma_lens/2
