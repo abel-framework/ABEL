@@ -20,7 +20,7 @@ def guineapig_run(inputfile, beam1, beam2, tmpfolder=None):
     guineapig_write_beam(beam2, beamfile2_fullpath)
 
     # run GUINEA-PIG
-    cmd = 'cd ' + tmpfolder + '; ' + CONFIG.guineapig_path + '/guinea default default ' + outputfile + ' --el_file=' + beamfile1 + ' --pos_file=' + beamfile2 + ' --acc_file=' + inputfile
+    cmd = 'cd ' + tmpfolder + '; ' + os.path.join(CONFIG.guineapig_path, 'guinea') + ' default default ' + outputfile + ' --el_file=' + beamfile1 + ' --pos_file=' + beamfile2 + ' --acc_file=' + inputfile
     subprocess.run(cmd, shell=True, check=True, capture_output=True)
     
     # parse outputs
