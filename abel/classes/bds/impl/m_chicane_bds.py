@@ -193,6 +193,12 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         # ls_B = [l_dipole1, l_dipole2, l_dipole3, l_diag, B1, B2]
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
         from scipy.optimize import minimize
+        """
+        Implement method of using the end-values for beta/alpha/Dispersion/R56 to
+        match the second half of the stage. In this matching, ensure that beta->beta0 alpha=0, D=0,
+        Dp=0, R56=0
+
+        """
 
         p = self.E_nom/SI.c
 
@@ -224,9 +230,12 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             B_max = 2
             inv_r_max = B_max/p
             inv_r_min = B_min/p
-            inv_r0 = -self.B_dipole/p
-            k0.append(inv_r0)
             k_bounds.append((inv_r_min,inv_r_max))
+            if not ks_matched:
+                inv_r0 = -self.B_dipole/p
+                k0.append(inv_r0)
+            else:
+                k0.append([element.ds for element in self.lattice if element.name=='dipole'][0])
 
         ls, inv_rs_list, ks_list = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True) # returns numpy arrays
 
@@ -246,17 +255,20 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             for i, j in enumerate(indices_dipoles):
                 if i < len(inv_rs):
                     inv_rs_list[j] = inv_rs[i]
+                    if match_full_length:
+                        if j==indices_dipoles[-1]:
+                            inv_rs_list[j] = inv_rs[i]
           
             beta_x, alpha_x, _ = evolve_beta_function(ls=ls, ks=ks_list, beta0=beta0_x)
             beta_y, alpha_y, _ = evolve_beta_function(ls=ls, ks=-ks_list, beta0=beta0_y)
 
-            Dx, Dpx, _ = evolve_dispersion(ls=ls, ks=ks_list, inv_rhos=inv_rs_list)
-            R56, _ = evolve_R56(ls=ls, ks=ks_list, inv_rhos=inv_rs_list)
+            Dx, Dpx, _ = evolve_dispersion(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True)
+            R56, _ = evolve_R56(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True)
             if match_full_length:
-                return (beta_x-beta0_x)**2 + (beta_y-beta0_y)**2 + max(beta_x-10*beta0_x, 0)**2 + \
-                 (Dx*1e2)**2 + (R56*1e2)**2 
+                return (beta_x-beta0_x)**2 + (beta_y-beta0_y)**2 + (Dx*1e3)**2 + (R56*1e3)**2 +\
+                    alpha_x**2 + alpha_y**2 + Dpx**2
             else:
-                return alpha_x**2 + alpha_y**2 + Dpx**2 + R56**2 + \
+                return alpha_x**2 + alpha_y**2 + (Dpx)**2 + (R56)**2 + \
                     max(beta_x-10*beta0_x, 0)**2 + max(beta_y-10*beta0_y, 0)**2
         
         opt = minimize(optimizer, x0=k0, bounds=k_bounds)

@@ -372,7 +372,7 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
     return DDx, DDpx, evolution
 
 
-def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
+def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, high_res=False):
 
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
@@ -385,7 +385,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res
     R56s = np.empty_like(ss)
 
     # intialize at zero R56
-    R56s[0] = 0
+    R56s[0] = R560
 
     # make cumulative lengths
     ssl = np.append([0.0], np.cumsum(ls))[:-1]
