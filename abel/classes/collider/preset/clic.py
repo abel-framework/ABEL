@@ -14,6 +14,10 @@ class CLIC(Collider):
 
         super().__init__()
 
+
+        self.com_energy = 380e9
+        self.energy_asymmetry = 1.0
+
         # define positron source
         esource = SourceBasic()
         esource.charge = -3.87e9 * SI.e # [C]
@@ -97,10 +101,9 @@ class CLIC(Collider):
         self.linac1 = elinac
         self.linac2 = plinac
         self.ip = ip
-        self.com_energy = 380e9
         self.bunch_separation = 0.5e-9 # [s]
         self.num_bunches_in_train = 485
-        self.rep_rate_trains = 50 # [Hz]
+        self.rep_rate_trains = 50.0 # [Hz]
 
         
         # assemble everything
