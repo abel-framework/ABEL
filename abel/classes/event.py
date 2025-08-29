@@ -113,15 +113,26 @@ class Event():
         
         # load file and add metadata
         series = io.Series(filename, io.Access.read_only)
-        event.luminosity_full = series.iterations[0].get_attribute("luminosity_full")
-        event.luminosity_geom = series.iterations[0].get_attribute("luminosity_geom")
-        event.luminosity_peak = series.iterations[0].get_attribute("luminosity_peak")
-        event.upsilon_max = series.iterations[0].get_attribute("upsilon_max")
-        event.num_pairs = series.iterations[0].get_attribute("num_pairs")
-        event.num_photon1 = series.iterations[0].get_attribute("num_photon1")
-        event.num_photon2 = series.iterations[0].get_attribute("num_photon2")
-        event.energy_loss1 = series.iterations[0].get_attribute("energy_loss1")
-        event.energy_loss2 = series.iterations[0].get_attribute("energy_loss2")
+        
+        luminosity_full = series.iterations[0].get_attribute("luminosity_full")
+        luminosity_geom = series.iterations[0].get_attribute("luminosity_geom")
+        luminosity_peak = series.iterations[0].get_attribute("luminosity_peak")
+        upsilon_max = series.iterations[0].get_attribute("upsilon_max")
+        num_pairs = series.iterations[0].get_attribute("num_pairs")
+        num_photon1 = series.iterations[0].get_attribute("num_photon1")
+        num_photon2 = series.iterations[0].get_attribute("num_photon2")
+        energy_loss1 = series.iterations[0].get_attribute("energy_loss1")
+        energy_loss2 = series.iterations[0].get_attribute("energy_loss2")
+        
+        event.luminosity_full = None if not luminosity_full else luminosity_full
+        event.luminosity_geom = None if not luminosity_geom else luminosity_geom
+        event.luminosity_peak = None if not luminosity_peak else luminosity_peak
+        event.upsilon_max = None if not upsilon_max else upsilon_max
+        event.num_pairs = None if not num_pairs else num_pairs
+        event.num_photon1 = None if not num_photon1 else num_photon1
+        event.num_photon2 = None if not num_photon2 else num_photon2
+        event.energy_loss1 = None if not energy_loss1 else energy_loss1
+        event.energy_loss2 = None if not energy_loss2 else energy_loss2
         
         return event
         
