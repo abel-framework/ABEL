@@ -1599,7 +1599,7 @@ class Beam():
             ax.set_ylim(np.array(Elims)/1e9)
         ax.set_xlabel('ξ (μm)')
         ax.set_ylabel('E (GeV)')
-        ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n <E> = {self.energy()/1e9:.1f} GeV, σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
+        ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n <E> = {self.energy()/1e9:.1f} GeV, $\sigma_E$ = {self.rel_energy_spread()*1e2:.1f}%, $\sigma_z$ = {self.bunch_length()*1e6:.1f} μm')
         cb = fig.colorbar(p)
         if not chromatic:
             cb.ax.set_ylabel('Charge density (pC/μm/GeV)')
@@ -1708,7 +1708,7 @@ class Beam():
         ax.set_xlabel('x (mm)')
         ax.set_ylabel('y (mm)')
         ax.set_title('Transverse profile')
-        ax.set_title(f"Transverse profile (s = {self.location:.2f} m) \n σx = {self.beam_size_x()*1e6:.1f} μm, σy = {self.beam_size_y()*1e6:.1f} μm")
+        ax.set_title(f"Transverse profile (s = {self.location:.2f} m) \n $\sigma_x$ = {self.beam_size_x()*1e6:.1f} μm, $\sigma_y$ = {self.beam_size_y()*1e6:.1f} μm")
         cb = fig.colorbar(p)
         if not chromatic:
             cb.ax.set_ylabel('Charge density (nC/mm^2)')
