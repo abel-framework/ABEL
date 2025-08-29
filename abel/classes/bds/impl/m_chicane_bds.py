@@ -7,7 +7,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
     def __init__(self, E_nom=2, delay_per_stage=1, length_stage=12, num_stages=2, ks=[], B_dipole=1, \
                  keep_data=False, enable_space_charge=False, enable_csr=False, enable_isr=False, layoutnr = 1,\
-                 l_diag = 2, use_monitors=False, x0=10):
+                 l_diag = 2, use_monitors=False, x0=10, lattice=[], ns=50, beta0_x=1, beta0_y=1):
         # E_nom in eV, delay in ns
         super().__init__()
         self._E_nom = E_nom #backing variable 
@@ -21,13 +21,18 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         self.ks = ks
         self.layoutnr = layoutnr
         self.use_monitors = use_monitors
-        self.x0=x0
+        self.x0 = x0
+        self.lattice = lattice
+        self.ns = ns
+        self.beta0_x = beta0_x
+        self.beta0_y = beta0_y
 
         # Lattice-elements lengths
-        self.l_quads = 0.1
+        self.l_quads = 0.4
         self.l_kick = 2
         self.l_gap = 0.25
         self.l_diag = l_diag
+        self.l_dipole = self.get_dipole_lengths()
         # 2*cell_length = L_tot = 2*L_stage+2*c*delay_per_stage
 
         self.B_dipole = B_dipole
@@ -59,7 +64,22 @@ class DriverDelaySystem_M(BeamDeliverySystem):
     def E_nom(self, value):
         self._E_nom = value
 
-    
+    ### Create constraints (delay and length of lattice). The function returns 2 values that should be kept around 0 while optimizing ###
+    # If I find the root of this function (I.e where it is 0, as it should be) by 
+    def constraint(self, params=None, B_multiplier=1, plot=False):
+        from abel.utilities.beam_physics import evolve_orbit
+        """
+        params= [k1, k2, k3, k4, B1, B2, B3], the B-fields to be optimized. Same input as in the optimize-function
+        """
+
+        ls, inv_rs = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos')) # dipoles = (bool, 'phi' OR 'inv_rhos'))
+        inv_rs = [inv_r*B_multiplier for inv_r in inv_rs]
+        
+        theta, evolution = evolve_orbit(ls=ls, inv_rhos=inv_rs, plot=plot) # evolution[0,:] = xs is the projected length
+
+        hypotenuse = np.sqrt(evolution[0,-1]**2 + evolution[1,-1]**2)
+
+        return evolution[0,-1] - self.length_stage, hypotenuse 
 
     def get_dipole_lengths(self):
         """
@@ -68,61 +88,23 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         L = (self.length_stage + SI.c*self.delay_per_stage - self.l_gap/2 - self.l_kick/2 - self.l_diag)/4
 
         return L
-    
-    def get_dipole_fields(self):
-        from abel.utilities.beam_physics import evolve_dispersion, evolve_R56
+    def get_quad_counts(self):
+        N = 0
+        for element in self.lattice:
+            if element.name=='quad':
+                N+=1
+        return N
+
+    def get_dipole_fields(self, optimize_quads=False):
+        from abel.utilities.beam_physics import evolve_dispersion, evolve_R56, evolve_beta_function
 
         p = self.E_nom/SI.c # eV/c, also: beam rigidity 
+        self.l_dipole = self.get_dipole_lengths()
 
-        ### Create constraints (delay and length of lattice). The function returns 2 values that should be kept around 0 while optimizing ###
-        def constraint(Bs):
-            """
-            Bs= [B1, B2, B3], the B-fields to be optimized. Same input as in the optimize-function
-            """
-            B4 = -(Bs[0] + Bs[1] + Bs[2]) # Write the signs implicitly
-
-            inv_r1 = Bs[0]/p
-            inv_r2 = Bs[1]/p
-            inv_r3 = Bs[2]/p
-            inv_r4 = B4/p
-
-            L_dipoles = self.get_dipole_lengths()
-
-            # Calculate the bend angles
-            theta1, theta2, theta3, theta4 = L_dipoles*inv_r1, L_dipoles*inv_r2, L_dipoles*inv_r3, L_dipoles*inv_r4
-
-            # first dipole:
-            if theta1==0:
-                const1 = L_dipoles
-            else:
-                const1 = np.sin(abs(theta1))/inv_r1
-            # second dipole
-            if theta2==0:
-                const2 = L_dipoles
-            else:
-                const2 = np.sin(abs(theta2/2))/inv_r2
-            # third dipole
-            if theta3==0:
-                const3 = L_dipoles
-            else:
-                const3 = np.sin(abs(theta3/2))/inv_r3
-            # fourth dipole
-            if theta4==0:
-                const4 = L_dipoles
-            else:
-                const4 = np.sin(abs(theta4))/inv_r4
-
-            # calculate projected length and subtract L_stage to make the constraint 0
-            constraint1 = self.l_kick/2 + const1 + 2*const2*np.cos(theta1+theta2/2) + \
-                    self.l_diag*np.cos(theta1 + theta2) + 2*const3*np.cos(theta1+theta2+theta3/2) + \
-                        const4 + self.l_gap/2 - self.length_stage # this must be 0 for our lattice to be valid (following the stages w. interstages)
-            """
-            With these constraints we can optimize for ls (see above) to make the dispersion prime and R56 zero.
-            The constraints ensure the lengths give the desired delay, and makes sure the longitudinal length (projected length) is the same as the length of the stage.
-            """
-            return constraint1
+        if optimize_quads:
+            beta0_x = 0.5
+            beta0_y = 0.5
         
-        constraint_scipy = NonlinearConstraint(constraint, lb=-1e-9, ub=1e-9) #Making the constraint with the bounds around 0
 
         ### Create initial guess that conforms to this constraint (setting all lengths equal) ###
         x0 = self.x0
@@ -144,73 +126,153 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         B_calc = lambda B: get_L_proj(x0, B) - self.length_stage
 
         opt_dipole = root_scalar(B_calc, x0=self.B_dipole)
+        print(opt_dipole)
 
-        B0 = [opt_dipole.root, -opt_dipole.root, -opt_dipole.root] # Initial guess in optimizing for Dispersion-prime and R56, manually set nr 2 and 3 negative
-        
+        # Get the lengths of the lattice elements (does not vary)
+        ls_list, = self.get_elements_arrays()
 
-        def optimize_dipole_fields(Bs):
-            D0 = 0
-            Dp0 = 0
+        # Initial guess in optimizing for Dispersion-prime and R56, manually set nr 2 and 3 negative
+        B0 = [opt_dipole.root, -opt_dipole.root/self.x0, -opt_dipole.root] 
 
-            if not self.ks:
-                self.get_quad_strengths()
+        if optimize_quads:
+            f0_1 = np.sum(ls_list[:5])/2  # drift between focusing quads in triplet
+            f0_2 = f0_1 # distance from mid quad to next mid quad (ish)
 
-            ls_list, inv_rs_list, ks_list = self.get_elements_arrays(Bs=Bs, ks=self.ks) # Get expanded numpy arrays
+            k0 = [1/f0_1/self.l_quads, -1/f0_2/self.l_quads, 1/f0_1/self.l_quads]
+            k0.extend(B0)
+            B0 = k0
+
+        if not optimize_quads and not self.ks:
+            self.get_quad_strengths()
+
+        def optimize_dipole_fields(Bs, plot=False):
+            """
+            if optimize_quads:
+                Bs = [k1, k2, B1, B2, B3]
+            else:
+                Bs = [B1, B2, B3]
+            """
+
+            if optimize_quads:
+                _, inv_rs_list, ks_list = self.get_elements_arrays(Bs=Bs[-3:], ks=Bs[:3]) # Get expanded numpy arrays
+            else:
+                _, inv_rs_list, ks_list = self.get_elements_arrays(Bs=Bs, ks=self.ks) # Get expanded numpy arrays
 
             _, Dpx, _ = evolve_dispersion(ls=ls_list, ks=ks_list, inv_rhos=inv_rs_list)
 
             R56, _ = evolve_R56(ls=ls_list, ks=ks_list, inv_rhos=inv_rs_list)
 
-            return Dpx**2 + (R56*1e2)**2
-        
-        B_bounds = [(-1.3,1.3)]*3 # Let B-values be negative
+            #L_const = self.constraint(Bs[-3:])
 
-        opt = minimize(optimize_dipole_fields, x0=B0, bounds=B_bounds, constraints=constraint_scipy, options={'maxiter': 1000})
+            if optimize_quads:
+                beta_x, alpha_x, _ = evolve_beta_function(ls_list, ks_list, beta0=beta0_x, alpha0=0, plot=plot)
+                beta_y, alpha_y, _ = evolve_beta_function(ls_list, -ks_list, beta0=beta0_y, alpha0=0, plot=plot)
+
+                return (Dpx*1e1)**2 + alpha_x**2 + alpha_y**2 + (R56*1e1)**2 + max(beta_x-beta0_x*5,0)**2 + max(beta_y-beta0_y*5,0)**2
+            else:
+                return Dpx**2 + (R56*1e1)**2
+        
+        B_bounds = [(-2,2)]*3 # Let B-values be negative
+        #B_bounds[0] = (1,1.4)
+
+        constraint = NonlinearConstraint(self.constraint, lb=0, ub=0)
+        
+        if optimize_quads:
+            k_bounds = [(0,15), (-15,0), (0,15)]
+            #k_bounds[1] = (-50,0)
+            k_bounds.extend(B_bounds)
+            opt = minimize(optimize_dipole_fields, x0=B0, bounds=k_bounds, options={'maxiter': 2000}, constraints=constraint)
+        else:
+            opt = minimize(optimize_dipole_fields, x0=B0, bounds=B_bounds, options={'maxiter': 2000}, constraints=constraint)
         print(opt)
             
         return opt.x
     
-    def get_quad_strengths(self):
+    def get_quad_strengths(self, match_full_length=False, ks_matched=False, match_dipole=False):
         ### Optimize for alpha_x/y to get quad-strengths ###
         # ls_B = [l_dipole1, l_dipole2, l_dipole3, l_diag, B1, B2]
-        from abel.utilities.beam_physics import evolve_beta_function
+        from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
         from scipy.optimize import minimize
 
-        beta0_x = 5
-        beta0_y = 5
-        ls_list, = self.get_elements_arrays() # Get expanded numpy array of lengths
+        p = self.E_nom/SI.c
 
+        n_quads = self.get_quad_counts()
+        print(n_quads)
 
-        def optimize_quads(ks_betas, plot=False):
-            """
-            Assume 0 bend while optimizing for the quads. This means the triplets are in the middle
-            ks_betas = [k1, k2, k3, betax, betay]
-            """
-            ls_list, ks_list = self.get_elements_arrays(ks=ks_betas[:3]) # Get expanded numpy arrays
-            if plot:
-                print(ls_list)
-                print(ks_list)
+        beta0_x = self.beta0_x
+        beta0_y = self.beta0_y
+        if not ks_matched:
+            f0 = (self.length_stage+self.delay_per_stage*SI.c)/2
+            if n_quads%2==0:
+                k0 = [1/f0/self.l_quads, -1/f0/self.l_quads]*(n_quads//2)
+                k_bounds = [(0,15), (-15,0)]*(n_quads//2)
+                print(len(k_bounds))
+            else:
+                k0 = [1/f0/self.l_quads, -1/f0/self.l_quads]*(n_quads//2)
+                k0.append(1/f0/self.l_quads)
+                k_bounds = [(0,15), (-15,0)]*(n_quads//2)
+                k_bounds.append((0,15))
+        else:
+            k0 = [element.k for element in self.lattice if element.name=='quad']
+            if n_quads%2==0:
+                k_bounds = [(0,15), (-15,0)]*(n_quads//2)
+            else:
+                k_bounds = [(0,15), (-15,0)]*(n_quads//2)
+                k_bounds.append((0,15))
+        if match_dipole:
+            B_min = -2
+            B_max = 2
+            inv_r_max = B_max/p
+            inv_r_min = B_min/p
+            inv_r0 = -self.B_dipole/p
+            k0.append(inv_r0)
+            k_bounds.append((inv_r_min,inv_r_max))
 
+        ls, inv_rs_list, ks_list = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True) # returns numpy arrays
 
-            _, alpha_x, _ = evolve_beta_function(ls_list, ks_list, beta0=ks_betas[3], alpha0=0, plot=plot)
-            _, alpha_y, _ = evolve_beta_function(ls_list, ks_list, beta0=ks_betas[4], alpha0=0, plot=plot)
-
-            return alpha_x**2 + alpha_y**2
+        # Get the indices of the quads in the lattice
+        indices_quads = [i for i, element in enumerate(self.lattice) if element.name=='quad']
+        indices_dipoles = [i for i, element in enumerate(self.lattice) if element.name=='dipole']
         
-        f0_1 = 2 * ls_list[5]  # drift between focusing quads in triplet
-        f0_2 = np.sum(ls_list[-6:])*2 # distance from mid quad to next mid quad (ish)
-        f0_3 = f0_2
-        k0 = [1/f0_1/self.l_quads, -1/f0_2/self.l_quads, 1/f0_3/self.l_quads, beta0_x, beta0_y] # initial guess
-        k_bounds = [(0,50)]*3
-        k_bounds[1] = (-50,0)
-        k_bounds.extend([(0.1,100)]*2)
+        def optimizer(params):
+            # params = [k1, k2, k3, k4, ..., inv_r1]
+            ks = params[:n_quads]
+            inv_rs = params[n_quads:]
+            # Vary the ks in the lattice without chinging the lattice values
+            # This requires that all quads are named 'quad #' (#=number in which they appear in the lattice)
+            for i, j in enumerate(indices_quads):
+                ks_list[j] = ks[i]
 
-        opt = minimize(optimize_quads, x0=k0, bounds=k_bounds)
+            for i, j in enumerate(indices_dipoles):
+                if i < len(inv_rs):
+                    inv_rs_list[j] = inv_rs[i]
+          
+            beta_x, alpha_x, _ = evolve_beta_function(ls=ls, ks=ks_list, beta0=beta0_x)
+            beta_y, alpha_y, _ = evolve_beta_function(ls=ls, ks=-ks_list, beta0=beta0_y)
+
+            Dx, Dpx, _ = evolve_dispersion(ls=ls, ks=ks_list, inv_rhos=inv_rs_list)
+            R56, _ = evolve_R56(ls=ls, ks=ks_list, inv_rhos=inv_rs_list)
+            if match_full_length:
+                return (beta_x-beta0_x)**2 + (beta_y-beta0_y)**2 + max(beta_x-10*beta0_x, 0)**2 + \
+                 (Dx*1e2)**2 + (R56*1e2)**2 
+            else:
+                return alpha_x**2 + alpha_y**2 + Dpx**2 + R56**2 + \
+                    max(beta_x-10*beta0_x, 0)**2 + max(beta_y-10*beta0_y, 0)**2
+        
+        opt = minimize(optimizer, x0=k0, bounds=k_bounds)
         print(opt)
-        #assert opt.fun<1e-3
-        self.ks = list(opt.x[:3]) # set the quad-strengths in the lattice
-        optimize_quads(opt.x, plot=True)
-        return opt.x[3:]
+        if len(opt.x)==n_quads:
+            return opt.x
+        else:
+            return opt.x[:n_quads], opt.x[n_quads:]
+    
+    def set_ks(self, ks):
+        j=0
+        for element in self.lattice:
+            if element.name == 'quad':
+                print(ks[j])
+                element.k = ks[j]
+                j+=1
 
     
     def get_elements_arrays(self, Bs=None, ks=None):
@@ -223,11 +285,12 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
         ls_list = [self.l_kick/2, L_dipoles, L_dipoles, L_to_first_quad, self.l_quads, L_drift_diag, self.l_quads, L_drift_diag, self.l_quads, L_to_first_quad, L_dipoles, L_dipoles, self.l_gap/2]
         assert abs(np.sum(ls_list) - (self.length_stage + self.delay_per_stage*SI.c)) < 1e-14
+
         yield np.array(ls_list)
 
         if Bs is not None:
             assert len(Bs)==3
-            B4 = -(Bs[1] + Bs[2] + Bs[0]) # Explicitly using the signs of the field-values
+            B4 = -(Bs[0] + Bs[1] + Bs[2]) # implicitly using the signs of the field-values
 
             inv_r1 = Bs[0]/p
             inv_r2 = Bs[1]/p
@@ -241,6 +304,29 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             assert len(ks)==3
             ks_list = [0, 0, 0, 0, ks[0], 0, ks[1], 0, ks[2], 0, 0, 0, 0]
             yield np.array(ks_list)
+
+    def get_elements_arrays_from_lattice(self, lengths: bool=True, dipoles: tuple=(False, 'inv_rhos'), quads: bool=False):
+        # self.lattice = {'dipole/quad': (length, magnetic variable), 'drift': length, ...}
+        # Make the lists that are required for the evolution functions in beam_physics.py
+        # self.lattice consists of impactx elements
+        if lengths:
+            ls = [element.ds for element in self.lattice]
+            yield np.array(ls)
+
+        if dipoles[0]:
+            if dipoles[1]=='inv_rhos':
+                inv_rhos = [element.phi/element.ds if hasattr(element, 'phi') else 0 for element in self.lattice]
+                yield np.array(inv_rhos)
+            elif dipoles[1]=='phis':
+                phis = [element.phi if hasattr(element, 'phi') else 0 for element in self.lattice]
+                yield np.array(phis)
+            else:
+                raise ValueError('must use ´inv_rhos´ or ´phi´')
+
+        if quads:
+            ks = [element.k if hasattr(element, 'k') and element.name=='quad' else 0 for element in self.lattice]
+            yield np.array(ks)
+
 
 
 
@@ -466,6 +552,64 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             
         return k_bounds
     
+    def extend_lattice(self, full=False):
+        deep_copy = self.copy_lattice()
+        deep_copy.reverse()
+        if full:
+            for element in deep_copy:
+                if element.name == 'dipole':
+                    element.phi = -element.phi
+        self.lattice.extend(deep_copy)
+    
+    def copy_lattice(self):
+        """
+        Manually creates a deep copy of the lattice.
+        
+        This is necessary because standard copy.deepcopy() fails on the
+        custom impactx pybind objects.
+        
+        Returns:
+            list: A new list with new, independent copies of each element.
+        """
+        import impactx
+        import copy
+
+        copied_lattice = []
+        for element in self.lattice:
+            # Re-create the element based on its type to ensure it's a new object
+            if isinstance(element, impactx.elements.ExactSbend):
+                new_element = impactx.elements.ExactSbend(
+                    ds=element.ds,
+                    phi=np.rad2deg(element.phi), # impactx constructor takes degrees, but attribute is in rads
+                    nslice=element.nslice
+                )
+            elif isinstance(element, impactx.elements.ExactQuad):
+                new_element = impactx.elements.ExactQuad(
+                    ds=element.ds,
+                    k=element.k,
+                    nslice=element.nslice
+                )
+            elif isinstance(element, impactx.elements.ExactDrift):
+                new_element = impactx.elements.ExactDrift(
+                    ds=element.ds,
+                    nslice=element.nslice
+                )
+            else:
+                # For other non-impactx types (like BeamMonitor), a shallow copy is usually safe
+                try:
+                    new_element = copy.copy(element)
+                except TypeError:
+                    print(f"Warning: Could not copy element of type {type(element)}")
+                    continue
+            
+            # Ensure other attributes like the name are also copied
+            if hasattr(element, 'name'):
+                new_element.name = element.name
+
+            copied_lattice.append(new_element)
+            
+        return copied_lattice
+    
     def plot_evolution(self):
 
         from matplotlib import pyplot as plt
@@ -547,3 +691,12 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         
         
         plt.show()
+    
+    def plot_simplified(self):
+        from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
+        ls, inv_rs, ks = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True)
+
+        _, _, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x, plot=True)
+        _, _, _ = evolve_beta_function(ls=ls, ks=-ks, beta0=self.beta0_y, plot=True)
+        _, _, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True)
+        _, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True)
