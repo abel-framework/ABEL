@@ -3,8 +3,6 @@ Introduction
 
 This manual describes ABEL blablah
 
-For installation of ABEL, see :doc:`installation <installation>`
-
 Python modules
 ===============
 
