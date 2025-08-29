@@ -1031,6 +1031,75 @@ class Stage(Trackable, CostModeled):
         plt.show()
 
 
+    # ==================================================
+    def plot_spin_evolution(self, bunch='beam'):
+
+        from matplotlib import pyplot as plt
+        
+        # select bunch
+        if bunch == 'beam':
+            evol = copy.deepcopy(self.evolution.beam)
+        elif bunch == 'driver':
+            evol = copy.deepcopy(self.evolution.driver)
+            
+        # extract wakefield if not already existing
+        if not hasattr(evol, 'location'):
+            print('No evolution calculated')
+            return
+
+        if not hasattr(evol, 'spin_x') or evol.spin_x is None:
+            print('No spin evolution calculated')
+            return
+        
+        # add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                upramp_evol = self.upramp.evolution.beam
+            elif bunch == 'driver':
+                upramp_evol = self.upramp.evolution.driver
+            evol.location = np.append(upramp_evol.location, evol.location-np.min(evol.location)+np.max(upramp_evol.location))
+            evol.spin_x = np.append(upramp_evol.spin_x, evol.spin_x)
+            evol.spin_y = np.append(upramp_evol.spin_y, evol.spin_y)
+            evol.spin_z = np.append(upramp_evol.spin_z, evol.spin_z)
+            
+
+        # add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                downramp_evol = self.downramp.evolution.beam
+            elif bunch == 'driver':
+                downramp_evol = self.downramp.evolution.driver
+            evol.location = np.append(evol.location, downramp_evol.location-np.min(downramp_evol.location)+np.max(evol.location))
+            evol.spin_x = np.append(evol.spin_x, downramp_evol.spin_x)
+            evol.spin_y = np.append(evol.spin_y, downramp_evol.spin_y)
+            evol.spin_z = np.append(evol.spin_z, downramp_evol.spin_z)
+        
+        # preprate plot
+        fig, axs = plt.subplots(1,1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+        colx = "tab:blue"
+        coly = "tab:orange"
+        colz = "tab:green"
+        long_label = 'Location [m]'
+        long_limits = [min(evol.location), max(evol.location)]
+
+        # plot energy
+        axs.plot(evol.location, evol.spin_x, color=colx, label='x')
+        axs.plot(evol.location, evol.spin_y, color=coly, label='y')
+        axs.plot(evol.location, evol.spin_z, color=colz, label='z')
+        axs.set_ylabel('Spin polarization')
+        axs.set_xlabel(long_label)
+        axs.set_xlim(long_limits)
+        axs.set_ylim(-1.02, 1.02)
+        axs.legend()
+        
+        if self.stage_number is not None:
+            fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
+        
+        plt.show()
+
+
     # ==================================================  
     def plot_wakefield(self):
 

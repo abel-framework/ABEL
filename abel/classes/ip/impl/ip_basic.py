@@ -12,9 +12,6 @@ class InteractionPointBasic(InteractionPoint):
         import scipy.constants as SI
         from abel.classes.event import Event
         
-        # create event
-        event = Event(beam1, beam2)
-        
         # geometric factor
         H_D = 1
         
@@ -34,10 +31,19 @@ class InteractionPointBasic(InteractionPoint):
             compton_conversion_efficiency = 0.45
             lumi = lumi * compton_conversion_efficiency**2
         
+        # create event
+        event = Event()
+        
+        # save beams
+        event.input_beam1 = beam1
+        event.input_beam2 = beam2
+        event.output_beam1 = beam1
+        event.output_beam2 = beam2
+        
         # save to event
         event.luminosity_full = lumi
         event.luminosity_peak = lumi
         event.luminosity_geom = lumi
-        
+
         return event
         
