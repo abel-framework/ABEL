@@ -44,7 +44,7 @@ class Collider(Runnable, CostModeled):
         # emissions
         self.emissions_per_tunnel_length = 6.38*1.73 # [ton CO2e/m] from 6.38 kton/km (CLIC estimate) plus additional structures
         self.emissions_per_energy_usage = 20/(1e9*3600) # [ton CO2e/J] from 20 ton/GWh
-        self.cost_carbon_tax_per_emissions = 800 # [ILCU per ton CO2e] 800 from European Investment Bank estimate for 2050
+        self.cost_carbon_tax_per_emissions = 800.0 # [ILCU per ton CO2e] 800 from European Investment Bank estimate for 2050
 
     
     def __str__(self):
