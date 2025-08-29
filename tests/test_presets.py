@@ -304,7 +304,7 @@ def test_HALHFv2():
     assert isinstance(halhf2.maintenance_cost(), float) and halhf2.maintenance_cost() > 0.0
     assert isinstance(halhf2.maintenance_labor(), float) and halhf2.maintenance_labor() > 0.0
     assert isinstance(halhf2.maintenance_labor_per_construction_cost, float) and halhf2.maintenance_labor_per_construction_cost > 0.0
-    #halhf2.maximum_upsilon()  # TODO: why does this give FALSE?
+    halhf2.maximum_upsilon()  # TODO: why does this give FALSE?
     assert isinstance(halhf2.num_bunches_in_train, int) and halhf2.num_bunches_in_train > 0
     #halhf2.num_coherent_pairs()  # TODO: why does this give FALSE?
     #halhf2.num_photons_beam1()  # TODO: why does this give FALSE?
@@ -372,6 +372,9 @@ def test_CLIC():
     clic = CLIC()
     clic.run('test_CLIC', overwrite=True, verbose=False)
 
+    assert np.isclose(clic.com_energy, 380e9, rtol=1e-15, atol=0.0)
+    assert isinstance(clic.full_luminosity(), float) and clic.full_luminosity() > 1e37
+
     # Remove output directory
     shutil.rmtree(clic.run_path())
 
@@ -386,6 +389,11 @@ def test_ILC():
 
     ilc = ILC()
     ilc.run('test_ILC', overwrite=True, verbose=False)
+
+    assert np.isclose(ilc.com_energy, 500e9, rtol=1e-15, atol=0.0)
+    assert isinstance(ilc.linac1.rf_accelerator.energy_usage_cooling(), float) and ilc.linac1.rf_accelerator.energy_usage_cooling() > 0.0
+    assert isinstance(ilc.linac1.rf_accelerator.energy_usage_klystrons(), float) and ilc.linac1.rf_accelerator.energy_usage_klystrons() > 0.0
+    assert isinstance(ilc.full_luminosity(), float) and ilc.full_luminosity() > 1e37
 
     # Remove output directory
     shutil.rmtree(ilc.run_path())
