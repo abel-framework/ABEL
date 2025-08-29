@@ -2028,10 +2028,13 @@ class PlasmaRamp(Stage):
 
         super().__init__(nom_accel_gradient=None, nom_energy_gain=nom_energy_gain, plasma_density=None, driver_source=None, ramp_beta_mag=ramp_beta_mag)
 
-        if ramp_shape != 'uniform' and ramp_shape != 'from_file':
+        if ramp_shape != 'uniform':
+            raise NotImplementedError('Ramp shape not yet implemented')
+        # TODO: Need code to handle ramp_shape='from_file' etc. ... need to ignore ramp_length, ramp_plasma_density. These need to be calculated.
+        
+        if ramp_shape != 'uniform' and ramp_shape != 'from_file' and ramp_shape != 'gaussian':
             raise StageError('Invalid ramp shape.')
         
-        # TODO: Need code to handle ramp_shape='from_file' ... need to ignore ramp_length, ramp_plasma_density. These need to be calculated.
 
         self.ramp_shape = ramp_shape
         self.length = ramp_length
