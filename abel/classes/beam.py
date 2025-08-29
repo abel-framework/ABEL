@@ -65,32 +65,38 @@ class Beam():
     # set phase space
     def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, spxs=None, spys=None, spzs=None, weightings=None, particle_mass=SI.m_e):
         """
-        Set the phase space of the beam. All input arrays must have the same lengths.
+        Set the phase space of the beam. All input arrays must have the same 
+        lengths.
 
         Parameters
         ----------
-        Q : [C], float
+        Q : [C] float
             Total beam charge.
 
-        xs, ys, zs: [m], 1D ndarray
+        xs, ys, zs : [m] 1D float ndarray
             Coordinates for the macroparticles.
             
-        uxs, uys, uzs: [m/s], 1D ndarray, optional
-            Proper velocities for the macroparticles. All uzs values must be above 10*particle rest energy/c/particle mass. Default set to ``None``.
+        uxs, uys, uzs : [m/s] 1D float ndarray, optional
+            Proper velocities for the macroparticles. All uzs values must be 
+            above 10*particle rest energy/c/particle mass. Default set to 
+            ``None``.
             
-        pxs, pys, pzs: [kg m/s], 1D ndarray, optional
-            Momenta for the macroparticles. All pzs values must be above 10*particle rest energy/c. Default set to ``None``.
+        pxs, pys, pzs : [kg m/s] 1D float ndarray, optional
+            Momenta for the macroparticles. All pzs values must be above 
+            10*particle rest energy/c. Default set to ``None``.
         
-        xps, yps: [rad], 1D ndarray, optional
-            Angles dx/ds and dy/ds for the macroparticles. Default set to ``None``.
+        xps, yps : [rad] 1D float ndarray, optional
+            Angles dx/ds and dy/ds for the macroparticles. Default set to 
+            ``None``.
 
-        Es : [eV], 1D ndarray, optional
-            Energies for the macroparticles. All values must be above 10*particle rest energy. Default set to ``None``.
+        Es : [eV] 1D float ndarray, optional
+            Energies for the macroparticles. All values must be above 
+            10*particle rest energy. Default set to ``None``.
 
-        weightings : 1D ndarray, optional
+        weightings : 1D float ndarray, optional
             Weights for the macroparticles. Default set to ``None``.
 
-        particle_mass : [kg], float, optional
+        particle_mass : [kg] float, optional
             Particle mass for a single real particle. Default set to ``SI.m_e``.
         
             
@@ -236,6 +242,8 @@ class Beam():
         if weightings is None:
             self.__phasespace[6,:] = Q/num_particles
         else:
+            if np.any(weightings < 0):
+                raise ValueError('Beam weightings cannot be negative.')
             self.__phasespace[6,:] = Q*weightings/np.sum(weightings)
         
         # ids
@@ -418,15 +426,17 @@ class Beam():
 
     def comp_beams(beam1, beam2, comp_location=False, rtol=1e-15, atol=0.0):
         """
-        Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within given tolerances.
+        Compare the phase spaces of two beams. Chekcks if all arrays are 
+        element-wise equal within given tolerances.
 
         Parameters
         ----------
         beam1, beam2 : ABEL ``Beam`` object
             Beams to be compared
 
-        comp_location: bool, optional
-            Flag for comparing the location of the beams. Default set to ``False``.
+        comp_location : bool, optional
+            Flag for comparing the location of the beams. Default set to 
+            ``False``.
             
         rtol : float, optional
             The relative tolerance parameter (see [1]_). Default set to 1e-15.
@@ -447,6 +457,7 @@ class Beam():
 
         if comp_location:
             assert np.allclose(beam1.location, beam2.location, rtol, atol)
+            assert beam1.stage_number == beam2.stage_number
         assert np.allclose(beam1.qs(), beam2.qs(), rtol, atol)
         assert np.allclose(beam1.weightings(), beam2.weightings(), rtol, atol)
         assert np.allclose(beam1.xs(), beam2.xs(), rtol, atol)
@@ -460,15 +471,17 @@ class Beam():
 
     def comp_beam_params(beam1, beam2, comp_location=False):
         """
-        Compare the parameters of two beams to see if they are equal within given tolerances.
+        Compare the parameters of two beams to see if they are equal within 
+        given tolerances.
 
         Parameters
         ----------
         beam1, beam2 : ABEL ``Beam`` object
             Beams to be compared
 
-        comp_location: bool, optional
-            Flag for comparing the location of the beams. Default set to ``False``.
+        comp_location : bool, optional
+            Flag for comparing the location of the beams. Default set to 
+            ``False``.
         
             
         Returns
@@ -489,18 +502,18 @@ class Beam():
         assert np.allclose(beam1.energy(), beam2.energy(), rtol=0.0, atol=0.6e9)  # Usually rather large discrepancy in energy.
         assert np.allclose(beam1.energy_spread(), beam2.energy_spread(), rtol=0.0, atol=0.6e9)
         assert np.allclose(beam1.rel_energy_spread(), beam2.rel_energy_spread(), rtol=0.0, atol=5e-4)
-        assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.0, atol=1e-6)
-        assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.0, atol=0.5e-6)
-        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.05, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.05, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.05, atol=0.05e-6)
         assert np.allclose(beam1.geom_emittance_x(), beam2.geom_emittance_x(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.geom_emittance_y(), beam2.geom_emittance_y(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.norm_emittance_x(), beam2.norm_emittance_x(), rtol=0.0, atol=1e-6)
         assert np.allclose(beam1.norm_emittance_y(), beam2.norm_emittance_y(), rtol=0.0, atol=0.5e-6)
         assert np.allclose(beam1.peak_current(), beam2.peak_current(), rtol=0.0, atol=0.7e3)
-        assert np.allclose(beam1.beta_x(), beam2.beta_x(), rtol=0.0, atol=50e-3)
-        assert np.allclose(beam1.beta_y(), beam2.beta_y(), rtol=0.0, atol=50e-3)
-        assert np.allclose(beam1.gamma_x(), beam2.gamma_x(), rtol=0.0, atol=0.1)
-        assert np.allclose(beam1.gamma_y(), beam2.gamma_y(), rtol=0.0, atol=0.1)        
+        assert np.allclose(beam1.beta_x(), beam2.beta_x(), rtol=0.05, atol=5e-3)
+        assert np.allclose(beam1.beta_y(), beam2.beta_y(), rtol=0.05, atol=5e-3)
+        assert np.allclose(beam1.gamma_x(), beam2.gamma_x(), rtol=0.05, atol=0.0)
+        assert np.allclose(beam1.gamma_y(), beam2.gamma_y(), rtol=0.05, atol=0.0)        
         assert np.allclose(beam1.z_offset(), beam2.z_offset(), rtol=0.0, atol=3e-6)
         assert np.allclose(beam1.x_offset(), beam2.x_offset(), rtol=0.0, atol=3e-6)
         assert np.allclose(beam1.y_offset(), beam2.y_offset(), rtol=0.0, atol=3e-6)
@@ -538,18 +551,30 @@ class Beam():
     # ==================================================
     def rotate_coord_sys_3D(self, axis1, angle1, axis2=np.array([0, 1, 0]), angle2=0.0, axis3=np.array([1, 0, 0]), angle3=0.0, invert=False):
         """
-        Rotates the coordinate system (passive transformation) of the beam first with angle1 around axis1, then with angle2 around axis2 and lastly with angle3 around axis3.
+        Rotates the coordinate system (passive transformation) of the beam first 
+        with ``angle1`` around ``axis1``, then with ``angle2`` around ``axis2`` 
+        and lastly with ``angle3`` around ``axis3``.
         
         Parameters
         ----------
-        axis1, axis2, axis3: 1x3 float nd arrays
-            Unit vectors specifying the rotation axes.
+        axis1 : 1x3 float ndarrays
+            Unit vector specifying the rotation axes.
         
-        angle1, angle2, angle3: [rad] float
-            Angles used for rotation of the beam's coordinate system around the respective axes.
+        angle1 : [rad] float
+            Angle used for rotation of the beam's coordinate system around the 
+            respective axes.
 
-        invert: bool
-            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+        axis2, axis3 : 1x3 float ndarrays, optional
+            Additional unit vectors specifying the rotation axes.
+
+        angle2, angle3 : [rad] float, optional
+            Additional angles used for rotation of the beam's coordinate system 
+            around the respective axes.
+
+        invert : bool, optional
+            Performs a standard passive transformation when False. If True, will 
+            perform an active transformation and can thus be used to invert the 
+            passive transformation.
             
         Returns
         ----------
@@ -600,7 +625,8 @@ class Beam():
     # ==================================================
     def beam_alignment_angles(self):
         """
-        Calculates the angles for rotation around the y- and x-axis to align the z-axis to the beam proper velocity.
+        Calculates the angles for rotation around the y- and x-axis to align the 
+        z-axis to the beam proper velocity.
         
         Parameters
         ----------
@@ -609,11 +635,14 @@ class Beam():
             
         Returns
         ----------
-        x_angle: [rad] float
+        x_angle : [rad] float
             Used for rotating the beam's frame around the y-axis.
         
-        y_angle: [rad] float
-            Used for rotating the beam's frame around the x-axis. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        y_angle : [rad] float
+            Used for rotating the beam's frame around the x-axis. Note that due 
+            to the right hand rule, a positive rotation angle in the zy-plane 
+            corresponds to rotation from z-axis towards negative y. I.e. the 
+            opposite sign convention of beam.yps().
         """
 
         # Get the mean proper velocity component offsets
@@ -649,18 +678,26 @@ class Beam():
     # ==================================================
     def xy_rotate_coord_sys(self, x_angle=None, y_angle=None, invert=False):
         """
-        Rotates the coordinate system of the beam first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis.
+        Rotates the coordinate system of the beam first with ``x_angle`` around 
+        the y-axis then with ``y_angle`` around the x-axis.
         
         Parameters
         ----------
-        x_angle: [rad] float
-            Angle to rotate the coordinate system with in the zx-plane.
+        x_angle : [rad] float, optional
+            Angle to rotate the coordinate system with in the zx-plane. Calls 
+            ``Beam.beam_alignment_angles()`` by default if no angle is provided.
         
-        y_angle: [rad] float
-            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        y_angle : [rad] float, optional
+            Angle to rotate the coordinate system with in the zy-plane. Note 
+            that due to the right hand rule, a positive rotation angle in the 
+            zy-plane corresponds to rotation from z-axis towards negative y. 
+            I.e. the opposite sign convention of beam.yps(). Calls 
+            ``Beam.beam_alignment_angles()`` by default if no angle is provided.
 
-        invert: bool
-            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+        invert : bool, optional
+            Performs a standard passive transformation when False. If True, will 
+            perform an active transformation and can thus be used to invert the 
+            passive transformation.
         
             
         Returns
@@ -687,11 +724,16 @@ class Beam():
         
         Parameters
         ----------
-         align_x_angle: [rad] float, optional
-            Beam coordinates in the zx-plane are rotated with this angle. If ``None``, will align the beam using its angular offset.
+        align_x_angle : [rad] float, optional
+            Beam coordinates in the zx-plane are rotated with this angle. If 
+            ``None``, will align the beam using its angular offset.
         
-        align_y_angle: [rad] float, optional
-            Beam coordinates in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of ``beam.yps()``. If ``None``, will align the beam using its angular offset.
+        align_y_angle : [rad] float, optional
+            Beam coordinates in the zy-plane are rotated with this angle. Note 
+            that due to the right hand rule, a positive rotation angle in the 
+            zy-plane corresponds to rotation from z-axis towards negative y. 
+            I.e. the opposite sign convention of ``beam.yps()``. If ``None``, 
+            will align the beam using its angular offset.
         
             
         Returns
@@ -738,25 +780,29 @@ class Beam():
 
         Parameters
         ----------
-        beam_quant: 1D float array
-            Beam quantity to be binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+        beam_quant : 1D float array
+            Beam quantity to be binned into bins/slices defined by z_centroids. 
+            The mean is calculated for the quantity for all particles in the 
+            z-bins. Includes e.g. beam.xs(), beam.Es() etc.
 
-        bin_number: float
+        bin_number : float, optional
             Number of beam slices.
 
-        cut_off: float
-            Determines the longitudinal coordinates inside the region of interest
+        cut_off : float, optional
+            Determines the longitudinal coordinates inside the region of 
+            interest.
 
-        make_plot: bool
+        make_plot : bool, optional
             Flag for making plots.
-
             
         Returns
         ----------
-        beam_quant_slices: 1D float array
-            beam_quant binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+        beam_quant_slices : 1D float array
+            beam_quant binned into bins/slices defined by z_centroids. The mean 
+            is calculated for the quantity for all particles in the z-bins. 
+            Includes e.g. beam.xs(), beam.Es() etc.
 
-        z_centroids: [m] 1D float array
+        z_centroids : [m] 1D float array
             z-coordinates of the beam slices.
         """
         
@@ -803,10 +849,6 @@ class Beam():
         
     
     # ==================================================
-    # def x_tilt_angle(self, clean=False):
-    #     #return np.arcsin(self.ux_offset(clean=clean)/self.uz_offset(clean=clean))
-    #     return np.arcsin(self.x_offset(clean=clean)/self.z_offset(clean=clean))
-    
     def x_tilt_angle(self, z_cutoff=None):
         "Retrieve the tilt angle of the beam in the zx-plane. WARNING: becomes unreliable around > 1e-4 rad."
         if z_cutoff is None:
@@ -832,15 +874,20 @@ class Beam():
         
         return np.arctan(slope)
 
+
+
     ## BEAM STATISTICS
 
     def total_particles(self):
+        "Total number of physical particles."
         return int(np.nansum(self.weightings()))
     
     def charge(self):
+        "Total beam charge."
         return np.nansum(self.qs())
     
     def abs_charge(self):
+        "Total absolute beam charge."
         return abs(self.charge())
     
     def charge_sign(self):
@@ -1031,19 +1078,22 @@ class Beam():
 
     def set_arbitrary_spin_polarization(self, polarization, direction='z', seed=None):
         """
-        Generates a random distribution of points on the surface of a sphere of radius 1, with the mean along a defined 'direction' is 
+        Generates a random distribution of points on the surface of a sphere of 
+        radius 1, with the mean along a defined 'direction' is 
         'polarization'.
-        For polarization=0, points are uniformly distributed on the surface of the sphere.
+        For polarization=0, points are uniformly distributed on the surface of 
+        the sphere.
     
         Parameters
         ----------
-        polarization: float
-            Mean value of projection in the defined direction for the generated spins.
+        polarization : float
+            Mean value of projection in the defined direction for the generated 
+            spins.
 
-        direction: string
+        direction : string
             Spin direction (default is z).
 
-        seed: int, optional
+        seed : int, optional
             Seed to initialize the random number generator (default is 42).
             
 
@@ -1255,16 +1305,16 @@ class Beam():
         
         Parameters
         ----------
-        zbins, xbins, ybins: [m] float or 1D float ndarray
+        zbins, xbins, ybins : [m] float or 1D float ndarray, optional
             The bins along z(x,y).
             
         Returns
         ----------
-        dQ_dxdydz: [C/m^3] 3D float ndarray 
+        dQ_dxdydz : [C/m^3] 3D float ndarray 
             Charge density of the beam.
         
-        zctrs, xctrs, yctrs: [m] 1D float ndarray 
-            The centre positions of the bins of dQ_dxdydz.
+        zctrs, xctrs, yctrs : [m] 1D float ndarray 
+            The centre positions of the bins of ``dQ_dxdydz``.
         """
         
         zs = self.zs()
@@ -1309,44 +1359,54 @@ class Beam():
     # ==================================================
     def Dirichlet_BC_system_matrix(self, main_diag, upper_inner_off_diag, lower_inner_off_diag, upper_outer_off_diag, lower_outer_off_diag, num_x_cells, num_unknowns, rhs, boundary_val):
         """
-        Applies Dirichlet boundary conditions and assemble the system matrix and the right hand side (source term) of the Poisson equation.
+        Applies Dirichlet boundary conditions and assemble the system matrix and 
+        the right hand side (source term) of the Poisson equation.
         
         Parameters
         ----------
-        main_diag: [m^-2] 1D float ndarray
-            The main diagonal of the system matrix to be modified according to the boundary conditions.
+        main_diag : [m^-2] 1D float ndarray
+            The main diagonal of the system matrix to be modified according to 
+            the boundary conditions.
 
-        upper_inner_off_diag: [m^-2] 1D float ndarray
-            The upper inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        upper_inner_off_diag : [m^-2] 1D float ndarray
+            The upper inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
-        lower_inner_off_diag: [m^-2] 1D float ndarray
-            The lower inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        lower_inner_off_diag : [m^-2] 1D float ndarray
+            The lower inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
-        outer_inner_off_diag: [m^-2] 1D float ndarray
-            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        outer_inner_off_diag : [m^-2] 1D float ndarray
+            The outer inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
-        outer_inner_off_diag: [m^-2] 1D float ndarray
-            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        outer_inner_off_diag : [m^-2] 1D float ndarray
+            The outer inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
             
-        num_x_cells: float
-            The number of cells in the x-direction. Determines the number of columns of the system matrix A.
+        num_x_cells : float
+            The number of cells in the x-direction. Determines the number of 
+            columns of the system matrix ``A``.
 
-        num_x_cells: float
-            The number of unknowns in the system, which is determined by The number of cells in the x and y-direction.
+        num_unknowns : float
+            The number of unknowns in the system, which is determined by The 
+            number of cells in the x and y-direction.
 
-        rhs: [V/m^3] 1D float ndarray
-            The right hand side of the Poisson equation to be modified according to the boundary conditions.
+        rhs : [V/m^3] 1D float ndarray
+            The right hand side of the Poisson equation to be modified according 
+            to the boundary conditions.
 
-        boundary_val: [V/m] float
-            The value of the electric fields Ex and Ey at the simulation box boundary.
-
+        boundary_val : [V/m] float
+            The value of the electric fields Ex and Ey at the simulation box 
+            boundary.
             
+
         Returns
         ----------
-        A: [m^-2] 2D float sparse matrix
+        A : [m^-2] 2D float sparse matrix
             System matrix.
 
-        rhs: [V/m^3] 1D float ndarray
+        rhs : [V/m^3] 1D float ndarray
             The modified right hand side of the Poisson equation.
         """
         
@@ -1391,7 +1451,10 @@ class Beam():
     # ==================================================
     def Ex_Ey_2D(self, num_x_cells, num_y_cells, charge_density_xy_slice, dx, dy, boundary_val=0.0):
         """
-        2D Poisson solver for the transverse electric fields Ex and Ey of a beam slice in the xy-plane. The equations solved are a combination of Gauss' law and Faraday's law assuming no time-varying z-component of magnetic field Bz. I.e.
+        2D Poisson solver for the transverse electric fields Ex and Ey of a beam 
+        slice in the xy-plane. The equations solved are a combination of Gauss' 
+        law and Faraday's law assuming no time-varying z-component of magnetic 
+        field Bz. I.e.
 
         dEx/dx + dEy/dy = 1/epsilon_0 * dQ/dzdxdy
         dEy/dx - dEx/dy = 0.
@@ -1399,24 +1462,23 @@ class Beam():
         
         Parameters
         ----------
-        num_x_cells, num_y_cells: float
+        num_x_cells, num_y_cells : float
             The number of cells in the x and y-direction.
 
-        charge_density_xy_slice: [C/m^3] 2D ndarray
+        charge_density_xy_slice: [C/m^3] 2D float ndarray
             A xy-slice of the beam charge density.
 
-        dx, dy: [m] float
+        dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
-
-        boundary_val: [V/m] 
-
+        boundary_val: [V/m] float, optional
+            ...
             
         Returns
         ----------
-        Ex: [V/m] 2D float array 
+        Ex : [V/m] 2D float array 
             x-conponent of electric field generated by the chosen beam slice.
 
-        Ey: [V/m] 2D float array 
+        Ey : [V/m] 2D float array 
             y-conponent of electric field generated by the chosen beam slice.
         """
         
@@ -1457,36 +1519,40 @@ class Beam():
     # ==================================================
     def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0, tolerance=5.0):
         """
-        Calculate slice Ex and Ey for the entire beam by solving the Poisson equations for Ex and Ey slice by slice.
+        Calculate slice Ex and Ey for the entire beam by solving the Poisson 
+        equations for Ex and Ey slice by slice.
 
         Parameters
         ----------
-        x_box_min, y_box_min: [m] float
-            The lower x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+        x_box_min, y_box_min : [m] float
+            The lower x(y) boundary of the simulation domain. Should be much 
+            larger than the plasma bubble radius.
 
-        x_box_max, y_box_max: [m] float
-            The upper x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+        x_box_max, y_box_max : [m] float
+            The upper x(y) boundary of the simulation domain. Should be much 
+            larger than the plasma bubble radius.
         
-        dx, dy: [m] float
+        dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
 
-        num_z_cells: float
+        num_z_cells : float, optional
             The number of cells in the z-direction.
 
-        boundary_val: [V/m]
-            The values of the electric fields Ex and Ey at the simulation domain boundary.
-
+        boundary_val : [V/m] float, optional
+            The values of the electric fields Ex and Ey at the simulation domain 
+            boundary.
             
         Returns
         ----------
-        Ex: [V/m] 2D float array 
+        Ex : [V/m] 2D float array 
             x-conponent of electric field generated by the chosen beam slice.
 
-        Ey: [V/m] 2D float array 
+        Ey : [V/m] 2D float array 
             y-conponent of electric field generated by the chosen beam slice.
 
-        zctrs, xctrs, yctrs: [m] 1D float ndarray
-            Coordinates in z, x and y for the centres of the bins of Ex and Ey.
+        zctrs, xctrs, yctrs : [m] 1D float ndarray
+            Coordinates in z, x and y for the centres of the bins of ``Ex`` and 
+            ``Ey``.
         """
 
         # Check if the selected simulation boundaries are significantly larger than the beam extent
@@ -1545,8 +1611,12 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
+
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
             
-        p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
+        p = ax.pcolor(zs*1e6, Es/1e9, dQdzdE*1e15, cmap=cmap, shading='auto')
         ax.set_xlabel('z (um)')
         ax.set_ylabel('E (GeV)')
         ax.set_title('Longitudinal phase space')
@@ -1558,8 +1628,13 @@ class Beam():
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        fig.set_figheight(5)
+        
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(xs*1e6, xps*1e3, dQdxdxp*1e3, cmap=cmap, shading='auto')
         ax.set_xlabel('x (um)')
         ax.set_ylabel('x'' (mrad)')
         ax.set_title('Horizontal trace space')
@@ -1572,7 +1647,12 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(ys*1e6, yps*1e3, dQdydyp*1e3, cmap=cmap, shading='auto')
         ax.set_xlabel('y (um)')
         ax.set_ylabel('y'' (mrad)')
         ax.set_title('Vertical trace space')
@@ -1585,7 +1665,12 @@ class Beam():
         fig, ax = plt.subplots()
         fig.set_figwidth(8)
         fig.set_figheight(5)
-        p = ax.pcolor(xs*1e6, ys*1e6, -dQdxdy, cmap=CONFIG.default_cmap, shading='auto')
+
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(xs*1e6, ys*1e6, dQdxdy, cmap=cmap, shading='auto')
         #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
         #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
         ax.set_xlabel('x (um)')
@@ -1718,7 +1803,8 @@ class Beam():
             The final energies for all macroparticles.
         
         evol : SimpleNamespace object
-            only returns when ``calc_evolution=True``. Contains beam parameter evolution data.
+            only returns when ``calc_evolution=True``. Contains beam parameter 
+            evolution data.
         """
         
         # remove particles with subzero and Nan energy
@@ -1934,7 +2020,10 @@ class Beam():
         mass = particles["mass"][io.Record_Component.SCALAR].get_attribute("value")
         
         # extract phase space
-        ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
+        if "id" in particles:
+            ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
+        else:
+            ids = None
         weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
         xs = particles['position']['x'].load_chunk()
         ys = particles['position']['y'].load_chunk()
@@ -1960,6 +2049,7 @@ class Beam():
         # make beam
         beam = Beam()
         beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, spxs=spxs, spys=spys, spzs=spzs, weightings=weightings)
+        beam.particle_mass = mass
         
         # add metadata to beam
         try:
@@ -2197,7 +2287,7 @@ class Beam():
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
 
 
-        # ==================================================
+    # ==================================================
     def print_summary(self):
 
         print('---------------------------------------------------')

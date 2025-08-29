@@ -3,7 +3,7 @@
 The ABEL simulation framework is a particle-tracking framework for plasma-accelerator linacs, implemented at varying levels of complexity, for fast optimization.
 
 ## Installation with pip
-1. Clone the repository to a local folder
+1. Clone the repository to a local folder, e.g., `git clone https://github.com/carlandreaslindstrom/ABEL.git`
 2. In your target python environment, run `pip install path-to-ABEL` where `path-to-ABEL` is where you have cloned ABEL to.
    If you want to be able to modify ABEL without uninstalling and reinstalling, you can run `pip install -e path-to-abel`, and the `abel`
    folder in your local clone will effectively be put into your `$PYTHONPATH`.
@@ -12,17 +12,19 @@ To remove ABEL, run `pip uninstall abel`.
 
 ## Configuration of ABEL
 To use ABEL, you must configure it. This is done with the file `.abelconfig.toml`, which is automatically created in your home directory the first time you import ABEL.
-Edit this file with your text editor to tell ABEL where to find tools such as ELEGANT, HIPACE, and GUINEAPIG, as well as configure it for your computing cluster, if needed.
+Edit this file with your text editor to tell ABEL where to find tools such as ELEGANT, [HIPACE++](https://github.com/Hi-PACE/hipace/), and GUINEAPIG, as well as configure it for your computing cluster, if needed.
 
-How to edit it is explained with comments in the file. It uses the file format "TOML", which is a simple text file similar to .ini, but better defined.
+Comments in the file explain how to edit it. The configuration file uses the [TOML format](https://en.wikipedia.org/wiki/TOML), which is a simple text file similar to `.ini`, but more well defined.
 
 Please do not edit the template file `abelconfig.toml` or `CONFIG.py` in the source code folder.
 
-The as-loaded configuration of ABEL is printed to the terminal when abel starts, along with the name of the config file it has loaded.
+The loaded configuration of ABEL is printed to the terminal when ABEL starts, along with the name of the config file it has loaded.
 
 ## Unit tests
 Unit tests are implemented with `pytest`; to run the tests on an installed version of ABEL please run
-``pytest -v``
+```
+pytest -v
+```
 from the root folder of ABEL.
 It is also possible to run single tests by name, for example: `pytest -v tests/test_init.py::testCore_init`
 
@@ -32,4 +34,4 @@ The test functions are also annotated with `@pytest.mark.MARKNAME`.
 
 Pytest is configured in the `[tool.pytest.ini_options]` section of `pyproject.toml`. This especially defines the "markers", which are named groups of tests that can be specified to run using `pytest -v -m MARKNAME`.
 
-When the tests succeed, no output (except `testfile::testfile PASSED`) is printed. If a test fails, a traceback and the printouts of that test is printed. If may tests fail, this can be very verbose.
+When the tests succeed, no output (except `testfile::testfile PASSED`) is printed. If a test fails, a traceback and the printouts of that test are printed. If many tests fail, this can be very verbose.
