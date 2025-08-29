@@ -6,29 +6,35 @@ import numpy as np
 class SCRFAcceleratorBasic(RFAccelerator):
 
     #NOTE: DIFFERENT ORDER OF OF PARAMETERS!
-    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=31.5e6, rep_rate_trains=None, bunch_separation=None, num_bunches_in_train=None, fill_factor=0.711, rf_frequency=1.3e9, structure_length=1.038, peak_power_klystron=9.822e6, operating_temperature=2):
-        
-        self.peak_power_klystron = peak_power_klystron
-        self.operating_temperature = operating_temperature
-
-        self.bunch_charge = None
+    def __init__(self, length=None, nom_energy_gain=None, nom_accel_gradient=31.5e6, rep_rate_trains=None, bunch_separation=None, num_bunches_in_train=None, fill_factor=0.711, rf_frequency=1.3e9, num_rf_cells=9, peak_power_klystron=9.822e6, operating_temperature=2):
         
         # run base class constructor
-        num_structures = None
-        if (length != None and structure_length != None and fill_factor != None):
-            num_structures = int(np.ceil(length/structure_length)/fill_factor)
-        #super().__init__(length=length, nom_energy_gain=nom_energy_gain, structure_length=structure_length, fill_factor=fill_factor, nom_accel_gradient=nom_accel_gradient, rf_frequency=rf_frequency, rep_rate_trains=rep_rate_trains, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation)
-        super().__init__(length=length, structure_length=structure_length, num_structures=num_structures, nom_energy_gain=nom_energy_gain)
-        self.rf_frequency=rf_frequency
+        super().__init__(length=length, nom_energy_gain=nom_energy_gain, num_rf_cells=num_rf_cells, fill_factor=fill_factor, rf_frequency=rf_frequency, operating_temperature=operating_temperature)
+        
+        self.peak_power_klystron = peak_power_klystron
+        self.bunch_charge = None
         self.rep_rate_trains = rep_rate_trains #To Trackable
 
+
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        b = super().track(beam, savedepth, runnable, verbose)
+        
+
+        # perform energy increase
+        beam.set_Es(beam.Es() + self.nom_energy_gain)
 
         # calculate the number of klystrons required
         self.energy_usage()
-
-        return b
+    
+        return super().track(beam, savedepth, runnable, verbose)
+    
+    @RFAccelerator.structure_length.getter
+    def structure_length(self) -> float:
+        "Gets the length of each individual RF structure [m]"
+        
+        phase_advance_cell = np.pi
+        omega = self.rf_frequency*2*np.pi
+        cell_length = phase_advance_cell*SI.c/omega
+        return cell_length*self.num_rf_cells
 
 
     def optimize_linac_geometry_and_gradient(self,fill_factor=1.0):

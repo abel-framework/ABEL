@@ -58,4 +58,5 @@ markers = [
   "linac_unit_test: Unit tests for the Linac class",
   "StageBasic: Unit tests for the StageBasic class",
   "StageBasic_linac: Integration tests for StageBasic linacs",
+  "presets: Tests for collider presets",
 ]
