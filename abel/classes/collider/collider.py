@@ -135,7 +135,7 @@ class Collider(Runnable, CostModeled):
         
     
     def get_event(self, load_beams=False):
-        return Event.load(self.ip.shot_path(shot1=self.linac1.shot, shot2=self.linac2.shot) + 'event.h5', load_beams=False)
+        return Event.load(self.ip.shot_path(shot1=self.linac1.shot, shot2=self.linac2.shot) + 'event.h5', load_beams=load_beams)
         
     # full luminosity per crossing [m^-2]
     def full_luminosity_per_crossing(self):
