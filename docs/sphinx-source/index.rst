@@ -82,7 +82,7 @@ Usage
    usage/examples.rst
 
 API documentation
------
+-----------------
 .. toctree::
    :caption: API DOCUMENTATION
    :maxdepth: 2
@@ -96,7 +96,7 @@ API documentation
    api_external/wrapper_apis.rst
 
 Development
----------
+-----------
 .. toctree::
    :caption: DEVELOPMENT
    :maxdepth: 1
