@@ -361,34 +361,34 @@ def test_HALHFgg():
     shutil.rmtree(halhfgg.run_path())
 
 
-# @pytest.mark.presets
-# def test_CLIC():
-#     """
-#     Test for the ``CLIC`` collider preset.
-#     """
+@pytest.mark.presets
+def test_CLIC():
+    """
+    Test for the ``CLIC`` collider preset.
+    """
 
-#     np.random.seed(42)
+    np.random.seed(42)
 
-#     clic = CLIC()
-#     clic.run('test_CLIC', overwrite=True, verbose=False)
+    clic = CLIC()
+    clic.run('test_CLIC', overwrite=True, verbose=False)
 
-#     # Remove output directory
-#     shutil.rmtree(clic.run_path())
+    # Remove output directory
+    shutil.rmtree(clic.run_path())
 
 
-# @pytest.mark.presets
-# def test_ILC():
-    # """
-    # Test for the ``ILC`` collider preset.
-    # """
+@pytest.mark.presets
+def test_ILC():
+    """
+    Test for the ``ILC`` collider preset.
+    """
 
-    # np.random.seed(42)
+    np.random.seed(42)
 
-    # ilc = ILC()
-    # ilc.run('test_ILC', overwrite=True, verbose=False)
+    ilc = ILC()
+    ilc.run('test_ILC', overwrite=True, verbose=False)
 
-    # # Remove output directory
-    # shutil.rmtree(ilc.run_path())
+    # Remove output directory
+    shutil.rmtree(ilc.run_path())
 
 
 @pytest.mark.presets
