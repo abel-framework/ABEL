@@ -428,8 +428,11 @@ class Beam():
 
         Parameters
         ----------
-        beam1, beam2 : ABEL ``Beam`` object
-            Beams to be compared
+        beam1 : ABEL ``Beam`` object
+            First beam to be compared.
+
+        beam2 : ABEL ``Beam`` object
+            Second beam to be compared.
 
         comp_location : bool, optional
             Flag for comparing the location of the beams. Default set to 
@@ -438,7 +441,7 @@ class Beam():
         rtol : float, optional
             The relative tolerance parameter (see [1]_). Default set to 1e-15.
             
-        rb_fit_obj : float, optional
+        atol : float, optional
             The absolute tolerance parameter (see [1]_). Default set to 0.0.
         
             
@@ -473,8 +476,11 @@ class Beam():
 
         Parameters
         ----------
-        beam1, beam2 : ABEL ``Beam`` object
-            Beams to be compared
+        beam1 : ABEL ``Beam`` object
+            First beam to be compared.
+
+        beam2 : ABEL ``Beam`` object
+            Second beam to be compared.
 
         comp_location : bool, optional
             Flag for comparing the location of the beams. Default set to 
