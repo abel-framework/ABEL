@@ -24,7 +24,7 @@ class StageQuasistatic2d(Stage):
 
         import wake_t
         from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
-        from openpmd_viewer import OpenPMDTimeSeries
+        #from openpmd_viewer import OpenPMDTimeSeries
         import warnings
         
         # suppress numba warnings from Ocelot
@@ -77,18 +77,6 @@ class StageQuasistatic2d(Stage):
         tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
-
-        # function to quiet the tracking output
-        from contextlib import contextmanager
-        @contextmanager
-        def suppress_stdout():
-            with open(os.devnull, "w") as devnull:
-                old_stdout = sys.stdout
-                sys.stdout = devnull
-                try:  
-                    yield
-                finally:
-                    sys.stdout = old_stdout
                     
         # perform tracking
         with suppress_stdout():
@@ -103,30 +91,8 @@ class StageQuasistatic2d(Stage):
             self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
             self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
 
-        # extract wakefield info
-        ts = OpenPMDTimeSeries(tmpfolder+'hdf5/')
-        Ez, metadata = ts.get_field(field='E', coord='z', iteration=min(ts.iterations))
-        self.initial.plasma.wakefield.onaxis.zs = metadata.z
-        self.initial.plasma.wakefield.onaxis.Ezs = Ez[round(len(metadata.r)/2),:].flatten()
-        
-        # extract initial plasma density
-        rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
-        self.initial.plasma.density.extent = metadata0_plasma.imshow_extent
-        self.initial.plasma.density.rho = -(rho0_plasma/SI.e)
-        
-        # extract initial beam density
-        data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
-        data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
-        extent0 = metadata0_plasma.imshow_extent
-        Nbins0 = self.initial.plasma.density.rho.shape
-        dr0 = (extent0[3]-extent0[2])/Nbins0[0]
-        dz0 = (extent0[1]-extent0[0])/Nbins0[1]
-        mask0_beam = np.logical_and(data0_beam[1] < dr0/2, data0_beam[1] > -dr0/2)
-        jz0_beam, _, _ = np.histogram2d(data0_beam[0][mask0_beam], data0_beam[2][mask0_beam], weights=data0_beam[3][mask0_beam], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
-        mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
-        jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
-        self.initial.beam.density.extent = metadata0_plasma.imshow_extent
-        self.initial.beam.density.rho = (jz0_beam+jz0_driver)/(dr0*dr0*dz0)
+        # Store wakefield and beam quantities
+        self.__save_initial_step(tmpfolder)
 
         # remove temporary directory
         shutil.rmtree(tmpfolder)
@@ -182,3 +148,56 @@ class StageQuasistatic2d(Stage):
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
         
+
+   
+
+    # ==================================================
+    def __save_initial_step(self, tmpfolder):
+    #def __save_initial_step(self, Ez0_axial, zs_Ez0, rho0, metadata_rho0, driver0, beam0):
+        """
+        Saves initial electric field, plasma and beam quantities to the stage.
+        """
+
+        from openpmd_viewer import OpenPMDTimeSeries
+
+        # extract wakefield info
+        ts = OpenPMDTimeSeries(tmpfolder+'hdf5/')
+        Ez, metadata = ts.get_field(field='E', coord='z', iteration=min(ts.iterations))
+        self.initial.plasma.wakefield.onaxis.zs = metadata.z
+        self.initial.plasma.wakefield.onaxis.Ezs = Ez[round(len(metadata.r)/2),:].flatten()
+        
+        # extract initial plasma density
+        rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
+        self.initial.plasma.density.extent = metadata0_plasma.imshow_extent
+        self.initial.plasma.density.rho = -(rho0_plasma/SI.e)
+        
+        # extract initial beam density
+        data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
+        data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
+        extent0 = metadata0_plasma.imshow_extent
+        Nbins0 = self.initial.plasma.density.rho.shape
+        dr0 = (extent0[3]-extent0[2])/Nbins0[0]
+        dz0 = (extent0[1]-extent0[0])/Nbins0[1]
+        mask0_beam = np.logical_and(data0_beam[1] < dr0/2, data0_beam[1] > -dr0/2)
+        jz0_beam, _, _ = np.histogram2d(data0_beam[0][mask0_beam], data0_beam[2][mask0_beam], weights=data0_beam[3][mask0_beam], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
+        mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
+        jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
+        self.initial.beam.density.extent = metadata0_plasma.imshow_extent
+        self.initial.beam.density.rho = (jz0_beam+jz0_driver)/(dr0*dr0*dz0)
+
+
+
+###################################################
+from contextlib import contextmanager
+@contextmanager
+def suppress_stdout():
+    """
+    Function to quiet the tracking output.
+    """
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:  
+            yield
+        finally:
+            sys.stdout = old_stdout
