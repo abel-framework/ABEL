@@ -8,12 +8,11 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_transverse_instability=False, enable_radiation_reaction=False, calculate_evolution=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_radiation_reaction=False, calculate_evolution=False):
         
         super().__init__(nom_accel_gradient, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # physics flags
-        self.enable_transverse_instability = enable_transverse_instability
         self.enable_radiation_reaction = enable_radiation_reaction
 
         # simulation flags
@@ -131,42 +130,19 @@ class StageQuasistatic2d(Stage):
 
         # remove temporary directory
         shutil.rmtree(tmpfolder)
-        
-        if self.enable_transverse_instability:
+            
+        # calculate energy gain
+        delta_Es = self.length_flattop*(beam_waket.Es() - beam.Es())/dz
 
-            # TODO: make sure driver offset is correctly handled
-            
-            # find maximum blowout radius
-            rs = np.linspace(self.initial.plasma.density.extent[2], self.initial.plasma.density.extent[3], self.initial.plasma.density.rho.shape[0])
-            rbs = np.zeros(self.initial.plasma.density.rho.shape[1])
-            threshold = 0.9*self.plasma_density
-            for i in range(len(rbs)):
-                rbs_upper = rs[np.logical_and(rs > 0, self.initial.plasma.density.rho[:,i] > threshold)].min()
-                rbs_lower = rs[np.logical_and(rs < 0, self.initial.plasma.density.rho[:,i] > threshold)].max()
-                rbs[i] = (rbs_upper-rbs_lower)/2
-
-            # interpolate for each particle
-            import scipy.interpolate.interp1d as interp1d
-            rbs_interp = interp1d(self.initial.plasma.wakefield.onaxis.zs, rbs)
-            Ezs_interp = interp1d(self.initial.plasma.wakefield.onaxis.zs, self.initial.plasma.wakefield.onaxis.Ezs)
-            
-            # perform tracking  # TODO: transverse_wake_instability_particles() signa has changed.
-            beam = transverse_wake_instability_particles(beam, self.plasma_density, Ezs_interp, rbs_interp, self.length_flattop, show_prog_bar=True)
-            
+        # find driver offset (to shift the beam relative) and apply betatron motion
+        output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, calc_evolution=self.calculate_evolution)
+        if self.calculate_evolution:
+            Es_final, self.evolution.beam = output
         else:
-            
-            # calculate energy gain
-            delta_Es = self.length_flattop*(beam_waket.Es() - beam.Es())/dz
-
-            # find driver offset (to shift the beam relative) and apply betatron motion
-            output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, calc_evolution=self.calculate_evolution)
-            if self.calculate_evolution:
-                Es_final, self.evolution.beam = output
-            else:
-                Es_final = output
-            
-            # accelerate beam (and remove nans)
-            beam.set_Es(Es_final)
+            Es_final = output
+        
+        # accelerate beam (and remove nans)
+        beam.set_Es(Es_final)
             
         # decelerate driver (and remove nans)
         delta_Es_driver = self.length_flattop*(driver0.Es()-driver_waket.Es())/dz
