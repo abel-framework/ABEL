@@ -1156,6 +1156,8 @@ class Stage(Trackable, CostModeled):
         if match_entrance:
             if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
                 return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
+            elif self.upramp is None and self.ramp_beta_mag is not None:
+                return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
             else:
                 return beta_matched(self.plasma_density, energy_incoming)
         else:
@@ -1698,7 +1700,7 @@ class Stage(Trackable, CostModeled):
         # extract wakefields and beam currents
         zs0 = self.initial.plasma.wakefield.onaxis.zs
         Ezs0 = self.initial.plasma.wakefield.onaxis.Ezs
-        has_final = self.final is not None and hasattr(self.final, 'plasma')
+        has_final = self.final is not None and hasattr(self.final, 'plasma.wakefield.onaxis.zs') and hasattr(self.final, 'plasma.wakefield.onaxis.Ezs')
 
         if has_final:
             zs = self.final.plasma.wakefield.onaxis.zs
@@ -1849,7 +1851,12 @@ class Stage(Trackable, CostModeled):
             return
         
         # make figures
-        has_final_step = self.final is not None and hasattr(self.final, 'plasma')
+        has_final_step = self.final is not None \
+            and hasattr(self.final, 'plasma.density.extent') \
+            and hasattr(self.final, 'plasma.wakefield.onaxis.zs') \
+            and hasattr(self.final, 'plasma.wakefield.onaxis.Ezs') \
+            and hasattr(self.final, 'plasma.density.rho') \
+            and hasattr(self.final, 'beam.density.rho')
 
         num_plots = 1 + int(has_final_step)
         fig, ax = plt.subplots(num_plots,1)
