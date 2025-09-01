@@ -9,7 +9,7 @@ SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1.0, depletion_efficiency=0.75, calc_evolution=False, test_beam_between_ramps=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1.0, depletion_efficiency=0.75, probe_evolution=False, test_beam_between_ramps=False):
         """
         Parameters
         ----------
@@ -35,7 +35,7 @@ class StageBasic(Stage):
         depletion_efficiency : float, optional
             Energy depletion efficiency for the drive beam. Default set to 0.75.
 
-        calc_evolution : bool, optional
+        probe_evolution : bool, optional
             Flag for storing the beam parameter evolution data. Default set to 
             ``False``.
 
@@ -49,7 +49,7 @@ class StageBasic(Stage):
         
         self.transformer_ratio = transformer_ratio
         self.depletion_efficiency = depletion_efficiency
-        self.calc_evolution = calc_evolution
+        self.probe_evolution = probe_evolution
         self.test_beam_between_ramps = test_beam_between_ramps
         
     
@@ -99,7 +99,7 @@ class StageBasic(Stage):
             stage_driver_in = copy.deepcopy(drive_beam_ramped)
 
         
-        # ========== Main tracking sequence ==========
+        # ========== Perform tracking in the flattop stage ==========
         beam, driver = self.main_tracking_procedure(beam_ramped, drive_beam_ramped)
 
 
@@ -168,7 +168,8 @@ class StageBasic(Stage):
     # ==================================================
     def main_tracking_procedure(self, beam_ramped, drive_beam_ramped):
         """
-        Prepares and performs the main reduced model beam tracking.
+        Prepares and performs the beam tracking using the physics models of the 
+        stage.
         
 
         Parameters
@@ -196,8 +197,8 @@ class StageBasic(Stage):
 
         # Betatron oscillations
         deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
-        if self.calc_evolution:
-            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset(), calc_evolution=self.calc_evolution)
+        if self.probe_evolution:
+            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset(), calc_evolution=self.probe_evolution)
             self.evolution.beam = evol
         else:
             beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset())
@@ -306,7 +307,7 @@ class StageBasic(Stage):
                                             driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
         # Save parameter evolution to the ramp
-        if self.calc_evolution:
+        if self.probe_evolution:
             self.upramp.evolution = upramp.evolution  # TODO: save to self instead, but need to change stage diagnostics and how this is saved in self.main_tracking_procedure() first.
             
         return beam, driver
@@ -399,7 +400,7 @@ class StageBasic(Stage):
                                             driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
         # Save parameter evolution to the ramp
-        if self.calc_evolution:
+        if self.probe_evolution:
             self.downramp.evolution = downramp.evolution  # TODO: save to self instead, but need to change stage diagnostics and how this is saved in self.main_tracking_procedure() first.
             
         return beam, driver
@@ -423,7 +424,7 @@ class StageBasic(Stage):
      
         
     # ==================================================
-    def copy_config2blank_stage(self, transformer_ratio=None, depletion_efficiency=None, calc_evolution=None):
+    def copy_config2blank_stage(self, transformer_ratio=None, depletion_efficiency=None, probe_evolution=None):
         """
         Makes a deepcopy of the stage to copy the configurations and settings,
         but most of the parameters in the deepcopy are set to ``None``.
@@ -432,7 +433,7 @@ class StageBasic(Stage):
         ----------
         ...
 
-        calc_evolution : bool, optional
+        probe_evolution : bool, optional
             Flag for recording the beam parameter evolution. Default set to the
             same value as ``self``.
             
@@ -455,8 +456,8 @@ class StageBasic(Stage):
             stage_copy.transformer_ratio = transformer_ratio
         if depletion_efficiency is not None:
             stage_copy.depletion_efficiency = depletion_efficiency
-        if calc_evolution is None:
-            stage_copy.calc_evolution = self.calc_evolution
+        if probe_evolution is None:
+            stage_copy.probe_evolution = self.probe_evolution
 
         return stage_copy
 
