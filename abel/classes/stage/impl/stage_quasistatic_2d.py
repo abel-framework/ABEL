@@ -191,7 +191,7 @@ class StageQuasistatic2d(Stage):
         delta_Es = self.length_flattop*(beam_waket.Es() - beam.Es())/dz
 
         # find driver offset (to shift the beam relative) and apply betatron motion
-        output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, calc_evolution=self.probe_evolution)
+        output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, probe_evolution=self.probe_evolution)
         if self.probe_evolution:
             Es_final, self.evolution.beam = output
         else:

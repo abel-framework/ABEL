@@ -27,7 +27,7 @@ import shutil
 import numpy as np
 
 
-def setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0):
+def setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0):
     driver = SourceBasic()
     driver.bunch_length = 42e-6                                                   # [m] This value is for trapezoid.
     driver.z_offset = 300e-6                                                      # [m]
@@ -71,7 +71,7 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
     main.emit_nx, main.emit_ny = 160e-6, 0.56e-6                                  # [m rad]
 
     # Beta functions
-    main.beta_x = beta_matched(plasma_density, main.energy) * ramp_beta_mag       # [m]
+    main.beta_x = beta_matched(plasma_density, main.energy)                       # [m]
     main.beta_y = main.beta_x                                                     # [m]
 
     # Offsets
@@ -83,7 +83,7 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
     return main
 
 
-def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
+def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, probe_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
     
     stage = StageBasic()
     stage.nom_accel_gradient = nom_accel_gradient                                 # [V/m]
@@ -94,7 +94,7 @@ def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_ga
     stage.test_beam_between_ramps = test_beam_between_ramps
     stage.transformer_ratio = transformer_ratio
     stage.depletion_efficiency = depletion_efficiency
-    stage.calc_evolution = calc_evolution
+    stage.probe_evolution = probe_evolution
     stage._return_tracked_driver = return_tracked_driver
 
     # Set up ramps after the stage is fully configured
@@ -113,7 +113,7 @@ def test_stage_length_gradient_energyGain():
     """
 
     np.random.seed(42)
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
     main_source = setup_basic_main_source()
 
 
@@ -163,7 +163,7 @@ def test_beam_between_ramps():
     np.random.seed(42)
 
     # ========== Driver jitter, no angular offset ==========
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
+    driver_source = setup_basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
     main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=True)
 
@@ -191,7 +191,7 @@ def test_beam_between_ramps():
 
 
     # ========== No jitter, no angular offset ==========
-    driver_source2 = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    driver_source2 = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
     main_source2 = setup_basic_main_source()
     stage2 = setup_StageBasic(driver_source=driver_source2, use_ramps=True, test_beam_between_ramps=True)
 
@@ -219,7 +219,7 @@ def test_beam_between_ramps():
 
 
     # ========== No jitter, large angular offset ==========
-    driver_source3 = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=1e-6, y_angle=1e-5)
+    driver_source3 = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=1e-6, y_angle=1e-5)
     main_source3 = setup_basic_main_source()
     stage3 = setup_StageBasic(driver_source=driver_source3, use_ramps=True, test_beam_between_ramps=True)
 
@@ -261,7 +261,7 @@ def test_driver_unrotation():
     # ========== No driver jitter, with angular offset, no ramps ==========
     x_angle = 1.3e-6                                                              # [rad]
     y_angle = 2e-6                                                                # [rad]
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
     main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
 
@@ -300,7 +300,7 @@ def test_driver_unrotation():
 
 
     # ========== Driver jitter, no angular offset ==========
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
+    driver_source = setup_basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
     main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
 
@@ -339,11 +339,11 @@ def test_driver_unrotation():
 
 
     # ========== No jitter, no angular offset ==========
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
     main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
 
-    stage.nom_energy = 36.9e9                                                     # [eV], HALHF v2 last stage nominal input energy 
+    stage.nom_energy = 36.9e9                                                     # [eV]
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -366,11 +366,11 @@ def test_driver_unrotation():
     # ========== No jitter, large angular offset ==========
     x_angle = 5e-6                                                                # [rad]
     y_angle = 2e-5                                                                # [rad]
-    driver_source2 = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
+    driver_source2 = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
     main_source2 = setup_basic_main_source()
     stage2 = setup_StageBasic(driver_source=driver_source2, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
 
-    stage2.nom_energy = 36.9e9                                                     # [eV], HALHF v2 last stage nominal input energy 
+    stage2.nom_energy = 36.9e9                                                     # [eV]
     _, driver = stage2.track(main_source2.track())
     driver0 = stage2.driver_incoming
 
@@ -411,7 +411,7 @@ def test_optimize_plasma_density():
 
     np.random.seed(42)
 
-    driver_source = setup_Basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
     main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
 
@@ -458,13 +458,13 @@ def test_copy_config2blank_stage():
     
     assert np.isclose(stage_copy.transformer_ratio, stage.transformer_ratio, rtol=1e-5, atol=0.0)
     assert np.isclose(stage_copy.depletion_efficiency, stage.depletion_efficiency, rtol=1e-5, atol=0.0)
-    assert np.isclose(stage_copy.calc_evolution, stage.calc_evolution, rtol=1e-5, atol=0.0)
+    assert np.isclose(stage_copy.probe_evolution, stage.probe_evolution, rtol=1e-5, atol=0.0)
 
 
     stage = setup_StageBasic(driver_source=None, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
     stage.transformer_ratio = 1.74
     stage.depletion_efficiency = 0.5354
-    stage.calc_evolution = True
+    stage.probe_evolution = True
     stage_copy = stage.copy_config2blank_stage()
 
     assert stage_copy.plasma_density is None
@@ -494,7 +494,7 @@ def test_copy_config2blank_stage():
     
     assert np.isclose(stage_copy.transformer_ratio, stage.transformer_ratio, rtol=1e-5, atol=0.0)
     assert np.isclose(stage_copy.depletion_efficiency, stage.depletion_efficiency, rtol=1e-5, atol=0.0)
-    assert np.isclose(stage_copy.calc_evolution, stage.calc_evolution, rtol=1e-5, atol=0.0)
+    assert np.isclose(stage_copy.probe_evolution, stage.probe_evolution, rtol=1e-5, atol=0.0)
 
 
     

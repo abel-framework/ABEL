@@ -87,7 +87,7 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
     return main
 
 
-def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, calc_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
+def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, probe_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
     
     stage = StageBasic()
     stage.nom_accel_gradient = nom_accel_gradient                                   # [GV/m]
@@ -98,7 +98,7 @@ def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_ga
     stage.test_beam_between_ramps = test_beam_between_ramps
     stage.transformer_ratio = transformer_ratio
     stage.depletion_efficiency = depletion_efficiency
-    stage.calc_evolution = calc_evolution
+    stage.probe_evolution = probe_evolution
     stage._return_tracked_driver = return_tracked_driver
 
     # Set up ramps after the stage is fully configured
@@ -134,7 +134,7 @@ def test_baseline_linac():
     
     driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(ramp_beta_mag=1.0)
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, calc_evolution=False)
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, probe_evolution=False)
     interstage = setup_InterstageBasic(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
@@ -198,7 +198,7 @@ def test_baseline_linac():
 def test_linac_plots():
     """
     Tests a linac with ``StageBasic`` plasma stages. No driver jitter, with 
-    ramps. ``StageBasic.calc_evolution=True``.
+    ramps. ``StageBasic.probe_evolution=True``.
 
     Checks that plotting methods can be executed.
     """
@@ -210,8 +210,8 @@ def test_linac_plots():
     
     driver_source = setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False)
     main_source = setup_basic_main_source()
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
-    stage.calc_evolution = True
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
+    stage.probe_evolution = True
     interstage = setup_InterstageBasic(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
@@ -297,7 +297,7 @@ def test_ramped_linac():
     
     driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source()
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     interstage = setup_InterstageBasic(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
@@ -403,13 +403,13 @@ def test_ramped_linac_vs_old_method():
     main_source = setup_basic_main_source()
 
     # Ramps constructed with PlasmRamp
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     interstage = setup_InterstageBasic(stage)
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
 
     # Ramps constructed with stage.__class__()
-    stage_old = setup_StageBasic(driver_source=driver_source, use_ramps=False, calc_evolution=False)
+    stage_old = setup_StageBasic(driver_source=driver_source, use_ramps=False, probe_evolution=False)
     stage_old.upramp = stage_old.__class__()
     stage_old.downramp = stage_old.__class__()
     stage_old.upramp.ramp_beta_mag = 10.0
@@ -448,7 +448,7 @@ def test_ramped_norm_emitt_jitter_linac():
     
     driver_source = setup_Basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm_emittance_jitter=True)
     main_source = setup_basic_main_source()
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     interstage = setup_InterstageBasic(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
@@ -475,7 +475,7 @@ def test_ramped_jitter_linac():
     
     driver_source = setup_Basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source()
-    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, calc_evolution=False)
+    stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     interstage = setup_InterstageBasic(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)

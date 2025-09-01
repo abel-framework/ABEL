@@ -52,7 +52,8 @@ class StageBasic(Stage):
         self.probe_evolution = probe_evolution
         self.test_beam_between_ramps = test_beam_between_ramps
         
-    
+
+    # ==================================================
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
         
         # get the driver
@@ -198,7 +199,7 @@ class StageBasic(Stage):
         # Betatron oscillations
         deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
         if self.probe_evolution:
-            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset(), calc_evolution=self.probe_evolution)
+            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset(), probe_evolution=self.probe_evolution)
             self.evolution.beam = evol
         else:
             beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset())
