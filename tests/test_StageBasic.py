@@ -55,7 +55,7 @@ def setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, 
     return driver
 
 
-def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
+def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=1.0):
     from abel.utilities.plasma_physics import beta_matched
 
     main = SourceBasic()
@@ -71,7 +71,7 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=10.0):
     main.emit_nx, main.emit_ny = 160e-6, 0.56e-6                                  # [m rad]
 
     # Beta functions
-    main.beta_x = beta_matched(plasma_density, main.energy)                       # [m]
+    main.beta_x = beta_matched(plasma_density, main.energy) * ramp_beta_mag       # [m]
     main.beta_y = main.beta_x                                                     # [m]
 
     # Offsets
@@ -114,11 +114,11 @@ def test_stage_length_gradient_energyGain():
 
     np.random.seed(42)
     driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
-    main_source = setup_basic_main_source()
 
 
     # ========== Set flattop length and nominal energy gain ==========
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=False)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.length_flattop = 4.82                                                   # [m]
     stage.nom_energy_gain = 31.9e9                                                # [eV]
@@ -135,6 +135,7 @@ def test_stage_length_gradient_energyGain():
 
     # ========== Set flattop nominal accelertaion gradient and nominal energy gain ==========
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=False)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
     stage.nom_accel_gradient = None                                               # [V/m]
@@ -164,8 +165,8 @@ def test_beam_between_ramps():
 
     # ========== Driver jitter, no angular offset ==========
     driver_source = setup_basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
-    main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, test_beam_between_ramps=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
@@ -192,8 +193,8 @@ def test_beam_between_ramps():
 
     # ========== No jitter, no angular offset ==========
     driver_source2 = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
-    main_source2 = setup_basic_main_source()
     stage2 = setup_StageBasic(driver_source=driver_source2, use_ramps=True, test_beam_between_ramps=True)
+    main_source2 = setup_basic_main_source(ramp_beta_mag=stage2.ramp_beta_mag)
 
     linac = PlasmaLinac(source=main_source2, stage=stage2, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
@@ -220,8 +221,8 @@ def test_beam_between_ramps():
 
     # ========== No jitter, large angular offset ==========
     driver_source3 = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=1e-6, y_angle=1e-5)
-    main_source3 = setup_basic_main_source()
     stage3 = setup_StageBasic(driver_source=driver_source3, use_ramps=True, test_beam_between_ramps=True)
+    main_source3 = setup_basic_main_source(ramp_beta_mag=stage3.ramp_beta_mag)
 
     linac = PlasmaLinac(source=main_source3, stage=stage3, num_stages=1)
     linac.run('test_beam_between_ramps', overwrite=True, verbose=False)
@@ -262,8 +263,8 @@ def test_driver_unrotation():
     x_angle = 1.3e-6                                                              # [rad]
     y_angle = 2e-6                                                                # [rad]
     driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
-    main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy = 51.4e9                                                    # [eV]
     _, driver = stage.track(main_source.track())
@@ -301,8 +302,8 @@ def test_driver_unrotation():
 
     # ========== Driver jitter, no angular offset ==========
     driver_source = setup_basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
-    main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy = 51.4e9                                                    # [eV]
     _, driver = stage.track(main_source.track())
@@ -340,8 +341,8 @@ def test_driver_unrotation():
 
     # ========== No jitter, no angular offset ==========
     driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
-    main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy = 36.9e9                                                     # [eV]
     _, driver = stage.track(main_source.track())
@@ -367,8 +368,8 @@ def test_driver_unrotation():
     x_angle = 5e-6                                                                # [rad]
     y_angle = 2e-5                                                                # [rad]
     driver_source2 = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
-    main_source2 = setup_basic_main_source()
     stage2 = setup_StageBasic(driver_source=driver_source2, use_ramps=True, return_tracked_driver=True, test_beam_between_ramps=True)
+    main_source2 = setup_basic_main_source(ramp_beta_mag=stage2.ramp_beta_mag)
 
     stage2.nom_energy = 36.9e9                                                     # [eV]
     _, driver = stage2.track(main_source2.track())
@@ -412,8 +413,8 @@ def test_optimize_plasma_density():
     np.random.seed(42)
 
     driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
-    main_source = setup_basic_main_source()
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, test_beam_between_ramps=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.optimize_plasma_density(main_source)
     assert np.isclose(stage.plasma_density, 6.592382486466319e+21, rtol=1e-5, atol=0.0)
