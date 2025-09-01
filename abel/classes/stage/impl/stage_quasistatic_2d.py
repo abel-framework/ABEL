@@ -19,12 +19,10 @@ class StageQuasistatic2d(Stage):
         self.probe_evolution = probe_evolution
     
         
+    # ==================================================
     # track the particles through
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
-        #import wake_t
-        #from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
-        #from openpmd_viewer import OpenPMDTimeSeries
         import warnings
         
         # suppress numba warnings from Ocelot
@@ -32,6 +30,15 @@ class StageQuasistatic2d(Stage):
         
         # make driver
         driver_incoming = self.driver_source.track()
+        original_driver = copy.deepcopy(driver_incoming)
+
+
+        # ========== Rotate the coordinate system of the beams ==========
+        # Perform beam rotations before calling on upramp tracking.
+        if self.parent is None:  # Ensures that this is the main stage and not a ramp.
+
+            # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
+            drive_beam_rotated, beam_rotated = self.rotate_beam_coordinate_systems(driver_incoming, beam_incoming)
 
 
         # ========== Prepare ramps ==========
@@ -42,14 +49,13 @@ class StageQuasistatic2d(Stage):
 
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:
-            #self.upramp.probe_evolution = self.probe_evolution
-            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
+            beam0, driver0 = self.track_upramp(beam_rotated, drive_beam_rotated)
         else:
-            beam0 = beam_incoming
-            driver0 = driver_incoming
-            if self.ramp_beta_mag is not None:
-                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+            beam0 = beam_rotated
+            driver0 = drive_beam_rotated
+            # if self.ramp_beta_mag is not None:
+            #     beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+            #     driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
 
         
         # ========== Perform tracking in the flattop stage ==========
@@ -58,15 +64,22 @@ class StageQuasistatic2d(Stage):
         
         # ==========  Apply plasma density down ramp (magnify beta function) ==========
         if self.downramp is not None:
-            #self.downramp.probe_evolution = self.probe_evolution
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
         else:
             beam_outgoing = beam
             driver_outgoing = driver
-            if self.ramp_beta_mag is not None:
-                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+            # if self.ramp_beta_mag is not None:
+            #     beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+            #     driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
         
+
+        # ========== Rotate the coordinate system of the beams back to original ==========
+        # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
+        if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
+            
+            # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
+            driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(original_driver, driver_outgoing, beam_outgoing)
+
 
         # ========== Bookkeeping ==========
         # copy meta data from input beam (will be iterated by super)
