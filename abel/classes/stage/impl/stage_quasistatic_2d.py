@@ -245,11 +245,6 @@ class StageQuasistatic2d(Stage):
         from abel.classes.stage.stage import Stage, PlasmaRamp
         from abel.classes.source.impl.source_capsule import SourceCapsule
 
-        # # Save beams to check for consistency between ramps and stage
-        # if self.test_beam_between_ramps:
-        #     ramp_beam_in = copy.deepcopy(beam0)
-        #     ramp_driver_in = copy.deepcopy(driver0)
-
         # Convert PlasmaRamp to a StageQuasistatic2d
         if type(self.upramp) is PlasmaRamp:
 
@@ -297,23 +292,6 @@ class StageQuasistatic2d(Stage):
         
         # save current profile
         self.upramp.calculate_beam_current(beam0, driver0, beam, driver)
-
-        # # TODO: Temporary "drive beam evolution": Demagnify the driver
-        # # Needs to be performed before self.upramp.store_beams_between_ramps().
-        # driver.magnify_beta_function(1/self.upramp.ramp_beta_mag, axis_defining_beam=driver)
-
-        # # Save beams to check for consistency between ramps and stage
-        # if self.test_beam_between_ramps:
-        #     ramp_beam_out = copy.deepcopy(beam)
-        #     ramp_driver_out = copy.deepcopy(driver)
-
-        # # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        # if self.test_beam_between_ramps:
-        #     self.upramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
-        #                                     beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
-        #                                     driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
-        #                                     beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
-        #                                     driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
         # Save parameter evolution to the ramp
         if self.probe_evolution:
@@ -348,11 +326,6 @@ class StageQuasistatic2d(Stage):
 
         from abel.classes.stage.stage import Stage, PlasmaRamp
         from abel.classes.source.impl.source_capsule import SourceCapsule
-
-        # # Save beams to check for consistency between ramps and stage
-        # if self.test_beam_between_ramps:
-        #     ramp_beam_in = copy.deepcopy(beam0)
-        #     ramp_driver_in = copy.deepcopy(driver0)
 
         # Convert PlasmaRamp to a StageQuasistatic2d
         if type(self.downramp) is PlasmaRamp:
@@ -401,19 +374,6 @@ class StageQuasistatic2d(Stage):
         
         # save current profile
         self.downramp.calculate_beam_current(beam0, driver0, beam, driver)
-
-        # # Save beams to check for consistency between ramps and stage
-        # if self.test_beam_between_ramps:
-        #     ramp_beam_out = copy.deepcopy(beam)
-        #     ramp_driver_out = copy.deepcopy(driver)
-
-        # # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        # if self.test_beam_between_ramps:
-        #     self.downramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
-        #                                     beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
-        #                                     driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
-        #                                     beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
-        #                                     driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
         # Save parameter evolution to the ramp
         if self.probe_evolution:
@@ -424,7 +384,6 @@ class StageQuasistatic2d(Stage):
 
     # ==================================================
     def __save_initial_step(self, tmpfolder):
-    #def __save_initial_step(self, Ez0_axial, zs_Ez0, rho0, metadata_rho0, driver0, beam0):
         """
         Saves initial electric field, plasma and beam quantities to the stage.
         """
