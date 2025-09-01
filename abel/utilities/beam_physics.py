@@ -164,7 +164,10 @@ def Dmat(l, inv_rho=0, k=0):
     
 
 def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False):
-
+    """
+    Evolution of the beta function.
+    """
+    
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
         fast = False
@@ -215,6 +218,9 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
 
 
 def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
+    """
+    Evolution of the first-order transverse dispersion.
+    """
     
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
@@ -271,6 +277,9 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
 
 
 def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=False):
+    """
+    Evolution of the second-order transverse dispersion.
+    """
     
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
@@ -371,7 +380,10 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
 
 
 def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
-
+    """
+    Evolution of longitudinal dispersion, R56.
+    """
+    
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
         fast = False
@@ -431,6 +443,9 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res
 
 
 def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
+    """
+    Evolution of the beam orbit (i.e., the top view).
+    """
 
     # points per dipole
     num_steps = 25
@@ -515,8 +530,147 @@ def evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, plot=False):
     return curlyH, evolution
 
 
-def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False):
+def evolve_I2(ls, inv_rhos, fast=False, plot=False):
+    """
+    Evolution of the second synchrotron radiation integral I_2.
+    """
+    
+    # make cumulative lengths
+    ss = np.append([0.0], np.cumsum(ls))
+    I2s = np.empty_like(ss)
+    
+    # intialize at zero  I2
+    I2s[0] = 0
+    
+    # calculate the evolution
+    for i in range(len(ls)):
+        deltaI2 = ls[i]*inv_rhos[i]**2
+        I2s[i+1] = I2s[i] + deltaI2
 
+    # save evolution
+    if not fast:
+        evolution = np.empty([2, len(ss)])
+        evolution[0,:] = ss
+        evolution[1,:] = I2s
+    else:
+        evolution = None
+
+    # extract final I2
+    I2 = I2s[-1]
+
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(ss, I2s)
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel(r'Second synchrotron radiation integral, $I_2$ (m$^{-1}$)')
+
+    return I2, evolution
+
+
+def evolve_I3(ls, inv_rhos, fast=False, plot=False):
+    """
+    Evolution of the third synchrotron radiation integral I_3.
+    """
+
+    # make cumulative lengths
+    ss = np.append([0.0], np.cumsum(ls))
+    I3s = np.empty_like(ss)
+    
+    # intialize at zero I3
+    I3s[0] = 0
+    
+    # calculate the evolution
+    for i in range(len(ls)):
+        deltaI3 = ls[i]*abs(inv_rhos[i])**3
+        I3s[i+1] = I3s[i] + deltaI3
+
+    # save evolution
+    if not fast:
+        evolution = np.empty([2, len(ss)])
+        evolution[0,:] = ss
+        evolution[1,:] = I3s
+    else:
+        evolution = None
+
+    # extract final I3
+    I3 = I3s[-1]
+
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(ss, I3s)
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel(r'Third synchrotron radiation integral, $I_3$ (m$^{-1}$)')
+
+    return I3, evolution
+
+
+def evolve_I4(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False):
+    """
+    Evolution of the fourth synchrotron radiation integral I_4.
+    """
+    
+    _, _, evol_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=True)
+    ss = evol_disp[0]
+    Dxs = -evol_disp[1] # TODO: check this sign
+    I4s = np.empty_like(ss)
+    
+    # make cumulative lengths
+    ssl = np.append([0.0], np.cumsum(ls))[:-1]
+    
+    # intialize at zero I5
+    I4s[0] = 0
+    
+    # calculate the evolution
+    for i in range(len(ss)-1):
+
+        s_prev = ss[i]
+        index_element_prev = np.argmin(abs(ssl - s_prev))
+        index_element_ceil_prev = index_element_prev + int(ssl[index_element_prev] <= s_prev) - 1
+        inv_rho_prev = inv_rhos[index_element_ceil_prev]
+        k_prev = ks[index_element_ceil_prev]
+
+        s = ss[i+1]
+        index_element = np.argmin(abs(ssl - s))
+        index_element_ceil = index_element + int(ssl[index_element] <= s) - 1
+        inv_rho = inv_rhos[index_element_ceil]
+        k = ks[index_element_ceil]
+
+        ds = ss[i+1]-ss[i]
+        inv_rho_halfstep = (inv_rho_prev+inv_rho)/2
+        k_halfstep = (k_prev+k)/2
+        Dx = Dxs[i+1]
+        deltaI4 = Dx * inv_rho_halfstep * (inv_rho_halfstep**2 + 2*k_halfstep) * ds
+        I4s[i+1] = I4s[i] + deltaI4
+
+    # save evolution
+    if not fast:
+        evolution = np.empty([2, len(ss)])
+        evolution[0,:] = ss
+        evolution[1,:] = I4s
+    else:
+        evolution = None
+
+    # extract final I5
+    I4 = I4s[-1]
+
+    if plot:
+        from matplotlib import pyplot as plt
+        fig, ax = plt.subplots(1,1)
+        ax.plot(ss, I4s)
+        ax.set_xlabel('s (m)')
+        ax.set_ylabel(r'Fourth synchrotron radiation integral, $I_4$ (m$^{-1}$)')
+        #ax.set_yscale('log')
+
+    return I4, evolution
+
+
+def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False):
+    """
+    Evolution of the fifth synchrotron radiation integral I_5.
+    """
+    
     _, evol = evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=alpha0, Dx0=Dx0, Dpx0=Dpx0, plot=False)
     ss = evol[0,:]
     curlyHs = evol[1,:]
@@ -525,7 +679,7 @@ def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot
     # make cumulative lengths
     ssl = np.append([0.0], np.cumsum(ls))[:-1]
     
-    # intialize at zero R56
+    # intialize at zero I5
     I5s[0] = 0
     
     # calculate the evolution
@@ -555,7 +709,7 @@ def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot
     else:
         evolution = None
 
-    # extract final R56
+    # extract final I5
     I5 = I5s[-1]
 
     if plot:
@@ -570,7 +724,10 @@ def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot
 
 
 def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False, bending_plane=True):
-
+    """
+    Evolution of the first-order chromatic amplitude W.
+    """
+    
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
         fast = False
