@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : StageBasic beamline calculation tests
+ABEL : StageBasic beamline integration tests
 =======================================
 
 This file is a part of ABEL.

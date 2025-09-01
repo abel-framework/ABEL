@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : StageBasic tests
+ABEL : StageBasic unit tests
 =======================================
 
 This file is a part of ABEL.
