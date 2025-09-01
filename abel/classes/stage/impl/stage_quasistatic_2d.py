@@ -42,8 +42,8 @@ class StageQuasistatic2d(Stage):
             self.upramp.calculate_evolution = self.calculate_evolution
             beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
         else:
-            beam0 = copy.deepcopy(beam_incoming)
-            driver0 = copy.deepcopy(driver_incoming)
+            beam0 = beam_incoming
+            driver0 = driver_incoming
             if self.ramp_beta_mag is not None:
                 beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
                 driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
@@ -51,6 +51,8 @@ class StageQuasistatic2d(Stage):
         # make copy of the beam to update later
         beam = copy.deepcopy(beam0)
         
+
+        # ========== Wake-T simulation and extraction ==========
         # convert beams to WakeT bunches
         driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
@@ -96,9 +98,11 @@ class StageQuasistatic2d(Stage):
 
         # remove temporary directory
         shutil.rmtree(tmpfolder)
-            
+        
+
+        # ========== Main tracking sequence ==========
         # calculate energy gain
-        delta_Es = self.length_flattop*(beam_waket.Es() - beam.Es())/dz
+        delta_Es = self.length_flattop*(beam_waket.Es() - beam0.Es())/dz
 
         # find driver offset (to shift the beam relative) and apply betatron motion
         output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, calc_evolution=self.calculate_evolution)
@@ -121,12 +125,14 @@ class StageQuasistatic2d(Stage):
             self.downramp.calculate_evolution = self.calculate_evolution
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
         else:
-            beam_outgoing = copy.deepcopy(beam)
-            driver_outgoing = copy.deepcopy(driver)
+            beam_outgoing = beam
+            driver_outgoing = driver
             if self.ramp_beta_mag is not None:
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
                 driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
         
+
+        # ========== Bookkeeping ==========
         # copy meta data from input beam (will be iterated by super)
         beam_outgoing.trackable_number = beam_incoming.trackable_number
         beam_outgoing.stage_number = beam_incoming.stage_number
@@ -149,7 +155,7 @@ class StageQuasistatic2d(Stage):
             return super().track(beam_outgoing, savedepth, runnable, verbose)
         
 
-   
+    
 
     # ==================================================
     def __save_initial_step(self, tmpfolder):
