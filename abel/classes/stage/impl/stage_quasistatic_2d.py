@@ -8,7 +8,7 @@ from abel.physics_models.particles_transverse_wake_instability import transverse
 
 class StageQuasistatic2d(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_radiation_reaction=False, probe_evolution=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_radiation_reaction=False, probe_evolution=False, store_beams_for_tests=False):
         
         super().__init__(nom_accel_gradient, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -17,6 +17,7 @@ class StageQuasistatic2d(Stage):
 
         # simulation flags
         self.probe_evolution = probe_evolution
+        self.store_beams_for_tests = store_beams_for_tests
     
         
     # ==================================================
@@ -82,6 +83,11 @@ class StageQuasistatic2d(Stage):
 
 
         # ========== Bookkeeping ==========
+        # Store beams for tests
+        if self.store_beams_for_tests:
+            # The original drive beam before rotation and ramps
+            self.driver_incoming = original_driver
+            
         # copy meta data from input beam (will be iterated by super)
         beam_outgoing.trackable_number = beam_incoming.trackable_number
         beam_outgoing.stage_number = beam_incoming.stage_number
