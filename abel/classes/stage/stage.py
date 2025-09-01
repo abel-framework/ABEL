@@ -1156,8 +1156,6 @@ class Stage(Trackable, CostModeled):
         if match_entrance:
             if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
                 return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
-            elif self.upramp is None and self.ramp_beta_mag is not None:
-                return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
             else:
                 return beta_matched(self.plasma_density, energy_incoming)
         else:
