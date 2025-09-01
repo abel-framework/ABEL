@@ -18,6 +18,8 @@ class InterstagePlasmaLens(Interstage, ABC):
         self.lens2_offset_x = 0
         self.lens1_offset_y = 0
         self.lens2_offset_y = 0
+
+        self.cancel_isr_kicks = False
         
         # length ratios
         self.length_ratio_gap = 0.025
@@ -31,6 +33,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         self._strength_plasma_lens = None # [1/m]
         self._nonlinearity_plasma_lens = None # [1/m]
         self._strength_sextupole = None # [1/m^2]
+
         
     
     ## OVERALL LENGTH
@@ -111,6 +114,20 @@ class InterstagePlasmaLens(Interstage, ABC):
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         return self.charge_sign*self.strength_sextupole*p0/(SI.e*self.length_central_gap_or_sextupole)
 
+
+    ## ISR KICK MITIGATION
+    
+    def lens_offset_isr_kick_mitigation(self):
+        """
+        Estimates the required lens offset [m] in order to cancel ISR kicks
+        (this value for the first lens, negative of it for the second lens)
+        """
+        pfit = [2.36256046e-08, 1.09612466e-07, 2.70442278e-07, -1.47004050e-07, 5.08857498e-08]
+        R56_scaling = SI.c**2*(self.field_dipole**2*self.length_dipole**3/self.nom_energy**2)
+        dx_scaling = self.field_dipole**3*self.length_dipole**3
+        dx = np.polyval(pfit, self.R56/R56_scaling)*dx_scaling
+        
+        return dx
     
     
     ## MATRIX LATTICE

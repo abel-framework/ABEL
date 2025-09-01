@@ -64,6 +64,12 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         phi_dip = self.length_dipole*B_dip*SI.e/energy2momentum(self.nom_energy)
         dipole = elements.ExactSbend(ds=self.length_dipole, phi=np.rad2deg(phi_dip), B=B_dip, nslice=self.num_slices)
 
+        # add lens offset for ISR mitigation
+        if self.enable_isr and self.cancel_isr_kicks:
+            dx_isr = self.lens_offset_isr_kick_mitigation()
+        else:
+            dx_isr = 0
+            
         # define plasma lens
         ds_pl = self.length_plasma_lens/(self.num_slices+1)
         drift_slice_pl = elements.ExactDrift(ds=ds_pl, nslice=1)
@@ -71,7 +77,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         plasma_lens2 = [drift_slice_pl]
         kl_lens = self.strength_plasma_lens
         tau_lens = self.nonlinearity_plasma_lens
-        dxs = np.array([self.lens1_offset_x, self.lens2_offset_x]) + np.random.normal(scale=self.jitter.lens_offset_x, size=2)
+        dxs = dx_isr*np.array([1, -1]) + np.array([self.lens1_offset_x, self.lens2_offset_x]) + np.random.normal(scale=self.jitter.lens_offset_x, size=2)
         dxps = np.random.normal(scale=self.jitter.lens_angle_x, size=2)
         dys = np.array([self.lens1_offset_y, self.lens2_offset_y]) + np.random.normal(scale=self.jitter.lens_offset_y, size=2)
         dyps = np.random.normal(scale=self.jitter.lens_angle_y, size=2)
