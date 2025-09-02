@@ -22,6 +22,12 @@ class StageWakeT(Stage):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
         from abel.utilities.plasma_physics import blowout_radius, k_p, beta_matched
+
+        
+        if self.upramp is not None:
+            raise NotImplementedError('Ramp tracking has not been implmented for StageWakeT.')
+        if self.downramp is not None:
+            raise NotImplementedError('Ramp tracking has not been implmented for StageWakeT.')
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
@@ -33,8 +39,9 @@ class StageWakeT(Stage):
         # make driver (and convert to WakeT bunch)
         driver0 = self.driver_source.track()
         
+        # ========== Apply plasma density up ramp (demagnify beta function) ==========
         # apply plasma-density up ramp (demagnify beta function)
-        if self.ramp_beta_mag is not None:
+        if self.ramp_beta_mag is not None: # TODO: remove this part
             driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
             beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
         
@@ -101,8 +108,9 @@ class StageWakeT(Stage):
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
+        # ========== Apply plasma density down ramp (magnify beta function) ==========
         # apply plasma-density down ramp (magnify beta function)
-        if self.ramp_beta_mag is not None:
+        if self.ramp_beta_mag is not None: # TODO: remove this part
             beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
             driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         
