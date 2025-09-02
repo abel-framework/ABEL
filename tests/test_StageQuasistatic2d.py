@@ -232,9 +232,9 @@ def test_driver_unrotation():
 
 
 @pytest.mark.StageQuasistatic2d
-def test_baseline_run():
+def test_baseline_tracking():
     """
-    Tests for running ``StageQuasistatic2d`` without ramps and radiation 
+    Tests for tracking ``StageQuasistatic2d`` without ramps and radiation 
     reaction.
 
     Examines stage configuraions and the output main beam parameters.
@@ -285,13 +285,75 @@ def test_baseline_run():
     assert np.isclose(beam.beta_y(), nom_beta_y, rtol=1e-2, atol=0.0)
     assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
     assert np.isclose(beam.rel_energy_spread(), 4.0e-2, rtol=1e-1, atol=0.0)
+
+
+@pytest.mark.StageQuasistatic2d
+def test_ramped_tracking():
+    """
+    Tests for tracking ``StageQuasistatic2d`` with ramps, but without radiation 
+    reaction.
+
+    Examines stage configuraions and the output main beam parameters.
+    """
+
+    np.random.seed(42)
+    
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0)
+    stage = setup_StageQuasistatic2d(driver_source=driver_source, enable_radiation_reaction=False, use_ramps=True, probe_evolution=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
+
+    stage.nom_energy = 5.0e9                                                        # [eV]
+    beam = stage.track(main_source.track())
+
+    # Inspect stage configurations
+    assert stage.has_ramp() is True
+    assert stage.enable_radiation_reaction is False
+    assert stage.probe_evolution is True
+    assert stage._return_tracked_driver is False
+    assert stage.store_beams_for_tests is False
+    assert np.isclose(stage.plasma_density, 7.0e21, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain, 31.9e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, stage.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient, 6.4e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient_flattop, 6.6e9, rtol=1e-2, atol=0.0)
+    assert np.isclose(stage.length, stage.nom_energy_gain/stage.nom_accel_gradient, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.length_flattop, stage.nom_energy_gain_flattop/stage.nom_accel_gradient_flattop, rtol=1e-15, atol=0.0)
+
+    # Examine output beam
+    assert np.isclose(beam.energy(), main_source.energy + stage.nom_energy_gain, rtol=3e-2, atol=0.0)
+    assert np.isclose(beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
+    assert len(beam) == main_source.num_particles
+    assert beam.stage_number == 1
+    assert np.isclose(beam.location, stage.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_offset(), main_source.x_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_offset(), main_source.y_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.z_offset(), main_source.z_offset, rtol=1e-3, atol=0.0)
+    assert np.isclose(beam.x_angle(), main_source.x_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_angle(), main_source.y_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), main_source.emit_ny, rtol=7e-2, atol=0.0)
+    nom_beta_x = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_x
+    nom_beta_y = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_y
+    assert np.isclose(beam.beta_x(), nom_beta_x, rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.beta_y(), nom_beta_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.rel_energy_spread(), 4.0e-2, rtol=1e-1, atol=0.0)
+
+    # Also test Stage.plot_evolution()
+    #import time
+    #from matplotlib import pyplot as plt
+    #plt.ion()
+    #stage.plot_evolution()
+    #time.sleep(5)  # pauses for 5 seconds
+
+
     
 
 
 
-
-
-    #assert np.isclose(stage.length_flattop, stage.nom_energy_gain_flattop/stage.nom_accel_gradient_flattop, rtol=1e-15, atol=0.0)
 
 
 
