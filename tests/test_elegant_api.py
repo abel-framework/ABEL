@@ -135,9 +135,11 @@ def test_elegant_write_read_beam():
 
     # Convert back to an ABEL beam
     beam = elegant_read_beam(inputbeamfile, tmpfolder=tmpfolder)
-    beam.set_zs(-1*beam.zs()) # TODO: Seems like there is an inconsistency in the definition of z in the ELEGANT api. is this really correct?
+    beam.set_zs(-1*beam.zs()) # TODO: Seems like there is an inconsistency in the definition of z in the ELEGANT api. is this really correct? Does the ELEGANT beam perhaps need to be passed through an ELEGANT tracking to have the zs set correctly?
 
-    Beam.comp_beams(beam0, beam, comp_location=True)
+    assert np.isclose(beam0.location, beam.location, rtol=0.0, atol=1.0e-10)
+    assert beam0.stage_number == beam.stage_number
+    Beam.comp_beams(beam0, beam, comp_location=False)
     
     # Remove temporary files
     shutil.rmtree(tmpfolder)
