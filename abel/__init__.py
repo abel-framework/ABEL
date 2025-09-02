@@ -30,10 +30,12 @@ from .classes.beamline.impl.driver_complex import DriverComplex
 from .classes.beamline.impl.linac.linac import Linac
 from .classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from .classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
-from .classes.beamline.impl.experiment.experiment import Experiment
-from .classes.beamline.impl.experiment.impl.experiment_pwfa import ExperimentPWFA
-from .classes.beamline.impl.experiment.impl.experiment_apl import ExperimentAPL
-from .classes.beamline.impl.experiment.impl.experiment_flashforward import ExperimentFLASHForward
+
+from .classes.beamline.impl.experiment import Experiment
+from .classes.beamline.impl.experiment.pwfa import ExperimentPWFA
+from .classes.beamline.impl.experiment.pwfa.flashforward import FLASHForward
+from .classes.beamline.impl.experiment.pwfa.facet2 import FACET2
+from .classes.beamline.impl.experiment.apl import ExperimentAPL
 
 from .classes.collider.collider import Collider
 

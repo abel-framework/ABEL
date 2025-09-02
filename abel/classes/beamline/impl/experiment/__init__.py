@@ -8,11 +8,11 @@ import numpy as np
 
 class Experiment(Beamline):
     
-    def __init__(self, linac=None, component=None, spectrometer=None, num_bunches_in_train=1, bunch_separation=0, rep_rate_trains=10):
+    def __init__(self, linac=None, test_device=None, spectrometer=None, num_bunches_in_train=1, bunch_separation=0, rep_rate_trains=10):
         super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
         
         self.linac = linac
-        self.component = component
+        self.test_device = test_device
         self.spectrometer = spectrometer
         
     
@@ -26,8 +26,8 @@ class Experiment(Beamline):
         assert(isinstance(self.linac, Linac) or isinstance(self.linac, Source))
         self.trackables.append(self.linac)
 
-        # add the experimental component
-        self.trackables.append(self.component)
+        # add the experimental test device
+        self.trackables.append(self.test_device)
 
         # add the spectrometer (if it exists
         if self.spectrometer is not None:
