@@ -39,7 +39,7 @@ def setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, 
     driver.energy = 31.25e9                                                       # [eV]
     driver.rel_energy_spread = 0.01                                               # Relative rms energy spread
 
-    driver.emit_nx, driver.emit_ny = 50e-6, 100e-6                                # [m rad]
+    driver.emit_nx, driver.emit_ny = 80e-6, 80e-6                                 # [m rad]
     driver.beta_x, driver.beta_y = 0.2, 0.2                                       # [m]
 
     if enable_xy_jitter:
@@ -83,14 +83,17 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=1.0):
     return main
 
 
-def setup_StageQuasistatic2d(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, enable_radiation_reaction=False, probe_evolution=False, return_tracked_driver=False, use_ramps=False, store_beams_for_tests=False):
+def setup_StageQuasistatic2d(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, enable_radiation_reaction=False, probe_evolution=False, return_tracked_driver=False, use_ramps=False, store_beams_for_tests=False):
 
     stage = StageQuasistatic2d()
     stage.nom_accel_gradient = nom_accel_gradient                                 # [V/m]
     stage.nom_energy_gain = nom_energy_gain                                       # [eV]
     stage.plasma_density = plasma_density                                         # [m^-3]
     stage.driver_source = driver_source
-    stage.ramp_beta_mag = ramp_beta_mag
+    if use_ramps:
+        stage.ramp_beta_mag = 10.0
+    else:
+        stage.ramp_beta_mag = 1.0
     stage.enable_radiation_reaction = enable_radiation_reaction
     stage.probe_evolution = probe_evolution
     stage._return_tracked_driver = return_tracked_driver
@@ -120,7 +123,7 @@ def test_driver_unrotation():
     stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, store_beams_for_tests=True)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
-    stage.nom_energy = 51.4e9                                                    # [eV]
+    stage.nom_energy = 51.4e9                                                       # [eV]
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -144,7 +147,7 @@ def test_driver_unrotation():
     stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
-    stage.nom_energy = 51.4e9                                                    # [eV]
+    stage.nom_energy = 51.4e9                                                       # [eV]
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -175,10 +178,8 @@ def test_driver_unrotation():
     stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
-    stage.nom_energy = 36.9e9                                                     # [eV]
+    stage.nom_energy = 36.9e9                                                       # [eV]
 
-    #make a linac instead and get driver from the initial driver?
-    #linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -204,7 +205,7 @@ def test_driver_unrotation():
     stage2 = setup_StageQuasistatic2d(driver_source=driver_source2, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
     main_source2 = setup_basic_main_source(ramp_beta_mag=stage2.ramp_beta_mag)
 
-    stage2.nom_energy = 36.9e9                                                     # [eV]
+    stage2.nom_energy = 36.9e9                                                      # [eV]
     _, driver = stage2.track(main_source2.track())
     driver0 = stage2.driver_incoming
 
@@ -233,11 +234,64 @@ def test_driver_unrotation():
 @pytest.mark.StageQuasistatic2d
 def test_baseline_run():
     """
-    Tests for checking .
+    Tests for running ``StageQuasistatic2d`` without ramps and radiation 
+    reaction.
+
+    Examines stage configuraions and the output main beam parameters.
     """
 
     np.random.seed(42)
     
     driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0)
-    main_source = setup_basic_main_source()
-    stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, store_beams_for_tests=True)
+    stage = setup_StageQuasistatic2d(driver_source=driver_source, enable_radiation_reaction=False, use_ramps=False)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
+
+    stage.nom_energy = 5.0e9                                                        # [eV]
+    beam = stage.track(main_source.track())
+
+    # Inspect stage configurations
+    assert stage.has_ramp() is False
+    assert stage.enable_radiation_reaction is False
+    assert stage.probe_evolution is False
+    assert stage._return_tracked_driver is False
+    assert stage.store_beams_for_tests is False
+    assert np.isclose(stage.plasma_density, 7.0e21, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain, 31.9e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, stage.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient, 6.4e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient_flattop, stage.nom_accel_gradient, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.length, stage.nom_energy_gain/stage.nom_accel_gradient, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.length_flattop, stage.length, rtol=1e-15, atol=0.0)
+
+    # Examine output beam
+    assert np.isclose(beam.energy(), main_source.energy + stage.nom_energy_gain, rtol=2e-2, atol=0.0)
+    assert np.isclose(beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
+    assert len(beam) == main_source.num_particles
+    assert beam.stage_number == 1
+    assert np.isclose(beam.location, stage.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_offset(), main_source.x_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_offset(), main_source.y_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.z_offset(), main_source.z_offset, rtol=1e-3, atol=0.0)
+    assert np.isclose(beam.x_angle(), main_source.x_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_angle(), main_source.y_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), main_source.emit_ny, rtol=7e-2, atol=0.0)
+    nom_beta_x = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_x
+    nom_beta_y = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_y
+    assert np.isclose(beam.beta_x(), nom_beta_x, rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.beta_y(), nom_beta_y, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.rel_energy_spread(), 4.0e-2, rtol=1e-1, atol=0.0)
+    
+
+
+
+
+
+    #assert np.isclose(stage.length_flattop, stage.nom_energy_gain_flattop/stage.nom_accel_gradient_flattop, rtol=1e-15, atol=0.0)
+
+
+
