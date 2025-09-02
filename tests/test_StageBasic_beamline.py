@@ -87,14 +87,17 @@ def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=1.0):
     return main
 
 
-def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, ramp_beta_mag=10.0, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, probe_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
+def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_gain=31.9e9, plasma_density=7.0e21, use_ramps=False, transformer_ratio=1, depletion_efficiency=0.75, probe_evolution=False, return_tracked_driver=False, test_beam_between_ramps=False):
     
     stage = StageBasic()
     stage.nom_accel_gradient = nom_accel_gradient                                   # [GV/m]
     stage.nom_energy_gain = nom_energy_gain                                         # [eV]
     stage.plasma_density = plasma_density                                           # [m^-3]
     stage.driver_source = driver_source
-    stage.ramp_beta_mag = ramp_beta_mag
+    if use_ramps:
+        stage.ramp_beta_mag = 10.0
+    else:
+        stage.ramp_beta_mag = 1.0
     stage.test_beam_between_ramps = test_beam_between_ramps
     stage.transformer_ratio = transformer_ratio
     stage.depletion_efficiency = depletion_efficiency
