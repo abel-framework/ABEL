@@ -4,7 +4,6 @@ import numpy as np
 import scipy.constants as SI
 from abel.utilities.plasma_physics import *
 import os, shutil, uuid, copy, sys
-from abel.physics_models.particles_transverse_wake_instability import transverse_wake_instability_particles
 
 class StageQuasistatic2d(Stage):
     
@@ -167,8 +166,8 @@ class StageQuasistatic2d(Stage):
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
-            os.mkdir(CONFIG.temp_path)
-        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+            os.makedirs(CONFIG.temp_path)
+        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + os.sep
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
                     
