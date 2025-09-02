@@ -117,8 +117,8 @@ def test_driver_unrotation():
     x_angle = 1.3e-6                                                              # [rad]
     y_angle = 2e-6                                                                # [rad]
     driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
-    main_source = setup_basic_main_source()
     stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, store_beams_for_tests=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy = 51.4e9                                                    # [eV]
     _, driver = stage.track(main_source.track())
@@ -141,8 +141,8 @@ def test_driver_unrotation():
 
     # ========== Driver jitter, no angular offset ==========
     driver_source = setup_basic_driver_source(enable_xy_jitter=True, enable_xpyp_jitter=True)
-    main_source = setup_basic_main_source()
     stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy = 51.4e9                                                    # [eV]
     _, driver = stage.track(main_source.track())
@@ -172,8 +172,8 @@ def test_driver_unrotation():
 
     # ========== No jitter, no angular offset ==========
     driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
-    main_source = setup_basic_main_source()
     stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy = 36.9e9                                                     # [eV]
 
@@ -201,8 +201,8 @@ def test_driver_unrotation():
     x_angle = 5e-6                                                                # [rad]
     y_angle = 2e-5                                                                # [rad]
     driver_source2 = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
-    main_source2 = setup_basic_main_source()
     stage2 = setup_StageQuasistatic2d(driver_source=driver_source2, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
+    main_source2 = setup_basic_main_source(ramp_beta_mag=stage2.ramp_beta_mag)
 
     stage2.nom_energy = 36.9e9                                                     # [eV]
     _, driver = stage2.track(main_source2.track())
@@ -228,3 +228,16 @@ def test_driver_unrotation():
     assert np.isclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
     assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
     assert np.allclose(driver.weightings(), driver0.weightings(), rtol=1e-13, atol=0.0)
+
+
+@pytest.mark.StageQuasistatic2d
+def test_baseline_run():
+    """
+    Tests for checking .
+    """
+
+    np.random.seed(42)
+    
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0)
+    main_source = setup_basic_main_source()
+    stage = setup_StageQuasistatic2d(driver_source=driver_source, use_ramps=False, return_tracked_driver=True, store_beams_for_tests=True)
