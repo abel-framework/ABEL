@@ -9,7 +9,7 @@ SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1.0, depletion_efficiency=0.75, probe_evolution=False, test_beam_between_ramps=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1.0, depletion_efficiency=0.75, probe_evolution=False, store_beams_for_tests=False):
         """
         Parameters
         ----------
@@ -39,7 +39,7 @@ class StageBasic(Stage):
             Flag for storing the beam parameter evolution data. Default set to 
             ``False``.
 
-        test_beam_between_ramps : bool, optional
+        store_beams_for_tests : bool, optional
             Flag for storing the beams between ramps and stage in order to 
             perform tests for assuring beams being correctly transferred. 
             Default set to ``False``.
@@ -50,7 +50,7 @@ class StageBasic(Stage):
         self.transformer_ratio = transformer_ratio
         self.depletion_efficiency = depletion_efficiency
         self.probe_evolution = probe_evolution
-        self.test_beam_between_ramps = test_beam_between_ramps
+        self.store_beams_for_tests = store_beams_for_tests
         
 
     # ==================================================
@@ -95,7 +95,7 @@ class StageBasic(Stage):
             drive_beam_ramped = drive_beam_rotated
 
         # Save beams to check for consistency between ramps and stage
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             stage_beam_in = copy.deepcopy(beam_ramped)
             stage_driver_in = copy.deepcopy(drive_beam_ramped)
 
@@ -115,7 +115,7 @@ class StageBasic(Stage):
             driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
 
             # Save beams to probe for consistency between ramps and stage
-            if self.test_beam_between_ramps:
+            if self.store_beams_for_tests:
                 stage_beam_out = copy.deepcopy(beam)
                 stage_driver_out = copy.deepcopy(driver)
             
@@ -125,7 +125,7 @@ class StageBasic(Stage):
             beam_outgoing = beam
             driver_outgoing = driver
 
-            if self.test_beam_between_ramps:
+            if self.store_beams_for_tests:
                 stage_beam_out = copy.deepcopy(beam_outgoing)
                 stage_driver_out = copy.deepcopy(driver_outgoing)
 
@@ -140,7 +140,7 @@ class StageBasic(Stage):
 
         # ========== Bookkeeping ==========
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             # Store beams for the main stage
             self.store_beams_between_ramps(driver_before_tracking=stage_driver_in,  # Drive beam after the upramp, before tracking
                                             beam_before_tracking=stage_beam_in,  # Main beam after the upramp, before tracking
@@ -242,7 +242,7 @@ class StageBasic(Stage):
         """
 
         # Save beams to check for consistency between ramps and stage
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
@@ -295,12 +295,12 @@ class StageBasic(Stage):
         driver.magnify_beta_function(1/self.upramp.ramp_beta_mag, axis_defining_beam=driver)
 
         # Save beams to check for consistency between ramps and stage
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             ramp_beam_out = copy.deepcopy(beam)
             ramp_driver_out = copy.deepcopy(driver)
 
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             self.upramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
                                             beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
                                             driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
@@ -339,7 +339,7 @@ class StageBasic(Stage):
         """
 
         # Save beams to check for consistency between ramps and stage
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
@@ -388,12 +388,12 @@ class StageBasic(Stage):
         self.downramp.calculate_beam_current(beam0, driver0, beam, driver)
 
         # Save beams to check for consistency between ramps and stage
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             ramp_beam_out = copy.deepcopy(beam)
             ramp_driver_out = copy.deepcopy(driver)
 
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.test_beam_between_ramps:
+        if self.store_beams_for_tests:
             self.downramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
                                             beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
                                             driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
