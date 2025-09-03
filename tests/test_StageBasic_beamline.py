@@ -112,11 +112,11 @@ def setup_StageBasic(driver_source=None, nom_accel_gradient=6.4e9, nom_energy_ga
     return stage
 
 
-def setup_InterstageBasic(stage):
-    interstage = InterstageBasic()
+def setup_interstage(stage):
+    interstage = InterstagePlasmaLensBasic()
     interstage.beta0 = lambda E: stage.matched_beta_function(E)
-    interstage.dipole_length = lambda E: 1 * np.sqrt(E/10e9)                        # [m(eV)]
-    interstage.dipole_field = lambda E: np.min([1.0, 100e9/E])                      # [T]
+    interstage.length_dipole = lambda E: 1 * np.sqrt(E/10e9)                        # [m(eV)]
+    interstage.field_dipole = lambda E: np.min([1.0, 100e9/E])                      # [T]
 
     return interstage
 
@@ -138,7 +138,7 @@ def test_baseline_linac():
     driver_source = setup_basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(ramp_beta_mag=1.0)
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, probe_evolution=False)
-    interstage = setup_InterstageBasic(stage)
+    interstage = setup_interstage(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -220,7 +220,7 @@ def test_linac_plots():
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     stage.probe_evolution = True
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
-    interstage = setup_InterstageBasic(stage)
+    interstage = setup_interstage(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -312,7 +312,7 @@ def test_ramped_linac():
     driver_source = setup_basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
-    interstage = setup_InterstageBasic(stage)
+    interstage = setup_interstage(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -424,7 +424,7 @@ def test_ramped_linac_vs_old_method():
     # Ramps constructed with PlasmRamp
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
-    interstage = setup_InterstageBasic(stage)
+    interstage = setup_interstage(stage)
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
 
@@ -434,7 +434,7 @@ def test_ramped_linac_vs_old_method():
     stage_old.downramp = stage_old.__class__()
     stage_old.upramp.ramp_beta_mag = 10.0
     stage_old.downramp.ramp_beta_mag = 10.0
-    interstage_old = setup_InterstageBasic(stage_old)
+    interstage_old = setup_interstage(stage_old)
     linac_old = PlasmaLinac(source=main_source, stage=stage_old, interstage=interstage_old, num_stages=num_stages)
     linac_old.run('test_baseline_linac', overwrite=True, verbose=False)
     
@@ -469,7 +469,7 @@ def test_ramped_norm_emitt_jitter_linac():
     driver_source = setup_basic_driver_source(enable_xt_jitter=False, enable_xpyp_jitter=False, enable_norm_emittance_jitter=True)
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
-    interstage = setup_InterstageBasic(stage)
+    interstage = setup_interstage(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -496,7 +496,7 @@ def test_ramped_jitter_linac():
     driver_source = setup_basic_driver_source(enable_xt_jitter, enable_xpyp_jitter)
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
-    interstage = setup_InterstageBasic(stage)
+    interstage = setup_interstage(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 

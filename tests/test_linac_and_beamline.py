@@ -27,7 +27,7 @@ import scipy.constants as SI
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.stage.impl.stage_basic import StageBasic
-from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.interstage.plasma_lens.basic import InterstagePlasmaLensBasic
 
 
 @pytest.mark.linac_unit_test
@@ -194,7 +194,7 @@ def test_get_cost_breakdown():
     stage = StageBasic()
     stage.length = 1.0
     stage.driver_source = driver_source
-    interstage = InterstageBasic()
+    interstage = InterstagePlasmaLensBasic()
     interstage.length = 2.1
     linac.source = source
     linac.trackables = []
@@ -249,7 +249,7 @@ def test_get_length():
     stage = StageBasic()
     stage.length = 1.0
     stage.driver_source = driver_source
-    interstage = InterstageBasic()
+    interstage = InterstagePlasmaLensBasic()
     interstage.length = 2.1
     linac.source = source
 
@@ -279,7 +279,7 @@ def test_get_cost_breakdown_civil_construction():
     stage = StageBasic()
     stage.length = 1.0
     stage.driver_source = driver_source
-    interstage = InterstageBasic()
+    interstage = InterstagePlasmaLensBasic()
     interstage.length = 2.1
     linac.source = source
     linac.trackables = []
@@ -294,7 +294,7 @@ def test_get_cost_breakdown_civil_construction():
     assert np.isclose(cost_breakdown[1][0][1], 0.0, rtol=1e-5, atol=0.0)
     assert cost_breakdown[1][1][0] == 'Plasma stage'
     assert np.isclose(cost_breakdown[1][1][1], 41207.961149999996, rtol=1e-5, atol=0.0)
-    assert cost_breakdown[1][2][0] == 'InterstageBasic'
+    assert cost_breakdown[1][2][0] == 'InterstagePlasmaLensBasic'
     assert np.isclose(cost_breakdown[1][2][1], 86536.718415, rtol=1e-5, atol=0.0)
     
     
@@ -312,7 +312,7 @@ def test_surveys():
     stage = StageBasic()
     stage.length = 1.0
     stage.driver_source = driver_source
-    interstage = InterstageBasic()
+    interstage = InterstagePlasmaLensBasic()
     interstage.length = 2.0
     linac.source = source
     linac.trackables = []
