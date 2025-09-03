@@ -2387,7 +2387,7 @@ def test_apply_betatron_motion_emitt_pres():
     initial_beam = copy.deepcopy(beam)
     deltaEs = np.full(len(beam.Es()), 1e9)  # Homogeneous energy gain
 
-    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=True)
+    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=True)
 
     assert np.allclose(Es_final.mean(), 4e9, rtol=1e-15, atol=0.0)
     assert np.allclose(np.std(Es_final), 1e-20, rtol=0.0, atol=1e-19)
@@ -2421,7 +2421,7 @@ def test_apply_betatron_motion():
     initial_beam = copy.deepcopy(beam)
     deltaEs = np.full(len(beam.Es()), 1e9)  # Homogeneous energy gain
 
-    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=True, calc_evolution=True)
+    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=True, probe_evolution=True)
 
     assert np.allclose(Es_final.mean(), 4e9, rtol=1e-6, atol=0.0)
     assert np.allclose(np.std(Es_final), 0.01*3e9, rtol=5e-3, atol=0.0)

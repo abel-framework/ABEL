@@ -53,6 +53,7 @@ from .classes.stage.impl.stage_wake_t import StageWakeT
 from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
 from .classes.stage.impl.stage_slice_transverse_wake_instability import StageSlicesTransWakeInstability
 from .classes.stage.impl.stage_particle_transverse_wake_instability import StagePrtclTransWakeInstability
+from .classes.stage.stage import PlasmaRamp
 from .classes.interstage.impl.interstage_null import InterstageNull
 from .classes.interstage.impl.interstage_basic import InterstageBasic
 from .classes.interstage.impl.interstage_elegant import InterstageElegant

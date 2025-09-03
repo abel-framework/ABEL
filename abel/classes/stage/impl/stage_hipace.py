@@ -30,10 +30,14 @@ class StageHipace(Stage):
         self.plasma_density_from_file = plasma_density_from_file
         self.save_drivers = save_drivers
         self.no_plasma = no_plasma
-        self.scale_density = 1
 
         # external focusing (APL-like) [T/m]
         self.external_focusing_radial = external_focusing_radial
+
+        # plasma profile
+        self.plasma_profile = SimpleNamespace()
+        self.plasma_profile.ss = None
+        self.plasma_profile.ns = None
 
         # physics flags
         self.ion_motion = ion_motion
@@ -60,32 +64,15 @@ class StageHipace(Stage):
             os.mkdir(tmpfolder)
         
         # generate driver
-        if self.driver_source is not None:
-            driver_incoming = self.driver_source.track()
-        else:
-            driver_incoming = None
+        driver_incoming = self.driver_source.track()
 
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
         self._prepare_ramps()
-
-        # plasma-density ramps (de-magnify beta function)
-        location_flattop_start = 0
-        if self.upramp is not None:
-            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
-            location_flattop_start = beam0.location
-        else:
-            # apply plasma-density up ramp (demagnify beta function)
-            driver0 = copy.deepcopy(driver_incoming)
-            beam0 = copy.deepcopy(beam_incoming)
-            if self.ramp_beta_mag is not None:
-                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                if driver0 is not None:
-                    driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        self._make_ramp_profile(tmpfolder)
         
-        beam0.location = 0.0
-        if driver0 is not None:
-            driver0.location = 0.0
+        beam0 = beam_incoming
+        driver0 = driver_incoming
         
         # SAVE BEAMS TO BE USED IN HiPACE++ SIMULATION
         
@@ -95,19 +82,17 @@ class StageHipace(Stage):
         beam0.save(filename = path_beam)
         
         # produce and save drive beam
-        if driver0 is not None:
-            filename_driver = 'driver.h5'
-            path_driver = tmpfolder + filename_driver
-            driver0.save(filename = path_driver, beam_name = 'driver')
-        else:
-            filename_driver = None
+        filename_driver = 'driver.h5'
+        path_driver = tmpfolder + filename_driver
+        driver0.save(filename = path_driver, beam_name = 'driver')
 
         # make directory
         if self.plasma_density_from_file is not None:
             density_table_file = os.path.basename(self.plasma_density_from_file)
-            shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
+            if not os.path.exists(tmpfolder + density_table_file):
+                shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
 
-            self.length = self.get_length() # TODO: ensure that the length from a density profile is correct
+            #self.length = self.get_length() # TODO: ensure that the length from a density profile is correct
             self.plasma_density = self.get_plasma_density()
         else:
             density_table_file = None
@@ -120,35 +105,20 @@ class StageHipace(Stage):
         if self.driver_only:
             box_min_z = driver0.z_offset() + driver0.bunch_length() - np.max([2*np.pi/k_p(self.plasma_density), 2.1*blowout_radius(self.plasma_density, driver0.peak_current())])
         else:
-            box_min_z = max(beam0.z_offset() - num_sigmas * beam0.bunch_length(), np.min(beam0.zs())-0.5/k_p(self.plasma_density))
-        #box_min_z = box_min_z - 1.5/k_p(self.plasma_density)
-        if driver0 is not None:
-            box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
-        else:
-            box_max_z = min(beam0.z_offset() + num_sigmas * beam0.bunch_length(), np.max(beam0.zs())+0.5/k_p(self.plasma_density))
+            box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length() 
+        box_min_z = box_min_z - 1.5/k_p(self.plasma_density)
+        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        if driver0 is not None:
-            Rb = blowout_radius(self.plasma_density, driver0.peak_current())
-        else:
-            Rb = blowout_radius(self.plasma_density, beam0.peak_current())
-
-        if driver0 is not None:
-            box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
-        else:
-            box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, beam0.peak_current())])
+        box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
         
         # calculate number of cells in x to get similar resolution
         dr = box_size_xy/self.num_cell_xy
         num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # calculate the time step
-        if driver0 is not None:
-            gamma_min = min(beam0.gamma(),driver0.gamma()/2)
-        else:
-            gamma_min = beam0.gamma()/2
-        beta_matched = np.sqrt(2*gamma_min)/k_p(self.plasma_density)
+        beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
         dz = beta_matched/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)
@@ -161,7 +131,8 @@ class StageHipace(Stage):
             else:  # If remainder is less than 10, round down
                 self.num_steps = self.num_steps - remainder
         
-        time_step = self.length_flattop/(self.num_steps*SI.c)
+        #time_step = self.length_flattop/(self.num_steps*SI.c)
+        time_step = self.length/(self.num_steps*SI.c)
 
         # overwrite output period
         if self.output is not None:
@@ -191,22 +162,13 @@ class StageHipace(Stage):
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam_incoming.trackable_number
         beam.stage_number = beam_incoming.stage_number
-        beam.location = location_flattop_start + beam0.location
-        if driver is not None:
-            driver.trackable_number = beam_incoming.trackable_number
-            driver.stage_number = beam_incoming.stage_number
-            driver.location = beam.location
-            
-        # apply plasma-density down ramp (magnify beta function)
-        if self.downramp is not None:
-            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
-        else:
-            beam_outgoing = copy.deepcopy(beam)
-            driver_outgoing = copy.deepcopy(driver)
-            if self.ramp_beta_mag is not None:
-                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                if driver_outgoing is not None:
-                    driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        beam.location = beam_incoming.location
+        driver.trackable_number = beam_incoming.trackable_number
+        driver.stage_number = beam_incoming.stage_number
+        driver.location = beam_incoming.location
+
+        beam_outgoing = beam
+        driver_outgoing = driver
         
         ## SAVE DRIVERS TO FILE
         if self.save_drivers:
@@ -242,7 +204,7 @@ class StageHipace(Stage):
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
     
-    
+            
     def __extract_evolution(self, tmpfolder, beam0, runnable):
 
         from abel.apis.hipace import read_insitu_diagnostics
@@ -259,10 +221,6 @@ class StageHipace(Stage):
 
             # skip for beam if driver only
             if bunch == 'beam' and self.driver_only:
-                continue
-                
-            # skip for beam if witness beam only
-            if bunch == 'driver' and self.driver_source is None:
                 continue
             
             # extract in-situ data
@@ -416,14 +374,58 @@ class StageHipace(Stage):
             destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number)
             shutil.move(source_path, destination_path)
 
+    
+    def _make_ramp_profile(self, tmpfolder):
+        """Prepare the ramps (local to HiPACE)."""
+        
+        # check that there is not already a plasma density profile set
+        assert self.plasma_density_from_file is None
+
+        # make the plasma ramp profile
+        if self.has_ramp():
+
+            ss_upramp = np.linspace(0, self.upramp.length, 100)
+            if self.upramp.ramp_shape == 'uniform':
+                ns_upramp = np.ones_like(ss_upramp)*self.upramp.plasma_density
+            
+            ss_flattop = max(ss_upramp)+np.linspace(0, self.length_flattop, 100)
+            ns_flattop = np.ones_like(ss_flattop)*self.plasma_density
+                
+            ss_downramp = max(ss_flattop)+np.linspace(0, self.downramp.length, 100)
+            if self.downramp.ramp_shape == 'uniform':
+                ns_downramp = np.ones_like(ss_downramp)*self.downramp.plasma_density
+
+            ss = np.concatenate((ss_upramp, ss_flattop, ss_downramp), axis=0)
+            ns = np.concatenate((ns_upramp, ns_flattop, ns_downramp), axis=0)
+
+            # save to file
+            self.plasma_profile.ss = ss
+            self.plasma_profile.ns = ns
+            
+            # save to file
+            density_table = np.column_stack((ss, ns))
+            filename = os.path.join(tmpfolder, 'plasma_profile.txt')
+            np.savetxt(filename, density_table, delimiter=" ")
+            self.plasma_density_from_file = filename
+            
+        
+    def plot_plasma_density_profile(self):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(1,1)
+        ax.plot(self.plasma_profile.ss, self.plasma_profile.ns/1e6, '-')
+        ax.set_xlim(min(self.plasma_profile.ss), max(self.plasma_profile.ss))
+        ax.set_yscale('log')
+        ax.set_xlabel('Longitudinal position (m)')
+        ax.set_ylabel(r'Plasma density (cm$^{-3}$)')
+        
+
     def get_plasma_density(self, locations=None):
         if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ns = density_table[:,1]
-            ns *= self.scale_density
+            ns = self.plasma_profile.ns
             self.plasma_density = ns.max()
             if locations is not None:
-                ss = density_table[:,0]
+                ss = self.plasma_profile.ss
                 return np.interp(locations, ss, ns)
             else:
                 return self.plasma_density
@@ -435,7 +437,8 @@ class StageHipace(Stage):
 
     def get_length(self):
         if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ss = density_table[:,0]
-            self.length = ss.max()-ss.min()
+            #density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
+            ss = self.plasma_profile.ss
+            #ss = density_table[:,0]
+            return ss.max()-ss.min()
         return super().get_length()
