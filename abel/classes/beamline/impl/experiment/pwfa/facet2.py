@@ -34,6 +34,7 @@ class FACET2(ExperimentPWFA):
         source.length = 1000.0
         
         stage = StageHipace()
+        #stage = StageBasic()
         stage.num_nodes = 16
         stage.num_cell_xy = 511
         stage.ion_motion = True
@@ -49,15 +50,3 @@ class FACET2(ExperimentPWFA):
         
         super().__init__(linac=source, stage=stage, spectrometer=spectrometer)
         
-    # assemble the trackables
-    def assemble_trackables(self):
-        # define spectrometer
-        if isinstance(self.linac, Source):
-            self.spectrometer.imaging_energy = self.linac.energy
-        elif isinstance(self.linac, Linac):
-            self.spectrometer.imaging_energy = self.linac.source.energy
-        else:
-            raise ValueError("You must define a linac that is either a type Source or a type Linac")
-
-        # set the bunch train pattern etc.
-        super().assemble_trackables()

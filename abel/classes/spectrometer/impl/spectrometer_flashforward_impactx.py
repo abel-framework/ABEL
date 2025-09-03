@@ -6,15 +6,9 @@ import numpy as np
 
 class SpectrometerFLASHForwardImpactX(Spectrometer):
     
-    def __init__(self, imaging_energy_x=None, imaging_energy_y=None, object_plane_x=0.0, object_plane_y=None, magnification_x=-8.0):
+    def __init__(self, imaging_energy_x=None, imaging_energy_y=None, object_plane_x=0.0, object_plane_y=None, magnification_x=-8.0, magnification_y=None):
 
-        super().__init__()
-
-        self.imaging_energy_x = imaging_energy_x
-        self.imaging_energy_y = imaging_energy_y
-        self.object_plane_x = object_plane_x
-        self.object_plane_y = object_plane_y
-        self.magnification_x = magnification_x
+        super().__init__(imaging_energy_x=imaging_energy_x, imaging_energy_y=imaging_energy_y, object_plane_x=object_plane_x, object_plane_y=object_plane_y, magnification_x=magnification_x, magnification_y=magnification_y)
         
         self.current_dipole = -200 # [A]
         self.current_quad1 = 60 # [A]

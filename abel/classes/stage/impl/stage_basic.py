@@ -57,7 +57,10 @@ class StageBasic(Stage):
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
         
         # get the driver
-        driver_incoming = self.driver_source.track()
+        if self.driver_source is not None:
+            driver_incoming = self.driver_source.track()
+        else:
+            driver_incoming = None
 
         original_driver = copy.deepcopy(driver_incoming)
         original_beam = copy.deepcopy(beam_incoming)
@@ -69,10 +72,13 @@ class StageBasic(Stage):
 
         # ========== Rotate the coordinate system of the beams ==========
         # Perform beam rotations before calling on upramp tracking.
-        if self.parent is None:  # Ensures that this is the main stage and not a ramp.
+        if self.parent is None and self.driver_source is not None:  # Ensures that this is the main stage and not a ramp.
 
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             drive_beam_rotated, beam_rotated = self.rotate_beam_coordinate_systems(driver_incoming, beam_incoming)
+        else:
+            drive_beam_rotated = driver_incoming
+            beam_rotated = beam_incoming
 
 
         # ========== Prepare ramps ==========
@@ -112,7 +118,8 @@ class StageBasic(Stage):
 
             # TODO: Temporary "drive beam evolution": Magnify the driver
             # Needs to be performed before self.track_downramp().
-            driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
+            if driver is not None:
+                driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
 
             # Save beams to probe for consistency between ramps and stage
             if self.store_beams_for_tests:
@@ -132,11 +139,13 @@ class StageBasic(Stage):
 
         # ========== Rotate the coordinate system of the beams back to original ==========
         # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
-        if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
+        if self.parent is None and self.driver_source is not None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(original_driver, driver_outgoing, beam_outgoing)
-
+        else:
+            driver_outgoing = driver_outgoing
+            beam_outgoing = beam_outgoing
 
         # ========== Bookkeeping ==========
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
@@ -167,7 +176,7 @@ class StageBasic(Stage):
         
 
     # ==================================================
-    def main_tracking_procedure(self, beam_ramped, drive_beam_ramped):
+    def main_tracking_procedure(self, beam, driver):
         """
         Prepares and performs the beam tracking using the physics models of the 
         stage.
@@ -191,30 +200,33 @@ class StageBasic(Stage):
             Drive beam after tracking.
         """
 
-        beam = beam_ramped
-        drive_beam = drive_beam_ramped
-        drive_beam_ramped_location = drive_beam_ramped.location
-        beam_ramped_location = beam_ramped.location
+        if driver is not None:
+            x0_driver = driver.x_offset()
+            y0_driver = driver.y_offset()
+        else:
+            x0_driver = 0.0
+            y0_driver = 0.0
 
         # Betatron oscillations
         deltaEs = np.full(len(beam.Es()), self.nom_energy_gain_flattop)  # Homogeneous energy gain for all macroparticles.
         if self.probe_evolution:
-            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset(), probe_evolution=self.probe_evolution)
+            _, evol = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=x0_driver, y0_driver=y0_driver, probe_evolution=self.probe_evolution)
             self.evolution.beam = evol
         else:
-            beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=drive_beam_ramped.x_offset(), y0_driver=drive_beam_ramped.y_offset())
+            beam.apply_betatron_motion(self.length_flattop, self.plasma_density, deltaEs, x0_driver=x0_driver, y0_driver=y0_driver)
 
         # Accelerate beam with homogeneous energy gain
         beam.set_Es(beam.Es() + self.nom_energy_gain_flattop)
 
-        # Decelerate the driver with homogeneous energy loss
-        drive_beam.set_Es(drive_beam_ramped.Es()*(1-self.depletion_efficiency))
-
         # Update the beam locations
-        drive_beam.location = drive_beam_ramped_location + self.length_flattop
-        beam.location = beam_ramped_location + self.length_flattop
-
-        return beam, drive_beam
+        #beam.location = beam_ramped.location + self.length_flattop
+        
+        # Decelerate the driver with homogeneous energy loss
+        if driver is not None:
+            driver.set_Es(driver.Es()*(1-self.depletion_efficiency))
+            #driver.location = driver.location + self.length_flattop
+        
+        return beam, driver
     
 
     # ==================================================

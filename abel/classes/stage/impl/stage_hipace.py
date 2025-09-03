@@ -64,7 +64,10 @@ class StageHipace(Stage):
             os.mkdir(tmpfolder)
         
         # generate driver
-        driver_incoming = self.driver_source.track()
+        if self.driver_source is not None:
+            driver_incoming = self.driver_source.track()
+        else:
+            driver_incoming = None
 
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
@@ -82,9 +85,12 @@ class StageHipace(Stage):
         beam0.save(filename = path_beam)
         
         # produce and save drive beam
-        filename_driver = 'driver.h5'
-        path_driver = tmpfolder + filename_driver
-        driver0.save(filename = path_driver, beam_name = 'driver')
+        if driver0 is not None:
+            filename_driver = 'driver.h5'
+            path_driver = tmpfolder + filename_driver
+            driver0.save(filename = path_driver, beam_name = 'driver')
+        else:
+            filename_driver = None
 
         # make directory
         if self.plasma_density_from_file is not None:
@@ -105,20 +111,35 @@ class StageHipace(Stage):
         if self.driver_only:
             box_min_z = driver0.z_offset() + driver0.bunch_length() - np.max([2*np.pi/k_p(self.plasma_density), 2.1*blowout_radius(self.plasma_density, driver0.peak_current())])
         else:
-            box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length() 
-        box_min_z = box_min_z - 1.5/k_p(self.plasma_density)
-        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
+            box_min_z = max(beam0.z_offset() - num_sigmas * beam0.bunch_length(), np.min(beam0.zs())-0.5/k_p(self.plasma_density))
+        #box_min_z = box_min_z - 1.5/k_p(self.plasma_density)
+        if driver0 is not None:
+            box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.5/k_p(self.plasma_density))
+        else:
+            box_max_z = min(beam0.z_offset() + num_sigmas * beam0.bunch_length(), np.max(beam0.zs())+0.5/k_p(self.plasma_density))
         box_range_z = [box_min_z, box_max_z]
         
         # making transverse box size
-        box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
+        if driver0 is not None:
+            Rb = blowout_radius(self.plasma_density, driver0.peak_current())
+        else:
+            Rb = blowout_radius(self.plasma_density, beam0.peak_current())
+
+        if driver0 is not None:
+            box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, driver0.peak_current())])
+        else:
+            box_size_xy = 2*np.max([4/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, beam0.peak_current())])
         
         # calculate number of cells in x to get similar resolution
         dr = box_size_xy/self.num_cell_xy
         num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # calculate the time step
-        beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
+        if driver0 is not None:
+            gamma_min = min(beam0.gamma(),driver0.gamma()/2)
+        else:
+            gamma_min = beam0.gamma()/2
+        beta_matched = np.sqrt(2*gamma_min)/k_p(self.plasma_density)
         dz = beta_matched/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)

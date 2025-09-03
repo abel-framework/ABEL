@@ -98,12 +98,9 @@ class Stage(Trackable, CostModeled):
         """
     
         if isinstance(self.driver_source, DriverComplex):
-            driver_source = self.driver_source.source
-        elif isinstance(self.driver_source, Source):
-            driver_source = self.driver_source
-        
-        return driver_source
-    
+            return self.driver_source.source
+        else:
+            return self.driver_source
 
     
     ## Define upramp and downramp, if present
@@ -1188,6 +1185,9 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_efficiency(self, beam0, driver0, beam, driver):
+        # abort if no driver or beam
+        if driver0 is None or beam0 is None:
+            return
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
         Etot0_driver = driver0.total_energy()
@@ -1203,7 +1203,10 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
-        
+
+        if driver0 is None:
+            driver0 = copy.deepcopy(beam0)
+            driver0.scale_charge(beam0.charge()*1e-15)
         dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
         num_sigmas = 6
         z_min = beam0.z_offset() - num_sigmas * beam0.bunch_length()
