@@ -35,6 +35,11 @@ class StageHipace(Stage):
         self.external_focusing = external_focusing
         self._external_focusing_gradient = None
 
+        # plasma profile
+        self.plasma_profile = SimpleNamespace()
+        self.plasma_profile.ss = None
+        self.plasma_profile.ns = None
+
         # physics flags
         self.ion_motion = ion_motion
         self.ion_species = ion_species
@@ -65,31 +70,17 @@ class StageHipace(Stage):
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
         self._prepare_ramps()
-
+        self._make_ramp_profile(tmpfolder)
+        
+        # set external focusing
         if self.external_focusing == False:
             self.external_focusing_gradient = 0
         if self.external_focusing == True and self._external_focusing_gradient is None:
             num_half_oscillations = 1
             self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2
-        if self.upramp is not None:
-            self.upramp._external_focusing_gradient = self._external_focusing_gradient
-        if self.downramp is not None:
-            self.downramp._external_focusing_gradient = self._external_focusing_gradient
-            
         
-        # plasma-density ramps (de-magnify beta function)
-        if self.upramp is not None:
-            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
-        else:
-            # apply plasma-density up ramp (demagnify beta function)
-            driver0 = copy.deepcopy(driver_incoming)
-            beam0 = copy.deepcopy(beam_incoming)
-            if self.ramp_beta_mag is not None:
-                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-        
-        beam0.location = 0.0
-        driver0.location = 0.0
+        beam0 = beam_incoming
+        driver0 = driver_incoming
         
         # SAVE BEAMS TO BE USED IN HiPACE++ SIMULATION
         
@@ -106,9 +97,10 @@ class StageHipace(Stage):
         # make directory
         if self.plasma_density_from_file is not None:
             density_table_file = os.path.basename(self.plasma_density_from_file)
-            shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
+            if not os.path.exists(tmpfolder + density_table_file):
+                shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
 
-            self.length = self.get_length() # TODO: ensure that the length from a density profile is correct
+            #self.length = self.get_length() # TODO: ensure that the length from a density profile is correct
             self.plasma_density = self.get_plasma_density()
         else:
             density_table_file = None
@@ -150,7 +142,8 @@ class StageHipace(Stage):
             else:  # If remainder is less than 10, round down
                 self.num_steps = self.num_steps - remainder
         
-        time_step = self.length_flattop/(self.num_steps*SI.c)
+        #time_step = self.length_flattop/(self.num_steps*SI.c)
+        time_step = self.length/(self.num_steps*SI.c)
 
         # overwrite output period
         if self.output is not None:
@@ -180,21 +173,13 @@ class StageHipace(Stage):
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam_incoming.trackable_number
         beam.stage_number = beam_incoming.stage_number
-        beam.location = beam0.location + self.length_flattop
-        #beam.location = beam0.location
+        beam.location = beam_incoming.location
         driver.trackable_number = beam_incoming.trackable_number
         driver.stage_number = beam_incoming.stage_number
-        driver.location = beam.location
-        
-        # apply plasma-density down ramp (magnify beta function)
-        if self.downramp is not None:
-            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
-        else:
-            beam_outgoing = copy.deepcopy(beam)
-            driver_outgoing = copy.deepcopy(driver)
-            if self.ramp_beta_mag is not None:
-                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        driver.location = beam_incoming.location
+
+        beam_outgoing = beam
+        driver_outgoing = driver
         
         ## SAVE DRIVERS TO FILE
         if self.save_drivers:
@@ -233,7 +218,7 @@ class StageHipace(Stage):
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
     
-    
+            
     def __extract_evolution(self, tmpfolder, beam0, runnable):
 
         from abel.apis.hipace import read_insitu_diagnostics
@@ -403,13 +388,58 @@ class StageHipace(Stage):
             destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number)
             shutil.move(source_path, destination_path)
 
+    
+    def _make_ramp_profile(self, tmpfolder):
+        """Prepare the ramps (local to HiPACE)."""
+        
+        # check that there is not already a plasma density profile set
+        assert self.plasma_density_from_file is None
+
+        # make the plasma ramp profile
+        if self.has_ramp():
+
+            ss_upramp = np.linspace(0, self.upramp.length, 100)
+            if self.upramp.ramp_shape == 'uniform':
+                ns_upramp = np.ones_like(ss_upramp)*self.upramp.plasma_density
+            
+            ss_flattop = max(ss_upramp)+np.linspace(0, self.length_flattop, 100)
+            ns_flattop = np.ones_like(ss_flattop)*self.plasma_density
+                
+            ss_downramp = max(ss_flattop)+np.linspace(0, self.downramp.length, 100)
+            if self.downramp.ramp_shape == 'uniform':
+                ns_downramp = np.ones_like(ss_downramp)*self.downramp.plasma_density
+
+            ss = np.concatenate((ss_upramp, ss_flattop, ss_downramp), axis=0)
+            ns = np.concatenate((ns_upramp, ns_flattop, ns_downramp), axis=0)
+
+            # save to file
+            self.plasma_profile.ss = ss
+            self.plasma_profile.ns = ns
+            
+            # save to file
+            density_table = np.column_stack((ss, ns))
+            filename = os.path.join(tmpfolder, 'plasma_profile.txt')
+            np.savetxt(filename, density_table, delimiter=" ")
+            self.plasma_density_from_file = filename
+            
+        
+    def plot_plasma_density_profile(self):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(1,1)
+        ax.plot(self.plasma_profile.ss, self.plasma_profile.ns/1e6, '-')
+        ax.set_xlim(min(self.plasma_profile.ss), max(self.plasma_profile.ss))
+        ax.set_yscale('log')
+        ax.set_xlabel('Longitudinal position (m)')
+        ax.set_ylabel(r'Plasma density (cm$^{-3}$)')
+        
+
     def get_plasma_density(self, locations=None):
         if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ns = density_table[:,1]
+            ns = self.plasma_profile.ns
             self.plasma_density = ns.max()
             if locations is not None:
-                ss = density_table[:,0]
+                ss = self.plasma_profile.ss
                 return np.interp(locations, ss, ns)
             else:
                 return self.plasma_density
@@ -421,7 +451,8 @@ class StageHipace(Stage):
 
     def get_length(self):
         if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ss = density_table[:,0]
-            self.length = ss.max()-ss.min()
+            #density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
+            ss = self.plasma_profile.ss
+            #ss = density_table[:,0]
+            return ss.max()-ss.min()
         return super().get_length()

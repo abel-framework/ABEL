@@ -55,7 +55,10 @@ def check_beam_source_parameters(beam, source):
 
 @pytest.mark.sources
 def test_SourceBasic2Beam():
-    "Check that the generated ``Beam`` from a ``SourceBasic`` has the desired properties."
+    """
+    Check that the generated ``Beam`` from a ``SourceBasic`` has the desired 
+    properties.
+    """
 
     np.random.seed(42)
 
@@ -96,7 +99,10 @@ def test_SourceBasic2Beam():
 
 @pytest.mark.sources
 def test_SourceTrapezoid2Beam():
-    "Check that the generated ``Beam`` from a ``SourceTrapezoid`` has the desired properties."
+    """
+    Check that the generated ``Beam`` from a ``SourceTrapezoid`` has the desired 
+    properties.
+    """
 
     np.random.seed(42)
 
@@ -135,7 +141,10 @@ def test_SourceTrapezoid2Beam():
 
 @pytest.mark.sources
 def test_SourceFlatopBeam():
-    "Check that the generated ``Beam`` from a ``SourceFlatTop`` has the desired properties."
+    """
+    Check that the generated ``Beam`` from a ``SourceFlatTop`` has the desired 
+    properties.
+    """
 
     np.random.seed(42)
 
@@ -172,7 +181,10 @@ def test_SourceFlatopBeam():
 
 @pytest.mark.sources
 def test_SourceCapsule2Beam():
-    "Check that ``SourceCapsule`` retuns returns the same ``Beam`` as the input ``Beam``."
+    """
+    Check that ``SourceCapsule`` retuns returns the same ``Beam`` as the input 
+    ``Beam``.
+    """
 
     beam_file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5'
 
@@ -185,7 +197,10 @@ def test_SourceCapsule2Beam():
 
 @pytest.mark.sources
 def test_SourceFromFile2Beam():
-    "Check that ``SourceFromFile`` retuns returns the same ``Beam`` as the input ``Beam``."
+    """
+    Check that ``SourceFromFile`` retuns returns the same ``Beam`` as the input 
+    ``Beam``.
+    """
 
     beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
 
