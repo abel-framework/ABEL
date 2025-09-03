@@ -37,4 +37,4 @@ Pytest is configured in the `[tool.pytest.ini_options]` section of `pyproject.to
 When the tests succeed, no output (except `testfile::testfile PASSED`) is printed. If a test fails, a traceback and the printouts of that test are printed. If many tests fail, this can be very verbose.
 
 ## Acknowledgements
-This work was supported by the European Research Council (project [SPARTA](https://www.mn.uio.no/fysikk/english/research/projects/staging-of-plasma-accelerators-for-timely-applications/), Grant No. [101116161](https://doi.org/10.3030/101116161) and the Research Council of Norway (Grant No. 313770).
+This work was supported by the European Research Council (project [SPARTA](https://www.mn.uio.no/fysikk/english/research/projects/staging-of-plasma-accelerators-for-timely-applications/), Grant No. [101116161](https://doi.org/10.3030/101116161)) and the Research Council of Norway (Grant No. 313770).
