@@ -428,8 +428,11 @@ class Beam():
 
         Parameters
         ----------
-        beam1, beam2 : ABEL ``Beam`` object
-            Beams to be compared
+        beam1 : ABEL ``Beam`` object
+            First beam to be compared.
+
+        beam2 : ABEL ``Beam`` object
+            Second beam to be compared.
 
         comp_location : bool, optional
             Flag for comparing the location of the beams. Default set to 
@@ -438,7 +441,7 @@ class Beam():
         rtol : float, optional
             The relative tolerance parameter (see [1]_). Default set to 1e-15.
             
-        rb_fit_obj : float, optional
+        atol : float, optional
             The absolute tolerance parameter (see [1]_). Default set to 0.0.
         
             
@@ -473,8 +476,11 @@ class Beam():
 
         Parameters
         ----------
-        beam1, beam2 : ABEL ``Beam`` object
-            Beams to be compared
+        beam1 : ABEL ``Beam`` object
+            First beam to be compared.
+
+        beam2 : ABEL ``Beam`` object
+            Second beam to be compared.
 
         comp_location : bool, optional
             Flag for comparing the location of the beams. Default set to 
@@ -878,6 +884,10 @@ class Beam():
     def total_particles(self):
         "Total number of physical particles."
         return int(np.nansum(self.weightings()))
+    
+    def particle_charge(self):
+        "The charge of a physical particle."
+        return self.charge()/self.total_particles()
     
     def charge(self):
         "Total beam charge."
@@ -1769,9 +1779,10 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=False):
         """
-        Evolve the beam by solving Hill's equation.
+        Evolve the beam by solving Hill's equation in the x- and y direction 
+        separately.
 
         Parameters
         ----------
@@ -1790,7 +1801,7 @@ class Beam():
         radiation_reaction : bool
             Flag for enabling ating radiation reaction.
         
-        calc_evolution : bool
+        probe_evolution : bool
             Flag for recording the beam parameter evolution. 
 
 
@@ -1800,7 +1811,7 @@ class Beam():
             The final energies for all macroparticles.
         
         evol : SimpleNamespace object
-            only returns when ``calc_evolution=True``. Contains beam parameter 
+            only returns when ``probe_evolution=True``. Contains beam parameter 
             evolution data.
         """
         
@@ -1821,7 +1832,7 @@ class Beam():
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
-        if calc_evolution:  # TODO: This seems to be very clumsy. Consider re-writing.
+        if probe_evolution:  # TODO: This seems to be very clumsy. Consider re-writing.
                 
             # calculate evolution
             num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
@@ -1877,7 +1888,7 @@ class Beam():
         self.set_ys(ys+y0_driver)
         self.set_uys(uys)
 
-        if calc_evolution:
+        if probe_evolution:
             return Es_final, evol
         else:
             return Es_final
