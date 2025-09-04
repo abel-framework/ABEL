@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, location=0.0, particle_mass=SI.m_e):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -41,10 +41,10 @@ class Beam():
         
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
-        self.location = 0   
+        self.location = location   
         
-        # single particle mass [kg]
-        self.particle_mass = SI.m_e
+        # particle mass
+        self.particle_mass = particle_mass
     
     
     # reset phase space
@@ -1688,52 +1688,7 @@ class Beam():
         ax.set_title('Transverse profile')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um^2)')
-
-
-    def plot_spectrometer_x(self, range_x=None, range_y=None, vlim=None, title=None):
-        dQdxde, xs, Es = self.phase_space_density(self.xs, self.Es)
-        if range_x is not None:
-            mask = (xs>=range_x[0]) & (xs<= range_x[1])
-            xs = xs[mask]
-            dQdxde = dQdxde[:,mask] 
-        if range_y is not None:
-            mask = (Es>=range_y[0]) & (Es<= range_y[1])
-            Es = Es[mask]
-            dQdxde = dQdxde[mask,:]
-
-        fig, ax = plt.subplots()
-        fig.tight_layout()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        if vlim is not None:
-            p = ax.pcolor(xs*1e6, Es/1e9, -dQdxde*1e9, cmap=CONFIG.default_cmap, shading='auto', vmin=vlim[0], vmax=vlim[1])
-        else:
-            p = ax.pcolor(xs*1e6, Es/1e9, -dQdxde*1e9, cmap=CONFIG.default_cmap, shading='auto')
-
-        ax.set_xlabel('x (um)')
-        ax.set_ylabel('E (GeV)')
-        if not title:
-            ax.set_title('Spectrometer image (energy vs. horizontal)')
-        else:
-            ax.set_title(f'{title}')
-
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
-
-    def plot_spectrometer_y(self):
-        dQdyde, ys, Es = self.phase_space_density(self.ys, self.Es)
-
-        fig, ax = plt.subplots()
-        fig.set_figwidth(8)
-        fig.set_figheight(5)  
-        p = ax.pcolor(ys*1e6, Es/1e9, -dQdyde*1e9, cmap=CONFIG.default_cmap, shading='auto')
-        ax.set_xlabel('y (um)')
-        ax.set_ylabel('E (GeV)')
-        ax.set_title('Spectrometer image (energy vs. vertical)')
-        cb = fig.colorbar(p)
-        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
         
-    
     # TODO: unfinished!
     # def plot_bunch_pattern(self):
         

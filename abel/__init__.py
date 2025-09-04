@@ -33,8 +33,8 @@ from .classes.beamline.impl.linac.impl.conventional_linac import ConventionalLin
 
 from .classes.beamline.impl.experiment import Experiment
 from .classes.beamline.impl.experiment.pwfa import ExperimentPWFA
-from .classes.beamline.impl.experiment.pwfa.flashforward import FLASHForward
-from .classes.beamline.impl.experiment.pwfa.facet2 import FACET2
+from .classes.beamline.impl.experiment.pwfa.preset.flashforward import FLASHForward
+from .classes.beamline.impl.experiment.pwfa.preset.facet2 import FACET2
 from .classes.beamline.impl.experiment.apl import ExperimentAPL
 
 from .classes.collider.collider import Collider

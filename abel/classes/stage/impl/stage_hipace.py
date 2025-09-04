@@ -184,9 +184,10 @@ class StageHipace(Stage):
         beam.trackable_number = beam_incoming.trackable_number
         beam.stage_number = beam_incoming.stage_number
         beam.location = beam_incoming.location
-        driver.trackable_number = beam_incoming.trackable_number
-        driver.stage_number = beam_incoming.stage_number
-        driver.location = beam_incoming.location
+        if driver is not None:
+            driver.trackable_number = beam_incoming.trackable_number
+            driver.stage_number = beam_incoming.stage_number
+            driver.location = beam_incoming.location
 
         beam_outgoing = beam
         driver_outgoing = driver
@@ -236,7 +237,10 @@ class StageHipace(Stage):
         # in-situ data path
         insitu_path = tmpfolder + 'diags/insitu/'
 
-        bunches = ['beam','driver']
+        if self.driver_source is not None:
+            bunches = ['beam','driver']
+        else:
+            bunches = ['beam']
 
         for bunch in bunches:
 
