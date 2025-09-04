@@ -144,8 +144,8 @@ class PlasmaLinac(Linac):
                     stage_instance = first_stage
                 elif i == (self.num_stages-1) and last_stage is not None:
                     stage_instance = last_stage
-                elif i == 0:
-                    stage_instance = self.stage
+                #elif i == 0:
+                #    stage_instance = self.stage
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 
