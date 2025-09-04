@@ -3,7 +3,7 @@ from abel.CONFIG import CONFIG
 from abel.classes.beamline.beamline import Beamline
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.source.source import Source
-from abel.classes.spectrometer.spectrometer import Spectrometer
+from abel.classes.spectrometer import Spectrometer
 import numpy as np
 
 class Experiment(Beamline):
@@ -46,13 +46,13 @@ class Experiment(Beamline):
 
     def get_cost_breakdown():
         return ('Experiment', 0)
+
     
-    # density plots
-    def plot_spectrometer_screen(self, xlims=None, ylims=None, E_calib = False, diverg = None, plot_m12 = False, savefig = None):
+    # plot the spectrometer screen
+    def plot_spectrometer_screen(self, xlims=None, ylims=None):
         
         from matplotlib import pyplot as plt
-        import warnings
-
+        
         # load phase space
         beam = self.final_beam
 
@@ -66,54 +66,19 @@ class Experiment(Beamline):
         dQdxdy, xedges, yedges = beam.density_transverse(hbins=xbins, vbins=ybins)
         
         # prepare figure
-        fig, ax = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 1]})
-        fig.set_figwidth(8)
-        fig.set_figheight(8)
+        fig, ax = plt.subplots(1, 1)
+        fig.set_figwidth(6)
+        fig.set_figheight(9)
         
-        # current profile
-        c0 = ax[0].pcolor(xedges*1e3, yedges * 1e3, abs(dQdxdy) * 1e3, cmap=CONFIG.default_cmap, shading='auto')
+        # plot spectrometer image
+        c0 = ax.pcolor(xedges*1e3, yedges * 1e3, abs(dQdxdy) * 1e3, cmap=CONFIG.default_cmap, shading='auto')
         
         # make plot
-        ax[0].set_xlabel('x (mm)')
-        ax[0].set_ylabel('y (mm)')
-        ax[0].set_title('Spectrometer screen (shot ' + str(self.shot+1) + ')')
-        ax[0].grid(False, which='major')
-        cbar0 = fig.colorbar(c0, ax=ax[0], pad = 0.015*fig.get_figwidth())
+        ax.set_xlabel('x (mm)')
+        ax.set_ylabel('y (mm)')
+        ax.set_title('Spectrometer screen (shot ' + str(self.shot+1) + ')')
+        ax.grid(False, which='major')
+        cbar0 = fig.colorbar(c0, ax=ax, pad = 0.015*fig.get_figwidth())
         cbar0.ax.set_ylabel('Charge density (nC ' r'$\mathrm{mm^{-2})}$')
-        ax[0].set_ylim(min(yedges * 1e3), max(yedges * 1e3))
-        
-        # calculate energy axis (E = E0*Dy/y)
-        Dy_img = self.spectrometer.get_dispersion(energy=self.spectrometer.imaging_energy_x)
-        E_times_Dy = self.spectrometer.imaging_energy_x*Dy_img
-        
-        # add imaging energies
-        y_img = -E_times_Dy/self.spectrometer.imaging_energy_y
-        y_img_y = -E_times_Dy/self.spectrometer.imaging_energy_y
-        ax[0].axhline(y_img*1e3, color = 'black', linestyle = '--', linewidth = 1, label = 'Imaging energy x (GeV)')
-        ax[0].axhline(y_img_y*1e3, color = 'black', linestyle = ':', linewidth = 1, label = 'Imaging energy y (GeV)')
-        
-        # add energy axis
-        warnings.simplefilter('ignore', category=RuntimeWarning)
-        ax2 = ax[0].secondary_yaxis('right', functions=(lambda y: -E_times_Dy/(y/1e3)/1e9, lambda y: -E_times_Dy/(y/1e3)/1e9))
-        ax2.set_ylabel('Energy (GeV)')
-        
-        if diverg is not None:
-            energies = -E_times_Dy/yedges
-            m12s = self.spectrometer.get_m12(energies)        
-            x_pos = m12s*diverg
-            x_neg = -m12s*diverg
-            ax[0].plot(x_pos*1e3, yedges*1e3, color = 'orange', label = str(diverg*1e3) + ' mrad butterfly', alpha = 0.7)
-            ax[0].plot(x_neg*1e3, yedges*1e3, color = 'orange', alpha = 0.7)
-            ax[1].plot(energies/1e9, m12s)
-            ax[1].set_ylabel(r'$\mathrm{m_{12}}$')
-            ax[1].set_xlabel('E (GeV)')
-            ax[1].grid(False, which='major')
-            
-        ax[0].set_xlim(min(xedges*1e3), max(xedges*1e3))
-        ax[0].legend(loc = 'center right', fontsize = 6)
-        
-        if plot_m12 == False:
-            fig.delaxes(ax[1])
-        if savefig is not None:
-            plt.savefig(str(savefig), dpi = 700)
+        ax.set_ylim(min(yedges * 1e3), max(yedges * 1e3))
     

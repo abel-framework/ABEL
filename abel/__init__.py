@@ -21,7 +21,8 @@ from .classes.plasma_lens.plasma_lens import PlasmaLens
 from .classes.interstage.interstage import Interstage
 from .classes.rf_accelerator.rf_accelerator import RFAccelerator, RFAcceleratorInitializationException
 from .classes.bds.bds import BeamDeliverySystem
-from .classes.spectrometer.spectrometer import Spectrometer
+from .classes.spectrometer import Spectrometer
+from .classes.spectrometer.quad_imaging import SpectrometerQuadImaging
 from .classes.damping_ring.damping_ring import DampingRing
 from .classes.combiner_ring.combiner_ring import CombinerRing
 from .classes.turnaround.turnaround import Turnaround
@@ -71,8 +72,9 @@ from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
 from .classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from .classes.bds.impl.bds_fbt import BeamDeliverySystemFlatBeamTransformer
-from .classes.spectrometer.impl.spectrometer_facet_ocelot import SpectrometerFacetOcelot
-from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
+from .classes.spectrometer.quad_imaging.preset.facet2 import SpectrometerFACET2
+#from .classes.spectrometer.impl.spectrometer_facet_ocelot import SpectrometerFacetOcelot
+#from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
 from .classes.ip.impl.ip_basic import InteractionPointBasic
 from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
 

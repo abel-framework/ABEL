@@ -3,7 +3,7 @@ from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.source.source import Source
 from abel.classes.stage.impl.stage_basic import StageBasic
 from abel.classes.stage.impl.stage_hipace import StageHipace
-from abel.classes.spectrometer.impl.spectrometer_flashforward_impactx import SpectrometerFLASHForwardImpactX
+#from abel.classes.spectrometer.impl.spectrometer_flashforward_impactx import SpectrometerFLASHForwardImpactX
 from abel.classes.beamline.impl.linac.linac import Linac
 
 class FLASHForward(ExperimentPWFA):

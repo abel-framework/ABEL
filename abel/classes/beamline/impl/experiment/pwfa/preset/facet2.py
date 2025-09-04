@@ -6,8 +6,7 @@ from abel.classes.source.source import Source
 from abel.classes.stage.impl.stage_basic import StageBasic
 from abel.classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
 from abel.classes.stage.impl.stage_hipace import StageHipace
-from abel.classes.spectrometer.impl.spectrometer_flashforward_impactx import SpectrometerFLASHForwardImpactX
-from abel.classes.spectrometer.impl.spectrometer_facet_ocelot import SpectrometerFacetOcelot
+from abel.classes.spectrometer.quad_imaging.preset.facet2 import SpectrometerFACET2
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 
@@ -79,9 +78,7 @@ class FACET2(ExperimentPWFA):
         stage.probe_evolution = True
 
         # set up spectrometer
-        spectrometer = SpectrometerFLASHForwardImpactX()
-        spectrometer.imaging_energy_x = self.energy
-        spectrometer.imaging_energy_y = self.energy
+        spectrometer = SpectrometerFACET2()
 
         # assigning the objects
         self.linac = linac

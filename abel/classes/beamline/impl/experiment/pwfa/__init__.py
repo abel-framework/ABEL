@@ -1,6 +1,6 @@
 from abel.classes.beamline.impl.experiment import Experiment
 from abel.classes.stage.stage import Stage
-from abel.classes.spectrometer.spectrometer import Spectrometer
+from abel.classes.spectrometer import Spectrometer
 from abel.classes.beamline.impl.linac.linac import Linac
 
 class ExperimentPWFA(Experiment):
@@ -31,8 +31,10 @@ class ExperimentPWFA(Experiment):
         self.stage.nom_energy = self.linac.nom_energy
 
         # set the spectrometer imaging energy to the nominal gain
+        self.spectrometer.nom_energy = self.stage.nom_energy + self.stage.nom_energy_gain
         if self.spectrometer.imaging_energy_x is None:
-            self.spectrometer.imaging_energy_x = self.stage.nom_energy + self.stage.nom_energy_gain
+            self.spectrometer.imaging_energy_x = self.spectrometer.nom_energy
+            self.spectrometer.imaging_energy_y = self.spectrometer.nom_energy
         
         # run beamline constructor
         super().assemble_trackables()
