@@ -205,7 +205,7 @@ class Stage(Trackable, CostModeled):
         if stage_copy.downramp is not None:
             stage_copy.downramp = None
 
-        # Can set energy gain and gradient parameters to None to let track_upramp() and track_downramp() determine these.
+        # Set energy gain, gradient and length parameters to None to let track_upramp() and track_downramp() determine these.
         # Do try/except to allow zeroing everything.
         try:
             stage_copy.nom_accel_gradient = None
@@ -223,11 +223,28 @@ class Stage(Trackable, CostModeled):
             stage_copy.nom_energy_gain_flattop = None
         except VariablesOverspecifiedError:
             pass
-            
-        # Everything else now unset, can set this safely.
-        # Will also trigger reset/recalc if needed
-        stage_copy.length_flattop = None
-        stage_copy.length = None
+        try:
+            stage_copy.length = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.length_flattop = None
+        except VariablesOverspecifiedError:
+            pass
+
+        if stage_copy.nom_accel_gradient_flattop is not None:
+            raise ValueError('stage_copy.nom_accel_gradient is not None.')
+        if stage_copy.nom_accel_gradient_flattop is not None:
+            raise ValueError('stage_copy.nom_accel_gradient_flattop is not None.')
+        if stage_copy.nom_energy_gain is not None:
+            raise ValueError('stage_copy.nom_energy_gain is not None.')
+        if stage_copy.nom_energy_gain_flattop is not None:
+            raise ValueError('stage_copy.nom_energy_gain_flattop is not None.')
+        if stage_copy.length is not None:
+            raise ValueError('stage_copy.length is not None.')
+        if stage_copy.length_flattop is not None:
+            raise ValueError('stage_copy.length_flattop is not None.')
+
         stage_copy.plasma_density = None
          
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
