@@ -558,6 +558,8 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
+        beam0_energy = beam0.energy()  # Records the input beam's energy.
+
         # Save beams to check for consistency between ramps and stage
         if self.store_beams_for_tests:
             ramp_beam_in = copy.deepcopy(beam0)
@@ -603,7 +605,7 @@ class StagePrtclTransWakeInstability(Stage):
 
 
         # ========== Bookkeeping ==========
-        self.upramp.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/driver.energy() * beam.abs_charge()/driver.abs_charge()
+        self.upramp.driver_to_beam_efficiency = (beam.energy()-beam0_energy)/driver.energy() * beam.abs_charge()/driver.abs_charge()
 
         # TODO: Temporary "drive beam evolution": Demagnify the driver
         # Needs to be performed before self.upramp.store_beams_between_ramps().
@@ -658,6 +660,8 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
+        beam0_energy = beam0.energy()  # Records the input beam's energy.
+
         # Save beams to check for consistency between ramps and stage
         if self.store_beams_for_tests:
             ramp_beam_in = copy.deepcopy(beam0)
@@ -703,7 +707,7 @@ class StagePrtclTransWakeInstability(Stage):
 
 
         # ========== Bookkeeping ==========
-        self.downramp.driver_to_beam_efficiency = (beam.energy()-beam0.energy())/driver.energy() * beam.abs_charge()/driver.abs_charge()
+        self.downramp.driver_to_beam_efficiency = (beam.energy()-beam0_energy)/driver.energy() * beam.abs_charge()/driver.abs_charge()
 
         # Save beams to check for consistency between ramps and stage
         if self.store_beams_for_tests:
