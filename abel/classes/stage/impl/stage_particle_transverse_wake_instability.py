@@ -516,7 +516,7 @@ class StagePrtclTransWakeInstability(Stage):
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
         
         # Perform main tracking
-        beam, drive_beam, evolution = transverse_wake_instability_particles(beam_filtered, copy.deepcopy(drive_beam_ramped), Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
+        beam, drive_beam, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
 
         self.evolution = evolution
 
@@ -620,11 +620,11 @@ class StagePrtclTransWakeInstability(Stage):
         wake_t_evolution = run_single_step_wake_t(upramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
 
         # Read the Wake-T simulation data
-        upramp.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(driver0), copy.deepcopy(beam0))
+        upramp.store_rb_Ez_2stage(wake_t_evolution, driver0, beam0)
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = upramp.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
+        beam, driver = upramp.main_tracking_procedure(driver0, beam0, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
 
 
         # ========== Bookkeeping ==========
@@ -745,11 +745,11 @@ class StagePrtclTransWakeInstability(Stage):
         wake_t_evolution = run_single_step_wake_t(downramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
 
         # Read the Wake-T simulation data
-        downramp.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(driver0), copy.deepcopy(beam0))
+        downramp.store_rb_Ez_2stage(wake_t_evolution, driver0, beam0)
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = downramp.main_tracking_procedure(copy.deepcopy(driver0), copy.deepcopy(beam0), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
+        beam, driver = downramp.main_tracking_procedure(driver0, beam0, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
 
 
         # ========== Bookkeeping ==========
