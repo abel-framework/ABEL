@@ -19,6 +19,7 @@ from abel.utilities.plasma_physics import beta_matched, blowout_radius
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
 from abel.apis.wake_t.wake_t_api import run_single_step_wake_t
 from abel.classes.stage.stage import Stage, StageError
+from abel.classes.stage.stage import Stage, PlasmaRamp
 from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.classes.beam import Beam
 from abel.CONFIG import CONFIG
@@ -225,9 +226,6 @@ class StagePrtclTransWakeInstability(Stage):
         Tracks the particles through the stage.
         """
 
-        #if self.parent is not None and self.upramp is not None and self.downramp is not None:
-        #    raise ValueError('Currently does not support ramps with both upramp and downramp.')
-
         # Set the diagnostics directory
         if runnable is not None:
             self.run_path = runnable.run_path()
@@ -264,6 +262,7 @@ class StagePrtclTransWakeInstability(Stage):
             #self.drive_beam = driver_incoming                    # TODO: delete ######################
         
         original_driver = copy.deepcopy(driver_incoming)
+        original_beam = copy.deepcopy(beam_incoming)
 
 
         # ========== Rotate the coordinate system of the beams ==========
@@ -283,16 +282,15 @@ class StagePrtclTransWakeInstability(Stage):
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:  # if self has an upramp
 
+            if type(self.upramp) is PlasmaRamp and self.upramp.ramp_shape != 'uniform':
+                raise TypeError('Only uniform ramps have been implemented.')
+
             # Pass the drive beam and main beam to track_upramp() and get the ramped beams in return
             beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
         
         else:  # Do the following if there are no upramp (a lone stage)
             beam_ramped = beam_rotated
             drive_beam_ramped = drive_beam_rotated
-            
-            if self.ramp_beta_mag is not None:
-                beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
-                drive_beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
 
         # Save beams to check for consistency between ramps and stage
         if self.store_beams_for_tests:
@@ -317,6 +315,9 @@ class StagePrtclTransWakeInstability(Stage):
 
         # ==========  Apply plasma density downramp (magnify beta function) ==========
         if self.downramp is not None:
+
+            if type(self.downramp) is PlasmaRamp and self.downramp.ramp_shape != 'uniform':
+                raise TypeError('Only uniform ramps have been implemented.')
             
             # TODO: Temporary "drive beam evolution": Magnify the driver
             # Needs to be performed before self.track_downramp().
@@ -333,15 +334,11 @@ class StagePrtclTransWakeInstability(Stage):
         else:  # Do the following if there are no downramp. 
             beam_outgoing = beam
             driver_outgoing = driver
-            if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
 
-                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
-
-                # Save beams to probe for consistency between ramps and stage
-                if self.store_beams_for_tests:
-                    stage_beam_out = copy.deepcopy(beam_outgoing)
-                    stage_driver_out = copy.deepcopy(driver_outgoing)
+            # Save beams to probe for consistency between ramps and stage
+            if self.store_beams_for_tests:
+                stage_beam_out = copy.deepcopy(beam_outgoing)
+                stage_driver_out = copy.deepcopy(driver_outgoing)
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -364,7 +361,7 @@ class StagePrtclTransWakeInstability(Stage):
         
 
         # ========== Bookkeeping ==========
-        self.driver_to_beam_efficiency = (beam_outgoing.energy()-beam_incoming.energy())/driver_outgoing.energy() * beam_outgoing.abs_charge()/driver_outgoing.abs_charge()
+        self.driver_to_beam_efficiency = (beam_outgoing.energy()-original_beam.energy())/driver_outgoing.energy() * beam_outgoing.abs_charge()/driver_outgoing.abs_charge()
         
         # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
         if self.store_beams_for_tests:
@@ -376,9 +373,9 @@ class StagePrtclTransWakeInstability(Stage):
                                             driver_incoming=original_driver)  # The original drive beam before rotation and ramps
 
         # Copy meta data from input beam_outgoing (will be iterated by super)
-        beam_outgoing.trackable_number = beam_incoming.trackable_number
-        beam_outgoing.stage_number = beam_incoming.stage_number
-        beam_outgoing.location = beam_incoming.location
+        beam_outgoing.trackable_number = original_beam.trackable_number
+        beam_outgoing.stage_number = original_beam.stage_number
+        beam_outgoing.location = original_beam.location
 
         # Clear some of the attributes to reduce file size of pickled files
         self.trim_attr_reduce_pickle_size()  # Remove this line to save wake snapshots in ramps
@@ -561,8 +558,6 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
-        from abel.classes.stage.stage import Stage, PlasmaRamp
-
         # Save beams to check for consistency between ramps and stage
         if self.store_beams_for_tests:
             ramp_beam_in = copy.deepcopy(beam0)
@@ -662,8 +657,6 @@ class StagePrtclTransWakeInstability(Stage):
         driver : ABEL ``Beam`` object
             Drive beam after tracking.
         """
-
-        from abel.classes.stage.stage import Stage, PlasmaRamp
 
         # Save beams to check for consistency between ramps and stage
         if self.store_beams_for_tests:
