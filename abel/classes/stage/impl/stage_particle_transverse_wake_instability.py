@@ -322,7 +322,11 @@ class StagePrtclTransWakeInstability(Stage):
             # TODO: Temporary "drive beam evolution": Magnify the driver
             # Needs to be performed before self.track_downramp().
             if self.downramp.ramp_beta_mag is not None:
-                driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
+                ramp_beta_mag = self.downramp.ramp_beta_mag
+            elif self.ramp_beta_mag is not None:
+                ramp_beta_mag = self.ramp_beta_mag
+
+            driver.magnify_beta_function(ramp_beta_mag, axis_defining_beam=driver)
             
             # Save beams to probe for consistency between ramps and stage
             if self.store_beams_for_tests:
@@ -609,8 +613,12 @@ class StagePrtclTransWakeInstability(Stage):
 
         # TODO: Temporary "drive beam evolution": Demagnify the driver
         # Needs to be performed before self.upramp.store_beams_between_ramps().
-        if self.ramp_beta_mag is not None:  
-            driver.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver)
+        if self.upramp.ramp_beta_mag is not None:
+            ramp_beta_mag = self.upramp.ramp_beta_mag
+        elif self.ramp_beta_mag is not None:
+            ramp_beta_mag = self.ramp_beta_mag
+        
+        driver.magnify_beta_function(1/ramp_beta_mag, axis_defining_beam=driver)
 
         # Save beams to check for consistency between ramps and stage
         if self.store_beams_for_tests:
