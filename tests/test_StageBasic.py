@@ -158,7 +158,7 @@ def test_stage_length_gradient_energyGain():
 
 
 @pytest.mark.StageBasic
-def store_beams_for_tests():
+def test_beam_between_ramps():
     """
     Tests for ensuring that the beams are correctly transferred between ramps 
     and stage.

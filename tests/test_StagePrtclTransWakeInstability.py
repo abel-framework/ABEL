@@ -125,7 +125,7 @@ def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_dens
 
 
 @pytest.mark.StagePrtclTransWakeInstability
-def store_beams_for_tests():
+def test_beam_between_ramps():
     """
     Tests for ensuring that the beams are correctly transferred between ramps 
     and stage.
