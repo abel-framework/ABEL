@@ -309,22 +309,10 @@ class StagePrtclTransWakeInstability(Stage):
         driver_num_profile, driver_z_slices = self.longitudinal_number_distribution(beam=drive_beam_ramped)
         self.driver_num_profile = driver_num_profile
         self.driver_z_slices = driver_z_slices
-        
-
-        # ========== Wake-T simulation and extraction ==========
-        # Extract driver xy-offsets for later use
-        driver_x_offset = drive_beam_ramped.x_offset()
-        driver_y_offset = drive_beam_ramped.y_offset()
-
-        # Perform a single time step Wake-T simulation
-        wake_t_evolution = run_single_step_wake_t(self.plasma_density, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam_ramped))  # Must send deepcopies of the beams, as this function changes the input beams. 
-
-        # Read the Wake-T simulation data
-        self.store_rb_Ez_2stage(wake_t_evolution, drive_beam_ramped, beam_ramped)
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = self.main_tracking_procedure(drive_beam_ramped, beam_ramped, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
+        beam, driver = self.main_tracking_procedure(beam_ramped, drive_beam_ramped, shot_path, tmpfolder)
 
 
         # ==========  Apply plasma density downramp (magnify beta function) ==========
@@ -403,24 +391,26 @@ class StagePrtclTransWakeInstability(Stage):
         
 
     # ==================================================
-    def main_tracking_procedure(self, drive_beam_ramped, beam_ramped, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path=None, tmpfolder=None):
+    def main_tracking_procedure(self, beam0, driver0, shot_path=None, tmpfolder=None):
         """
         Prepares and performs the main reduced model beam tracking.
-        - Filter out beam particles outside of the plasma bubble.
-        - Set up the configuration for the reduced model tracking.
-        - Make corrections to the Wake-T r-coordinate before saving the initial 
+        - Performs single time step Wake-T simulation and extracts relevant 
+            information.
+        - Filters out beam particles outside of the plasma bubble.
+        - Sets up the configuration for the reduced model tracking.
+        - Makes corrections to the Wake-T r-coordinate before saving the initial 
             time step.
-        - Call on the physics model to perform the tracking.
-        - Store beam parameter evolution as a stage attribute.
-        - Save the final time step if desired.
+        - Calls on the physics model to perform the tracking.
+        - Stores beam parameter evolution as a stage attribute.
+        - Stores the final time step if desired.
         
 
         Parameters
         ----------
-        drive_beam_ramped : ABEL ``Beam`` object
+        driver0 : ABEL ``Beam`` object
             Drive beam.
 
-        beam_ramped : ABEL ``Beam`` object
+        beam0 : ABEL ``Beam`` object
             Main beam.
 
         driver_x_offset : [m] float
@@ -449,14 +439,27 @@ class StagePrtclTransWakeInstability(Stage):
         drive_beam : ABEL ``Beam`` object
             Drive beam after tracking.
         """
+        
+        # ========== Wake-T simulation and extraction ==========
+        # Extract driver xy-offsets for later use
+        driver_x_offset = driver0.x_offset()
+        driver_y_offset = driver0.y_offset()
 
+        # Perform a single time step Wake-T simulation
+        wake_t_evolution = run_single_step_wake_t(self.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))  # Must send deepcopies of the beams, as this function changes the input beams. 
+
+        # Read the Wake-T simulation data
+        self.store_rb_Ez_2stage(wake_t_evolution, driver0, beam0)
+
+
+        # ========== Set up and track the beams using the physics models ==========
         # Filter out beam particles outside of the plasma bubble
-        beam_filtered = self.bubble_filter(beam_ramped, sort_zs=True)
-        beam_filtered.location = beam_ramped.location
-        beam_filtered.stage_number = beam_ramped.stage_number
+        beam_filtered = self.bubble_filter(beam0, sort_zs=True)
+        beam_filtered.location = beam0.location
+        beam_filtered.stage_number = beam0.stage_number
         
         if self.num_z_cells_main is None:
-            self.num_z_cells_main = round(np.sqrt( len(drive_beam_ramped)+len(beam_filtered) )/2)
+            self.num_z_cells_main = round(np.sqrt( len(driver0)+len(beam_filtered) )/2)
 
         # # Prepare fields from Wake-T for use in drive beam tracking # TODO: remove when driver evolution has been implemented.
         # if self.drive_beam_update_period > 0:  # Do drive beam evolution
@@ -469,7 +472,7 @@ class StagePrtclTransWakeInstability(Stage):
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
             stage_length=self.length_flattop, 
-            drive_beam=drive_beam_ramped, 
+            drive_beam=driver0, 
             main_beam=beam_filtered, 
             time_step_mod=self.time_step_mod, 
             show_prog_bar=self.show_prog_bar,
@@ -477,7 +480,7 @@ class StagePrtclTransWakeInstability(Stage):
             make_animations=self.make_animations, 
             tmpfolder=tmpfolder, 
             shot_path=shot_path, 
-            stage_num=beam_ramped.stage_number, 
+            stage_num=beam0.stage_number, 
             enable_tr_instability=self.enable_tr_instability, 
             enable_radiation_reaction=self.enable_radiation_reaction, 
             enable_ion_motion=self.enable_ion_motion, 
@@ -495,7 +498,7 @@ class StagePrtclTransWakeInstability(Stage):
             #wake_t_fields=wake_t_fields  # TODO: remove when driver evolution has been implemented.
         )
         
-        inputs = [drive_beam_ramped, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
+        inputs = [driver0, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
         if some_are_none:
@@ -513,10 +516,10 @@ class StagePrtclTransWakeInstability(Stage):
         # Save the initial step with ramped beams in rotated coordinate system after upramp
         Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
         zs_Ez_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.zs
-        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=drive_beam_ramped, beam0=beam_filtered)
+        self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=driver0, beam0=beam_filtered)
         
         # Perform main tracking
-        beam, drive_beam, evolution = transverse_wake_instability_particles(beam_filtered, drive_beam_ramped, Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
+        beam, drive_beam, evolution = transverse_wake_instability_particles(beam_filtered, driver0, Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
 
         self.evolution = evolution
 
@@ -598,33 +601,10 @@ class StagePrtclTransWakeInstability(Stage):
 
         # Set driver
         upramp.driver_source = SourceCapsule(beam=driver0)
-    
-    
-        # ========== Record longitudinal number profile ==========
-        # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
-        main_num_profile, z_slices = upramp.longitudinal_number_distribution(beam=beam0)
-        upramp.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
-        upramp.main_num_profile = main_num_profile
-
-        driver_num_profile, driver_z_slices = upramp.longitudinal_number_distribution(beam=driver0)
-        upramp.driver_num_profile = driver_num_profile
-        upramp.driver_z_slices = driver_z_slices
-        
-
-        # ========== Wake-T simulation and extraction ==========
-        # Extract driver xy-offsets for later use
-        driver_x_offset = driver0.x_offset()
-        driver_y_offset = driver0.y_offset()
-
-        # Perform a single time step Wake-T simulation
-        wake_t_evolution = run_single_step_wake_t(upramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
-
-        # Read the Wake-T simulation data
-        upramp.store_rb_Ez_2stage(wake_t_evolution, driver0, beam0)
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = upramp.main_tracking_procedure(driver0, beam0, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
+        beam, driver = upramp.main_tracking_procedure(beam0, driver0, shot_path, tmpfolder=None)
 
 
         # ========== Bookkeeping ==========
@@ -723,33 +703,10 @@ class StagePrtclTransWakeInstability(Stage):
 
         # set driver
         downramp.driver_source = SourceCapsule(beam=driver0)
-    
-    
-        # ========== Record longitudinal number profile ==========
-        # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
-        main_num_profile, z_slices = downramp.longitudinal_number_distribution(beam=beam0)
-        downramp.z_slices = z_slices  # Update the longitudinal position of the beam slices needed to fit Ez and bubble radius.
-        downramp.main_num_profile = main_num_profile
-
-        driver_num_profile, driver_z_slices = downramp.longitudinal_number_distribution(beam=driver0)
-        downramp.driver_num_profile = driver_num_profile
-        downramp.driver_z_slices = driver_z_slices
-        
-
-        # ========== Wake-T simulation and extraction ==========
-        # Extract driver xy-offsets for later use
-        driver_x_offset = driver0.x_offset()
-        driver_y_offset = driver0.y_offset()
-
-        # Perform a single time step Wake-T simulation
-        wake_t_evolution = run_single_step_wake_t(downramp.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))
-
-        # Read the Wake-T simulation data
-        downramp.store_rb_Ez_2stage(wake_t_evolution, driver0, beam0)
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = downramp.main_tracking_procedure(driver0, beam0, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder=None)
+        beam, driver = downramp.main_tracking_procedure(beam0, driver0, shot_path, tmpfolder=None)
 
 
         # ========== Bookkeeping ==========
