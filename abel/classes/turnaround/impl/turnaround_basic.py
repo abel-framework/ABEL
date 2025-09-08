@@ -4,7 +4,7 @@ from abel.classes.turnaround.turnaround import Turnaround
 
 class TurnaroundBasic(Turnaround):
     
-    def __init__(self, nom_energy=None, bend_radius=None, use_semi_circle=False, fill_factor=0.9, max_dipole_field=1.4, max_rel_energy_loss=0.005):
+    def __init__(self, nom_energy=None, bend_radius=None, use_semi_circle=False, fill_factor=0.9, max_dipole_field=1.4, max_rel_energy_loss=0.003):
 
         super().__init__(nom_energy=nom_energy, use_semi_circle=use_semi_circle)
 
