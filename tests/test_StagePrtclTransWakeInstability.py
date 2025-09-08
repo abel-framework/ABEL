@@ -405,25 +405,43 @@ def test_copy_config2blank_stage():
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, test_beam_between_ramps=True)
 
-    ramp = stage.copy_config2blank_stage()
+    stage_copy = stage.copy_config2blank_stage()
 
-    assert np.allclose(ramp.ramp_beta_mag, 1.0, rtol=1e-15, atol=0.0)  # Always set to 1.0 for ramps.
-    assert ramp.upramp is None
-    assert ramp.downramp is None
-    assert ramp.nom_accel_gradient is None
-    assert ramp.nom_energy_gain is None
-    assert ramp.nom_accel_gradient_flattop is None
-    assert ramp.nom_energy_gain_flattop is None
-    assert ramp.length_flattop is None
-    assert ramp.length is None
-    assert ramp.plasma_density is None
-    assert ramp.driver_source is None
+    assert stage_copy.plasma_density is None
+    assert stage_copy.ramp_beta_mag is None
+    assert stage_copy.length is None
+    assert stage_copy.length_flattop is None
+    assert stage_copy.nom_energy_gain is None
+    assert stage_copy.nom_energy_gain_flattop is None
+    assert stage_copy.nom_energy is None
+    assert stage_copy.nom_energy_flattop is None
+    assert stage_copy.nom_accel_gradient is None
+    assert stage_copy.nom_accel_gradient_flattop is None
 
-    assert ramp.enable_tr_instability is True
-    assert ramp.enable_radiation_reaction is True
-    assert ramp.enable_ion_motion is True
-    assert ramp.drive_beam_update_period == 0
-    assert ramp._return_tracked_driver is False
+    assert stage_copy._length_calc is None
+    assert stage_copy._length_flattop_calc is None
+    assert stage_copy._nom_energy_gain_calc is None
+    assert stage_copy._nom_energy_gain_flattop_calc is None
+    assert stage_copy._nom_energy_calc is None
+    assert stage_copy._nom_energy_flattop_calc is None
+    assert stage_copy._nom_accel_gradient_calc is None
+    assert stage_copy._nom_accel_gradient_flattop_calc is None
+
+    assert stage_copy.driver_source is None
+    assert stage_copy.upramp is None
+    assert stage_copy.downramp is None
+    assert stage_copy.has_ramp() is False
+    assert stage_copy.is_upramp() is False
+    assert stage_copy.is_downramp() is False
+
+    assert stage_copy.enable_tr_instability is True
+    assert stage_copy.enable_radiation_reaction is True
+    assert stage_copy.enable_ion_motion is True
+    assert stage_copy.drive_beam_update_period == 0
+    assert stage_copy._return_tracked_driver is False
+    assert stage_copy.probe_evol_period == 1
+    assert stage_copy.make_animations is False  # Currently does not support animations in ramps, as they get overwritten.
+    assert stage_copy.show_prog_bar is False
 
 
 # @pytest.mark.StagePrtclTransWakeInstability
