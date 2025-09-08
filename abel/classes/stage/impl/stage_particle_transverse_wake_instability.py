@@ -559,7 +559,7 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
-        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
+        from abel.classes.stage.stage import Stage, PlasmaRamp
 
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
@@ -684,7 +684,7 @@ class StagePrtclTransWakeInstability(Stage):
             Drive beam after tracking.
         """
 
-        from abel.classes.stage.impl.plasma_ramp import PlasmaRamp
+        from abel.classes.stage.stage import Stage, PlasmaRamp
 
         # Save beams to check for consistency between ramps and stage
         if self.test_beam_between_ramps:
