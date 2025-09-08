@@ -263,8 +263,7 @@ class StagePrtclTransWakeInstability(Stage):
             driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
             #self.drive_beam = driver_incoming                    # TODO: delete ######################
         
-        if self.store_beams_for_tests:
-            original_driver = copy.deepcopy(driver_incoming)
+        original_driver = copy.deepcopy(driver_incoming)
 
 
         # ========== Rotate the coordinate system of the beams ==========
@@ -288,8 +287,8 @@ class StagePrtclTransWakeInstability(Stage):
             beam_ramped, drive_beam_ramped = self.track_upramp(beam_rotated, drive_beam_rotated)
         
         else:  # Do the following if there are no upramp (a lone stage)
-            beam_ramped = copy.deepcopy(beam_rotated)
-            drive_beam_ramped = copy.deepcopy(drive_beam_rotated)
+            beam_ramped = beam_rotated
+            drive_beam_ramped = drive_beam_rotated
             
             if self.ramp_beta_mag is not None:
                 beam_ramped.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=drive_beam_ramped)
@@ -318,14 +317,14 @@ class StagePrtclTransWakeInstability(Stage):
         driver_y_offset = drive_beam_ramped.y_offset()
 
         # Perform a single time step Wake-T simulation
-        wake_t_evolution = run_single_step_wake_t(self.plasma_density, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam_ramped))
+        wake_t_evolution = run_single_step_wake_t(self.plasma_density, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam_ramped))  # Must send deepcopies of the beams, as this function changes the input beams. 
 
         # Read the Wake-T simulation data
-        self.store_rb_Ez_2stage(wake_t_evolution, copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam_ramped))
+        self.store_rb_Ez_2stage(wake_t_evolution, drive_beam_ramped, beam_ramped)
 
         
         # ========== Main tracking sequence ==========
-        beam, driver = self.main_tracking_procedure(copy.deepcopy(drive_beam_ramped), copy.deepcopy(beam_ramped), driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
+        beam, driver = self.main_tracking_procedure(drive_beam_ramped, beam_ramped, driver_x_offset, driver_y_offset, wake_t_evolution, shot_path, tmpfolder)
 
 
         # ==========  Apply plasma density downramp (magnify beta function) ==========
@@ -341,11 +340,11 @@ class StagePrtclTransWakeInstability(Stage):
                 stage_beam_out = copy.deepcopy(beam)
                 stage_driver_out = copy.deepcopy(driver)
 
-            beam_outgoing, driver_outgoing = self.track_downramp(copy.deepcopy(beam), copy.deepcopy(driver))
+            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
 
         else:  # Do the following if there are no downramp. 
-            beam_outgoing = copy.deepcopy(beam)
-            driver_outgoing = copy.deepcopy(driver)
+            beam_outgoing = beam
+            driver_outgoing = driver
             if self.ramp_beta_mag is not None:  # Do the following before rotating back to original frame.
 
                 beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
