@@ -334,7 +334,7 @@ class StagePrtclTransWakeInstability(Stage):
             # TODO: Temporary "drive beam evolution": Magnify the driver
             # Needs to be performed before self.track_downramp().
             if self.downramp.ramp_beta_mag is not None:
-                driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver)
+                driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
             
             # Save beams to probe for consistency between ramps and stage
             if self.store_beams_for_tests:
@@ -362,7 +362,7 @@ class StagePrtclTransWakeInstability(Stage):
         if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
-            driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(driver_incoming, driver_outgoing, beam_outgoing)
+            driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(original_driver, driver_outgoing, beam_outgoing)
         
         
         # ==========  Make animations ==========
