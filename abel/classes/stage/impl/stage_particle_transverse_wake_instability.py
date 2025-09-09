@@ -26,7 +26,7 @@ from abel.CONFIG import CONFIG
 
 
 
-class StagePrtclTransWakeInstability(Stage):
+class StageReducedModels(Stage):
     """
     TODO: Short description
     None of lines in the docstring text should exceed this length ..........
@@ -573,8 +573,8 @@ class StagePrtclTransWakeInstability(Stage):
         if type(self.upramp) is PlasmaRamp:
 
             upramp = self.convert_PlasmaRamp(self.upramp)
-            if type(upramp) is not StagePrtclTransWakeInstability:
-                raise TypeError('upramp is not a StagePrtclTransWakeInstability.')
+            if type(upramp) is not StageReducedModels:
+                raise TypeError('upramp is not a StageReducedModels.')
 
         elif type(self.upramp) is Stage:
             upramp = self.upramp  # Allow for other types of ramps
@@ -679,8 +679,8 @@ class StagePrtclTransWakeInstability(Stage):
         if type(self.downramp) is PlasmaRamp:
 
             downramp = self.convert_PlasmaRamp(self.downramp)
-            if type(downramp) is not StagePrtclTransWakeInstability:
-                raise TypeError('downramp is not a StagePrtclTransWakeInstability.')
+            if type(downramp) is not StageReducedModels:
+                raise TypeError('downramp is not a StageReducedModels.')
             
         elif type(self.downramp) is Stage:
             downramp = self.downramp  # Allow for other types of ramps
@@ -750,7 +750,7 @@ class StagePrtclTransWakeInstability(Stage):
             
         Returns
         ----------
-        stage_copy : ``StagePrtclTransWakeInstability`` object
+        stage_copy : ``StageReducedModels`` object
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
