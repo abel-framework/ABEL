@@ -53,7 +53,6 @@ from .classes.stage.stage import PlasmaRamp
 from .classes.interstage.impl.interstage_null import InterstageNull
 from .classes.interstage.impl.interstage_basic import InterstageBasic
 from .classes.interstage.impl.interstage_elegant import InterstageElegant
-from .classes.interstage.impl.interstage_ocelot import InterstageOcelot
 from .classes.interstage.impl.interstage_impactx import InterstageImpactX
 from .classes.interstage.impl.interstage_quads_impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
@@ -67,7 +66,6 @@ from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
 from .classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from .classes.bds.impl.bds_fbt import BeamDeliverySystemFlatBeamTransformer
-from .classes.spectrometer.impl.spectrometer_facet_ocelot import SpectrometerFacetOcelot
 from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
 from .classes.ip.impl.ip_basic import InteractionPointBasic
 from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
