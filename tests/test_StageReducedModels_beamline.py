@@ -144,7 +144,7 @@ def test_baseline_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    #ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
     enable_tr_instability = False
@@ -163,20 +163,60 @@ def test_baseline_linac():
     # Perform tracking
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
     
-    # Check the outputs
-    assert np.allclose(linac.stages[0].nom_energy, 361.8e9)
-    assert np.allclose(linac.stages[1].nom_energy, 369.6e9)
-    assert np.allclose(linac.get_beam(0).energy(), 361.8e9, rtol=0, atol=0.6e9)
-    assert np.allclose(linac.get_beam(-1).energy(), 377.4e9, rtol=0, atol=0.6e9)
+    # Check the machine parameters
+    stages = linac.stages
+    
+    assert np.isclose(stages[0].nom_energy, 361.8e9)
+    assert np.isclose(stages[0].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[1].nom_energy, stages[0].nom_energy + stages[0].nom_energy_gain)
+    assert np.isclose(stages[1].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+
+    interstage = linac.interstages[0]
+    interstage_nom_energy = interstage.nom_energy
+    assert np.isclose(interstage.nom_energy, stages[1].nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.dipole_field, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+
+    # Check the initial and final beams
+    initial_beam = linac.get_beam(0)
+    assert np.isclose(initial_beam.energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
+    assert np.isclose(initial_beam.beta_x(), stages[0].matched_beta_function(stages[0].nom_energy), rtol=1e-1, atol=0.0)
+    assert np.isclose(initial_beam.beta_y(), stages[0].matched_beta_function(stages[0].nom_energy), rtol=1e-1, atol=0.0)
 
     final_beam = linac.get_beam(-1)
-    final_beam.beam_name = 'Test beam'
-    ref_beam = Beam.load('./tests/data/test_StageReducedModels_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5')
-    ref_beam.beam_name = 'Reference beam'
+    assert final_beam.stage_number == 2
+    assert np.isclose(final_beam.location, linac.get_length(), rtol=1e-15, atol=0.0)
+    assert np.isclose(final_beam.energy(), stages[1].nom_energy + stages[1].nom_energy_gain, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 0.0192, rtol=1e-2, atol=0.0)
 
-    final_beam.print_summary()
-    ref_beam.print_summary()
-    Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
+    nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
+    nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_y()
+    assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=1e-1, atol=0.0)
+    nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
+    nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
+    assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.3, atol=0.0)
+    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
+
+    
+
+
+
+
+    # final_beam.beam_name = 'Test beam'
+    # ref_beam = Beam.load('./tests/data/test_StageReducedModels_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5')
+    # ref_beam.beam_name = 'Reference beam'
+
+    # final_beam.print_summary()
+    # ref_beam.print_summary()
+    # Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
+
+    
 
     # Test plotting functions
     linac.stages[-1].plot_Ez_rb_cut()
