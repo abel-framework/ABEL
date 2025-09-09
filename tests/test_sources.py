@@ -186,7 +186,8 @@ def test_SourceCapsule2Beam():
     ``Beam``.
     """
 
-    beam_file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5'
+    #beam_file = 'tests/data/test_StageReducedModels_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5'
+    beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
 
     source = SourceCapsule()
     ref_beam = Beam.load(beam_file)
@@ -202,7 +203,7 @@ def test_SourceFromFile2Beam():
     ``Beam``.
     """
 
-    beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
+    beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
 
     source = SourceFromFile()
     source.file = beam_file
@@ -212,10 +213,10 @@ def test_SourceFromFile2Beam():
 
     # Trigger exception for when a file does not exist
     with pytest.raises(FileNotFoundError):
-        file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'blabla.h5'
+        file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'blabla.h5'
         source = SourceFromFile(file=file)
     with pytest.raises(FileNotFoundError):
-        file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'blabla.h5'
+        file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'blabla.h5'
         source = SourceFromFile()
         source.file = file
 
