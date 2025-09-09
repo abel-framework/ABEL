@@ -29,17 +29,22 @@ class StageQuasistatic2d(Stage):
         warnings.simplefilter('ignore', category=RuntimeWarning)
         
         # make driver
-        driver_incoming = self.driver_source.track()
+        if self.driver_source is not None:
+            driver_incoming = self.driver_source.track()
+        else:
+            driver_incoming = None
         original_driver = copy.deepcopy(driver_incoming)
 
 
         # ========== Rotate the coordinate system of the beams ==========
         # Perform beam rotations before calling on upramp tracking.
-        if self.parent is None:  # Ensures that this is the main stage and not a ramp.
+        if self.parent is None and self.driver_source is not None:  # Ensures that this is the main stage and not a ramp.
 
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             drive_beam_rotated, beam_rotated = self.rotate_beam_coordinate_systems(driver_incoming, beam_incoming)
-
+        else:
+            drive_beam_rotated = driver_incoming
+            beam_rotated = beam_incoming
 
         # ========== Prepare ramps ==========
         # If ramps exist, set ramp lengths, nominal energies, nominal energy gains
@@ -75,11 +80,13 @@ class StageQuasistatic2d(Stage):
 
         # ========== Rotate the coordinate system of the beams back to original ==========
         # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
-        if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
+        if self.parent is None and self.driver_source is not None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
             
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(original_driver, driver_outgoing, beam_outgoing)
-
+        else:
+            driver_outgoing = driver_outgoing
+            beam_outgoing = beam_outgoing
 
         # ========== Bookkeeping ==========
         # Store beams for tests
@@ -140,19 +147,24 @@ class StageQuasistatic2d(Stage):
         # make copy of the beams to update later
         beam = copy.deepcopy(beam0)
         driver = copy.deepcopy(driver0)
-        driver0_location = driver0.location
-        beam0_location = beam0.location
 
         # ========== Wake-T simulation and extraction ==========
         # convert beams to WakeT bunches
-        driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
+        if driver0 is not None:
+            driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
+        else:
+            driver0_wake_t = None
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
         
         # create plasma stage
         box_min_z = beam0.z_offset(clean=True) - 5 * beam0.bunch_length(clean=True) - 0.25/k_p(self.plasma_density)
-        box_max_z = driver0.z_offset(clean=True) + 4 * driver0.bunch_length(clean=True)
-        box_size_r = 3 * blowout_radius(self.plasma_density, driver0.peak_current())
-        k_beta_driver = k_p(self.plasma_density)/np.sqrt(2*driver0.gamma())
+        if driver0 is None:
+            driver_or_beam = copy.deepcopy(beam0)
+        else:
+            driver_or_beam = driver0
+        box_max_z = driver_or_beam.z_offset(clean=True) + 4 * driver_or_beam.bunch_length(clean=True)
+        box_size_r = 3 * blowout_radius(self.plasma_density, driver_or_beam.peak_current())
+        k_beta_driver = k_p(self.plasma_density)/np.sqrt(2*driver_or_beam.gamma())
         k_beta_beam = k_p(self.plasma_density)/np.sqrt(2*beam0.gamma())
         lambda_betatron_min = 2*np.pi/max(k_beta_beam, k_beta_driver)
         lambda_betatron_max = 2*np.pi/min(k_beta_beam, k_beta_driver)
@@ -170,19 +182,30 @@ class StageQuasistatic2d(Stage):
         tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + os.sep
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
-                    
+
+        if driver0_wake_t is not None:
+            bunches0 = [driver0_wake_t, beam0_wake_t]
+        else:
+            bunches0 = [beam0_wake_t]
+            
         # perform tracking
         with suppress_stdout():
-            bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
-        
+            bunches = plasma.track(bunches0, opmd_diag=True, diag_dir=tmpfolder)
+
         # convert back to ABEL beams
-        beam_waket = wake_t_bunch2beam(bunches[1][-1])
-        driver_waket = wake_t_bunch2beam(bunches[0][-1])
+        if driver0_wake_t is not None:
+            beam_waket = wake_t_bunch2beam(bunches[1][-1])
+            driver_waket = wake_t_bunch2beam(bunches[0][-1])
+        else:
+            beam_waket = wake_t_bunch2beam(bunches[-1])
         
         # save evolution of the beam and driver
         if self.probe_evolution:
-            self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
-            self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
+            if driver0_wake_t is not None:
+                self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
+                self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
+            else:
+                self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches)
 
         # Store wakefield and beam quantities
         self.__save_initial_step(tmpfolder)
@@ -195,8 +218,15 @@ class StageQuasistatic2d(Stage):
         # calculate energy gain
         delta_Es = self.length_flattop*(beam_waket.Es() - beam.Es())/dz
 
+        if driver0 is not None:
+            x0_driver = driver0.x_offset()
+            y0_driver = driver0.y_offset()
+        else:
+            x0_driver = 0.0
+            y0_driver = 0.0
+            
         # find driver offset (to shift the beam relative) and apply betatron motion
-        output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, probe_evolution=self.probe_evolution)
+        output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=x0_driver, y0_driver=y0_driver, radiation_reaction=self.enable_radiation_reaction, probe_evolution=self.probe_evolution)
         if self.probe_evolution:
             Es_final, self.evolution.beam = output
         else:
@@ -206,13 +236,14 @@ class StageQuasistatic2d(Stage):
         beam.set_Es(Es_final)
             
         # decelerate driver (and remove nans)
-        delta_Es_driver = self.length_flattop*(driver0.Es()-driver_waket.Es())/dz
-        driver.apply_betatron_damping(delta_Es_driver)
-        driver.set_Es(driver0.Es() + delta_Es_driver)
+        if driver0 is not None:
+            delta_Es_driver = self.length_flattop*(driver0.Es()-driver_waket.Es())/dz
+            driver.apply_betatron_damping(delta_Es_driver)
+            driver.set_Es(driver0.Es() + delta_Es_driver)
 
         # Update the beam locations
-        driver.location = driver0_location + self.length_flattop
-        beam.location = beam0_location + self.length_flattop
+        #driver.location = driver0.location + self.length_flattop
+        #beam.location = beam0.location + self.length_flattop
         
         return beam, driver
     
@@ -401,18 +432,22 @@ class StageQuasistatic2d(Stage):
         self.initial.plasma.density.rho = -(rho0_plasma/SI.e)
         
         # extract initial beam density
-        data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
-        data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
         extent0 = metadata0_plasma.imshow_extent
         Nbins0 = self.initial.plasma.density.rho.shape
         dr0 = (extent0[3]-extent0[2])/Nbins0[0]
         dz0 = (extent0[1]-extent0[0])/Nbins0[1]
+        data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
         mask0_beam = np.logical_and(data0_beam[1] < dr0/2, data0_beam[1] > -dr0/2)
         jz0_beam, _, _ = np.histogram2d(data0_beam[0][mask0_beam], data0_beam[2][mask0_beam], weights=data0_beam[3][mask0_beam], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
-        mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
-        jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
         self.initial.beam.density.extent = metadata0_plasma.imshow_extent
-        self.initial.beam.density.rho = (jz0_beam+jz0_driver)/(dr0*dr0*dz0)
+        if self.driver_source is not None:
+            data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
+            mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
+            jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
+            jz0 = jz0_beam+jz0_driver
+        else:
+            jz0 = jz0_beam
+        self.initial.beam.density.rho = jz0/(dr0*dr0*dz0)
 
 
 

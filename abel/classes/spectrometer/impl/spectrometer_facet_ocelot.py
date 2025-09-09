@@ -5,14 +5,11 @@ import scipy.constants as SI
 
 class SpectrometerFacetOcelot(Spectrometer):
     
-    def __init__(self, dipole_field=-1, img_energy=None, obj_plane=0, mag_x=-4, img_energy_y=None, obj_plane_y=None, exact_tracking=True):   
+    def __init__(self, dipole_field=-1, imaging_energy_x=None, object_plane_x=0, magnification_x=-4, imaging_energy_y=None, object_plane_y=None, exact_tracking=True):   
+
+        super().__init__(imaging_energy_x=imaging_energy_x, imaging_energy_y=imaging_energy_y, object_plane_x=object_plane_x, object_plane_y=object_plane_y, magnification_x=magnification_x)
         
         self.dipole_field = dipole_field
-        self.img_energy = img_energy
-        self.obj_plane = obj_plane
-        self.mag_x = mag_x
-        self.img_energy_y = img_energy_y
-        self.obj_plane_y = obj_plane_y
         self.exact_tracking = exact_tracking
         
         # initial guess for quadrupole strengths
@@ -41,7 +38,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         
         # scale quad and dipole strengths to correct energy
         if ks is None:
-            ks = self.ks_for_img_energy*self.img_energy/energy        
+            ks = self.ks_for_img_energy*self.imaging_energy_x/energy        
         bend_angle = self.dipole_field*dipole_length*SI.c/energy
 
         # define elements
@@ -82,17 +79,17 @@ class SpectrometerFacetOcelot(Spectrometer):
         def img_condition_fcn(ks):
             
             # set vertical plane if not already
-            if self.img_energy_y is None:
-                self.img_energy_y = self.img_energy
-            if self.obj_plane_y is None:
-                self.obj_plane_y = self.obj_plane
+            if self.imaging_energy_y is None:
+                self.imaging_energy_y = self.imaging_energy_x
+            if self.object_plane_y is None:
+                self.object_plane_y = self.object_plane_x
             
             # calculate transfer matrices
             
-            lattice_x = self.get_lattice(ks, self.img_energy, self.obj_plane)
-            Rx = lattice_transfer_map(lattice_x, energy=self.img_energy/1e9)
-            lattice_y = self.get_lattice(ks, self.img_energy_y, self.obj_plane_y)
-            Ry = lattice_transfer_map(lattice_y, energy=self.img_energy/1e9)
+            lattice_x = self.get_lattice(ks, self.imaging_energy_x, self.object_plane_x)
+            Rx = lattice_transfer_map(lattice_x, energy=self.imaging_energy_x/1e9)
+            lattice_y = self.get_lattice(ks, self.imaging_energy_y, self.object_plane_y)
+            Ry = lattice_transfer_map(lattice_y, energy=self.imaging_energy_x/1e9)
 
             # return object function
             return (Rx[0,1])**2 + (Ry[2,3])**2 + (Rx[0,0]-self.mag_x)**2
@@ -159,7 +156,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         
         # get lattice
         if energy is None:
-            energy = self.img_energy
+            energy = self.imaging_energy_x
         if waist_plane is None:
             waist_plane = 0
         lattice = self.get_lattice(energy=energy, obj_plane=waist_plane)
@@ -185,7 +182,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         
         # set default energy
         if energy is None:
-            energy = self.img_energy
+            energy = self.imaging_energy_x
             
         # set the imaging and get the lattice
         self.set_imaging()
@@ -212,7 +209,7 @@ class SpectrometerFacetOcelot(Spectrometer):
         
         m12s = np.zeros(len(energies))
         for i in range(len(energies)):
-            lattice_x = self.get_lattice(energy=energies[i], obj_plane=self.obj_plane)
+            lattice_x = self.get_lattice(energy=energies[i], obj_plane=self.object_plane_x)
             Rx = lattice_transfer_map(lattice_x, energy=energies[i]/1e9)
             m12s[i] = Rx[0, 1]
         

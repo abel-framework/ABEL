@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, location=0.0, particle_mass=SI.m_e):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -41,7 +41,10 @@ class Beam():
         
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
-        self.location = 0        
+        self.location = location   
+        
+        # particle mass
+        self.particle_mass = particle_mass
     
     
     # reset phase space
@@ -1685,8 +1688,7 @@ class Beam():
         ax.set_title('Transverse profile')
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um^2)')
-
-    
+        
     # TODO: unfinished!
     # def plot_bunch_pattern(self):
         

@@ -21,7 +21,8 @@ from .classes.plasma_lens.plasma_lens import PlasmaLens
 from .classes.interstage.interstage import Interstage
 from .classes.rf_accelerator.rf_accelerator import RFAccelerator, RFAcceleratorInitializationException
 from .classes.bds.bds import BeamDeliverySystem
-from .classes.spectrometer.spectrometer import Spectrometer
+from .classes.spectrometer import Spectrometer
+from .classes.spectrometer.quad_imaging import SpectrometerQuadImaging
 from .classes.damping_ring.damping_ring import DampingRing
 from .classes.combiner_ring.combiner_ring import CombinerRing
 from .classes.turnaround.turnaround import Turnaround
@@ -30,9 +31,12 @@ from .classes.beamline.impl.driver_complex import DriverComplex
 from .classes.beamline.impl.linac.linac import Linac
 from .classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from .classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
-from .classes.beamline.impl.experiment.experiment import Experiment
-from .classes.beamline.impl.experiment.impl.experiment_pwfa import ExperimentPWFA
-from .classes.beamline.impl.experiment.impl.experiment_apl import ExperimentAPL
+
+from .classes.beamline.impl.experiment import Experiment
+from .classes.beamline.impl.experiment.pwfa import ExperimentPWFA
+from .classes.beamline.impl.experiment.pwfa.preset.flashforward import FLASHForward
+from .classes.beamline.impl.experiment.pwfa.preset.facet2 import FACET2
+from .classes.beamline.impl.experiment.apl import ExperimentAPL
 
 from .classes.collider.collider import Collider
 
@@ -40,6 +44,7 @@ from .classes.source.impl.source_basic import SourceBasic
 from .classes.source.impl.source_trapezoid import SourceTrapezoid
 from .classes.source.impl.source_combiner import SourceCombiner
 from .classes.source.impl.source_from_file import SourceFromFile
+from .classes.source.impl.source_from_profile import SourceFromProfile
 from .classes.source.impl.source_flattop import SourceFlatTop
 from .classes.source.impl.source_capsule import SourceCapsule
 from .classes.stage.impl.stage_basic import StageBasic
@@ -67,8 +72,9 @@ from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
 from .classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from .classes.bds.impl.bds_fbt import BeamDeliverySystemFlatBeamTransformer
-from .classes.spectrometer.impl.spectrometer_facet_ocelot import SpectrometerFacetOcelot
-from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
+from .classes.spectrometer.quad_imaging.preset.facet2 import SpectrometerFACET2
+#from .classes.spectrometer.impl.spectrometer_facet_ocelot import SpectrometerFacetOcelot
+#from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
 from .classes.ip.impl.ip_basic import InteractionPointBasic
 from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
 

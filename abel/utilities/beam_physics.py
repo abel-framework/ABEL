@@ -314,3 +314,22 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False):
 
     return DDx, DDpx, evolution
 
+
+def evolve_transfer_matrix(ls, ks, plasmalens=False, fast=True):
+    
+    # calculate transfer matrix evolution
+    Rtot = np.identity(4)
+    for i in range(len(ls)):
+        
+        # full beta evolution
+        if not fast:
+            s0 = np.sum(ls[:i])
+            ss_l = s0 + np.linspace(0, ls[i], Nres)
+            for j in range(len(ss_l)):
+                R_l = Rmat(ss_l[j]-s0, ks[i], plasmalens=plasmalens) @ Rtot
+        
+        # final matrix
+        Rtot = Rmat(ls[i], ks[i], plasmalens=plasmalens) @ Rtot
+    
+    return Rtot
+
