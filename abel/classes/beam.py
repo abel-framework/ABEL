@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, allow_low_energy_particles=False):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -41,7 +41,9 @@ class Beam():
         
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
-        self.location = 0        
+        self.location = 0
+
+        self.allow_low_energy_particles = allow_low_energy_particles  # Flag for allowing particles to have low energies.
     
     
     # reset phase space
@@ -207,16 +209,16 @@ class Beam():
         if uzs is None:
             
             if pzs is not None:
-                if np.any(pzs < pz_thres):
+                if np.any(pzs < pz_thres) and not self.allow_low_energy_particles:
                     raise ValueError('pzs contains values that are too small.')
                 uzs = momentum2proper_velocity(pzs)
 
             elif Es is not None:
-                if np.any(Es < energy_thres):
+                if np.any(Es < energy_thres) and not self.allow_low_energy_particles:
                     raise ValueError('Es contains values that are too small.')
                 uzs = energy2proper_velocity(Es)
         else:
-            if np.any(uzs < uz_thres):
+            if np.any(uzs < uz_thres) and not self.allow_low_energy_particles:
                 raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
@@ -351,7 +353,7 @@ class Beam():
     def set_uzs(self, uzs):
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
-        if np.any(uzs < uz_thres):
+        if np.any(uzs < uz_thres) and not self.allow_low_energy_particles:
             raise ValueError('uzs contains values that are too small.')
         self.__phasespace[5,:] = uzs
         
@@ -361,7 +363,7 @@ class Beam():
         self.set_uys(yps*self.uzs())
     def set_Es(self, Es):
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
-        if np.any(Es < energy_thres):
+        if np.any(Es < energy_thres) and not self.allow_low_energy_particles:
             raise ValueError('Es contains values that are too small.')
         self.set_uzs(energy2proper_velocity(Es))
         
@@ -884,6 +886,10 @@ class Beam():
     def total_particles(self):
         "Total number of physical particles."
         return int(np.nansum(self.weightings()))
+    
+    def population(self):
+        "Total number of physical particles."
+        return np.sum(self.weightings())
     
     def particle_charge(self):
         "The charge of a physical particle."
