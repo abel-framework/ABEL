@@ -47,7 +47,7 @@ from .classes.stage.impl.stage_nonlinear_1d import StageNonlinear1d
 from .classes.stage.impl.stage_hipace import StageHipace
 from .classes.stage.impl.stage_wake_t import StageWakeT
 from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
-from .classes.stage.impl.stage_particle_transverse_wake_instability import StagePrtclTransWakeInstability
+from .classes.stage.impl.stage_reduced_models import StageReducedModels
 from .classes.stage.stage import PlasmaRamp
 from .classes.interstage.impl.interstage_null import InterstageNull
 from .classes.interstage.impl.interstage_basic import InterstageBasic
