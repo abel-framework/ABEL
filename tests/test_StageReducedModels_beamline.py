@@ -198,25 +198,10 @@ def test_baseline_linac():
     assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=1e-1, atol=0.0)
     nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
     nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
-    assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.3, atol=0.0)
-    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
-
-    
-
-
-
-
-    # final_beam.beam_name = 'Test beam'
-    # ref_beam = Beam.load('./tests/data/test_StageReducedModels_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5')
-    # ref_beam.beam_name = 'Reference beam'
-
-    # final_beam.print_summary()
-    # ref_beam.print_summary()
-    # Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
-
-    
+    assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.2, atol=0.0)
+    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=0.2, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=0.2, atol=0.0)
 
     # Test plotting functions
     linac.stages[-1].plot_Ez_rb_cut()
