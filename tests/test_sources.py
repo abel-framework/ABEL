@@ -23,9 +23,39 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import pytest
 from abel import *
 from abel.utilities.plasma_physics import beta_matched
-import os
+import os, shutil
 import scipy.constants as SI
 import numpy as np
+
+
+def setup_basic_source(plasma_density=6.0e20):
+
+    source = SourceBasic()
+    source.bunch_length = 40.0e-06                                                  # [m], rms.
+    source.num_particles = 10000                                               
+    source.charge = -SI.e * 1.0e10                                                  # [C]
+
+    # Energy parameters
+    source.energy = 3.0e9                                                           # [eV]
+    source.rel_energy_spread = 0.02                                                 # Relative rms energy spread
+
+    # Emittances
+    source.emit_nx, source.emit_ny = 15e-6, 0.1e-6                                  # [m rad]
+
+    # Beta functions
+    source.beta_x = beta_matched(plasma_density, source.energy)                     # [m]
+    source.beta_y = source.beta_x                                                   # [m]
+
+    # Offsets
+    source.z_offset = 0.0                                                           # [m]
+    source.x_offset = 0.0                                                           # [m]
+    source.y_offset = 0.0                                                           # [m]
+
+    # Other
+    source.symmetrize_6d = True
+
+    return source
+
 
 def check_beam_source_parameters(beam, source):
     assert np.allclose(beam.particle_mass, SI.m_e, rtol=1e-05, atol=1e-08)
@@ -186,11 +216,12 @@ def test_SourceCapsule2Beam():
     ``Beam``.
     """
 
-    #beam_file = 'tests/data/test_StageReducedModels_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5'
-    beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
+    # Generate a beam for comparison
+    source_ref = setup_basic_source()
+    ref_beam = source_ref.track()
 
+    # Compare the beams
     source = SourceCapsule()
-    ref_beam = Beam.load(beam_file)
     source.beam = ref_beam
     beam = source.track()
     Beam.comp_beams(beam, ref_beam)
@@ -203,15 +234,23 @@ def test_SourceFromFile2Beam():
     ``Beam``.
     """
 
-    beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
+    # Make a beam file for comparison
+    save_dir = 'tests' + os.sep + 'data' + os.sep + 'test_beam'
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+    beam_file = save_dir + os.sep + 'beam_test_SourceCapsule2Beam.h5'
+    source = setup_basic_source()
+    ref_beam = source.track()
+    ref_beam.save(filename=beam_file)
 
+    # Use SourceFromFile to extract from beam file and compare beams
     source = SourceFromFile()
     source.file = beam_file
     beam = source.track()
-    ref_beam = Beam.load(beam_file)
     Beam.comp_beams(beam, ref_beam)
+    shutil.rmtree(save_dir)
 
-    # Trigger exception for when a file does not exist
+    # Trigger exception for when a file does not exist and check that these are handled correctly
     with pytest.raises(FileNotFoundError):
         file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'blabla.h5'
         source = SourceFromFile(file=file)
@@ -219,5 +258,7 @@ def test_SourceFromFile2Beam():
         file = 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'blabla.h5'
         source = SourceFromFile()
         source.file = file
+
+    
 
 
