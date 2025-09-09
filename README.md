@@ -1,5 +1,7 @@
 # ABEL: the Adaptable Beginning-to-End Linac framework
 
+<img width="100" height="100" alt="abel_logo" src="https://github.com/user-attachments/assets/23247a60-ab84-42ef-a647-c899f6932766" align="left" />
+
 The ABEL simulation framework is a particle-tracking framework for multi-element particle accelerators (such as plasma-accelerator linacs, colliders, experimental test facilities, etc.), implemented at varying levels of complexity, for fast investigations or optimizations. As a systems code, it can be used for physics simulations as well as generating (and optimizing for) cost estimates.
 
 ## Installation with `pip`
