@@ -211,7 +211,7 @@ def test_elegant_apl_fieldmap2D():
                                             lens_x_offset=lens_x_offset, lens_y_offset=lens_y_offset, 
                                             tmpfolder=tmpfolder)
 
-    # Convert SDDS file to CSV file
+    # Convert the output SDDS file to a CSV file for later comparison
     subprocess.run(CONFIG.elegant_exec + 'sdds2stream ' + lensfile + ' -columns=x,y,Bx,By > ' + tmpfile, shell=True)
 
     # Load feildmap from CSV file
@@ -224,18 +224,6 @@ def test_elegant_apl_fieldmap2D():
     # Create a fieldmap for comparison
     xs = np.linspace(-lensdim_x, lensdim_x, 2001)
     ys = np.linspace(-lensdim_y, lensdim_y, 201)
-    Bmap = np.zeros((len(xs)*len(ys), 4))
-    
-    # for i in range(len(xs)):
-    #     x = xs[i]   
-    #     for j in range(len(ys)):
-    #         y = ys[j]
-            
-    #         Bx = ((y+lens_y_offset) + (x+lens_x_offset) * (y+lens_y_offset) * tau_lens)
-    #         By = -((x+lens_x_offset) + (( (x+lens_x_offset)**2 + (y+lens_y_offset)**2 )/2)*tau_lens)
-            
-    #         index = i + j*len(xs)
-    #         Bmap[index,:] = [x, y, Bx, By]
 
     X, Y = np.meshgrid(xs, ys, indexing="xy")  # Shape: (len(ys), len(xs))
     Xo = X + lens_x_offset
