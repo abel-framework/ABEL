@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : StagePrtclTransWakeInstability tests
+ABEL : StageReducedModels tests
 =======================================
 
 This file is a part of ABEL.
@@ -84,9 +84,9 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     return main
 
 
-def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density=6.0e20, ramp_beta_mag=5.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, return_tracked_driver=False, store_beams_for_tests=False, length_flattop=7.8):
+def setup_StageReducedModels(driver_source, main_source, plasma_density=6.0e20, ramp_beta_mag=5.0, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, return_tracked_driver=False, store_beams_for_tests=False, length_flattop=7.8):
 
-    stage = StagePrtclTransWakeInstability()
+    stage = StageReducedModels()
     stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
     stage.length_flattop = length_flattop                                         # [m]
     if length_flattop is not None:
@@ -124,7 +124,7 @@ def setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_dens
     return stage
 
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_beam_between_ramps():
     """
     Tests for ensuring that the beams are correctly transferred between ramps 
@@ -146,7 +146,7 @@ def test_beam_between_ramps():
     # ========== Driver jitter, no angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, store_beams_for_tests=True)
+    stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, store_beams_for_tests=True)
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('store_beams_for_tests', overwrite=True, verbose=False)
@@ -175,7 +175,7 @@ def test_beam_between_ramps():
     # ========== No jitter, no angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, store_beams_for_tests=True)
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, store_beams_for_tests=True)
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('store_beams_for_tests', overwrite=True, verbose=False)
@@ -202,7 +202,7 @@ def test_beam_between_ramps():
     # ========== No jitter, large angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=1e-6, y_angle=1e-5)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, store_beams_for_tests=True)
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, store_beams_for_tests=True)
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('store_beams_for_tests', overwrite=True, verbose=False)
@@ -230,7 +230,7 @@ def test_beam_between_ramps():
     shutil.rmtree(linac.run_path())
 
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_stage_length_gradient_energyGain():
     """
     Tests ensuring that the flattop length and total length of the stage as well 
@@ -254,7 +254,7 @@ def test_stage_length_gradient_energyGain():
 
 
     # ========== Set stage length and nominal energy gain ==========
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False)
+    stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False)
 
     stage.length_flattop = 7.8                                                    # [m]
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
@@ -270,7 +270,7 @@ def test_stage_length_gradient_energyGain():
 
 
     # ========== Set nominal energy gain and flattop nominal acceleration gradient ==========
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False, length_flattop=None)
+    stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False, length_flattop=None)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
     stage.nom_energy_gain_flattop = 7.8e9                                         # [eV]
@@ -288,7 +288,7 @@ def test_stage_length_gradient_energyGain():
     shutil.rmtree(linac.run_path())
 
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_driver_unrotation():
     """
     Tests for checking the driver being correctly un-rotated back to its 
@@ -311,7 +311,7 @@ def test_driver_unrotation():
     # ========== Driver jitter, no angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, store_beams_for_tests=True)
+    stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, store_beams_for_tests=True)
 
     stage.nom_energy = 369.6e9                                                    # [eV], HALHF v2 last stage nominal input energy
     _, driver = stage.track(main_source.track())
@@ -341,7 +341,7 @@ def test_driver_unrotation():
     # ========== No jitter, no angular offset ==========
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
 
     stage.nom_energy = 7.8e9                                                      # [eV], HALHF v2 last stage nominal input energy 
     _, driver = stage.track(main_source.track())
@@ -355,7 +355,7 @@ def test_driver_unrotation():
     y_angle = 2e-5                                                                # [rad]
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=x_angle, y_angle=y_angle)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
 
     stage.nom_energy = 7.8e9                                                      # [eV], HALHF v2 last stage nominal input energy 
     _, driver = stage.track(main_source.track())
@@ -382,10 +382,10 @@ def test_driver_unrotation():
     assert np.allclose(driver.particle_mass, driver0.particle_mass, rtol=1e-13, atol=0.0)
 
     
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_copy_config2blank_stage():
     """
-    Tests for ``StagePrtclTransWakeInstability.copy_config2blank_stage()``.
+    Tests for ``StageReducedModels.copy_config2blank_stage()``.
     """
 
     np.random.seed(42)
@@ -403,7 +403,7 @@ def test_copy_config2blank_stage():
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, store_beams_for_tests=True)
+    stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, store_beams_for_tests=True)
 
     stage_copy = stage.copy_config2blank_stage()
 
@@ -444,23 +444,11 @@ def test_copy_config2blank_stage():
     assert stage_copy.show_prog_bar is False
 
 
-# @pytest.mark.StagePrtclTransWakeInstability
-# def test_convert():
-#     """
-#     Tests for StagePrtclTransWakeInstability.conver...(), i.e. conversion of 
-#     ... .
-
-#     Test whether the output ramp has the same parameters as the input rampHusk and parent stage.
-#     """
-
-#     # 
-    
-
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_rb_Ez_tracing():
     """
     Tests for checking correct tracing of bubble radius and axial electric field 
-    by ``StagePrtclTransWakeInstability`` methods by comparing against the data in  
+    by ``StageReducedModels`` methods by comparing against the data in  
     reference files.
     """
 
@@ -471,7 +459,7 @@ def test_rb_Ez_tracing():
     np.random.seed(42)
 
     # ========== Load data from the reference file ==========
-    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez.npz'
+    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez.npz'
 
     data = np.load(file_path)
     arrays = data["array"]
@@ -488,7 +476,7 @@ def test_rb_Ez_tracing():
     main_source = setup_basic_main_source()
     ramp_beta_mag = 5.0
     plasma_density = 6.0e20
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, length_flattop=0.01)
+    stage = setup_StageReducedModels(driver_source, main_source, length_flattop=0.01)
 
     drive_beam = driver_source.track()
     beam = main_source.track()
@@ -538,7 +526,7 @@ def test_rb_Ez_tracing():
 
 
     # ========== Compare the data only in the region of interest ==========
-    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez_roi.npz'
+    file_path = '.' + os.sep + 'tests' + os.sep + 'data' + os.sep + 'test_StageReducedModels' + os.sep + 'test_rb_Ez_tracing' + os.sep + 'bubble_radius_axial_Ez_roi.npz'
 
     data_roi = np.load(file_path)
     arrays_roi = data_roi["array"]
@@ -560,17 +548,17 @@ def test_rb_Ez_tracing():
     assert np.allclose(rb_roi, rb_ref_roi, rtol=0.0, atol=20e-6)
     
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_longitudinal_number_distribution():
     """
-    Tests for ``StagePrtclTransWakeInstability.longitudinal_number_distribution()``.
+    Tests for ``StageReducedModels.longitudinal_number_distribution()``.
     """
 
     np.random.seed(42)
 
     driver_source = setup_trapezoid_driver_source()
     main_source = setup_basic_main_source()
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source)
+    stage = setup_StageReducedModels(driver_source, main_source)
 
     beam = main_source.track()
     main_num_profile, z_slices = stage.longitudinal_number_distribution(beam=beam)
@@ -595,10 +583,10 @@ def test_longitudinal_number_distribution():
     assert np.allclose(driver_z_slices, driver_z_ctrs, rtol=1e-15, atol=0.0)
 
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_matched_beta_function():
     """
-    Tests for ``StagePrtclTransWakeInstability.matched_beta_function()``.
+    Tests for ``StageReducedModels.matched_beta_function()``.
     """
 
     from abel.utilities.relativity import energy2gamma
@@ -610,7 +598,7 @@ def test_matched_beta_function():
 
     driver_source = setup_trapezoid_driver_source()
     main_source = setup_basic_main_source()
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, plasma_density, ramp_beta_mag)
+    stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag)
 
     kp = np.sqrt(plasma_density*SI.e**2/(SI.epsilon_0*SI.m_e*SI.c**2))  # plasma wavenumber [m^-1]
     beta_mat = np.sqrt(2*energy2gamma(main_source.energy))/kp * ramp_beta_mag
@@ -618,19 +606,19 @@ def test_matched_beta_function():
     assert np.allclose(stage.matched_beta_function(main_source.energy), beta_mat, rtol=1e-15, atol=0.0)
 
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_trim_attr_reduce_pickle_size():
     """
-    Tests for ``StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size()``.
+    Tests for ``StageReducedModels.trim_attr_reduce_pickle_size()``.
     """
 
     np.random.seed(42)
 
     driver_source = setup_trapezoid_driver_source()
     main_source = setup_basic_main_source()
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True)
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True)
 
-    # Before calling StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size()
+    # Before calling StageReducedModels.trim_attr_reduce_pickle_size()
     assert stage.upramp is not None
     assert stage.upramp.initial is not None
     assert stage.upramp.final is not None
@@ -640,7 +628,7 @@ def test_trim_attr_reduce_pickle_size():
 
     stage.trim_attr_reduce_pickle_size()
 
-    # After calling StagePrtclTransWakeInstability.trim_attr_reduce_pickle_size()
+    # After calling StageReducedModels.trim_attr_reduce_pickle_size()
     assert stage.upramp.drive_beam is None
     assert stage.upramp.initial is None
     assert stage.upramp.final is None
@@ -650,10 +638,10 @@ def test_trim_attr_reduce_pickle_size():
     assert stage.drive_beam is None
 
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_plotting_methods():
     """
-    Tests for various ``StagePrtclTransWakeInstability`` plotting methods.
+    Tests for various ``StageReducedModels`` plotting methods.
     """
 
     import matplotlib.pyplot as plt
@@ -661,7 +649,7 @@ def test_plotting_methods():
 
     driver_source = setup_trapezoid_driver_source()
     main_source = setup_basic_main_source()
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True, length_flattop=1.0)
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, length_flattop=1.0)
     stage.save_final_step = True
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
@@ -683,16 +671,16 @@ def test_plotting_methods():
     shutil.rmtree(linac.run_path())
 
 
-@pytest.mark.StagePrtclTransWakeInstability
+@pytest.mark.StageReducedModels
 def test_print_summary():
     """
-    Tests for ``StagePrtclTransWakeInstability.print_summary()``.
+    Tests for ``StageReducedModels.print_summary()``.
     """
 
     np.random.seed(42)
 
     driver_source = setup_trapezoid_driver_source()
     main_source = setup_basic_main_source()
-    stage = setup_StagePrtclTransWakeInstability(driver_source, main_source, use_ramps=True)
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True)
 
     stage.print_summary()
