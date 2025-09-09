@@ -43,7 +43,6 @@ from .classes.source.impl.source_from_file import SourceFromFile
 from .classes.source.impl.source_flattop import SourceFlatTop
 from .classes.source.impl.source_capsule import SourceCapsule
 from .classes.stage.impl.stage_basic import StageBasic
-from .classes.stage.impl.stage_nonlinear_1d import StageNonlinear1d
 from .classes.stage.impl.stage_hipace import StageHipace
 from .classes.stage.impl.stage_wake_t import StageWakeT
 from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
