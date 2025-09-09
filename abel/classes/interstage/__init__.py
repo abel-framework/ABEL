@@ -40,6 +40,8 @@ class Interstage(Trackable, CostModeled):
         self.jitter.lens_offset_y = 0
         self.jitter.lens_angle_x = 0
         self.jitter.lens_angle_y = 0
+        self.jitter.sextupole_offset_x = 0
+        self.jitter.sextupole_offset_y = 0
         
         # evolution (saved when tracking)
         self.evolution = SimpleNamespace()

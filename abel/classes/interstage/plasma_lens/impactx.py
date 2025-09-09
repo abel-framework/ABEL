@@ -120,7 +120,9 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
 
         # define sextupole (or gap)
         if self.cancel_sec_order_dispersion:
-            half_sextupole_or_gap = elements.ExactMultipole(ds=self.length_central_gap_or_sextupole/2, k_normal=[0.,0.,self.strength_sextupole/self.length_central_gap_or_sextupole], k_skew=[0.,0.,0.], nslice=self.num_slices)
+            dx_sext = np.random.normal(scale=self.jitter.sextupole_offset_x)
+            dy_sext = np.random.normal(scale=self.jitter.sextupole_offset_y)
+            half_sextupole_or_gap = elements.ExactMultipole(ds=self.length_central_gap_or_sextupole/2, k_normal=[0.,0.,self.strength_sextupole/self.length_central_gap_or_sextupole], k_skew=[0.,0.,0.], nslice=self.num_slices, dx=dx_sext, dy=dy_sext)
         else:
             half_sextupole_or_gap = elements.ExactDrift(ds=self.length_central_gap_or_sextupole/2, nslice=1)
         
