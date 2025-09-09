@@ -2,7 +2,7 @@ from abel.classes.stage.stage import Stage
 from abel.classes.beam import Beam
 from abel.CONFIG import CONFIG
 import scipy.constants as SI
-import os, shutil, uuid
+import os, shutil, uuid, copy
 import numpy as np
 from types import SimpleNamespace
 
@@ -30,13 +30,18 @@ class StageWakeT(Stage):
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
 
+        # make driver (and convert to WakeT bunch)
+        driver0 = self.driver_source.track()
+        driver_original = copy.deepcopy(driver0)
+        
+        # rotate the beam coordinate system to align with the driver
+        if self.parent is None:
+            driver0, beam0 = self.rotate_beam_coordinate_systems(driver0, beam0)
+        
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
         self._prepare_ramps()
         plasma_profile = self.get_plasma_profile()
-        
-        # make driver (and convert to WakeT bunch)
-        driver0 = self.driver_source.track()
         
         # convert beams to WakeT bunches
         from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch
@@ -95,6 +100,11 @@ class StageWakeT(Stage):
         from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         driver = wake_t_bunch2beam(bunches[0][-1])
+
+        # undo system rotation
+        if self.parent is None:
+            driver, beam = self.undo_beam_coordinate_systems_rotation(driver_original, driver, beam)
+
         
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number
@@ -144,7 +154,13 @@ class StageWakeT(Stage):
             evol.emit_ny = beam_evol['emitt_y']
             evol.beta_x = beam_evol['beta_x']
             evol.beta_y = beam_evol['beta_y']
-            evol.plasma_density = np.ones_like(evol.location)*self.plasma_density
+
+            # add plasma profile
+            plasma_profile = self.get_plasma_profile()
+            if callable(plasma_profile):
+                evol.plasma_density = plasma_profile(evol.location)
+            else:
+                evol.plasma_density = np.ones_like(evol.location)*self.plasma_density
             
             # assign it to the right beam
             if i == 0:
