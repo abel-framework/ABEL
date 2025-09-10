@@ -1,4 +1,4 @@
-Wrapper APIs for external codes
+Wrappers for external codes
 ===============================
 
 ``HiPACE++``
@@ -14,4 +14,7 @@ Wrapper APIs for external codes
 ---------------------
 
 ``RF-Track``
+---------------------
+
+``Wake-T``
 ---------------------

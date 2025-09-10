@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.interstage.interstage import Interstage
-from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
+from abel.wrappers.elegant.elegant_wrapper import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
 from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion
 
 
@@ -192,7 +192,7 @@ class InterstageElegant(Interstage):
                   'path_to_beam_centroid_file': path_beam_centroid_file,
                   'path_to_uncoupled_Twiss_parameter_output_file': path_twiss_parameter_file}
 
-        runfile_template = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'runscript_interstage.ele')
+        runfile_template = os.path.join(os.path.dirname(abel.wrappers.elegant.elegant_wrapper.__file__), 'templates', 'runscript_interstage.ele')
         with open(runfile_template, 'r') as fin, open(tmpfile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
@@ -231,7 +231,7 @@ class InterstageElegant(Interstage):
             self.apl_field_map = data
         
         # make lattice file from template
-        lattice_template = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'lattice_interstage.lte')
+        lattice_template = os.path.join(os.path.dirname(abel.wrappers.elegant.elegant_wrapper.__file__), 'templates', 'lattice_interstage.lte')
 
         if save_evolution:
             num_watches = 5

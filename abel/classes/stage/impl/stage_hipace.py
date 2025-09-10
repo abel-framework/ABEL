@@ -50,7 +50,7 @@ class StageHipace(Stage):
 
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
-        from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_write_jobscript
+        from abel.wrappers.hipace.hipace_wrapper import hipace_write_inputs, hipace_run, hipace_write_jobscript
         
         ## PREPARE TEMPORARY FOLDER
         
@@ -207,7 +207,7 @@ class StageHipace(Stage):
             
     def __extract_evolution(self, tmpfolder, beam0, runnable):
 
-        from abel.apis.hipace import read_insitu_diagnostics
+        from abel.wrappers.hipace import read_insitu_diagnostics
         
         # suppress divide-by-zero errors
         np.seterr(divide='ignore', invalid='ignore')

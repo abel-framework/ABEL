@@ -44,7 +44,7 @@ class StageWakeT(Stage):
         plasma_profile = self.get_plasma_profile()
         
         # convert beams to WakeT bunches
-        from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch
+        from abel.wrappers.wake_t.wake_t_wrapper import beam2wake_t_bunch
         driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
         
@@ -97,7 +97,7 @@ class StageWakeT(Stage):
         shutil.rmtree(tmpfolder)
         
         # extract beams
-        from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam
+        from abel.wrappers.wake_t.wake_t_wrapper import wake_t_bunch2beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         driver = wake_t_bunch2beam(bunches[0][-1])
 

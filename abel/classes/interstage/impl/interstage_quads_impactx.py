@@ -127,7 +127,7 @@ class InterstageQuadsImpactX(Interstage):
     def match_lattice(self, runnable=None):
 
         from scipy import optimize as optim
-        from abel.apis.impactx.impactx_api import run_envelope_impactx
+        from abel.wrappers.impactx.impactx_wrapper import run_envelope_impactx
         
         # ensure that the incoming beta function is set before matching
         assert self.beta0 is not None
@@ -174,7 +174,7 @@ class InterstageQuadsImpactX(Interstage):
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
-        from abel.apis.impactx.impactx_api import run_impactx
+        from abel.wrappers.impactx.impactx_wrapper import run_impactx
         
         # get lattice
         lattice = self.get_lattice()
