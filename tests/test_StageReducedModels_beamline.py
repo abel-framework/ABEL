@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : StageReducedModels beamline calculation tests
+ABEL : StageReducedModels beamline integration tests
 =======================================
 
 This file is a part of ABEL.
