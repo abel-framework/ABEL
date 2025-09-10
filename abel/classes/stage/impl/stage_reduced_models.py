@@ -292,11 +292,6 @@ class StageReducedModels(Stage):
             beam_ramped = beam_rotated
             drive_beam_ramped = drive_beam_rotated
 
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            stage_beam_in = copy.deepcopy(beam_ramped)
-            stage_driver_in = copy.deepcopy(drive_beam_ramped)
-
 
         # ========== Record longitudinal number profile ==========
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
@@ -328,21 +323,12 @@ class StageReducedModels(Stage):
 
             driver.magnify_beta_function(ramp_beta_mag, axis_defining_beam=driver)
             
-            # Save beams to probe for consistency between ramps and stage
-            if self.store_beams_for_tests:
-                stage_beam_out = copy.deepcopy(beam)
-                stage_driver_out = copy.deepcopy(driver)
-
+            # Track the beams through the downramp
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
 
         else:  # Do the following if there are no downramp. 
             beam_outgoing = beam
             driver_outgoing = driver
-
-            # Save beams to probe for consistency between ramps and stage
-            if self.store_beams_for_tests:
-                stage_beam_out = copy.deepcopy(beam_outgoing)
-                stage_driver_out = copy.deepcopy(driver_outgoing)
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -366,15 +352,11 @@ class StageReducedModels(Stage):
 
         # ========== Bookkeeping ==========
         self.driver_to_beam_efficiency = (beam_outgoing.energy()-original_beam.energy())/driver_outgoing.energy() * beam_outgoing.abs_charge()/driver_outgoing.abs_charge()
-        
-        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
+
+        # Store beams for tests
         if self.store_beams_for_tests:
-            # Store beams for the main stage
-            self.store_beams_between_ramps(driver_before_tracking=stage_driver_in,  # Drive beam after the upramp, before tracking
-                                            beam_before_tracking=stage_beam_in,  # Main beam after the upramp, before tracking
-                                            driver_outgoing=stage_driver_out,  # Drive beam after tracking, before the downramp
-                                            beam_outgoing=stage_beam_out,  # Main beam after tracking, before the downramp
-                                            driver_incoming=original_driver)  # The original drive beam before rotation and ramps
+            # The original drive beam before rotation and ramps
+            self.driver_incoming = original_driver
 
         # Copy meta data from input beam_outgoing (will be iterated by super)
         beam_outgoing.trackable_number = original_beam.trackable_number
@@ -611,27 +593,15 @@ class StageReducedModels(Stage):
         # ========== Bookkeeping ==========
         self.upramp.driver_to_beam_efficiency = (beam.energy()-beam0_energy)/driver.energy() * beam.abs_charge()/driver.abs_charge()
 
+
+        # ========== Temporary "drive beam evolution" ==========
         # TODO: Temporary "drive beam evolution": Demagnify the driver
-        # Needs to be performed before self.upramp.store_beams_between_ramps().
         if self.upramp.ramp_beta_mag is not None:
             ramp_beta_mag = self.upramp.ramp_beta_mag
         elif self.ramp_beta_mag is not None:
             ramp_beta_mag = self.ramp_beta_mag
         
         driver.magnify_beta_function(1/ramp_beta_mag, axis_defining_beam=driver)
-
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            ramp_beam_out = copy.deepcopy(beam)
-            ramp_driver_out = copy.deepcopy(driver)
-
-        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.store_beams_for_tests:
-            self.upramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
-                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
-                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
-                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
 
         # Save parameter evolution, initial and final time steps to the ramp
         self.upramp.evolution = upramp.evolution  # TODO: save to self instead, but need to change stage diagnostics first.
@@ -716,20 +686,7 @@ class StageReducedModels(Stage):
 
         # ========== Bookkeeping ==========
         self.downramp.driver_to_beam_efficiency = (beam.energy()-beam0_energy)/driver.energy() * beam.abs_charge()/driver.abs_charge()
-
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            ramp_beam_out = copy.deepcopy(beam)
-            ramp_driver_out = copy.deepcopy(driver)
-
-        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.store_beams_for_tests:
-            self.downramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
-                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
-                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
-                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
-
+        
         # Save parameter evolution, initial and final time steps to the ramp
         self.downramp.evolution = downramp.evolution  # TODO: save to self instead, but need to change stage diagnostics first.
         # self.downramp.initial = downramp.initial
