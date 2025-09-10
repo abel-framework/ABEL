@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, allow_low_energy_particles=False):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, allow_low_energy_particles=True):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
