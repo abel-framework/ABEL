@@ -96,11 +96,6 @@ class StageBasic(Stage):
             beam_ramped = beam_rotated
             drive_beam_ramped = drive_beam_rotated
 
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            stage_beam_in = copy.deepcopy(beam_ramped)
-            stage_driver_in = copy.deepcopy(drive_beam_ramped)
-
         
         # ========== Perform tracking in the flattop stage ==========
         beam, driver = self.main_tracking_procedure(beam_ramped, drive_beam_ramped)
@@ -116,20 +111,12 @@ class StageBasic(Stage):
             # Needs to be performed before self.track_downramp().
             driver.magnify_beta_function(self.downramp.ramp_beta_mag, axis_defining_beam=driver)
 
-            # Save beams to probe for consistency between ramps and stage
-            if self.store_beams_for_tests:
-                stage_beam_out = copy.deepcopy(beam)
-                stage_driver_out = copy.deepcopy(driver)
-            
+            # Track the beams through the downramp
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
 
         else:  # Do the following if there are no downramp.
             beam_outgoing = beam
             driver_outgoing = driver
-
-            if self.store_beams_for_tests:
-                stage_beam_out = copy.deepcopy(beam_outgoing)
-                stage_driver_out = copy.deepcopy(driver_outgoing)
 
 
         # ========== Rotate the coordinate system of the beams back to original ==========
@@ -141,14 +128,10 @@ class StageBasic(Stage):
 
 
         # ========== Bookkeeping ==========
-        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
+        # Store beams for tests
         if self.store_beams_for_tests:
-            # Store beams for the main stage
-            self.store_beams_between_ramps(driver_before_tracking=stage_driver_in,  # Drive beam after the upramp, before tracking
-                                            beam_before_tracking=stage_beam_in,  # Main beam after the upramp, before tracking
-                                            driver_outgoing=stage_driver_out,  # Drive beam after tracking, before the downramp
-                                            beam_outgoing=stage_beam_out,  # Main beam after tracking, before the downramp
-                                            driver_incoming=original_driver)  # The original drive beam before rotation and ramps
+            # The original drive beam before rotation and ramps
+            self.driver_incoming = original_driver
 
         # calculate efficiency
         self.calculate_efficiency(original_beam, original_driver, beam_outgoing, driver_outgoing)
@@ -243,11 +226,6 @@ class StageBasic(Stage):
             Drive beam after tracking.
         """
 
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            ramp_beam_in = copy.deepcopy(beam0)
-            ramp_driver_in = copy.deepcopy(driver0)
-
         # Convert PlasmaRamp to a StageBasic
         if type(self.upramp) is PlasmaRamp:
 
@@ -291,27 +269,14 @@ class StageBasic(Stage):
         
         # save current profile
         self.upramp.calculate_beam_current(beam0, driver0, beam, driver)
-
-        # TODO: Temporary "drive beam evolution": Demagnify the driver
-        # Needs to be performed before self.upramp.store_beams_between_ramps().
-        driver.magnify_beta_function(1/self.upramp.ramp_beta_mag, axis_defining_beam=driver)
-
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            ramp_beam_out = copy.deepcopy(beam)
-            ramp_driver_out = copy.deepcopy(driver)
-
-        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.store_beams_for_tests:
-            self.upramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
-                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
-                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
-                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
         # Save parameter evolution to the ramp
         if self.probe_evolution:
             self.upramp.evolution = upramp.evolution  # TODO: save to self instead, but need to change stage diagnostics and how this is saved in self.main_tracking_procedure() first.
+
+
+        # ========== Modify the driver before the stage ==========
+        driver.magnify_beta_function(1/self.upramp.ramp_beta_mag, axis_defining_beam=driver)
             
         return beam, driver
     
@@ -339,11 +304,6 @@ class StageBasic(Stage):
         driver : ABEL ``Beam`` object
             Drive beam after tracking.
         """
-
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            ramp_beam_in = copy.deepcopy(beam0)
-            ramp_driver_in = copy.deepcopy(driver0)
 
         # Convert PlasmaRamp to a StageBasic
         if type(self.downramp) is PlasmaRamp:
@@ -388,19 +348,6 @@ class StageBasic(Stage):
         
         # save current profile
         self.downramp.calculate_beam_current(beam0, driver0, beam, driver)
-
-        # Save beams to check for consistency between ramps and stage
-        if self.store_beams_for_tests:
-            ramp_beam_out = copy.deepcopy(beam)
-            ramp_driver_out = copy.deepcopy(driver)
-
-        # Store outgoing beams for comparison between ramps and its parent. Stored inside the ramps.
-        if self.store_beams_for_tests:
-            self.downramp.store_beams_between_ramps(driver_before_tracking=ramp_driver_in,  # A deepcopy of the incoming drive beam before tracking.
-                                            beam_before_tracking=ramp_beam_in,  # A deepcopy of the incoming main beam before tracking.
-                                            driver_outgoing=ramp_driver_out,  # Drive beam after tracking through the ramp (has not been un-rotated)
-                                            beam_outgoing=ramp_beam_out,  # Main beam after tracking through the ramp (has not been un-rotated)
-                                            driver_incoming=None)  # Only the main stage needs to store the original drive beam
             
         # Save parameter evolution to the ramp
         if self.probe_evolution:
