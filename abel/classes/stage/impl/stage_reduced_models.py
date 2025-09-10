@@ -155,7 +155,6 @@ class StageReducedModels(Stage):
         self.drive_beam = drive_beam
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
-        self.interstage_dipole_field = None
 
         # Physics flags
         self.enable_tr_instability = enable_tr_instability 
@@ -211,8 +210,6 @@ class StageReducedModels(Stage):
         
         self.reljitter = SimpleNamespace()
         self.reljitter.plasma_density = 0
-
-        self.interstages_enabled = False  # TODO: to be removed.
 
         # internally sampled values (given some jitter)
         self.__n = None 
@@ -686,7 +683,7 @@ class StageReducedModels(Stage):
 
         # ========== Bookkeeping ==========
         self.downramp.driver_to_beam_efficiency = (beam.energy()-beam0_energy)/driver.energy() * beam.abs_charge()/driver.abs_charge()
-        
+
         # Save parameter evolution, initial and final time steps to the ramp
         self.downramp.evolution = downramp.evolution  # TODO: save to self instead, but need to change stage diagnostics first.
         # self.downramp.initial = downramp.initial
@@ -2695,17 +2692,6 @@ class StageReducedModels(Stage):
         
         print('======================================================================')
         print(f"Time step [betatron wavelength/c]:\t\t\t {self.time_step_mod :.3f}")
-        print(f"Interstages enabled:\t\t\t\t\t {str(self.interstages_enabled) :s}")
-
-        if self.interstage_dipole_field is None:
-            print(f"Interstage dipole field:\t\t\t\t {'Not registered.' :s}")
-        elif callable(self.interstage_dipole_field):
-            interstage_dipole_field = self.interstage_dipole_field(main_beam.energy())
-            print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
-        else:
-            interstage_dipole_field = self.interstage_dipole_field
-            print(f"Interstage dipole field:\t\t\t\t {interstage_dipole_field :.3f}")
-            
         print(f"Ramp beta magnification:\t\t\t\t {self.ramp_beta_mag :.3f}")
 
         if self.main_source is None:
@@ -2794,16 +2780,6 @@ class StageReducedModels(Stage):
         with open(self.run_path + 'output.txt', 'w') as f:
             print('============================================================================', file=f)
             print(f"Time step [betatron wavelength/c]:\t\t {self.time_step_mod :.3f}", file=f)
-            print(f"Interstages enabled:\t\t\t\t {str(self.interstages_enabled) :s}", file=f)
-            
-            if self.interstage_dipole_field is None:
-                print(f"Interstage dipole field:\t\t\t {'Not registered.' :s}", file=f)
-            elif callable(self.interstage_dipole_field):
-                interstage_dipole_field = self.interstage_dipole_field(beam_out.energy())
-                print(f"Interstage dipole field:\t\t\t {interstage_dipole_field :.3f}", file=f)
-            else:
-                interstage_dipole_field = self.interstage_dipole_field
-                print(f"Interstage dipole field:\t\t\t {interstage_dipole_field :.3f}", file=f)
             
             if self.main_source is None:
                 print(f"Symmetrised main beam:\t\t\t\t Not registered", file=f)
