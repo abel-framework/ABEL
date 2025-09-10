@@ -43,7 +43,6 @@ from .classes.source.impl.source_from_file import SourceFromFile
 from .classes.source.impl.source_flattop import SourceFlatTop
 from .classes.source.impl.source_capsule import SourceCapsule
 from .classes.stage.impl.stage_basic import StageBasic
-from .classes.stage.impl.stage_nonlinear_1d import StageNonlinear1d
 from .classes.stage.impl.stage_hipace import StageHipace
 from .classes.stage.impl.stage_wake_t import StageWakeT
 from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
@@ -57,6 +56,7 @@ from .classes.interstage.impl.interstage_impactx import InterstageImpactX
 from .classes.interstage.impl.interstage_quads_impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
+from .classes.plasma_lens.impl.plasma_lens_nonlinear_thick import PlasmaLensNonlinearThick
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
 from .classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorBasic
 from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti

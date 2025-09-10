@@ -2,7 +2,7 @@ from abel.classes.stage.stage import Stage
 from abel.classes.beam import Beam
 from abel.CONFIG import CONFIG
 import scipy.constants as SI
-import os, shutil, uuid
+import os, shutil, uuid, copy
 import numpy as np
 from types import SimpleNamespace
 
@@ -22,12 +22,6 @@ class StageWakeT(Stage):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
         from abel.utilities.plasma_physics import blowout_radius, k_p, beta_matched
-
-        
-        if self.upramp is not None:
-            raise NotImplementedError('Ramp tracking has not been implmented for StageWakeT.')
-        if self.downramp is not None:
-            raise NotImplementedError('Ramp tracking has not been implmented for StageWakeT.')
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
@@ -38,12 +32,16 @@ class StageWakeT(Stage):
 
         # make driver (and convert to WakeT bunch)
         driver0 = self.driver_source.track()
+        driver_original = copy.deepcopy(driver0)
         
-        # ========== Apply plasma density up ramp (demagnify beta function) ==========
-        # apply plasma-density up ramp (demagnify beta function)
-        if self.ramp_beta_mag is not None: # TODO: remove this part
-            driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
-            beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver0)
+        # rotate the beam coordinate system to align with the driver
+        if self.parent is None:
+            driver0, beam0 = self.rotate_beam_coordinate_systems(driver0, beam0)
+        
+        # Set ramp lengths, nominal energies, nominal energy gains
+        # and flattop nominal energy if not already done
+        self._prepare_ramps()
+        plasma_profile = self.get_plasma_profile()
         
         # convert beams to WakeT bunches
         from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch
@@ -78,7 +76,7 @@ class StageWakeT(Stage):
             
         n_out = round(self.length/dz/8)
         import wake_t
-        plasma = wake_t.PlasmaStage(length=self.length, density=self.plasma_density, wakefield_model=wakefield_model,
+        plasma = wake_t.PlasmaStage(length=self.length, density=plasma_profile, wakefield_model=wakefield_model,
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
@@ -102,17 +100,16 @@ class StageWakeT(Stage):
         from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         driver = wake_t_bunch2beam(bunches[0][-1])
+
+        # undo system rotation
+        if self.parent is None:
+            driver, beam = self.undo_beam_coordinate_systems_rotation(driver_original, driver, beam)
+
         
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
-        
-        # ========== Apply plasma density down ramp (magnify beta function) ==========
-        # apply plasma-density down ramp (magnify beta function)
-        if self.ramp_beta_mag is not None: # TODO: remove this part
-            beam.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
-            driver.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver0)
         
         # calculate efficiency
         self.calculate_efficiency(beam0, driver0, beam, driver)
@@ -157,7 +154,13 @@ class StageWakeT(Stage):
             evol.emit_ny = beam_evol['emitt_y']
             evol.beta_x = beam_evol['beta_x']
             evol.beta_y = beam_evol['beta_y']
-            evol.plasma_density = np.ones_like(evol.location)*self.plasma_density
+
+            # add plasma profile
+            plasma_profile = self.get_plasma_profile()
+            if callable(plasma_profile):
+                evol.plasma_density = plasma_profile(evol.location)
+            else:
+                evol.plasma_density = np.ones_like(evol.location)*self.plasma_density
             
             # assign it to the right beam
             if i == 0:
@@ -264,4 +267,34 @@ class StageWakeT(Stage):
         jz_driver, _, _ = np.histogram2d(data_driver[0][mask_driver], data_driver[2][mask_driver], weights=data_driver[3][mask_driver], bins=Nbins, range=[extent[2:4],extent[0:2]])
         self.final.beam.density.extent = metadata_plasma.imshow_extent
         self.final.beam.density.rho = (jz_beam+jz_driver)/(dr*dr*dz)
+
+    
+    def get_plasma_profile(self):
+        """Prepare the ramps (local to WakeT)."""
         
+        # make the plasma ramp profile
+        if self.has_ramp():
+
+            # assert uniform ramps (for now)
+            assert(self.upramp.ramp_shape == 'uniform')
+            assert(self.downramp.ramp_shape == 'uniform')
+
+            # define the density levels
+            n_upramp = self.upramp.plasma_density
+            n_flattop = self.plasma_density
+            n_downramp = self.downramp.plasma_density
+
+            # define the ramp transition locations
+            z_up = self.upramp.length
+            z_down = self.upramp.length + self.length_flattop
+            
+            # define the (uniform) profile function            
+            profile_fcn = lambda z: np.piecewise(z, [z<z_up,np.logical_and(z>=z_up,z<=z_down),z>z_down], [n_upramp, n_flattop, n_downramp])
+
+            return profile_fcn
+            
+        else:
+
+            # otherwise return a constant density
+            return self.plasma_density
+    
