@@ -1470,50 +1470,7 @@ class Stage(Trackable, CostModeled):
         filename = bunch + '_evolution.csv'
         np.savetxt(filename, matrix, delimiter=',')
         
-
-    # ==================================================
-    def store_beams_between_ramps(self, driver_before_tracking, beam_before_tracking, driver_outgoing, beam_outgoing, driver_incoming=None):
-        """
-        Stores drive beams and main beams before and between ramps/stage for 
-        comparison in tests. The beams are stored as attributes in the 
-        ramps/stage.
-        
-
-        Parameters
-        ----------
-        driver_before_tracking : ``Beam`` object
-            The incoming drive beam before any tracking.
-
-        beam_before_tracking : ``Beam`` object
-            The incoming main beam before any tracking.
-
-        driver_outgoing : ``Beam`` object
-            The outgoing drive beam from a ramp/stage.
-
-        beam_outgoing : ``Beam`` object
-            The outgoing main beam from a ramp/stage.
-
-        driver_incoming : ``Beam`` object, optional
-            The incoming drive beam before rotation and ramps. Only need to be 
-            stored inside the main stage.
-
-
-        Returns
-        ----------
-        None
-        """
-
-        # The beams before tracking
-        self.driver_in = driver_before_tracking
-        self.beam_in = beam_before_tracking
-        
-        # The outgoing beams 
-        self.driver_out = driver_outgoing
-        self.beam_out = beam_outgoing
-
-        # The original drive beam before rotation and ramps
-        self.driver_incoming = driver_incoming
-
+    
     # ==================================================
     def plot_driver_evolution(self):
         self.plot_evolution(bunch='driver')
