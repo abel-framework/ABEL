@@ -78,6 +78,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         theta, evolution = evolve_orbit(ls=ls, inv_rhos=inv_rs, plot=plot) # evolution[0,:] = xs is the projected length
 
         hypotenuse = np.sqrt(evolution[0,-1]**2 + evolution[1,-1]**2)
+        print('delay: ', (np.sum(ls)-hypotenuse)/SI.c*1e9)
 
         return evolution[0,-1] - self.length_stage, hypotenuse 
 
@@ -259,8 +260,8 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                         if j==indices_dipoles[-1]:
                             inv_rs_list[j] = inv_rs[i]
           
-            beta_x, alpha_x, _ = evolve_beta_function(ls=ls, ks=ks_list, beta0=beta0_x)
-            beta_y, alpha_y, _ = evolve_beta_function(ls=ls, ks=-ks_list, beta0=beta0_y)
+            beta_x, alpha_x, _ = evolve_beta_function(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, beta0=beta0_x)
+            beta_y, alpha_y, _ = evolve_beta_function(ls=ls, ks=-ks_list, inv_rhos=inv_rs_list, beta0=beta0_y)
 
             Dx, Dpx, _ = evolve_dispersion(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True)
             R56, _ = evolve_R56(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True)
@@ -277,14 +278,94 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             return opt.x
         else:
             return opt.x[:n_quads], opt.x[n_quads:]
+        
+    def optimize_quads_twice(self):
+        from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
+
+        n_quads = self.get_quad_counts()
+
+        k0, inv_r0 = self.get_quad_strengths(match_dipole=True) # params0=[k1, k2, k3, k4, ..., inv_r1]
+
+        self.set_ks(k0[:n_quads])
+        
+        self.lattice[1].phi = inv_r0*self.lattice[1].ds # phi=L/r
+
+        p = self.E_nom/SI.c
+
+        # Set bounds on the quads and dipole
+        if n_quads%2==0:
+            k_bounds = [(0,15), (-15,0)]*(n_quads//2)
+        else:
+            k_bounds = [(0,15), (-15,0)]*(n_quads//2)
+            k_bounds.append((0,15))
+        B_min = -2
+        B_max = 2
+        inv_r_max = B_max/p
+        inv_r_min = B_min/p
+        k_bounds.append((inv_r_min,inv_r_max))
+
+        ls, inv_rs_list, ks_list = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True)
+        
+        beta0_x, alpha0_x, _ = evolve_beta_function(ls=ls, ks=ks_list, beta0=self.beta0_x, inv_rhos=inv_rs_list, plot=True)
+        beta0_y, alpha0_y, _ = evolve_beta_function(ls=ls, ks=-ks_list, beta0=self.beta0_y, inv_rhos=inv_rs_list, plot=True)
+
+        Dx0, Dpx0, _ = evolve_dispersion(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True, plot=True)
+        R560, _ = evolve_R56(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True, plot=True)
+
+        indices_quads = [i for i, element in enumerate(self.lattice) if element.name=='quad']
+        indices_dipoles = [i for i, element in enumerate(self.lattice) if element.name=='dipole']
+        
+        def optimizer(params):
+            #nonlocal ls, inv_rs_list, ks_list
+            # params = [k1, k2, k3, k4, ..., inv_r1]
+            ks = params[:n_quads]
+            inv_rs = params[n_quads:]
+
+            for i, j in enumerate(indices_quads):
+                ks_list[j] = ks[i]
+
+            
+            for i, j in enumerate(indices_dipoles):
+                if i < len(inv_rs):
+                    inv_rs_list[j] = inv_rs[i]
+            
+
+            # Reverse the lists to make the second half mirror symmetric to the first half
+            l = ls[::-1]
+            inv_r = inv_rs_list[::-1]
+            k = ks_list[::-1]
+
+            beta_x, alpha_x, _ = evolve_beta_function(ls=l, ks=k, beta0=beta0_x, inv_rhos=inv_r, alpha0=alpha0_x)
+            beta_y, alpha_y, _ = evolve_beta_function(ls=l, ks=-k, beta0=beta0_y, inv_rhos=inv_r, alpha0=alpha0_y)
+
+            Dx, Dpx, _ = evolve_dispersion(ls=l, ks=k, inv_rhos=inv_r, Dx0=Dx0, Dpx0=Dpx0, high_res=True)
+            R56, _ = evolve_R56(ls=l, ks=k, inv_rhos=inv_r, Dx0=Dx0, Dpx0=Dpx0, R560=R560, high_res=True)
+
+            return (beta_x-self.beta0_x)**2 + (beta_y-self.beta0_y)**2 + (Dx*1e2)**2 + (R56*1e2)**2 +\
+                    alpha_x**2 + alpha_y**2 + (Dpx*1e2)**2
+        
+        x0=np.append(k0, inv_r0)
+        opt = minimize(optimizer, x0=x0, bounds=k_bounds)
+        print(opt)
+        if len(opt.x)==n_quads:
+            return k0, opt.x, inv_r0
+        else:
+            return k0, opt.x[:n_quads], inv_r0, opt.x[n_quads:]
     
-    def set_ks(self, ks):
+    def set_ks(self, ks, lattice=None):
         j=0
-        for element in self.lattice:
-            if element.name == 'quad':
-                print(ks[j])
-                element.k = ks[j]
-                j+=1
+        if not lattice:
+            for element in self.lattice:
+                if element.name == 'quad':
+                    print(ks[j])
+                    element.k = ks[j]
+                    j+=1
+        else:
+            for element in lattice:
+                if element.name == 'quad':
+                    print(ks[j])
+                    element.k = ks[j]
+                    j+=1
 
     
     def get_elements_arrays(self, Bs=None, ks=None):
@@ -708,7 +789,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
         ls, inv_rs, ks = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True)
 
-        _, _, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x, plot=True)
-        _, _, _ = evolve_beta_function(ls=ls, ks=-ks, beta0=self.beta0_y, plot=True)
+        _, _, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x, inv_rhos=inv_rs, plot=True)
+        _, _, _ = evolve_beta_function(ls=ls, ks=-ks, beta0=self.beta0_y, inv_rhos=inv_rs, plot=True)
         _, _, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True)
         _, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True)
