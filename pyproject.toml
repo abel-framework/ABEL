@@ -59,5 +59,6 @@ markers = [
   "StageBasic: Unit tests for the StageBasic class",
   "StageBasic_linac: Integration tests for StageBasic linacs",
   "StageQuasistatic2d: Tests for the StageQuasistatic2d class",
+  "StageWakeT: Tests for the StageWakeT class",
   "presets: Tests for collider presets",
 ]
