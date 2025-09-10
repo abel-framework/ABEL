@@ -410,15 +410,25 @@ def test_set_phase_space5():
     
     # Set energies below the accepted threshold
     with pytest.raises(ValueError):
-        beam = Beam()
+        beam = Beam(allow_low_energy_particles=False)
         beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs=np.random.rand(num_particles))
     with pytest.raises(ValueError):
-        beam = Beam()
+        beam = Beam(allow_low_energy_particles=False)
         beam.set_phase_space(Q, xs, ys, zs, pzs=pzs*0.01)
     with pytest.raises(ValueError):
-        beam = Beam()
+        beam = Beam(allow_low_energy_particles=False)
         beam.set_phase_space(Q, xs, ys, zs, Es=np.random.rand(num_particles))
     
+    # Check that warnings are displayed when attempting to set energies below the accepted threshold
+    with pytest.warns(UserWarning, match="Beam uzs contains values that are too small."):
+        beam = Beam(allow_low_energy_particles=True)
+        beam.set_phase_space(Q, xs, ys, zs, uxs, uys, uzs=np.random.rand(num_particles))
+    with pytest.warns(UserWarning, match="Beam pzs contains values that are too small."):
+        beam = Beam(allow_low_energy_particles=True)
+        beam.set_phase_space(Q, xs, ys, zs, pzs=pzs*0.01)
+    with pytest.warns(UserWarning, match="Beam Es contains values that are too small."):
+        beam = Beam(allow_low_energy_particles=True)
+        beam.set_phase_space(Q, xs, ys, zs, Es=np.random.rand(num_particles))
 
 
 @pytest.mark.beam
