@@ -164,7 +164,12 @@ def test_baseline_linac():
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
     
     # Check the machine parameters
-    stages = linac.stages    
+    stages = linac.stages
+    assert len(stages) == num_stages
+    assert np.isclose(linac.nom_energy, 377400000000.0, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.get_length(), 48.559, rtol=1e-4, atol=0.0)
+
     assert np.isclose(stages[0].nom_energy, 361.8e9)
     assert np.isclose(stages[0].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, stages[0].nom_energy + stages[0].nom_energy_gain)
