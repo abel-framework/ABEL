@@ -3,8 +3,8 @@ ABEL : Beam class tests
 =======================================
 
 This file is a part of ABEL.
-Copyright 2022– C.A.Lindstrøm, B.Chen, O.G. Finnerud,
-D. Kallvik, E. Hørlyk, K.N. Sjobak, E.Adli, University of Oslo
+Copyright 2022– C.A.Lindstrøm, J.B.B.Chen, O.G.Finnerud,
+D.Kallvik, E.Hørlyk, K.N.Sjobak, E.Adli, University of Oslo
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,15 +22,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
-from abel.utilities.beam_physics import generate_trace_space
+from abel.utilities.beam_physics import generate_trace_space, generate_trace_space_xy, generate_symm_trace_space_xyz
+from abel.utilities.plasma_physics import beta_matched
+from abel.utilities.relativity import energy2proper_velocity, energy2gamma, gamma2momentum, proper_velocity2gamma, proper_velocity2energy
+from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 import random
+import scipy.constants as SI
+import numpy as np
+import copy, shutil
+from matplotlib import pyplot as plt
+import warnings
 
 
 def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0, bunch_length=40.0e-06, energy=3e9, rel_energy_spread=0.02, z_offset=0.0, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0):
     source = SourceBasic()
     source.bunch_length = bunch_length                                              # [m], rms.
     source.num_particles = 10000                                               
-    source.charge = -e * 1.0e10                                                     # [C]
+    source.charge = -SI.e * 1.0e10                                                     # [C]
 
     # Energy parameters
     source.energy = energy                                                          # [eV]
@@ -418,7 +426,7 @@ def test_reset_phase_space():
     "Test reset_phase_space to ensure it initializes an 8xN zero matrix for the specified number of particles."
     beam = Beam()
     beam.reset_phase_space(10)
-    assert beam._Beam__phasespace.shape == (8, 10)
+    assert beam._Beam__phasespace.shape == (11, 10)
     assert (beam._Beam__phasespace == 0).all()
 
     # Purposedly trigger exceptions
@@ -489,7 +497,7 @@ def test_getitem():
     beam.set_phase_space(Q, xs, ys, zs)
     random_integer = random.randint(0, 999)
     particle = beam[random_integer]
-    assert particle.shape == (8,)
+    assert particle.shape == (11,)
     assert np.allclose(particle[0], xs[random_integer])
     assert np.allclose(particle[1], ys[random_integer])
     assert np.allclose(particle[2], zs[random_integer])
@@ -774,7 +782,7 @@ def test_param_calcs_generate_trace_space():
     Es = np.random.normal(loc=3e9, scale=0.02*3e9, size=10011)
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert np.isclose(np.std(xs), np.sqrt(geo_emitt_x*beta_x), rtol=1e-2, atol=0.0)  # Beam size
@@ -818,7 +826,7 @@ def test_param_calcs_generate_trace_space_xy():
     Es = np.random.normal(loc=3e9, scale=0.02*3e9, size=num_particles)
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert len(beam) == num_particles
@@ -852,7 +860,7 @@ def test_param_calcs_generate_trace_space_xy():
     Es = np.tile(Es, num_tiling)
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert len(beam) == num_particles
@@ -896,7 +904,7 @@ def test_param_calcs_generate_symm_trace_space_xyz():
     Es += 3e9  # Add offset.
 
     beam = Beam()
-    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-e*1.0e10)
+    beam.set_phase_space(xs=xs, ys=ys, zs=zs, xps=xps, yps=yps, Es=Es, Q=-SI.e*1.0e10)
 
     # Examine the beam parameters
     assert len(beam) == num_particles
@@ -2170,11 +2178,11 @@ def test_magnify_beta_function():
 
     x_offset = 5.354e-6
     y_offset = 0.1516e-6
-    ux_offset = 0.0
+    ux_offset = 1.0e-15
     uy_offset = 1583681.8243787317
     beta_mag = 5.0  # Magnify
 
-    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset, y_angle=uy_offset/energy2proper_velocity(3e9))
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
     beam = source.track()
     initial_beam = copy.deepcopy(beam)
 
@@ -2199,7 +2207,7 @@ def test_magnify_beta_function():
     assert np.isclose(beam.y_offset(), y_offset, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_x(), initial_beam.beam_size_x()*mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.beam_size_y(), initial_beam.beam_size_y()*mag, rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.x_angle(), ux_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_angle(), initial_beam.x_angle(), rtol=0, atol=1e-15)
     assert np.isclose(beam.y_angle(), uy_offset/energy2proper_velocity(3e9), rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_x(), initial_beam.divergence_x()/mag, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.divergence_y(), initial_beam.divergence_y()/mag, rtol=1e-15, atol=0.0)
@@ -2211,7 +2219,7 @@ def test_magnify_beta_function():
 
 
     beta_mag = 1/beta_mag  # De-magnify
-    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset, y_angle=uy_offset/energy2proper_velocity(3e9))
+    source = setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=beta_mag, energy=3e9, rel_energy_spread=0.0, z_offset=0.0, y_offset=y_offset, x_offset=x_offset, x_angle=ux_offset/energy2proper_velocity(3e9), y_angle=uy_offset/energy2proper_velocity(3e9))
     beam = source.track()
     initial_beam = copy.deepcopy(beam)
 
@@ -2379,7 +2387,7 @@ def test_apply_betatron_motion_emitt_pres():
     initial_beam = copy.deepcopy(beam)
     deltaEs = np.full(len(beam.Es()), 1e9)  # Homogeneous energy gain
 
-    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=True)
+    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=True)
 
     assert np.allclose(Es_final.mean(), 4e9, rtol=1e-15, atol=0.0)
     assert np.allclose(np.std(Es_final), 1e-20, rtol=0.0, atol=1e-19)
@@ -2413,7 +2421,7 @@ def test_apply_betatron_motion():
     initial_beam = copy.deepcopy(beam)
     deltaEs = np.full(len(beam.Es()), 1e9)  # Homogeneous energy gain
 
-    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=True, calc_evolution=True)
+    Es_final, evol = beam.apply_betatron_motion(L=1.0, n0=6.0e20, deltaEs=deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=True, probe_evolution=True)
 
     assert np.allclose(Es_final.mean(), 4e9, rtol=1e-6, atol=0.0)
     assert np.allclose(np.std(Es_final), 0.01*3e9, rtol=5e-3, atol=0.0)

@@ -1,12 +1,13 @@
 import numpy as np
-import scipy.integrate as sciint
-import scipy.interpolate as sciinterp
 import scipy.constants as SI
 from abel.utilities.plasma_physics import k_p
 
 
 # calculate the longitudinal electric field
 def wakefield_1d(n0, driver, beam=None):
+
+    import scipy.integrate as sciint
+    import scipy.interpolate as sciinterp
 
     # make cylindrical beam density (density vs. r and z)
     bins_r = 5 * np.std(driver.rs()) * np.linspace(0, 1, round(np.sqrt(len(driver))/4))

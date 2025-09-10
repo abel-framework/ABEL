@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from abel import Beamline
+from abel.classes.beamline.beamline import Beamline
 
 class Linac(Beamline):
     
@@ -26,10 +26,27 @@ class Linac(Beamline):
         super().assemble_trackables()
     
 
+    @property
+    def nom_energy(self) -> float | None:
+        "The nominal energy [eV] of the linac."
+        return self._nom_energy
+    @nom_energy.setter
+    def nom_energy(self, energy : float | None):
+        if energy is not None and energy < 0.0:
+            raise ValueError('Nominal energy cannot be negative.')
+        self._nom_energy = energy
+    _nom_energy = None
+
+
     def get_nom_energy(self):
+        "Alias of linac nominal energy."
         return self.nom_energy
-        
     
+    
+    def get_nom_beam_power(self):
+        return abs(self.nom_energy * self.source.get_charge() * self.get_rep_rate_average())
+    
+
     def get_effective_gradient(self):
         return self.get_nom_energy()/self.get_length()
 
@@ -42,6 +59,7 @@ class Linac(Beamline):
             Etot += trackable.energy_usage()
         return Etot
 
+
     def get_cost_breakdown(self):
         "Cost breakdown for the linac [ILC units]"
         
@@ -49,6 +67,6 @@ class Linac(Beamline):
         
         # cost of the civil construction
         for trackable in self.trackables:
-            breakdown.append(trackables.get_cost_breakdown())
+            breakdown.append(trackable.get_cost_breakdown())
 
         return (self.name, breakdown)

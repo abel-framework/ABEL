@@ -1,10 +1,8 @@
 from abel.classes.interstage.interstage import Interstage
 import numpy as np
-from scipy import optimize as optim
-from abel.apis.impactx.impactx_api import run_impactx, run_envelope_impactx
-import contextlib, os
+import os
 from types import SimpleNamespace
-from matplotlib import pyplot as plt
+
 import scipy.constants as SI
 
 class InterstageQuadsImpactX(Interstage):
@@ -128,6 +126,9 @@ class InterstageQuadsImpactX(Interstage):
 
     def match_lattice(self, runnable=None):
 
+        from scipy import optimize as optim
+        from abel.apis.impactx.impactx_api import run_envelope_impactx
+        
         # ensure that the incoming beta function is set before matching
         assert self.beta0 is not None
         
@@ -172,6 +173,8 @@ class InterstageQuadsImpactX(Interstage):
         
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+
+        from abel.apis.impactx.impactx_api import run_impactx
         
         # get lattice
         lattice = self.get_lattice()
@@ -186,6 +189,8 @@ class InterstageQuadsImpactX(Interstage):
 
     
     def plot_layout(self):
+
+        from matplotlib import pyplot as plt
         
         L1 = float(self.dipole_length)
         B1 = float(self.dipole_field)
@@ -254,6 +259,8 @@ class InterstageQuadsImpactX(Interstage):
     
     def plot_evolution(self):
 
+        from matplotlib import pyplot as plt
+        
         evol = self.evolution
         
         # prepare plot

@@ -1,15 +1,5 @@
 import numpy as np
-from scipy.integrate import solve_ivp, odeint
 import scipy.constants as SI
-import matplotlib.pyplot as plt
-from joblib import Parallel, delayed
-import multiprocessing
-import os
-
-num_cores = multiprocessing.cpu_count()
-os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
-
-re = SI.physical_constants['classical electron radius'][0]
 
 # Calculate acceleration and change in gamma
 def oscillator2d(t, x, A, B, C, D):
@@ -28,6 +18,17 @@ def oscillator2d(t, x, A, B, C, D):
 # Assume x0 etc is a vector containing appropriate value for each particle
 #def evolve_betatron_motion(x0, ux0, y0, uy0, L, gamma, kp, Es):
 def evolve_betatron_motion(x0, ux0, y0, uy0, L, gamma, dgamma_ds, kp, enable_rr = True):
+
+    from joblib import Parallel, delayed
+    from scipy.integrate import solve_ivp
+    import multiprocessing
+    import os
+
+    num_cores = multiprocessing.cpu_count()
+    os.environ['NUMEXPR_MAX_THREADS'] = f'{num_cores}'
+
+    re = SI.physical_constants['classical electron radius'][0]
+    
     # Constants
     #Ezs = Es/L #eV/m = J/e/m = V/m
     Ezs = dgamma_ds*SI.m_e*SI.c**2/SI.e #eV/m = J/e/m = V/m
@@ -87,19 +88,10 @@ def evolve_betatron_motion(x0, ux0, y0, uy0, L, gamma, dgamma_ds, kp, enable_rr 
         gamma_end = solution.y[4, -1]
         
         ux_end = vx_end * gamma_end
-        #uxs[i] = ux_end
         
         uy_end = vy_end * gamma_end
-        #uys[i] = uy_end
         
-        #if i ==0:
-        #    print(vx_end, vy_end)
-        #    print(x_dot0, y_end)
-        #    plt.plot(t, solution.y[0,:])
-        #    plt.show()
-
         E = gamma_end*SI.m_e*SI.c**2 / SI.e # eV
-        #Es[i] = E
     
         return x_end, ux_end, y_end, uy_end, E
 

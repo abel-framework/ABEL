@@ -38,17 +38,12 @@ Ben Chen, 5 October 2023, University of Oslo
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.constants import c, e, m_e, epsilon_0 as eps0
+from scipy.constants import c, e, m_e, epsilon_0 as eps0 # TODO: replace with "import scipy.constants as SI" for consistency
 
 from tqdm import tqdm
-import time
-from joblib import Parallel, delayed  # Parallel tracking
-from joblib_progress import joblib_progress
 import csv, os
-#from types import SimpleNamespace
 
-from abel.classes.beam import *  # TODO: no need to import everything.
+from abel.classes.beam import Beam
 from abel.utilities.relativity import momentum2gamma, velocity2gamma
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_mean, weighted_std

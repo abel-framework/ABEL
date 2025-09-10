@@ -1,12 +1,13 @@
 import uuid, os, subprocess, csv, shutil
 import numpy as np
-from abel import CONFIG, Beam
+from abel.CONFIG import CONFIG
+from abel.classes.beam import Beam
 import scipy.constants as SI
-from abel.utilities.relativity import gamma2energy, energy2gamma
-import matplotlib.pyplot as plt
 
 def elegant_read_beam(filename, tmpfolder=None):
 
+    from abel.utilities.relativity import gamma2energy
+    
     make_new_tmpfolder = tmpfolder is None
     if make_new_tmpfolder:
         tmpfolder = CONFIG.temp_path + str(uuid.uuid4())
@@ -45,6 +46,8 @@ def elegant_read_beam(filename, tmpfolder=None):
 
 
 def elegant_write_beam(beam, filename, tmpfolder=None):
+
+    from abel.utilities.relativity import energy2gamma
     
     # create temporary CSV file and folder
     make_new_tmpfolder = tmpfolder is None

@@ -1,8 +1,6 @@
 import numpy as np
 import scipy.constants as SI
-from abel import Source, Beam
-from abel.utilities.beam_physics import generate_trace_space_xy
-from abel.utilities.relativity import energy2gamma
+from abel.classes.source.source import Source
 
 class SourceFlatTop(Source):
     
@@ -26,6 +24,10 @@ class SourceFlatTop(Source):
 
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
+
+        from abel.classes.beam import Beam
+        from abel.utilities.beam_physics import generate_trace_space_xy
+        from abel.utilities.relativity import energy2gamma
         
         # make empty beam
         beam = Beam()
@@ -53,7 +55,7 @@ class SourceFlatTop(Source):
         # longitudinal positions
         zs = np.random.uniform(low=self.z_offset-self.bunch_length, high=self.z_offset, size=num_particles_actual)
 
-        weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+        weightings = np.ones(zs.shape)*np.abs(self.charge)/(SI.e * self.num_particles)
         
         # symmetrize
         if self.symmetrize:

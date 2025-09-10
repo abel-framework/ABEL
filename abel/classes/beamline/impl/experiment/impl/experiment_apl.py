@@ -1,4 +1,5 @@
-from abel import Experiment, Linac, PlasmaLens, Spectrometer
+from abel.classes.beamline.impl.experiment.experiment import Experiment
+from abel.classes.plasma_lens.plasma_lens import PlasmaLens
 
 class ExperimentAPL(Experiment):
     

@@ -1,0 +1,230 @@
+# -*- coding: utf-8 -*-
+"""
+ABEL : StageWakeT unit tests
+=======================================
+
+This file is a part of ABEL.
+Copyright 2022– C.A.Lindstrøm, J.B.B.Chen, O.G.Finnerud,
+D.Kallvik, E.Hørlyk, K.N.Sjobak, E.Adli, University of Oslo
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
+import pytest
+from abel import *
+import numpy as np
+
+
+def setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0):
+    driver = SourceBasic()
+    driver.bunch_length = 42e-6                                                   # [m] This value is for trapezoid.
+    driver.z_offset = 300e-6                                                      # [m]
+    driver.x_angle = x_angle                                                      # [rad]
+    driver.y_angle = y_angle                                                      # [rad]
+
+    driver.num_particles = 100000                                                 
+    driver.charge = -2.7e10 * SI.e                                                # [C]
+    driver.energy = 31.25e9                                                       # [eV]
+    driver.rel_energy_spread = 0.01                                               # Relative rms energy spread
+
+    driver.emit_nx, driver.emit_ny = 80e-6, 80e-6                                 # [m rad]
+    driver.beta_x, driver.beta_y = 0.2, 0.2                                       # [m]
+
+    if enable_xy_jitter:
+        driver.jitter.x = 100e-9                                                  # [m], std
+        driver.jitter.y = 100e-9                                                  # [m], std
+
+    if enable_xpyp_jitter:
+        driver.jitter.xp = 1.0e-6                                                 # [rad], std
+        driver.jitter.yp = 1.0e-6                                                 # [rad], std
+
+    driver.symmetrize = True
+
+    return driver
+
+
+def setup_basic_main_source(plasma_density=7.0e21, ramp_beta_mag=1.0):
+    from abel.utilities.plasma_physics import beta_matched
+
+    main = SourceBasic()
+    main.bunch_length = 18e-6                                                     # [m], rms. Standard value
+    main.num_particles = 10000                                               
+    main.charge = -SI.e * 1.0e10                                                  # [C]
+
+    # Energy parameters
+    main.energy = 5.0e9                                                           # [eV]
+    main.rel_energy_spread = 0.01                                                 # Relative rms energy spread
+
+    # Emittances
+    main.emit_nx, main.emit_ny = 160e-6, 0.56e-6                                  # [m rad]
+
+    # Beta functions
+    main.beta_x = beta_matched(plasma_density, main.energy) * ramp_beta_mag       # [m]
+    main.beta_y = main.beta_x                                                     # [m]
+
+    # Offsets
+    main.z_offset = -36e-6                                                        # [m] # Standard value
+
+    # Other
+    main.symmetrize_6d = True
+
+    return main
+
+
+def setup_StageWakeT(driver_source=None, nom_accel_gradient_flattop=6.4e9, nom_energy_gain_flattop=31.9e9, plasma_density=7.0e21, use_ramps=False):
+
+    stage = StageWakeT()
+    stage.nom_accel_gradient_flattop = nom_accel_gradient_flattop
+    stage.nom_energy_gain_flattop = nom_energy_gain_flattop
+    stage.plasma_density = plasma_density                                         # [m^-3]
+    stage.driver_source = driver_source
+    if use_ramps:
+        stage.ramp_beta_mag = 10.0
+    else:
+        stage.ramp_beta_mag = 1.0
+    
+    # Set up ramps after the stage is fully configured
+    if use_ramps:
+        stage.upramp = PlasmaRamp() 
+        stage.downramp = PlasmaRamp()
+    
+    return stage
+
+@pytest.mark.StageWakeT
+def test_tracking():
+    """
+    Tests for tracking ``StageWakeT`` without ramps.
+    Examines stage configurations and the output main beam parameters.
+    """
+
+    # reset seed (for reproducibility)
+    np.random.seed(42)
+
+    nom_energy_gain=0.319e9
+    
+    # setup beams and stage
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0)
+    stage = setup_StageWakeT(driver_source=driver_source, nom_energy_gain_flattop=nom_energy_gain, use_ramps=False)
+    main_source = setup_basic_main_source()
+    stage.nom_energy = main_source.energy
+
+    # perform simulation
+    beam = stage.track(main_source.track())
+
+    # Inspect stage configurations
+    assert stage.has_ramp() is False
+    assert np.isclose(stage.plasma_density, 7.0e21, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain, nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, stage.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient, 6.4e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient_flattop, 6.4e9, rtol=1e-2, atol=0.0)
+    assert np.isclose(stage.length, stage.nom_energy_gain/stage.nom_accel_gradient, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.length_flattop, stage.nom_energy_gain_flattop/stage.nom_accel_gradient_flattop, rtol=1e-15, atol=0.0)
+
+    # examine the plasma density profile
+    assert np.isclose(stage.get_plasma_profile(), stage.plasma_density, rtol=1e-15, atol=0.0)
+    
+    # Examine output beam
+    assert np.isclose(beam.energy(), main_source.energy + stage.nom_energy_gain, rtol=3e-2, atol=0.0)
+    assert np.isclose(beam.charge(), main_source.charge, rtol=1e-3, atol=0.0)
+    assert len(beam) == main_source.num_particles
+    assert beam.stage_number == 1
+    assert np.isclose(beam.location, stage.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_offset(), main_source.x_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_offset(), main_source.y_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.z_offset(), main_source.z_offset, rtol=0.0, atol=1.0e-6)
+    assert np.isclose(beam.x_angle(), main_source.x_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_angle(), main_source.y_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), main_source.emit_ny, rtol=7e-2, atol=0.0)
+    nom_beta_x = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_x
+    nom_beta_y = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_y
+    assert np.isclose(beam.beta_x(), nom_beta_x, rtol=1e-1, atol=0.0)
+    assert np.isclose(beam.beta_y(), nom_beta_y, rtol=1e-1, atol=0.0)
+    assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.rel_energy_spread(), 0.0097, rtol=1e-1, atol=0.0)
+
+
+    
+    
+
+@pytest.mark.StageWakeT
+def test_ramped_tracking():
+    """
+    Tests for tracking ``StageWakeT`` with ramps.
+    Examines stage configurations and the output main beam parameters.
+    """
+
+    np.random.seed(42)
+
+    nom_energy_gain=0.319e9
+    
+    driver_source = setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0)
+    stage = setup_StageWakeT(driver_source=driver_source, nom_energy_gain_flattop=nom_energy_gain, use_ramps=True)
+    main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
+    stage.nom_energy = main_source.energy
+
+    # perform tracking
+    beam = stage.track(main_source.track())
+
+    # Inspect stage configurations
+    assert stage.has_ramp() is True
+    assert np.isclose(stage.plasma_density, 7.0e21, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain, nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, stage.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient, 2.287e9, rtol=1e-2, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient_flattop, 6.4e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.length, stage.nom_energy_gain/stage.nom_accel_gradient, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.length_flattop, stage.nom_energy_gain_flattop/stage.nom_accel_gradient_flattop, rtol=1e-15, atol=0.0)
+
+    # examine the plasma density profile
+    plasma_profile = stage.get_plasma_profile()
+    assert callable(plasma_profile)
+    assert np.isclose(plasma_profile(0.0), stage.plasma_density/stage.ramp_beta_mag, rtol=1e-3, atol=0.0)
+    assert np.isclose(plasma_profile(stage.length/2), stage.plasma_density, rtol=1e-3, atol=0.0)
+    assert np.isclose(plasma_profile(stage.length), stage.plasma_density/stage.ramp_beta_mag, rtol=1e-3, atol=0.0)
+    
+    # Examine output beam
+    assert np.isclose(beam.energy(), main_source.energy + stage.nom_energy_gain, rtol=3e-2, atol=0.0)
+    assert np.isclose(beam.charge(), main_source.charge, rtol=1e-3, atol=0.0)
+    assert len(beam) == main_source.num_particles
+    assert beam.stage_number == 1
+    assert np.isclose(beam.location, stage.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_offset(), main_source.x_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_offset(), main_source.y_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.z_offset(), main_source.z_offset, rtol=0.0, atol=1.0e-6)
+    assert np.isclose(beam.x_angle(), main_source.x_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_angle(), main_source.y_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), main_source.emit_ny, rtol=7e-2, atol=0.0)
+    nom_beta_x = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_x
+    nom_beta_y = np.sqrt(beam.energy()/main_source.energy) * main_source.beta_y
+    assert np.isclose(beam.beta_x(), nom_beta_x, rtol=1e-1, atol=0.0)
+    assert np.isclose(beam.beta_y(), nom_beta_y, rtol=1e-1, atol=0.0)
+    assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.rel_energy_spread(), 0.0097, rtol=1e-1, atol=0.0)
+
+    
+
+
+
+
+
+

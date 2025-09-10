@@ -1,4 +1,4 @@
-from abel import Source, Beam
+from abel.classes.source.source import Source
 import os
 
 class SourceFromFile(Source):
@@ -25,6 +25,8 @@ class SourceFromFile(Source):
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
+
+        from abel.classes.beam import Beam
         
         # make empty beam
         beam = Beam.load(self.file)
