@@ -190,14 +190,6 @@ def test_baseline_linac():
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
 
-    
-    #ref_beam = Beam.load('./tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5')
-    #ref_beam.beam_name = 'Reference beam'
-
-    final_beam.print_summary()
-    #ref_beam.print_summary()
-    #Beam.comp_beam_params(final_beam, ref_beam, comp_location=True)  # Compare output beam with reference beam file.
-
     # Remove output directory
     shutil.rmtree(linac.run_path())
 
