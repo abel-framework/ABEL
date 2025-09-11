@@ -176,6 +176,8 @@ class InterstageElegant(Interstage):
 
     def __make_run_script(self, latticefile, inputbeamfile, tmpfolder=None):
 
+        import abel.apis.elegant.elegant_api as elegant_api
+
         # create temporary CSV file and folder
         make_new_tmpfolder = tmpfolder is None
         if make_new_tmpfolder:
@@ -191,8 +193,10 @@ class InterstageElegant(Interstage):
                   'inputbeamfile': inputbeamfile,
                   'path_to_beam_centroid_file': path_beam_centroid_file,
                   'path_to_uncoupled_Twiss_parameter_output_file': path_twiss_parameter_file}
+        
+        
+        runfile_template = os.path.join(os.path.dirname(elegant_wrapper.__file__), 'templates', 'runscript_interstage.ele')
 
-        runfile_template = os.path.join(os.path.dirname(abel.wrappers.elegant.elegant_wrapper.__file__), 'templates', 'runscript_interstage.ele')
         with open(runfile_template, 'r') as fin, open(tmpfile, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
@@ -201,6 +205,8 @@ class InterstageElegant(Interstage):
     
     
     def __make_lattice(self, beam, outputbeamfile, latticefile, lensfile, evolutionfolder, save_evolution=False, tmpfolder=None):
+
+        import abel.apis.elegant.elegant_api as elegant_api
         
         # perform matching to find exact element strengths
         g_lens, tau_lens, Bdip3, m_sext = self.match()
@@ -231,7 +237,7 @@ class InterstageElegant(Interstage):
             self.apl_field_map = data
         
         # make lattice file from template
-        lattice_template = os.path.join(os.path.dirname(abel.wrappers.elegant.elegant_wrapper.__file__), 'templates', 'lattice_interstage.lte')
+        lattice_template = os.path.join(os.path.dirname(elegant_wrapper.__file__), 'templates', 'lattice_interstage.lte')
 
         if save_evolution:
             num_watches = 5
@@ -1359,7 +1365,7 @@ class InterstageElegant(Interstage):
         return filename
 
     
-    # apply waterfall function to all beam files
+    # Apply waterfall function to all beam files
     def __waterfall_fcn(self, fcns, edges, evolution_folder, args=None, shot=0):
         
         # find number of beam outputs to plot
@@ -1397,7 +1403,7 @@ class InterstageElegant(Interstage):
         return waterfalls, locations, bins
 
     
-    # density plots
+    # Waterfall plots
     def plot_waterfalls(self, evolution_folder, shot=None, save_fig=False):
         
         if self.save_evolution is False:

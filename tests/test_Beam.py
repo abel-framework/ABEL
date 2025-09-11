@@ -2529,7 +2529,7 @@ def test_save_load():
 
     save_dir = 'tests' + os.sep + 'data' + os.sep + 'test_beam' + os.sep
     if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+        os.makedirs(save_dir)
     filename = save_dir + os.sep + 'beam_test_save.h5'
 
     beam.save(filename=filename)

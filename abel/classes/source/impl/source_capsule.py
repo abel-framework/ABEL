@@ -10,6 +10,7 @@ class SourceCapsule(Source):
         super().__init__(length, charge, energy, accel_gradient, wallplug_efficiency, x_offset, y_offset, x_angle, y_angle)
 
         self.beam = beam
+        #print('beam location inside capsule:', beam.location)     #######################
 
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
@@ -20,5 +21,6 @@ class SourceCapsule(Source):
         beam = copy.deepcopy(self.beam)
         
         # add jitters and offsets in super function
-        return super().track(beam, savedepth, runnable, verbose)
+        return beam
+        #return super().track(beam, savedepth, runnable, verbose)
     

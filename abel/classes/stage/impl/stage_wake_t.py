@@ -1,4 +1,4 @@
-from abel.classes.stage.stage import Stage
+from abel.classes.stage.stage import Stage, SimulationDomainSizeError
 from abel.classes.beam import Beam
 from abel.CONFIG import CONFIG
 import scipy.constants as SI
@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 class StageWakeT(Stage):
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False, run_path=None):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
@@ -18,15 +18,22 @@ class StageWakeT(Stage):
         # physics flags
         self.ion_motion = ion_motion
 
-        
+        #self.drive_beam = drive_beam
+        self.run_path = run_path
+
+
+    # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
-        from abel.utilities.plasma_physics import blowout_radius, k_p, beta_matched
+        import wake_t
+        from abel.utilities.plasma_physics import blowout_radius, k_p
+        from abel.wrappers.wake_t.wake_t_wrapper import beam2wake_t_bunch, wake_t_bunch2beam
+        self.stage_number = beam0.stage_number
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
-            os.mkdir(CONFIG.temp_path)
-        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+            os.makedirs(CONFIG.temp_path)
+        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + os.sep
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
 
@@ -44,7 +51,6 @@ class StageWakeT(Stage):
         plasma_profile = self.get_plasma_profile()
         
         # convert beams to WakeT bunches
-        from abel.wrappers.wake_t.wake_t_wrapper import beam2wake_t_bunch
         driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
         
@@ -52,10 +58,13 @@ class StageWakeT(Stage):
         num_sigmas = 6
         #box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
         R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
-        box_min_z = driver0.z_offset() - 3.3 * R_blowout
+        box_min_z = driver0.z_offset() - 4.0 * R_blowout
+        #box_min_z = driver0.z_offset() - 3.3 * R_blowout
         #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
         box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
-        box_range_z = [box_min_z, box_max_z]
+
+        if box_min_z > beam0.zs().min() or box_max_z < driver0.zs().max():
+            raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
         
         # making transverse box size
         box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, driver0.peak_current())])
@@ -65,8 +74,8 @@ class StageWakeT(Stage):
         num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # find stepsize
-        beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
-        dz = beta_matched/10
+        matched_beta = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
+        dz = matched_beta/10
 
         # select the wakefield model (ion motion or not)
         if self.ion_motion:
@@ -75,13 +84,13 @@ class StageWakeT(Stage):
             wakefield_model='quasistatic_2d'
             
         n_out = round(self.length/dz/8)
-        import wake_t
         plasma = wake_t.PlasmaStage(length=self.length, density=plasma_profile, wakefield_model=wakefield_model,
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
         # do tracking
-        bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
+        bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
+        #bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
         
         # save evolution of the beam and driver
         self.__extract_evolution(bunches)
@@ -97,11 +106,10 @@ class StageWakeT(Stage):
         shutil.rmtree(tmpfolder)
         
         # extract beams
-        from abel.wrappers.wake_t.wake_t_wrapper import wake_t_bunch2beam
         beam = wake_t_bunch2beam(bunches[1][-1])
         driver = wake_t_bunch2beam(bunches[0][-1])
 
-        # undo system rotation
+        # undo coordinate system rotation
         if self.parent is None:
             driver, beam = self.undo_beam_coordinate_systems_rotation(driver_original, driver, beam)
 
@@ -119,9 +127,10 @@ class StageWakeT(Stage):
         
         return super().track(beam, savedepth, runnable, verbose)
 
-    
-    def __extract_evolution(self, bunches):
 
+    # ==================================================
+    def __extract_evolution(self, bunches):
+        
         # get beam
         from wake_t.diagnostics import analyze_bunch_list
 
@@ -167,9 +176,9 @@ class StageWakeT(Stage):
                 self.evolution.driver = evol
             elif i == 1:
                 self.evolution.beam = evol
-        
 
-    
+
+    # ==================================================
     def __extract_initial_and_final_step(self, tmpfolder):
 
         from openpmd_viewer import OpenPMDTimeSeries
@@ -268,7 +277,7 @@ class StageWakeT(Stage):
         self.final.beam.density.extent = metadata_plasma.imshow_extent
         self.final.beam.density.rho = (jz_beam+jz_driver)/(dr*dr*dz)
 
-    
+
     def get_plasma_profile(self):
         """Prepare the ramps (local to WakeT)."""
         
@@ -297,4 +306,228 @@ class StageWakeT(Stage):
 
             # otherwise return a constant density
             return self.plasma_density
+        
+
+    # ==================================================
+    def energy_usage(self):
+        return None # TODO
+
+
+    # ==================================================
+    def matched_beta_function(self, energy):
+        from abel.utilities.plasma_physics import beta_matched
+        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
+
     
+    # ==================================================
+    # Apply waterfall function to all beam dump files
+    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+        """
+        Applies waterfall function to all Wake-T HDF5 output files in ``data_dir``.
+
+         Parameters
+        ----------
+        fcns : A list of Beam class methods
+            Beam class profile methods such as ``Beam.current_profile``, ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, ``Beam.transverse_profile_y``.
+
+        edges : float list
+            Specifies the bins to be used to create the histogram(s) in the waterfall plot(s).
+
+        data_dir : str
+            Path to the directory containing all Wake-T HDF5 output files.
+
+        species : str, optional
+            Specifies the name of the beam to be extracted.
+
+        clean : bool, optional
+            Determines whether the extracted beams from the Wake-T HDF5 output files should be cleaned before further processing.
+
+        remove_halo_nsigma : float, optional
+            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+
+        args : float list, optional
+            Allows passing additional arguments to the functions in ``fcns``.
+            
+            
+        Returns
+        ----------
+        waterfalls : list of 2D float ndarrays
+            Each element in ``waterfalls`` corresponds to the output of one function in ``fcns`` applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
+        
+        locations : [m] 1D float ndarray
+            Stores the location for each slice of ``waterfalls``.
+        
+        bins : list of 1D float ndarrays
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+        """
+
+        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
+        
+        # find number of beam outputs to plot
+        files = sorted(os.listdir(data_dir))
+        num_outputs = len(files)
+        
+        # prepare to read simulation data
+        file_path = data_dir + files[0]
+        
+        # declare data structure
+        bins = [None] * len(fcns)
+        waterfalls = [None] * len(fcns)
+        for j in range(len(fcns)):
+            waterfalls[j] = np.empty((len(edges[j])-1, num_outputs))
+        
+        locations = np.empty(num_outputs)
+        
+        # go through files
+        for index in range(num_outputs):
+            # load phase space
+            file_path = data_dir + files[index]
+            beam = wake_t_hdf5_load(file_path=file_path, species=species)
+
+            if clean:
+                beam.remove_halo_particles(nsigma=remove_halo_nsigma)
+            
+            # find beam location
+            locations[index] = beam.location
+            
+            # get all waterfalls (apply argument if it exists)
+            for j in range(len(fcns)):
+                if args[j] is None:
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, bins=edges[j])
+                else:
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, args[j][index], bins=edges[j])
+                
+        return waterfalls, locations, bins
+
+
+    # ==================================================
+    def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, nsig=5, args=None):
+        '''
+        Extracts data for waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+
+        Parameters
+        ----------
+        data_dir : str
+            Path to the directory containing all Wake-T HDF5 output files.
+
+        species : str, optional
+            Specifies the name of the beam to be extracted.
+
+        clean : bool, optional
+            Determines whether the extracted beams from the Wake-T HDF5 output files should be cleaned before further processing.
+
+        remove_halo_nsigma : float, optional
+            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+
+        nsig : float, optional
+            Helps define the range of the histograms. E.g. the range in x is defined by the beam x offset +- nsig * x beam size.
+
+        args : float list, optional
+            Allows passing additional arguments to the functions in fcns.
+
+            
+        Returns
+        ----------
+        waterfalls : list of 2D float ndarrays
+            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+        
+        locations : [m] 1D float ndarray
+            Stores the location for each slice of the ``waterfalls``.
+        
+        bins : list of 1D float ndarrays
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+        '''
+
+        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
+        
+        files = sorted(os.listdir(data_dir))
+        file_path = data_dir + files[0]
+        beam0 = wake_t_hdf5_load(file_path=file_path, species=species)
+        num_bins = int(np.sqrt(len(beam0)*2))
+        
+        if species == 'driver':
+            deltaedges = np.linspace(-0.5, 0.5, num_bins)
+        else:
+            deltaedges = np.linspace(-0.05, 0.05, num_bins)
+        tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
+        xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
+        yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
+        
+        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
+
+        return waterfalls, locations, bins
+
+
+    # ==================================================
+    def plot_waterfalls(self, waterfalls, locations, bins, save_fig=False):
+        '''
+        Makes waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+
+        Parameters
+        ----------
+        waterfalls : list of 2D float ndarrays
+            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+        
+        locations : [m] 1D float ndarray
+            Stores the location for each slice of the ``waterfalls``.
+        
+        bins : list of 1D float ndarrays
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+
+        save_fig : bool, optional
+            Flag for saving the output figure.
+
+
+        Returns
+        ----------
+        N/A
+        '''
+
+        from matplotlib import pyplot as plt
+
+        # prepare figure
+        fig, axs = plt.subplots(4,1)
+        fig.set_figwidth(8)
+        fig.set_figheight(2.8*4)
+        
+        # current profile
+        Is = waterfalls[0]
+        ts = bins[0]
+        c0 = axs[0].pcolor(locations, ts*SI.c*1e6, -Is/1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar0 = fig.colorbar(c0, ax=axs[0])
+        axs[0].set_ylabel(r'Longitudinal position [$\mathrm{\mu}$m]')
+        cbar0.ax.set_ylabel('Beam current [kA]')
+        #axs[0].set_title('Shot ' + str(shot+1))
+        
+        # energy profile
+        dQddeltas = waterfalls[1]
+        deltas = bins[1]
+        c1 = axs[1].pcolor(locations, deltas*1e2, -dQddeltas*1e7, cmap=CONFIG.default_cmap, shading='auto')
+        cbar1 = fig.colorbar(c1, ax=axs[1])
+        axs[1].set_ylabel('Relative energy spread [%]')
+        cbar1.ax.set_ylabel('Spectral density [nC/%]')
+        
+        densityX = waterfalls[2]
+        xs = bins[2]
+        c2 = axs[2].pcolor(locations, xs*1e6, -densityX*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar2 = fig.colorbar(c2, ax=axs[2])
+        axs[2].set_ylabel(r'Horizontal position [$\mathrm{\mu}$m]')
+        cbar2.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
+        
+        densityY = waterfalls[3]
+        ys = bins[3]
+        c3 = axs[3].pcolor(locations, ys*1e6, -densityY*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar3 = fig.colorbar(c3, ax=axs[3])
+        axs[3].set_ylabel(r'Vertical position [$\mathrm{\mu}$m]')
+        cbar3.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
+        axs[3].set_xlabel('Location along the stage [m]')
+        
+        plt.show()
+        if save_fig:
+            plot_path = self.run_path + 'plots' + os.sep
+            if not os.path.exists(plot_path):
+                os.makedirs(plot_path)
+            filename = plot_path + 'waterfalls' + '.png'
+            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+
+            

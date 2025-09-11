@@ -68,4 +68,14 @@ class Interstage(Trackable, CostModeled):
         label = 'Interstage'
         color = 'orange'
         return x_points, y_points, final_angle, label, color
+    
+
+    def print_summary(self):
+        print('Type: ', type(self))
+        # if callable(self.dipole_length):
+        #     print('Dipole length [m]: callable')
+        # else:
+        #     print('Dipole length [m]: ', self.dipole_length)
+        # print('Dipole field [T]: ', self.dipole_field)
+        # print('Entrance beta function [mm]: ', self.beta0*1e3)
         
