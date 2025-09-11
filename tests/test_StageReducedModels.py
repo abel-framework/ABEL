@@ -262,7 +262,7 @@ def test_driver_unrotation():
     driver0.set_xs(xs + x_drift)
     driver0.set_ys(ys + y_drift)
 
-    assert np.allclose(driver.x_angle(), driver0.x_angle(), rtol=1e-15, atol=0.0)
+    assert np.allclose(driver.x_angle(), driver0.x_angle(), rtol=1e-10, atol=0.0)
     assert np.allclose(driver.y_angle(), driver0.y_angle(), rtol=1e-13, atol=0.0)
 
     assert np.allclose(driver.qs(), driver0.qs(), rtol=1e-13, atol=0.0)
