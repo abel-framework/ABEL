@@ -467,3 +467,5 @@ def wakeT_r_E_filter(bunch, r_thres, pz_thres):
     filtered_bunch.prop_distance = bunch.prop_distance
 
     return filtered_bunch
+
+

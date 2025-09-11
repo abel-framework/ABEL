@@ -592,13 +592,13 @@ class Beam():
             around the respective axes.
 
         invert : bool, optional
-            Performs a standard passive transformation when False. If True, will 
-            perform an active transformation and can thus be used to invert the 
-            passive transformation.
+            Performs a standard passive transformation when ``False``. If 
+            ``True``, will perform an active transformation and can thus be used 
+            to invert the passive transformation.
             
         Returns
         ----------
-        Modified beam xs, ys, zs, uxs, uys and uzs.
+        Modified beam ``xs``, ``ys``, ``zs``, ``uxs``, ``uys`` and ``uzs``.
         """
 
         # Check the inputs
@@ -662,7 +662,7 @@ class Beam():
             Used for rotating the beam's frame around the x-axis. Note that due 
             to the right hand rule, a positive rotation angle in the zy-plane 
             corresponds to rotation from z-axis towards negative y. I.e. the 
-            opposite sign convention of beam.yps().
+            opposite sign convention of ``beam.yps()``.
         """
 
         # Get the mean proper velocity component offsets
@@ -711,7 +711,7 @@ class Beam():
             Angle to rotate the coordinate system with in the zy-plane. Note 
             that due to the right hand rule, a positive rotation angle in the 
             zy-plane corresponds to rotation from z-axis towards negative y. 
-            I.e. the opposite sign convention of beam.yps(). Calls 
+            I.e. the opposite sign convention of ``beam.yps()``. Calls 
             ``Beam.beam_alignment_angles()`` by default if no angle is provided.
 
         invert : bool, optional
@@ -722,7 +722,7 @@ class Beam():
             
         Returns
         ----------
-        Modified beam xs, ys, zs, uxs, uys and uzs.
+        Modified beam ``xs``, ``ys``, ``zs``, ``uxs``, ``uys`` and ``uzs``.
         """
         
         x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
@@ -758,7 +758,7 @@ class Beam():
             
         Returns
         ----------
-        Modified beam xs, ys and zs.
+        Modified beam ``xs``, ``ys`` and ``zs``.
         """
 
         if align_x_angle is None:
@@ -796,14 +796,14 @@ class Beam():
     # ==================================================
     def slice_centroids(self, beam_quant, bin_number=None, cut_off=None, make_plot=False):
         """
-        Returns the slice centroids of a beam quantity beam_quant.
+        Returns the slice centroids of a beam quantity ``beam_quant``.
 
         Parameters
         ----------
         beam_quant : 1D float array
-            Beam quantity to be binned into bins/slices defined by z_centroids. 
+            Beam quantity to be binned into bins/slices defined by ``z_centroids``. 
             The mean is calculated for the quantity for all particles in the 
-            z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+            z-bins. Includes e.g. ``beam.xs()``, ``beam.Es()`` etc.
 
         bin_number : float, optional
             Number of beam slices.
@@ -818,9 +818,9 @@ class Beam():
         Returns
         ----------
         beam_quant_slices : 1D float array
-            beam_quant binned into bins/slices defined by z_centroids. The mean 
+            ``beam_quant`` binned into bins/slices defined by ``z_centroids``. The mean 
             is calculated for the quantity for all particles in the z-bins. 
-            Includes e.g. beam.xs(), beam.Es() etc.
+            Includes e.g. ``beam.xs()``, ``beam.Es()`` etc.
 
         z_centroids : [m] 1D float array
             z-coordinates of the beam slices.
@@ -1107,10 +1107,10 @@ class Beam():
     def set_arbitrary_spin_polarization(self, polarization, direction='z', seed=None):
         """
         Generates a random distribution of points on the surface of a sphere of 
-        radius 1, with the mean along a defined 'direction' is 
-        'polarization'.
-        For polarization=0, points are uniformly distributed on the surface of 
-        the sphere.
+        radius 1, with the mean along a defined ``direction`` is 
+        ``polarization``.
+        For ``polarization=0``, points are uniformly distributed on the surface 
+        of the sphere.
     
         Parameters
         ----------
@@ -1119,7 +1119,7 @@ class Beam():
             spins.
 
         direction : string
-            Spin direction (default is z).
+            Spin direction (default is ``'z'``).
 
         seed : int, optional
             Seed to initialize the random number generator (default is 42).
@@ -1335,6 +1335,8 @@ class Beam():
         ----------
         zbins, xbins, ybins : [m] float or 1D float ndarray, optional
             The bins along z(x,y).
+
+        ...
             
         Returns
         ----------
@@ -1493,13 +1495,15 @@ class Beam():
         num_x_cells, num_y_cells : float
             The number of cells in the x and y-direction.
 
-        charge_density_xy_slice: [C/m^3] 2D float ndarray
+        charge_density_xy_slice : [C/m^3] 2D float ndarray
             A xy-slice of the beam charge density.
 
         dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
-        boundary_val: [V/m] float, optional
-            ...
+
+        boundary_val : [V/m] float, optional
+            The value of the electric fields Ex and Ey at the simulation box 
+            boundary. Default set to ``0.0``.
             
         Returns
         ----------
@@ -1568,7 +1572,12 @@ class Beam():
 
         boundary_val : [V/m] float, optional
             The values of the electric fields Ex and Ey at the simulation domain 
-            boundary.
+            boundary. Default set to ``0.0``.
+
+        tolerance : float, optional
+            Value used to determine the tolerance of the simulation box size as 
+            ``np.abs(x_box_min/xs.min()) < tolerance`` for all four sides. 
+            Default set to ``5.0``.
             
         Returns
         ----------
@@ -1733,6 +1742,26 @@ class Beam():
         del self[Es < 0]
         
     def compress(self, R_56, nom_energy):
+        """
+        Compress the beam longitudinally by applying longitudinal dispersion.
+        The compression is applied by changing the z-coordinates by
+
+        z = z0 + (1-E/nom_energy) * R_56.
+
+
+        Parameters
+        ----------
+        R_56 : float
+            R_56 used to determine the beam compression.
+
+        nom_energy : [eV] float
+            Nominal energy used to determine the beam compression.
+
+
+        Returns
+        ----------
+        ``None``
+        """
         zs = self.zs() + (1-self.Es()/nom_energy) * R_56
         self.set_zs(zs)
         
@@ -2098,33 +2127,38 @@ class Beam():
 
 
     # ==================================================
-    def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=None, ylab=None, clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
-        
-        if axes is None:
-            fig = plt.figure()  # an empty figure with an axes
-            ax = fig.add_axes([.15, .15, .75, .75])
-            cbar_ax = fig.add_axes([.85, .15, .03, .75])
-        else:
-            #ax = axes[0]  # TODO: adjust colourbar axes
-            #cbar_ax = axes[1]
-            
-            ax = axes
-            cbar_ax = None
+    def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab=None, ylab=None, clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, cax_pad=0.03):
 
-        if reduce_cax_pad is True:
-            # Create an axis on the right side of ax. The width of cax will be 5%
-            # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+        if axes is None:
+            from matplotlib.gridspec import GridSpec
+
+            # Create a figure with GridSpec
+            fig = plt.figure(figsize=(5, 4))
+            gs = GridSpec(1, 2, width_ratios=[1, 0.03], wspace=cax_pad)  # Adjust cax_pad for padding
+            
+            ax = fig.add_subplot(gs[0, 0])  # Main plot axes
+            cbar_ax = fig.add_subplot(gs[0, 1])  # Colour bar axes
+        else:
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+            ax = axes
             divider = make_axes_locatable(ax)
-            cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
+            cbar_ax = divider.append_axes("right", size="3%", pad=cax_pad)
 
         if vmin is None:
             vmin = data.min()
         if vmax is None:
             vmax = data.max()
 
+        # Modify tick parameters
+        ax.tick_params(axis='both', direction='out', length=4)
+        #ax.xaxis.set_ticks_position('both')  # Ticks on both top and bottom
+        ax.minorticks_on()  # Enable minor ticks
+        ax.tick_params(axis='both', which='minor', direction='out', length=2.5)  # Configure minor ticks
+
         # Make a 2D plot
         if log_cax is True:
-            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=colors.LogNorm(vmin+1, vmax))
+            from matplotlib.colors import LogNorm
+            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=LogNorm(vmin+1, vmax))
         else:
             p = ax.imshow(data, extent=extent, vmin=vmin, vmax=vmax, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation)
 
@@ -2133,30 +2167,15 @@ class Beam():
             ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
 
         # Add a colourbar
-        cbar = plt.colorbar(p, ax=ax, cax=cbar_ax)
+        cbar = plt.colorbar(p, ax=ax, cax=cbar_ax, pad=cax_pad)
         cbar.set_label(clab)
-
-        # Set the tick formatter to use power notation
-        #import matplotlib.ticker as ticker
-        #cbar.ax.yaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
-        #cbar.ax.tick_params(axis='y', which='major', pad=10)
-
-        #import matplotlib.ticker as ticker
-        #fmt = ticker.ScalarFormatter(useMathText=True)
-        #fmt.set_powerlimits((-3, 19))
-        #cbar.ax.yaxis.set_major_formatter(fmt)
-
-        # Customize the colorbar tick locator and formatter
-        #from matplotlib.ticker import ScalarFormatter
-        #cbar.ax.yaxis.set_major_locator(plt.MaxNLocator(nbins=6))  # Set the number of tick intervals
-        #cbar.ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))  # Use scientific notation
 
         ax.set_ylabel(ylab)
         ax.set_xlabel(xlab)
 
     
     # ==================================================
-    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', reduce_cax_pad=False):
+    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, scale=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', log_cax=False, cax_pad=0.03):
 
         if weights is None:
             weights = self.weightings()
@@ -2171,17 +2190,17 @@ class Beam():
             extent = hist_range[0] + hist_range[1]
         
         binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
-        beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
-        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
+        
+        if scale is None:
+            beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
+        else:
+            beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)/scale
+        
+        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, log_cax=log_cax, cax_pad=cax_pad)
 
     
     # ==================================================
     def density_map_diags(self):
-        
-        #colors = ['white', 'aquamarine', 'lightgreen', 'green']
-        #colors = ['white', 'forestgreen', 'limegreen', 'lawngreen', 'aquamarine', 'deepskyblue']
-        #bounds = [0, 0.2, 0.4, 0.8, 1]
-        #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
         
         cmap = CONFIG.default_cmap
 
@@ -2204,7 +2223,7 @@ class Beam():
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
-        fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
+        fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(5*3, 4*3))
         fig.suptitle(r'$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
 
         nbins = int(np.sqrt(len(weights)/2))
@@ -2314,6 +2333,132 @@ class Beam():
         extent_energ[2] = extent_energ[2]/1e9  # [GeV]
         extent_energ[3] = extent_energ[3]/1e9  # [GeV]
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
+
+        # Adjust layout to prevent overlaps
+        plt.tight_layout()  # Avoid overlap globally
+
+
+    # ==================================================
+    def energy_scatter_profiles(self, n_th_particle=1):
+        '''
+        Creates scatter plots of various beam profiles with particles coloured 
+        according to energy.
+
+        Parameters
+        ----------
+        n_th_particle : int, optional
+            Specifies the amount of plotted particles by only plotting every 
+            ``n_th_particle`` particle. Default set to 1, i.e.
+
+            
+        Returns
+        ----------
+        ``None``
+        '''
+
+        if not isinstance(n_th_particle, int) or n_th_particle < 1:
+            raise ValueError("n_th_particle must be an integer <= 1.")
+        
+        from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+        
+        # Define the color map and boundaries
+        colors = ['black', 'red', 'orange', 'yellow']
+        bounds = [0, 0.2, 0.4, 0.8, 1]
+        cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
+
+        # Macroparticles data
+        zs = self.zs()
+        xs = self.xs()
+        xps = self.xps()
+        ys = self.ys()
+        yps = self.yps()
+        Es = self.Es()
+        weights = self.weightings()
+
+        # Labels for plots
+        zlab = r'$z$ [$\mathrm{\mu}$m]'
+        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
+        xlab = r'$x$ [$\mathrm{\mu}$m]'
+        ylab = r'$y$ [$\mathrm{\mu}$m]'
+        xps_lab = r"$x'$ [mrad]"
+        yps_lab = r"$y'$ [mrad]"
+        energ_lab = r'$\mathcal{E}$ [GeV]'
+        
+        # Set up a figure with axes
+        fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(5*3, 4*3))
+        plt.tight_layout(pad=6.0)  # Sets padding between the figure edge and the edges of subplots, as a fraction of the font size.
+        fig.subplots_adjust(top=0.85)  # By setting top=..., you are specifying that the top boundary of the subplots should be at ...% of the figure’s height.
+        
+        # 2D z-x distribution
+        ax = axs[0][0]
+        p = ax.scatter(zs[::n_th_particle]*1e6, xs[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(xlab)
+            
+        # 2D z-x' distribution
+        ax = axs[0][1]
+        ax.scatter(zs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(xps_lab)
+            
+        # 2D x-x' distribution
+        ax = axs[0][2]
+        ax.scatter(xs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xlab)
+        ax.set_ylabel(xps_lab)
+            
+        # 2D z-y distribution
+        ax = axs[1][0]
+        ax.scatter(zs[::n_th_particle]*1e6, ys[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(ylab)
+            
+        # 2D z-y' distribution
+        ax = axs[1][1]
+        ax.scatter(zs[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(yps_lab)
+            
+        # 2D y-y' distribution
+        ax = axs[1][2]
+        ax.scatter(ys[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(ylab)
+        ax.set_ylabel(yps_lab)
+            
+        # 2D x-y distribution
+        ax = axs[2][0]
+        ax.scatter(xs[::n_th_particle]*1e6, ys[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xlab)
+        ax.set_ylabel(ylab)
+        
+        # 2D x'-y' distribution
+        ax = axs[2][1]
+        ax.scatter(xps[::n_th_particle]*1e3, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xps_lab)
+        ax.set_ylabel(yps_lab)
+
+        # Energy distribution
+        #ax = axs[2][1]
+        #dN_dE, rel_energ = self.rel_energy_spectrum()
+        #dN_dE = dN_dE/-e
+        #ax.fill_between(rel_energ*100, y1=dN_dE, y2=0, color='b', alpha=0.3)
+        #ax.plot(rel_energ*100, dN_dE, color='b', alpha=0.3, label='Relative energy density')
+        #ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+        #ax.set_xlabel(r'$\mathcal{E}/\langle\mathcal{E}\rangle-1$ [%]')
+        #ax.set_ylabel('Relative energy density')
+        ## Add text to the plot
+        #ax.text(0.05, 0.95, r'$\sigma_\mathcal{E}/\langle\mathcal{E}\rangle=$' f'{format(self.rel_energy_spread()*100, ".2f")}' '%', fontsize=12, color='black', ha='left', va='top', transform=ax.transAxes)
+        
+        # 2D z-energy distribution
+        ax = axs[2][2]
+        ax.scatter(zs[::n_th_particle]*1e6, Es[::n_th_particle]/1e9, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(energ_lab)
+            
+        # Set label and other properties for the colorbar
+        fig.suptitle(r'$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
+        cbar_ax = fig.add_axes([0.15, 0.91, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
+        fig.colorbar(p, cax=cbar_ax, orientation='horizontal', label=energ_lab)
 
 
     # ==================================================
