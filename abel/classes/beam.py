@@ -2339,6 +2339,129 @@ class Beam():
 
 
     # ==================================================
+    def energy_scatter_profiles(self, n_th_particle=1):
+        '''
+        Creates scatter plots of various beam profiles with particles coloured 
+        according to energy.
+
+        Parameters
+        ----------
+        n_th_particle : int, optional
+            Specifies the amount of plotted particles by only plotting every 
+            ``n_th_particle`` particle. Default set to 1, i.e.
+
+            
+        Returns
+        ----------
+        ``None``
+        '''
+
+        if not isinstance(n_th_particle, int) or n_th_particle < 1:
+            raise ValueError("n_th_particle must be an integer <= 1.")
+        
+        from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+        
+        # Define the color map and boundaries
+        colors = ['black', 'red', 'orange', 'yellow']
+        bounds = [0, 0.2, 0.4, 0.8, 1]
+        cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
+
+        # Macroparticles data
+        zs = self.zs()
+        xs = self.xs()
+        xps = self.xps()
+        ys = self.ys()
+        yps = self.yps()
+        Es = self.Es()
+        weights = self.weightings()
+
+        # Labels for plots
+        zlab = r'$z$ [$\mathrm{\mu}$m]'
+        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
+        xlab = r'$x$ [$\mathrm{\mu}$m]'
+        ylab = r'$y$ [$\mathrm{\mu}$m]'
+        xps_lab = r"$x'$ [mrad]"
+        yps_lab = r"$y'$ [mrad]"
+        energ_lab = r'$\mathcal{E}$ [GeV]'
+        
+        # Set up a figure with axes
+        fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(5*3, 4*3))
+        plt.tight_layout(pad=6.0)  # Sets padding between the figure edge and the edges of subplots, as a fraction of the font size.
+        fig.subplots_adjust(top=0.85)  # By setting top=..., you are specifying that the top boundary of the subplots should be at ...% of the figure’s height.
+        
+        # 2D z-x distribution
+        ax = axs[0][0]
+        p = ax.scatter(zs[::n_th_particle]*1e6, xs[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(xlab)
+            
+        # 2D z-x' distribution
+        ax = axs[0][1]
+        ax.scatter(zs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(xps_lab)
+            
+        # 2D x-x' distribution
+        ax = axs[0][2]
+        ax.scatter(xs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xlab)
+        ax.set_ylabel(xps_lab)
+            
+        # 2D z-y distribution
+        ax = axs[1][0]
+        ax.scatter(zs[::n_th_particle]*1e6, ys[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(ylab)
+            
+        # 2D z-y' distribution
+        ax = axs[1][1]
+        ax.scatter(zs[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(yps_lab)
+            
+        # 2D y-y' distribution
+        ax = axs[1][2]
+        ax.scatter(ys[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(ylab)
+        ax.set_ylabel(yps_lab)
+            
+        # 2D x-y distribution
+        ax = axs[2][0]
+        ax.scatter(xs[::n_th_particle]*1e6, ys[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xlab)
+        ax.set_ylabel(ylab)
+        
+        # 2D x'-y' distribution
+        ax = axs[2][1]
+        ax.scatter(xps[::n_th_particle]*1e3, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xps_lab)
+        ax.set_ylabel(yps_lab)
+
+        # Energy distribution
+        #ax = axs[2][1]
+        #dN_dE, rel_energ = self.rel_energy_spectrum()
+        #dN_dE = dN_dE/-e
+        #ax.fill_between(rel_energ*100, y1=dN_dE, y2=0, color='b', alpha=0.3)
+        #ax.plot(rel_energ*100, dN_dE, color='b', alpha=0.3, label='Relative energy density')
+        #ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+        #ax.set_xlabel(r'$\mathcal{E}/\langle\mathcal{E}\rangle-1$ [%]')
+        #ax.set_ylabel('Relative energy density')
+        ## Add text to the plot
+        #ax.text(0.05, 0.95, r'$\sigma_\mathcal{E}/\langle\mathcal{E}\rangle=$' f'{format(self.rel_energy_spread()*100, ".2f")}' '%', fontsize=12, color='black', ha='left', va='top', transform=ax.transAxes)
+        
+        # 2D z-energy distribution
+        ax = axs[2][2]
+        ax.scatter(zs[::n_th_particle]*1e6, Es[::n_th_particle]/1e9, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(energ_lab)
+            
+        # Set label and other properties for the colorbar
+        fig.suptitle(r'$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
+        cbar_ax = fig.add_axes([0.15, 0.91, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
+        fig.colorbar(p, cax=cbar_ax, orientation='horizontal', label=energ_lab)
+
+
+    # ==================================================
     def print_summary(self):
 
         print('---------------------------------------------------')
