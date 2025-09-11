@@ -234,10 +234,8 @@ class StageReducedModels(Stage):
         if self.make_animations:
             # Create the temporary folder
             parent_dir = CONFIG.temp_path
-            if not os.path.exists(parent_dir):
-                os.makedirs(parent_dir)
             tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
-            os.mkdir(tmpfolder)
+            os.makedirs(tmpfolder, exist_ok=True)  # Make tmpfolder and all its parents if they do not exist. If they do, do nothing.
         else:
             tmpfolder = None
 
@@ -2488,7 +2486,7 @@ class StageReducedModels(Stage):
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
-        plot_path = self.run_path + 'plots/'
+        plot_path = self.run_path + 'plots' + os.sep
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
         filename = plot_path + 'phasespace_x_stage_' + str(self.stage_number) + '.gif'
@@ -2675,7 +2673,7 @@ class StageReducedModels(Stage):
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
-        plot_path = self.run_path + 'plots/'
+        plot_path = self.run_path + 'plots' + os.sep
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
         filename = plot_path + 'phasespace_y_stage_' + str(self.stage_number) + '.gif'
