@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : unit tests for the RF-Track API
+ABEL : unit tests for the RF-Track wrapper
 =======================================
 
 This file is a part of ABEL.
@@ -56,13 +56,13 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     return main
 
 
-@pytest.mark.rft_api_unit_test
+@pytest.mark.rft_wrapper_unit_test
 def test_abel_beam2rft_beam():
     """
     Tests for ``abel_beam2rft_beam()``.
     """
 
-    from abel.apis.rf_track.rf_track_api import abel_beam2rft_beam
+    from abel.wrappers.rf_track.rf_track_wrapper import abel_beam2rft_beam
 
     source = setup_basic_main_source()
     beam = source.track()
@@ -146,14 +146,14 @@ def test_abel_beam2rft_beam():
     assert np.allclose(phase_space_rft[:,8], weightings_abel , rtol=1e-15, atol=0.0)
 
 
-@pytest.mark.rft_api_unit_test
+@pytest.mark.rft_wrapper_unit_test
 def test_rft_beam2abel_beam():
     """
     Tests for ``rft_beam2abel_beam()``.
     """
 
     from RF_Track import Bunch6dT
-    from abel.apis.rf_track.rf_track_api import rft_beam2abel_beam
+    from abel.wrappers.rf_track.rf_track_wrapper import rft_beam2abel_beam
 
     source = setup_basic_main_source()
     beam = source.track()
@@ -179,13 +179,13 @@ def test_rft_beam2abel_beam():
 
     
 
-@pytest.mark.rft_api_unit_test
+@pytest.mark.rft_wrapper_unit_test
 def test_sc_fields_obj_and_beam_fields():
     """
     Tests for ``calc_sc_fields_obj()`` and ``rft_beam_fields()``.
     """
     
-    from abel.apis.rf_track.rf_track_api import rft_beam_fields, calc_sc_fields_obj
+    from abel.wrappers.rf_track.rf_track_wrapper import rft_beam_fields, calc_sc_fields_obj
     np.random.seed(42)
     
     # Parameters

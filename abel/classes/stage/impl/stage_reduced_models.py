@@ -17,7 +17,7 @@ import os, copy, warnings, uuid, shutil
 from abel.physics_models.particles_transverse_wake_instability import *
 from abel.utilities.plasma_physics import beta_matched, blowout_radius
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
-from abel.apis.wake_t.wake_t_api import run_single_step_wake_t
+from abel.wrappers.wake_t.wake_t_wrapper import run_single_step_wake_t
 from abel.classes.stage.stage import Stage, StageError
 from abel.classes.stage.stage import Stage, PlasmaRamp
 from abel.classes.source.impl.source_capsule import SourceCapsule
