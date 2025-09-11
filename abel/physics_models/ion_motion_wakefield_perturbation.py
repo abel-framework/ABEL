@@ -14,7 +14,7 @@ from abel.classes.beam import Beam
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_std
 from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_upwards
-from abel.apis.rf_track.rf_track_api import calc_sc_fields_obj
+from abel.wrappers.rf_track.rf_track_wrapper import calc_sc_fields_obj
 
 
 

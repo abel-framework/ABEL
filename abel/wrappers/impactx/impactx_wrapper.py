@@ -254,7 +254,7 @@ def beam2particle_container(beam, sim=None, verbose=False):
 
     import amrex.space3d as amr
     from impactx import Config
-    import abel.apis.impactx.transformation_utilities as pycoord
+    import abel.wrappers.impactx.transformation_utilities as pycoord
     
     # make simulation object if not already existing
     if sim is None:

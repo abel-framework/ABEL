@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : unit tests for the Wake-T API
+ABEL : unit tests for the Wake-T wrapper
 =======================================
 
 This file is a part of ABEL.
@@ -26,7 +26,7 @@ import numpy as np
 import scipy.constants as SI
 from abel.classes.beam import Beam
 from abel.classes.source.impl.source_basic import SourceBasic
-from abel.apis.wake_t.wake_t_api import *
+from abel.wrappers.wake_t.wake_t_wrapper import *
 
 
 def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
@@ -57,7 +57,7 @@ def setup_basic_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     return source
 
 
-@pytest.mark.wake_t_api_unit_test
+@pytest.mark.wake_t_wrapper_unit_test
 def test_beam2wake_t_bunch():
     """
     Test for ``beam2wake_t_bunch()``.
@@ -84,7 +84,7 @@ def test_beam2wake_t_bunch():
     assert np.isclose(beam.location, wake_t_bunch.prop_distance, rtol=1e-15, atol=0.0)
 
 
-@pytest.mark.wake_t_api_unit_test
+@pytest.mark.wake_t_wrapper_unit_test
 def test_wake_t_bunch2beam():
     """
     Test for ``wake_t_bunch2beam()``.
@@ -103,7 +103,7 @@ def test_wake_t_bunch2beam():
     Beam.comp_beams(beam_test, beam, comp_location=True, rtol=1e-12, atol=0.0)
 
 
-@pytest.mark.wake_t_api_unit_test
+@pytest.mark.wake_t_wrapper_unit_test
 def test_plasma_stage_setup():
     """
     Test for ``plasma_stage_setup()``.
@@ -169,7 +169,7 @@ def test_plasma_stage_setup():
     assert isinstance(plasma3.wakefield, wake_t.physics_models.plasma_wakefields.qs_rz_baxevanis.wakefield.Quasistatic2DWakefield)
 
 
-@pytest.mark.wake_t_api_unit_test
+@pytest.mark.wake_t_wrapper_unit_test
 def test_wake_t_hdf5_load():
     """
     Test for ``wake_t_hdf5_load()``.

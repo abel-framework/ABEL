@@ -132,7 +132,7 @@ class StageQuasistatic2d(Stage):
         """
 
         import wake_t
-        from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
+        from abel.wrappers.wake_t.wake_t_wrapper import beam2wake_t_bunch, wake_t_bunch2beam
 
         # make copy of the beams to update later
         beam = copy.deepcopy(beam0)

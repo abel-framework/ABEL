@@ -15,7 +15,7 @@ class PlasmaLensImpactX(PlasmaLens):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
         import impactx
-        from abel.apis.impactx.impactx_api import beam2particle_container, particle_container2beam
+        from abel.wrappers.impactx.impactx_wrapper import beam2particle_container, particle_container2beam
         
         # initialize AMReX
         verbose_debug = False

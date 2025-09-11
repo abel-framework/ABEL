@@ -347,7 +347,7 @@ def test_rb_Ez_tracing():
     """
 
     import os, copy, uuid
-    from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, plasma_stage_setup, extract_initial_and_final_Ez_rho
+    from abel.wrappers.wake_t.wake_t_wrapper import beam2wake_t_bunch, plasma_stage_setup, extract_initial_and_final_Ez_rho
     from abel.utilities.plasma_physics import blowout_radius
 
     np.random.seed(42)

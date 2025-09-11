@@ -27,7 +27,7 @@ class StageWakeT(Stage):
 
         import wake_t
         from abel.utilities.plasma_physics import blowout_radius, k_p
-        from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
+        from abel.wrappers.wake_t.wake_t_wrapper import beam2wake_t_bunch, wake_t_bunch2beam
         self.stage_number = beam0.stage_number
         
         # make temp folder

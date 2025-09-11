@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : unit tests for the ELEGANT API
+ABEL : unit tests for the ELEGANT wrapper
 =======================================
 
 This file is a part of ABEL.
@@ -26,7 +26,7 @@ import numpy as np
 import scipy.constants as SI
 from abel.classes.source.impl.source_basic import SourceBasic
 #from abel.classes.beam import Beam
-from abel.apis.elegant.elegant_api import *
+from abel.wrappers.elegant.elegant_wrapper import *
 #from abel.classes.interstage.impl.interstage_elegant import InterstageElegant
 from string import Template
 
@@ -77,7 +77,7 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
 #                 'path_to_beam_centroid_file': path_beam_centroid_file,
 #                 'path_to_uncoupled_Twiss_parameter_output_file': path_twiss_parameter_file}
 
-#     runfile_template = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'runscript_interstage.ele')
+#     runfile_template = os.path.join(os.path.dirname(abel.wrappers.elegant.elegant_wrapper.__file__), 'templates', 'runscript_interstage.ele')
 #     with open(runfile_template, 'r') as fin, open(tmpfile, 'w') as fout:
 #         results = Template(fin.read()).substitute(inputs)
 #         fout.write(results)
@@ -110,7 +110,7 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
 #             fout.write(results)
             
 
-@pytest.mark.elegant_api_unit_test
+@pytest.mark.elegant_wrapper_unit_test
 def test_elegant_write_read_beam():
     """
     Test of ``elegant_write_beam()`` and ``elegant_read_beam()``.
@@ -135,7 +135,7 @@ def test_elegant_write_read_beam():
 
     # Convert back to an ABEL beam
     beam = elegant_read_beam(inputbeamfile, tmpfolder=tmpfolder)
-    beam.set_zs(-1*beam.zs()) # TODO: Seems like there is an inconsistency in the definition of z in the ELEGANT api. is this really correct? Does the ELEGANT beam perhaps need to be passed through an ELEGANT tracking to have the zs set correctly?
+    beam.set_zs(-1*beam.zs()) # TODO: Seems like there is an inconsistency in the definition of z in the ELEGANT wrapper. is this really correct? Does the ELEGANT beam perhaps need to be passed through an ELEGANT tracking to have the zs set correctly?
 
     assert np.isclose(beam0.location, beam.location, rtol=0.0, atol=1.0e-10)
     assert beam0.stage_number == beam.stage_number
@@ -145,7 +145,7 @@ def test_elegant_write_read_beam():
     shutil.rmtree(tmpfolder)
 
 
-# @pytest.mark.elegant_api_unit_test
+# @pytest.mark.elegant_wrapper_unit_test
 # def test_elegant_run():
 #     """
 #     Test of ``elegant_run()``.
@@ -153,7 +153,7 @@ def test_elegant_write_read_beam():
 
 #     # make temporary folder and files
 #     #parent_dir = '.' + os.sep + 'tests' + os.sep + 'run_data' + os.sep + 'temp' + os.sep
-#     #parent_dir = os.path.join(os.path.dirname(abel.apis.elegant.elegant_api.__file__), 'templates', 'lattice_interstage.lte')
+#     #parent_dir = os.path.join(os.path.dirname(abel.wrappers.elegant.elegant_wrapper.__file__), 'templates', 'lattice_interstage.lte')
 
 #     if not os.path.exists(parent_dir):
 #         os.makedirs(parent_dir)
@@ -181,7 +181,7 @@ def test_elegant_write_read_beam():
 #     beam = elegant_run(runfile, beam0, inputbeamfile, outputbeamfile, quiet=True, tmpfolder=tmpfolder) #This is not executed correctly yet...
 
 
-@pytest.mark.elegant_api_unit_test
+@pytest.mark.elegant_wrapper_unit_test
 def test_elegant_apl_fieldmap2D():
     """
     Test of ``elegant_apl_fieldmap2D()``.

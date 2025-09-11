@@ -17,7 +17,7 @@ from abel.classes.beam import Beam
 from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2energy, gamma2momentum, energy2gamma
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
-from abel.apis.wake_t.wake_t_api import wake_t_bunch2beam, beam2wake_t_bunch, wakeT_r_E_filter #, wake_t_remove_halo_particles
+from abel.wrappers.wake_t.wake_t_wrapper import wake_t_bunch2beam, beam2wake_t_bunch, wakeT_r_E_filter #, wake_t_remove_halo_particles
 #from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation, push_driver
 from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig
 import abel.physics_models.ion_motion_wakefield_perturbation as ion_motion

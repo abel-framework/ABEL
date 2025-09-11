@@ -103,7 +103,7 @@ class InterstageImpactX(Interstage):
         
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
-        from abel.apis.impactx.impactx_api import run_impactx
+        from abel.wrappers.impactx.impactx_wrapper import run_impactx
         
         # get lattice
         lattice = self.get_lattice()
