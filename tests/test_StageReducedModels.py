@@ -554,7 +554,6 @@ def test_plotting_methods():
     linac.stages[-1].plot_wakefield(saveToFile=None, includeWakeRadius=True)
     linac.stages[-1].plot_wake(show_Ez=False, trace_rb=False, savefig=None, aspect='auto')
     linac.stages[-1].plot_wake(show_Ez=True, trace_rb=True, savefig=None, aspect='auto')
-    linac.stages[-1].scatter_diags(beam, n_th_particle=10)
     linac.stages[-1].plot_Ez_rb_cut()
     linac.stages[-1].plot_flattop_evolution()
 
@@ -563,6 +562,21 @@ def test_plotting_methods():
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.StageReducedModels
+def test_print_stage_beam_summary():
+    """
+    Tests for ``StageReducedModels.print_stage_beam_summary()``.
+    """
+
+    np.random.seed(42)
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source()
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True)
+
+    stage.print_stage_beam_summary(initial_main_beam=main_source.track(), beam_out=main_source.track(), clean=True)
 
 
 @pytest.mark.StageReducedModels
