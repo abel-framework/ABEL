@@ -1612,66 +1612,6 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=r'$\xi$ [$\mathrm{\mu}$m]', ylab=r'$x$ [$\mathrm{\mu}$m]', clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
-        
-        from matplotlib.colors import LogNorm
-        
-        if axes is None:
-            fig = plt.figure()  # an empty figure with an axes
-            ax = fig.add_axes([.15, .15, .75, .75])
-            cbar_ax = fig.add_axes([.85, .15, .03, .75])
-        else:
-            #ax = axes[0]  # TODO: adjust colourbar axes
-            #cbar_ax = axes[1]            
-            ax = axes
-            cbar_ax = None
-
-        if reduce_cax_pad is True:
-            # Create an axis on the right side of ax. The width of cax will be 5%
-            # of ax and the padding between cax and ax will be fixed at 0.05 inch.
-            from mpl_toolkits.axes_grid1 import make_axes_locatable  # For manipulating colourbars
-            divider = make_axes_locatable(ax)
-            cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
-
-        if vmin is None:
-            vmin = data.min()
-        if vmax is None:
-            vmax = data.max()
-
-        # Make a 2D plot
-        if log_cax is True:
-            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=LogNorm(vmin+1, vmax))
-        else:
-            p = ax.imshow(data, extent=extent, vmin=vmin, vmax=vmax, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation)
-
-        # Add a grid
-        if gridOn == True:
-            ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
-
-        # Add a colourbar
-        cbar = plt.colorbar(p, ax=ax, cax=cbar_ax)
-        cbar.set_label(clab)
-
-        # Set the tick formatter to use power notation
-        #import matplotlib.ticker as ticker
-        #cbar.ax.yaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
-        #cbar.ax.tick_params(axis='y', which='major', pad=10)
-
-        #import matplotlib.ticker as ticker
-        #fmt = ticker.ScalarFormatter(useMathText=True)
-        #fmt.set_powerlimits((-3, 19))
-        #cbar.ax.yaxis.set_major_formatter(fmt)
-
-        # Customize the colorbar tick locator and formatter
-        #from matplotlib.ticker import ScalarFormatter
-        #cbar.ax.yaxis.set_major_locator(plt.MaxNLocator(nbins=6))  # Set the number of tick intervals
-        #cbar.ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))  # Use scientific notation
-
-        ax.set_ylabel(ylab)
-        ax.set_xlabel(xlab)
-
-
-    # ==================================================
     def plot_Ez_rb_cut(self):
 
         z_slices = self.z_slices
