@@ -1,14 +1,8 @@
 import numpy as np
-from abel import CONFIG
-import abel.apis.impactx.transformation_utilities as pycoord
-import amrex.space3d as amr
+from abel.CONFIG import CONFIG
 import uuid, os, shutil
-from abel.classes.beam import Beam 
-from impactx import ImpactX, Config, elements
 import scipy.constants as SI
 from types import SimpleNamespace
-from abel.utilities.relativity import gamma2energy
-import openpmd_api as io
 
 def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, space_charge=False, csr=False, isr=False, verbose=False):
 
@@ -126,26 +120,23 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
 
 
 def initialize_impactx_sim(verbose=False):
-    
-    # add before the simulation setup
-    pp_prof = amr.ParmParse("tiny_profiler")
-    pp_prof.add("enabled", int(verbose))
-    
-    # set AMReX verbosity
-    if not amr.initialized():
-        if verbose:
-            amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])
-        else:
-            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
+
+    from impactx import ImpactX
 
     # make simulation object
     sim = ImpactX()
 
+    # serial run on one CPU core
+    sim.omp_threads = 1
+
     # set ImpactX verbosity
     sim.verbose = int(verbose)
+    sim.tiny_profiler = verbose
     
     # enable diagnostics
     sim.diagnostics = True
+    #   Note: Diagnostics in every element's slice steps is verbose.
+    #         Disable for speed if if only beam monitors and final results are needed.
     sim.slice_step_diagnostics = True
 
     # set numerical parameters and IO control
@@ -158,23 +149,17 @@ def initialize_impactx_sim(verbose=False):
 
 
 def finalize_impactx_sim(sim, verbose=False):
+    """finalize and delete the simulation"""
 
-    # finalize and delete the simulation
     sim.finalize()
-    del sim
-    
-    # finalize AMReX
-    if amr.initialized():
-        if verbose:
-            amr.finalize()
-        else:
-            eval('amr.finalize()')
 
 
 def extract_evolution(path='', second_order=False):
     
-    # read CSV file
+    from abel.utilities.relativity import gamma2energy
     import pandas as pd
+
+    # read CSV file
     try:
         ref = pd.read_csv(path+"diags/ref_particle.0.0", delimiter=r"\s+")
         diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0.0", delimiter=r"\s+")
@@ -202,6 +187,8 @@ def extract_evolution(path='', second_order=False):
     evol.dispersion_y = diags["dispersion_y"]
 
     if second_order:
+
+        import openpmd_api as io
         
         # load OpenPMD series
         series = io.Series(path+"diags/openPMD/monitor.h5", io.Access.read_only)
@@ -238,6 +225,8 @@ def extract_evolution(path='', second_order=False):
 # convert from ImpactX particle container to ABEL beam
 def particle_container2beam(particle_container):
 
+    from abel.classes.beam import Beam
+    
     beam = Beam()
     beam.reset_phase_space(int(particle_container.total_number_of_particles()))
     
@@ -262,6 +251,10 @@ def particle_container2beam(particle_container):
     
 # convert from ABEL beam to ImpactX particle container
 def beam2particle_container(beam, sim=None, verbose=False):
+
+    import amrex.space3d as amr
+    from impactx import Config
+    import abel.apis.impactx.transformation_utilities as pycoord
     
     # make simulation object if not already existing
     if sim is None:

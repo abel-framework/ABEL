@@ -1,6 +1,18 @@
-from abel import *
+from abel.classes.collider.collider import Collider
 import scipy.constants as SI
 import numpy as np
+from abel.classes.source.impl.source_basic import SourceBasic
+from abel.classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
+from abel.classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
+from abel.classes.beamline.impl.driver_complex import DriverComplex
+from abel.classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
+from abel.classes.turnaround.impl.turnaround_basic import TurnaroundBasic
+from abel.classes.stage.impl.stage_basic import StageBasic
+from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
+from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
+from abel.classes.ip.impl.ip_basic import InteractionPointBasic
+import copy
 
 class PWFACollider(Collider):
 
@@ -11,37 +23,42 @@ class PWFACollider(Collider):
         # OPTIMIZATION VARIABLES
         self.com_energy = 10e12 # [eV]
         
-        self.num_bunches_in_train = 80
-        self.rep_rate_trains = 80.0 # [Hz]
-        
-        self.driver_separation_num_buckets = 6
+        self.num_bunches_in_train = 100
+        self.rep_rate_trains = 50 # [Hz]
+
+        self.driver_charge = -8e-9 # [C]
+        self.driver_separation_num_buckets = 5
         self.driver_linac_rf_frequency = 1e9 # [Hz]
-        self.driver_linac_gradient = 4.3e6 # [V/m]
+        self.driver_linac_gradient = 4e6 # [V/m]
         self.driver_linac_structure_num_rf_cells = 23
         self.driver_linac_num_structures_per_klystron = 1.0
-
-        self.combiner_ring_compression_factor = 5
         
-        self.pwfa_num_stages = 100
+        self.num_combiner_rings = 0
+        #self.combiner_ring_compression_factor = 12
+        
+        self.pwfa_num_stages = 125
+        self.pwfa_gradient = 1e9
         self.pwfa_transformer_ratio = 2
-        self.pwfa_gradient = 2e9
+        self.pwfa_depletion_efficiency = 0.8
+        self.pwfa_extraction_efficiency = 0.5
 
-        self.target_integrated_luminosity = 20e46
+        self.target_integrated_luminosity = 10e46
         
         
 
     # pre-assembly of the collider subsystems
     def assemble_trackables(self):
-
+        
         driver_separation = self.driver_separation_num_buckets/self.driver_linac_rf_frequency
-        colliding_bunch_separation = self.pwfa_num_stages*driver_separation
-        driver_energy = (self.com_energy/2)/(self.pwfa_transformer_ratio*self.pwfa_num_stages)
+        colliding_bunch_separation = int(self.pwfa_num_stages)*driver_separation
+        driver_energy = (self.com_energy/2)/(self.pwfa_transformer_ratio*int(self.pwfa_num_stages))
 
+        colliding_bunch_charge = self.driver_charge * self.pwfa_depletion_efficiency * self.pwfa_extraction_efficiency / self.pwfa_transformer_ratio
         self.bunch_separation = colliding_bunch_separation
         
         # define driver
         driver_source = SourceBasic()
-        driver_source.charge = -8e-9 # [C]
+        driver_source.charge = self.driver_charge
         driver_source.energy = 0.15e9 # [eV]
         driver_source.rel_energy_spread = 0.01
         driver_source.bunch_length = 700e-6 # [m]
@@ -66,11 +83,18 @@ class PWFACollider(Collider):
         driver_complex.source = driver_source
         driver_complex.rf_accelerator = driver_accel
         driver_complex.bunch_separation = driver_separation
-        driver_complex.turnaround = TurnaroundBasic()
+        if self.num_combiner_rings > 0:
+            driver_complex.combiner_ring = CombinerRingBasic()
+            driver_complex.combiner_ring.num_rings = self.num_combiner_rings
+            driver_complex.combiner_ring.compression_factor = self.combiner_ring_compression_factor
+            driver_complex.combiner_ring.exit_angle = np.pi
+            driver_complex.combiner_ring.start_with_quarter_circle = True
+        else:
+            driver_complex.turnaround = TurnaroundBasic()
         
         # define beam
         esource = SourceBasic()
-        esource.charge = -1e10 * SI.e # [C]
+        esource.charge = -abs(colliding_bunch_charge)
         esource.energy = 76e6 # [eV]
         esource.rel_energy_spread = 0.01
         esource.emit_nx, esource.emit_ny = 1e-6, 1e-6 # [m rad]
@@ -120,12 +144,13 @@ class PWFACollider(Collider):
         elinac.source = esource
         elinac.rf_injector = einjector
         elinac.stage = stage
-        elinac.num_stages = self.pwfa_num_stages
+        elinac.num_stages = int(self.pwfa_num_stages)
         elinac.interstage = interstage
         elinac.bds = ebds
         
         # define interaction point
         ip = InteractionPointBasic()
+        ip.gamma_gamma = True
         
         # define collider (with two different linacs)
         self.linac1 = elinac

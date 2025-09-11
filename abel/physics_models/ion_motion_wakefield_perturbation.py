@@ -7,14 +7,8 @@ Ben Chen, 12 June 2024, University of Oslo
 
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
 import scipy.constants as SI
-from scipy.interpolate import RegularGridInterpolator
-import copy
-from joblib import Parallel, delayed
-import os
-import time, warnings
+import copy, os, warnings
 
 from abel.classes.beam import Beam
 from abel.utilities.plasma_physics import k_p
@@ -463,6 +457,8 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
     Interpolate the ion wake field perturbation to beam macroparticle positions.
     """
 
+    from scipy.interpolate import RegularGridInterpolator
+    
     if intplt_beam_region_only:  # Perform the interpolation only in the beam's region
         zs_probe = ion_motion_config.zs_probe
         dz = ion_motion_config.grid_size_z
@@ -503,6 +499,8 @@ def intplt_ion_wakefield_perturbation(beam, wakefield_perturbations, ion_motion_
 
 ###################################################
 def ion_wakefield_scatter(arr1, arr2, intpl_W_perts, label1=None, label2=None, clabel=None, n_th_particle=1):
+
+    import matplotlib.pyplot as plt
     
     arr1 = arr1[::n_th_particle]
     arr2 = arr2[::n_th_particle]
@@ -521,6 +519,9 @@ def ion_wakefield_scatter(arr1, arr2, intpl_W_perts, label1=None, label2=None, c
 ###################################################
 def ion_wakefield_xy_scatter(beam, plasma_density, intpl_Wx_perts, intpl_Wy_perts, n_th_particle=1):
 
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+    
     # Define the color map and boundaries
     colors = ['yellow', 'orange', 'red', 'black']
     bounds = [0, 0.2, 0.4, 0.8, 1]

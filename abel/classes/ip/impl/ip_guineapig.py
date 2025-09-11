@@ -1,21 +1,23 @@
-import uuid, os
-import numpy as np
-import scipy.constants as SI
-from string import Template
-import abel
-from abel import InteractionPoint, CONFIG
-from abel.apis.guineapig.guineapig_api import guineapig_run
+from abel.classes.ip.ip import InteractionPoint
 
 class InteractionPointGuineaPig(InteractionPoint):
     
-    def __init__(self, enable_waist_shift = False):
+    def __init__(self, enable_waist_shift=False, do_pairs=True, do_coherent=True):
         super().__init__()
         self.enable_waist_shift = enable_waist_shift
         self.waist_shift_frac = 1 # fraction of bunch length
         
     # perform GUINEA-PIG simulation
-    def interact(self, beam1, beam2, load_beams=False):
+    def interact(self, beam1, beam2, load_beams=True):
 
+        import uuid, os
+        import numpy as np
+        import scipy.constants as SI
+        from abel.CONFIG import CONFIG
+        from abel.apis.guineapig.guineapig_api import guineapig_run
+        import abel
+        from string import Template
+        
         nsigma_cut = 5
         
         # make inputs
@@ -29,6 +31,8 @@ class InteractionPointGuineaPig(InteractionPoint):
                   'espread1': beam1.rel_energy_spread(),
                   'offset_x1': beam1.x_offset()*1e9, # [nm]
                   'offset_y1': beam1.y_offset()*1e9, # [nm]
+                  'angle_x1': beam1.x_angle(), # [rad]
+                  'angle_y1': beam1.y_angle(), # [rad]
                   'waist_x1': 0, # [um]
                   'waist_y1': int(self.enable_waist_shift)*min(beam1.bunch_length(),beam2.bunch_length())*1e6*self.waist_shift_frac, # [um]
                   'energy2': beam2.energy()/1e9, # [GeV]
@@ -41,6 +45,8 @@ class InteractionPointGuineaPig(InteractionPoint):
                   'espread2': beam2.rel_energy_spread(), # [um]
                   'offset_x2': beam2.x_offset()*1e9, # [nm]
                   'offset_y2': beam2.y_offset()*1e9, # [nm]
+                  'angle_x2': beam2.x_angle(), # [rad]
+                  'angle_y2': beam2.y_angle(), # [rad]
                   'waist_x2': 0, # [um]
                   'waist_y2': int(self.enable_waist_shift)*min(beam1.bunch_length(),beam2.bunch_length())*1e6*self.waist_shift_frac, # [um]
                   'ecm_min': 0.99*np.sqrt(4*beam1.energy()*beam2.energy())/1e9, # [GeV] 1% peak
@@ -52,7 +58,7 @@ class InteractionPointGuineaPig(InteractionPoint):
                   'n_m2': len(beam2),
                   'cut_x': max(abs(beam1.x_offset())+nsigma_cut*beam1.beam_size_x(), abs(beam2.x_offset())+nsigma_cut*beam2.beam_size_x())*1e9,
                   'cut_y': max(abs(beam1.y_offset())+nsigma_cut*beam1.beam_size_y(), abs(beam2.y_offset())+nsigma_cut*beam2.beam_size_y())*1e9,
-                  'cut_z': nsigma_cut*max(beam1.bunch_length(), beam2.bunch_length())*1e6,
+                  'cut_z': 0.66*nsigma_cut*max(beam1.bunch_length(), beam2.bunch_length())*1e6,
                   'load_beam': 3*int(load_beams)}
 
         # create temporary folder
@@ -61,17 +67,18 @@ class InteractionPointGuineaPig(InteractionPoint):
     
         # make lattice file from template
         inputfile_template = os.path.join(os.path.dirname(abel.apis.guineapig.guineapig_api.__file__), 'templates', 'inputdeck_simple.dat')
-        inputfile = tmpfolder + '/inputdeck_simple.dat'
-        with open(inputfile_template, 'r') as fin, open(inputfile, 'w') as fout:
+        inputfile = 'inputdeck_simple.dat'
+        inputfile_fullpath = tmpfolder + '/' + inputfile
+        with open(inputfile_template, 'r') as fin, open(inputfile_fullpath, 'w') as fout:
             results = Template(fin.read()).substitute(inputs)
             fout.write(results)
         
         # run the simulation
-        event = guineapig_run(inputfile, beam1, beam2)
+        event = guineapig_run(inputfile, beam1, beam2, tmpfolder=tmpfolder)
         
         # delete input file and temporary folder
-        os.remove(inputfile)
-        os.rmdir(tmpfolder)
+        import shutil
+        shutil.rmtree(tmpfolder)
         
         return event
         

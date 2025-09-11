@@ -3,8 +3,8 @@ ABEL : Source class tests
 =======================================
 
 This file is a part of ABEL.
-Copyright 2022– C.A.Lindstrøm, B.Chen, O.G. Finnerud,
-D. Kallvik, E. Hørlyk, K.N. Sjobak, E.Adli, University of Oslo
+Copyright 2022– C.A.Lindstrøm, J.B.B.Chen, O.G.Finnerud,
+D.Kallvik, E.Hørlyk, K.N.Sjobak, E.Adli, University of Oslo
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,7 +22,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import pytest
 from abel import *
+from abel.utilities.plasma_physics import beta_matched
 import os
+import scipy.constants as SI
+import numpy as np
 
 def check_beam_source_parameters(beam, source):
     assert np.allclose(beam.particle_mass, SI.m_e, rtol=1e-05, atol=1e-08)
@@ -52,7 +55,10 @@ def check_beam_source_parameters(beam, source):
 
 @pytest.mark.sources
 def test_SourceBasic2Beam():
-    "Check that the generated ``Beam`` from a ``SourceBasic`` has the desired properties."
+    """
+    Check that the generated ``Beam`` from a ``SourceBasic`` has the desired 
+    properties.
+    """
 
     np.random.seed(42)
 
@@ -62,7 +68,7 @@ def test_SourceBasic2Beam():
     source = SourceBasic()
     source.bunch_length = 40.0e-06                                                # [m], rms.
     source.num_particles = 10000                                               
-    source.charge = -e * 1.0e10                                                   # [C]
+    source.charge = -SI.e * 1.0e10                                                   # [C]
 
     # Energy parameters
     source.energy = 3e9                                                           # [eV]
@@ -93,14 +99,17 @@ def test_SourceBasic2Beam():
 
 @pytest.mark.sources
 def test_SourceTrapezoid2Beam():
-    "Check that the generated ``Beam`` from a ``SourceTrapezoid`` has the desired properties."
+    """
+    Check that the generated ``Beam`` from a ``SourceTrapezoid`` has the desired 
+    properties.
+    """
 
     np.random.seed(42)
 
     source = SourceTrapezoid()
     source.bunch_length = 1050e-6                                                 # [m], rms.
     source.num_particles = 30000                                               
-    source.charge = -e * 5.0e10                                                   # [C]
+    source.charge = -SI.e * 5.0e10                                                   # [C]
     source.current_head = 0.1e3                                                   # [A]
 
     # Energy parameters
@@ -132,14 +141,17 @@ def test_SourceTrapezoid2Beam():
 
 @pytest.mark.sources
 def test_SourceFlatopBeam():
-    "Check that the generated ``Beam`` from a ``SourceFlatTop`` has the desired properties."
+    """
+    Check that the generated ``Beam`` from a ``SourceFlatTop`` has the desired 
+    properties.
+    """
 
     np.random.seed(42)
 
     source = SourceFlatTop()
     source.bunch_length = 1050e-6                                                 # [m], rms.
     source.num_particles = 30000                                               
-    source.charge = -e * 5.0e10                                                   # [C]
+    source.charge = -SI.e * 5.0e10                                                   # [C]
 
     # Energy parameters
     source.energy = 4.0e9                                                         # [eV]
@@ -169,7 +181,10 @@ def test_SourceFlatopBeam():
 
 @pytest.mark.sources
 def test_SourceCapsule2Beam():
-    "Check that ``SourceCapsule`` retuns returns the same ``Beam`` as the input ``Beam``."
+    """
+    Check that ``SourceCapsule`` retuns returns the same ``Beam`` as the input 
+    ``Beam``.
+    """
 
     beam_file = 'tests/data/test_StagePrtclTransWakeInstability_beamline/test_baseline_linac/shot_000/beam_003_00048.558626.h5'
 
@@ -182,7 +197,10 @@ def test_SourceCapsule2Beam():
 
 @pytest.mark.sources
 def test_SourceFromFile2Beam():
-    "Check that ``SourceFromFile`` retuns returns the same ``Beam`` as the input ``Beam``."
+    """
+    Check that ``SourceFromFile`` retuns returns the same ``Beam`` as the input 
+    ``Beam``.
+    """
 
     beam_file = 'tests' + os.sep + 'data' + os.sep + 'test_StagePrtclTransWakeInstability_beamline' + os.sep + 'test_baseline_linac' + os.sep + 'shot_000' + os.sep + 'beam_003_00048.558626.h5'
 

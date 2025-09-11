@@ -1,10 +1,24 @@
-from abel import *
+from abel.classes.collider.collider import Collider
+from abel.classes.source.impl.source_basic import SourceBasic
+from abel.classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
+from abel.classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
+from abel.classes.beamline.impl.driver_complex import DriverComplex
+from abel.classes.turnaround.impl.turnaround_basic import TurnaroundBasic
+from abel.classes.stage.impl.stage_basic import StageBasic
+from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
+from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
+from abel.classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
+from abel.classes.ip.impl.ip_basic import InteractionPointBasic
+import numpy as np
+import scipy.constants as SI
 
 class HALHFv1(Collider):
 
     def __init__(self):
 
         super().__init__()
+        
         
         # define driver
         driver_source = SourceBasic()
@@ -152,7 +166,7 @@ class HALHFv1(Collider):
         self.energy_asymmetry = 4
         self.bunch_separation = 80e-9 # [s]
         self.num_bunches_in_train = 100
-        self.rep_rate_trains = 100 # [Hz]
+        self.rep_rate_trains = 100.0 # [Hz]
 
         # assemble everything
         self.assemble_trackables()

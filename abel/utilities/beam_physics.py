@@ -1,5 +1,4 @@
 import numpy as np
-import time
 
 # generate trace space from geometric emittance and twiss parameters
 def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):

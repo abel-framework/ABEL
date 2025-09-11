@@ -1,13 +1,10 @@
-# suppress numba warnings from Ocelot
-import warnings
-from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+import numpy as np
+import scipy.constants as SI
 
 # import configuration class
 from .CONFIG import CONFIG
 CONFIG.initialize()
-CONFIG.printCONFIG()
+#CONFIG.printCONFIG()
 
 # import all other classes
 from .classes.beam import Beam
@@ -39,47 +36,48 @@ from .classes.beamline.impl.experiment.impl.experiment_apl import ExperimentAPL
 
 from .classes.collider.collider import Collider
 
-from .classes.source.impl.source_basic import *
+from .classes.source.impl.source_basic import SourceBasic
 from .classes.source.impl.source_trapezoid import SourceTrapezoid
-from .classes.source.impl.source_combiner import *
-from .classes.source.impl.source_energy_comb import *
-from .classes.source.impl.source_from_file import *
-from .classes.source.impl.source_flattop import *
-from .classes.source.impl.source_capsule import *
-from .classes.stage.impl.stage_basic import *
-from .classes.stage.impl.stage_nonlinear_1d import *
-from .classes.stage.impl.stage_hipace import *
-from .classes.stage.impl.stage_wake_t import *
-from .classes.stage.impl.stage_quasistatic_2d import *
-from .classes.stage.impl.stage_slice_transverse_wake_instability import *
-from .classes.stage.impl.stage_particle_transverse_wake_instability import *
-from .classes.interstage.impl.interstage_null import *
-from .classes.interstage.impl.interstage_basic import *
-from .classes.interstage.impl.interstage_elegant import *
-#from .classes.interstage.impl.interstage_ocelot import *
+from .classes.source.impl.source_combiner import SourceCombiner
+from .classes.source.impl.source_from_file import SourceFromFile
+from .classes.source.impl.source_flattop import SourceFlatTop
+from .classes.source.impl.source_capsule import SourceCapsule
+from .classes.source.impl.source_energy_comb import SourceEnergyComb
+from .classes.stage.impl.stage_basic import StageBasic
+from .classes.stage.impl.stage_hipace import StageHipace
+from .classes.stage.impl.stage_wake_t import StageWakeT
+from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
+from .classes.stage.impl.stage_slice_transverse_wake_instability import StageSlicesTransWakeInstability
+from .classes.stage.impl.stage_particle_transverse_wake_instability import StagePrtclTransWakeInstability
+from .classes.stage.stage import PlasmaRamp
+from .classes.interstage.impl.interstage_null import InterstageNull
+from .classes.interstage.impl.interstage_basic import InterstageBasic
+from .classes.interstage.impl.interstage_elegant import InterstageElegant
 from .classes.interstage.impl.interstage_impactx import InterstageImpactX
 from .classes.interstage.impl.interstage_quads_impactx import InterstageQuadsImpactX
-from .classes.plasma_lens.impl.plasma_lens_basic import *
-from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import *
+from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
+from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
+from .classes.plasma_lens.impl.plasma_lens_nonlinear_thick import PlasmaLensNonlinearThick
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
 from .classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorBasic
-#from .classes.rf_accelerator.impl.rf_accelerator_TW.rf_accelerator_TW import RFAccelerator_TW
-#from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLICG import RFAccelerator_TW_CLICG
-#from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_CLIC502 import RFAccelerator_TW_CLIC502
-#from .classes.rf_accelerator.impl.rf_accelerator_TW.impl.rf_accelerator_TW_DB2 import RFAccelerator_TW_DB2
 from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
 from .classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
 from .classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
 from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
-from .classes.bds.impl.bds_basic import *
-from .classes.bds.impl.bds_fbt import *
-from .classes.spectrometer.impl.spectrometer_facet_ocelot import *
-from .classes.spectrometer.impl.spectrometer_basic_clear import *
+from .classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
+from .classes.bds.impl.bds_basic import BeamDeliverySystemBasic
+from .classes.bds.impl.bds_fbt import BeamDeliverySystemFlatBeamTransformer
+from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
 from .classes.spectrometer.impl.achromatic.spectrometer_achromatic import SpectrometerAchromatic
 from .classes.spectrometer.impl.achromatic.impl.spectrometer_achromatic_basic import SpectrometerAchromaticBasic
 from .classes.spectrometer.impl.achromatic.impl.spectrometer_achromatic_impactX import SpectrometerAchromaticImpactX
-from .classes.ip.impl.ip_basic import *
-from .classes.ip.impl.ip_guineapig import *
+from .classes.ip.impl.ip_basic import InteractionPointBasic
+from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
 
 from abel.classes.collider.preset.halhf_v1 import HALHFv1
 from abel.classes.collider.preset.halhf_v2 import HALHFv2
+from abel.classes.collider.preset.halhf_gg import HALHFgg
+from abel.classes.collider.preset.pwfa_collider import PWFACollider
+from abel.classes.collider.preset.c3 import C3
+from abel.classes.collider.preset.ilc import ILC
+from abel.classes.collider.preset.clic import CLIC
