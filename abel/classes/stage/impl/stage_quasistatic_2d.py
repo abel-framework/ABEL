@@ -22,11 +22,6 @@ class StageQuasistatic2d(Stage):
     # ==================================================
     # track the particles through
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
-
-        import warnings
-        
-        # suppress numba warnings from Ocelot
-        warnings.simplefilter('ignore', category=RuntimeWarning)
         
         # make driver
         driver_incoming = self.driver_source.track()

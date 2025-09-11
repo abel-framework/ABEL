@@ -1,25 +1,25 @@
 import numpy as np
 import openpmd_api as io
+import copy, warnings
+import scipy.constants as SI
+import scipy.sparse as sp
+from scipy.spatial.transform import Rotation as Rot
 from datetime import datetime
 from pytz import timezone
-from abel.CONFIG import CONFIG
 from types import SimpleNamespace
-import scipy.constants as SI
+from matplotlib import pyplot as plt
+
+from abel.CONFIG import CONFIG
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2momentum
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
 from abel.physics_models.betatron_motion import evolve_betatron_motion
 
-import scipy.sparse as sp
-from scipy.spatial.transform import Rotation as Rot
-import copy
-
-from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, allow_low_energy_particles=True):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -43,7 +43,7 @@ class Beam():
         self.stage_number = 0
         self.location = 0
 
-        self.allow_low_energy_particles = False  # Flag for allowing particles to have low energies.
+        self.allow_low_energy_particles = allow_low_energy_particles  # Flag for allowing particles to have low energies.
     
     
     # reset phase space
@@ -209,17 +209,26 @@ class Beam():
         if uzs is None:
             
             if pzs is not None:
-                if np.any(pzs < pz_thres) and not self.allow_low_energy_particles:
-                    raise ValueError('pzs contains values that are too small.')
+                if np.any(pzs < pz_thres):
+                    if not self.allow_low_energy_particles:
+                        raise ValueError('Beam pzs contains values that are too small.')
+                    else:
+                        warnings.warn('Beam pzs contains values that are too small.\n', UserWarning)
                 uzs = momentum2proper_velocity(pzs)
 
             elif Es is not None:
-                if np.any(Es < energy_thres) and not self.allow_low_energy_particles:
-                    raise ValueError('Es contains values that are too small.')
+                if np.any(Es < energy_thres):
+                    if not self.allow_low_energy_particles:
+                        raise ValueError('Beam Es contains values that are too small.')
+                    else:
+                        warnings.warn('Beam Es contains values that are too small.\n', UserWarning)
                 uzs = energy2proper_velocity(Es)
         else:
-            if np.any(uzs < uz_thres) and not self.allow_low_energy_particles:
-                raise ValueError('uzs contains values that are too small.')
+            if np.any(uzs < uz_thres):
+                if not self.allow_low_energy_particles:
+                    raise ValueError('Beam uzs contains values that are too small.')
+                else:
+                    warnings.warn('Beam uzs contains values that are too small.\n', UserWarning)
         self.__phasespace[5,:] = uzs
         
         if uxs is None:
@@ -353,8 +362,11 @@ class Beam():
     def set_uzs(self, uzs):
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
-        if np.any(uzs < uz_thres) and not self.allow_low_energy_particles:
-            raise ValueError('uzs contains values that are too small.')
+        if np.any(uzs < uz_thres):
+            if not self.allow_low_energy_particles:
+                raise ValueError('Beam uzs contains values that are too small.')
+            else:
+                warnings.warn('Beam uzs contains values that are too small.\n', UserWarning)
         self.__phasespace[5,:] = uzs
         
     def set_xps(self, xps):
@@ -363,8 +375,11 @@ class Beam():
         self.set_uys(yps*self.uzs())
     def set_Es(self, Es):
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
-        if np.any(Es < energy_thres) and not self.allow_low_energy_particles:
-            raise ValueError('Es contains values that are too small.')
+        if np.any(Es < energy_thres):
+            if not self.allow_low_energy_particles:
+                raise ValueError('Beam Es contains values that are too small.')
+            else:
+                warnings.warn('Beam Es contains values that are too small.\n', UserWarning)
         self.set_uzs(energy2proper_velocity(Es))
         
     def set_qs(self, qs):
