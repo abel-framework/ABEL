@@ -2614,7 +2614,10 @@ class StageReducedModels(Stage):
         
     
     # ==================================================
-    def print_current_summary(self, initial_main_beam, beam_out, clean=False):
+    def print_stage_beam_summary(self, initial_main_beam, beam_out, clean=False):
+        """
+        Prints a table to summarise stage and beam parameters.
+        """
 
         if self.evolution is None:
             print('Beam parameter evolution has not been recorded.')
