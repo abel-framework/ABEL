@@ -1979,6 +1979,10 @@ class StageReducedModels(Stage):
     # Animate the horizontal sideview (top view)
     def animate_sideview_x(self, evolution_folder):
         
+        # Check if the directory in self.run_path exists
+        if self.run_path is None or not os.path.exists(self.run_path):
+            raise NotADirectoryError("self.run_path is not a directory.")
+        
         from matplotlib import ticker as mticker
         from matplotlib.animation import FuncAnimation
         
@@ -2131,10 +2135,10 @@ class StageReducedModels(Stage):
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
-        plot_path = self.run_path + 'plots' + os.sep
+        plot_path = os.path.join(self.run_path, 'plots')
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
-        filename = plot_path +'sideview_x_stage_' + str(self.stage_number)+ '.gif'
+        filename = os.path.join(plot_path, 'sideview_x_stage_' + str(self.stage_number) + '.gif')
         animation.save(filename, writer="pillow", fps=20)
 
         # hide the figure
@@ -2149,6 +2153,10 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the vertical sideview
     def animate_sideview_y(self, evolution_folder):
+
+        # Check if the directory in self.run_path exists
+        if self.run_path is None or not os.path.exists(self.run_path):
+            raise NotADirectoryError("self.run_path is not a directory.")
         
         from matplotlib import ticker as mticker
         from matplotlib.animation import FuncAnimation
@@ -2294,10 +2302,10 @@ class StageReducedModels(Stage):
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
-        plot_path = self.run_path + 'plots' + os.sep
+        plot_path = os.path.join(self.run_path, 'plots')
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
-        filename = plot_path +'sideview_y_stage_' + str(self.stage_number)+ '.gif'
+        filename = os.path.join(plot_path, 'sideview_y_stage_' + str(self.stage_number) + '.gif')
         animation.save(filename, writer="pillow", fps=20)
 
         # hide the figure
@@ -2312,6 +2320,10 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the horizontal phase space
     def animate_phasespace_x(self, evolution_folder):
+
+        # Check if the directory in self.run_path exists
+        if self.run_path is None or not os.path.exists(self.run_path):
+            raise NotADirectoryError("self.run_path is not a directory.")
         
         from matplotlib import ticker as mticker
         from matplotlib.animation import FuncAnimation
@@ -2486,10 +2498,10 @@ class StageReducedModels(Stage):
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
-        plot_path = self.run_path + 'plots' + os.sep
+        plot_path = os.path.join(self.run_path, 'plots')
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
-        filename = plot_path + 'phasespace_x_stage_' + str(self.stage_number) + '.gif'
+        filename = os.path.join(plot_path, 'phasespace_x_stage_' + str(self.stage_number) + '.gif')
         animation.save(filename, writer="pillow", fps=20)
 
         # hide the figure
@@ -2501,6 +2513,10 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the vertical phase space
     def animate_phasespace_y(self, evolution_folder):
+
+        # Check if the directory in self.run_path exists
+        if self.run_path is None or not os.path.exists(self.run_path):
+            raise NotADirectoryError("self.run_path is not a directory.")
         
         from matplotlib import ticker as mticker
         from matplotlib.animation import FuncAnimation
@@ -2673,10 +2689,10 @@ class StageReducedModels(Stage):
         animation = FuncAnimation(fig, frameFcn, frames=range(len(files)), repeat=False, interval=100)
         
         # save the animation as a GIF
-        plot_path = self.run_path + 'plots' + os.sep
+        plot_path = os.path.join(self.run_path, 'plots')
         if not os.path.exists(plot_path):
             os.makedirs(plot_path)
-        filename = plot_path + 'phasespace_y_stage_' + str(self.stage_number) + '.gif'
+        filename = os.path.join(plot_path, 'phasespace_y_stage_' + str(self.stage_number) + '.gif')
         animation.save(filename, writer="pillow", fps=20)
 
         # hide the figure
