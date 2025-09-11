@@ -55,7 +55,7 @@ def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=Fal
     return driver
 
 
-def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
+def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3.0e9):
     from abel.utilities.plasma_physics import beta_matched
 
     main = SourceBasic()
@@ -64,7 +64,7 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     main.charge = -SI.e * 1.0e10                                                  # [C]
 
     # Energy parameters
-    main.energy = 3.0e9                                                           # [eV], HALHF v2 last stage nominal input energy
+    main.energy = energy                                                          # [eV], HALHF v2 first stage nominal input energy as default.
     main.rel_energy_spread = 0.02                                                 # Relative rms energy spread
 
     # Emittances
@@ -237,7 +237,7 @@ def test_driver_unrotation():
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
 
-    stage.nom_energy = 7.8e9                                                      # [eV], HALHF v2 last stage nominal input energy 
+    stage.nom_energy = 7.8e9                                                      # [eV]
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -251,7 +251,7 @@ def test_driver_unrotation():
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
 
-    stage.nom_energy = 7.8e9                                                      # [eV], HALHF v2 last stage nominal input energy 
+    stage.nom_energy = 7.8e9                                                      # [eV]
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -578,3 +578,28 @@ def test_print_summary():
     stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True)
 
     stage.print_summary()
+
+
+@pytest.mark.StageReducedModels
+def test_make_animations():
+    """
+    Tests for ``StageReducedModels`` functions for making animations.
+    """
+    from pathlib import Path
+    import os
+
+    np.random.seed(42)
+
+    driver_source = setup_trapezoid_driver_source()
+    main_source = setup_basic_main_source(energy=300.0e9)  # High energy for faster tracking.
+    stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True)
+    stage.time_step_mod = 0.03                                                    # In units of betatron wavelengths/c.
+    stage.probe_evol_period = 18
+    stage.make_animations = True
+    stage.run_path = Path("tests/run_data")
+    os.makedirs(stage.run_path, exist_ok=True)
+
+    stage.nom_energy = main_source.energy                                         # [eV]
+    stage.track(main_source.track())
+
+    shutil.rmtree( os.path.join(stage.run_path, 'plots') )
