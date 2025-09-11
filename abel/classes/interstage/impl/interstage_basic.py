@@ -14,6 +14,7 @@ class InterstageBasic(Interstage):
     
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        "Applies the self-correction mechanism to ``beam`` directly through coordinate transformations."
         
         # compress beam
         beam.compress(R_56=self.get_R56(), nom_energy=self.nom_energy)
