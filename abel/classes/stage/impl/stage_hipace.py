@@ -61,8 +61,8 @@ class StageHipace(Stage):
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
-            os.mkdir(CONFIG.temp_path)
-        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+            os.makedirs(CONFIG.temp_path)
+        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + os.sep
         
         # make directory
         if not os.path.exists(tmpfolder):
@@ -332,7 +332,7 @@ class StageHipace(Stage):
 
         # delete or move data
         if self.keep_data:
-            destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number) + '/insitu'
+            destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number) + os.sep + 'insitu'
             shutil.move(insitu_path, destination_path)
         
         
