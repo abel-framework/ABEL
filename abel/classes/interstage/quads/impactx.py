@@ -27,7 +27,7 @@ class InterstageQuadsImpactX(InterstageQuads):
         lattice = self.get_impactx_lattice()
         
         # run ImpactX
-        from abel.apis.impactx.impactx_api import run_impactx
+        from abel.wrappers.impactx.impactx_wrapper import run_impactx
         beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, 
                                            space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
         
@@ -47,7 +47,7 @@ class InterstageQuadsImpactX(InterstageQuads):
         
         # add monitor (before and after gaps, and in the middle)
         if self.use_monitors:
-            from abel.apis.impactx.impactx_api import initialize_amrex
+            from abel.wrappers.impactx.impactx_wrapper import initialize_amrex
             initialize_amrex()
             monitor = elements.BeamMonitor(name='monitor', backend='h5', encoding='g')
         else:
