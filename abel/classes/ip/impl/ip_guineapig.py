@@ -14,7 +14,7 @@ class InteractionPointGuineaPig(InteractionPoint):
         import numpy as np
         import scipy.constants as SI
         from abel.CONFIG import CONFIG
-        from abel.apis.guineapig.guineapig_api import guineapig_run
+        from abel.wrappers.guineapig.guineapig_wrapper import guineapig_run
         import abel
         from string import Template
         
@@ -66,7 +66,7 @@ class InteractionPointGuineaPig(InteractionPoint):
         os.mkdir(tmpfolder)
     
         # make lattice file from template
-        inputfile_template = os.path.join(os.path.dirname(abel.apis.guineapig.guineapig_api.__file__), 'templates', 'inputdeck_simple.dat')
+        inputfile_template = os.path.join(os.path.dirname(abel.wrappers.guineapig.guineapig_wrapper.__file__), 'templates', 'inputdeck_simple.dat')
         inputfile = 'inputdeck_simple.dat'
         inputfile_fullpath = tmpfolder + '/' + inputfile
         with open(inputfile_template, 'r') as fin, open(inputfile_fullpath, 'w') as fout:
