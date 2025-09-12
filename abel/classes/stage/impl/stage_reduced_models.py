@@ -9,7 +9,7 @@ Ben Chen, 6 October 2023, University of Oslo
 import numpy as np
 from scipy.constants import c, e, m_e, epsilon_0 as eps0
 from matplotlib import pyplot as plt
-import time
+#import time
 
 from types import SimpleNamespace
 import os, copy, warnings, uuid, shutil
@@ -2672,6 +2672,6 @@ class StageReducedModels(Stage):
         print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
         print(f"Ion motion enabled:\t\t\t\t\t {str(self.enable_ion_motion) :s}")
 
-        print('\n')
+        print('')
         
     
