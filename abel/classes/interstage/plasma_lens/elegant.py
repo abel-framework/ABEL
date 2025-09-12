@@ -4,7 +4,7 @@ import numpy as np
 import scipy.constants as SI
 from string import Template
 from abel.CONFIG import CONFIG
-from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
+from abel.wrappers.elegant.elegant_wrapper import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
 
 class InterstagePlasmaLensElegant(InterstagePlasmaLens):
     
