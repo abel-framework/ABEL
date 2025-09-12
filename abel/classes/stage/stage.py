@@ -68,7 +68,7 @@ class Stage(Trackable, CostModeled):
         self.final.plasma.wakefield.onaxis = SimpleNamespace()
 
         self.name = 'Plasma stage'
-
+        
 
     # ==================================================
     @property
@@ -205,7 +205,7 @@ class Stage(Trackable, CostModeled):
         if stage_copy.downramp is not None:
             stage_copy.downramp = None
 
-        # Can set energy gain and gradient parameters to None to let track_upramp() and track_downramp() determine these.
+        # Set energy gain, gradient and length parameters to None to let track_upramp() and track_downramp() determine these.
         # Do try/except to allow zeroing everything.
         try:
             stage_copy.nom_accel_gradient = None
@@ -223,11 +223,28 @@ class Stage(Trackable, CostModeled):
             stage_copy.nom_energy_gain_flattop = None
         except VariablesOverspecifiedError:
             pass
-            
-        # Everything else now unset, can set this safely.
-        # Will also trigger reset/recalc if needed
-        stage_copy.length_flattop = None
-        stage_copy.length = None
+        try:
+            stage_copy.length = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.length_flattop = None
+        except VariablesOverspecifiedError:
+            pass
+
+        if stage_copy.nom_accel_gradient_flattop is not None:
+            raise ValueError('stage_copy.nom_accel_gradient is not None.')
+        if stage_copy.nom_accel_gradient_flattop is not None:
+            raise ValueError('stage_copy.nom_accel_gradient_flattop is not None.')
+        if stage_copy.nom_energy_gain is not None:
+            raise ValueError('stage_copy.nom_energy_gain is not None.')
+        if stage_copy.nom_energy_gain_flattop is not None:
+            raise ValueError('stage_copy.nom_energy_gain_flattop is not None.')
+        if stage_copy.length is not None:
+            raise ValueError('stage_copy.length is not None.')
+        if stage_copy.length_flattop is not None:
+            raise ValueError('stage_copy.length_flattop is not None.')
+
         stage_copy.plasma_density = None
          
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
@@ -316,6 +333,7 @@ class Stage(Trackable, CostModeled):
                 self.upramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.upramp.nom_energy is None:
                 self.upramp.nom_energy = self.nom_energy
+                self.upramp.nom_energy_flattop = self.upramp.nom_energy
                 self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy_gain
 
             # Can calculate and set the ramp length after the nominal energy of the ramp is determined
@@ -339,6 +357,46 @@ class Stage(Trackable, CostModeled):
             # Can calculate and set the ramp length after the nominal energy of the ramp is determined
             if self.downramp.length_flattop is None:
                 self.downramp.length_flattop = self._calc_ramp_length(self.downramp)
+    
+    
+    # ==================================================
+    def is_upramp(self):
+        "Checks if self is an upramp."
+
+        if self.parent is not None:
+            if self.parent.upramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def is_downramp(self):
+        "Checks if self is an downramp."
+
+        if self.parent is not None:
+            if self.parent.downramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def has_ramp(self):
+        "Checks if there are any ramps attached to the stage."
+
+        if self.upramp is not None or self.downramp is not None:
+            return True
+        else:
+            return False
+
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+
     
     # ==================================================
     def is_upramp(self):
@@ -1412,50 +1470,7 @@ class Stage(Trackable, CostModeled):
         filename = bunch + '_evolution.csv'
         np.savetxt(filename, matrix, delimiter=',')
         
-
-    # ==================================================
-    def store_beams_between_ramps(self, driver_before_tracking, beam_before_tracking, driver_outgoing, beam_outgoing, driver_incoming=None):
-        """
-        Stores drive beams and main beams before and between ramps/stage for 
-        comparison in tests. The beams are stored as attributes in the 
-        ramps/stage.
-        
-
-        Parameters
-        ----------
-        driver_before_tracking : ``Beam`` object
-            The incoming drive beam before any tracking.
-
-        beam_before_tracking : ``Beam`` object
-            The incoming main beam before any tracking.
-
-        driver_outgoing : ``Beam`` object
-            The outgoing drive beam from a ramp/stage.
-
-        beam_outgoing : ``Beam`` object
-            The outgoing main beam from a ramp/stage.
-
-        driver_incoming : ``Beam`` object, optional
-            The incoming drive beam before rotation and ramps. Only need to be 
-            stored inside the main stage.
-
-
-        Returns
-        ----------
-        None
-        """
-
-        # The beams before tracking
-        self.driver_in = driver_before_tracking
-        self.beam_in = beam_before_tracking
-        
-        # The outgoing beams 
-        self.driver_out = driver_outgoing
-        self.beam_out = beam_outgoing
-
-        # The original drive beam before rotation and ramps
-        self.driver_incoming = driver_incoming
-
+    
     # ==================================================
     def plot_driver_evolution(self):
         self.plot_evolution(bunch='driver')
@@ -1778,7 +1793,7 @@ class Stage(Trackable, CostModeled):
         z_beam = zs_masked[np.abs(Is[mask]).argmax()]
         Ez_driver = Ezs0[zs0 > z_mid].max()
         Ez_beam = np.interp(z_beam, zs0, Ezs0)
-
+        
         # get wakefield
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
@@ -2039,7 +2054,6 @@ class PlasmaRamp(Stage):
         
         if ramp_shape != 'uniform' and ramp_shape != 'from_file' and ramp_shape != 'gaussian':
             raise StageError('Invalid ramp shape.')
-        
 
         self.ramp_shape = ramp_shape
         self.length = ramp_length

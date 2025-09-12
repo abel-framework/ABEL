@@ -188,6 +188,6 @@ class Beamline(Trackable, Runnable, CostModeled):
 
 
 class NotAssembledError(Exception):
-    "Exception class for ``Beanline`` to throw if ``self.trackables`` have not been assembled."
+    "Exception class for ``Beamline`` to throw if ``self.trackables`` have not been assembled."
     pass
         

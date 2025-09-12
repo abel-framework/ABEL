@@ -24,6 +24,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import pytest
 import numpy as np
 import scipy.constants as SI
+
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.stage.impl.stage_basic import StageBasic
@@ -304,6 +305,8 @@ def test_surveys():
     Tests for ``Beamline.survey_object()`` and ``Beamline.plot_survey()``.
     """
 
+    from matplotlib import pyplot as plt
+
     linac = Linac()
     source = SourceBasic()
     source.energy = 1e9
@@ -373,5 +376,6 @@ def test_surveys():
     assert objs[5][2] == stage3_survey[2]
     assert objs[5][3] == stage3_survey[3]
     assert objs[5][4] == stage3_survey[4]
-
+    
+    plt.ion()
     linac.plot_survey()

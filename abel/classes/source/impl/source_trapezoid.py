@@ -130,3 +130,28 @@ class SourceTrapezoid(Source):
     def energy_efficiency(self):
         return self.wallplug_efficiency
     
+
+    def print_summary(self):
+        print('Type: ', type(self))
+        print('Number of macro particles: ', self.num_particles)
+        print('Charge [nC]: ', self.charge*1e9)
+        print('Energy [GeV]: ', self.energy/1e9)
+        print('Normalised x emittance [mm mrad]: ', self.emit_nx*1e6)
+        print('Normalised y emittance [mm mrad]: ', self.emit_ny*1e6)
+        print('x beta function [mm]: ', self.beta_x*1e3)
+        print('y beta function [mm]: ', self.beta_y*1e3)
+        print('Relative energy spread [%]: ', self.rel_energy_spread*100)
+        print('Bunch length [um]: ', self.bunch_length*1e6)
+        print('Gaussian blur [um]: ', self.gaussian_blur*1e6)
+        print('Current head [A]: ', self.current_head)
+        print('x-offset [um]: ', self.x_offset*1e6)
+        print('y-offset [um]: ', self.y_offset*1e6)
+        print('z-offset [um]: ', self.z_offset*1e6)
+        print('x-jitter [nm]: ', self.jitter.x*1e9)
+        print('y-jitter [nm]: ', self.jitter.y*1e9)
+        print('t-jitter [ns]: ', self.jitter.t*1e9)
+        print('Normalised x emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_x * 1e6 if self.norm_jitter_emittance_x is not None else "None")
+        print('Normalised y emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_y * 1e6 if self.norm_jitter_emittance_y is not None else "None")
+        print('Symmetrisation: ', self.symmetrize)

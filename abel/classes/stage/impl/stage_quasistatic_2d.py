@@ -23,10 +23,7 @@ class StageQuasistatic2d(Stage):
     # track the particles through
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
-        import warnings
-        
-        # suppress numba warnings from Ocelot
-        warnings.simplefilter('ignore', category=RuntimeWarning)
+        self.stage_number = beam_incoming.stage_number
         
         # make driver
         driver_incoming = self.driver_source.track()
@@ -135,7 +132,7 @@ class StageQuasistatic2d(Stage):
         """
 
         import wake_t
-        from abel.apis.wake_t.wake_t_api import beam2wake_t_bunch, wake_t_bunch2beam
+        from abel.wrappers.wake_t.wake_t_wrapper import beam2wake_t_bunch, wake_t_bunch2beam
 
         # make copy of the beams to update later
         beam = copy.deepcopy(beam0)
