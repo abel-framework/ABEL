@@ -10,6 +10,7 @@ from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.interstage.interstage import Interstage
 from abel.wrappers.elegant.elegant_wrapper import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
+import abel.wrappers.elegant.elegant_wrapper as elegant_wrapper
 from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion
 
 
@@ -176,8 +177,6 @@ class InterstageElegant(Interstage):
 
     def __make_run_script(self, latticefile, inputbeamfile, tmpfolder=None):
 
-        import abel.apis.elegant.elegant_api as elegant_api
-
         # create temporary CSV file and folder
         make_new_tmpfolder = tmpfolder is None
         if make_new_tmpfolder:
@@ -205,8 +204,6 @@ class InterstageElegant(Interstage):
     
     
     def __make_lattice(self, beam, outputbeamfile, latticefile, lensfile, evolutionfolder, save_evolution=False, tmpfolder=None):
-
-        import abel.apis.elegant.elegant_api as elegant_api
         
         # perform matching to find exact element strengths
         g_lens, tau_lens, Bdip3, m_sext = self.match()

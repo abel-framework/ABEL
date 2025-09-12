@@ -24,7 +24,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import pytest
 from abel import *
 import matplotlib
-import os, shutil
+import shutil
 matplotlib.use('Agg')  # Use a backend that does not display figure to suppress plots.
 
 def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False):
