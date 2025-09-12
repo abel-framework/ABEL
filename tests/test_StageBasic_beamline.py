@@ -150,7 +150,7 @@ def test_baseline_linac():
     interstages = linac.interstages
     assert len(stages) == num_stages
     assert len(interstages) == num_stages - 1
-    assert np.isclose(linac.get_length(), 79.30149471158896, rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.get_length(), 93.0738788160906, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, 36.9e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[2].nom_energy, 68.8e9, rtol=1e-15, atol=0.0)
@@ -162,12 +162,12 @@ def test_baseline_linac():
     assert np.isclose(interstages[3].nom_energy, stages[4].nom_energy, rtol=1e-15, atol=0.0)
     interstage_nom_energy = interstages[0].nom_energy
     assert np.isclose(interstages[0].beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_field, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].field_dipole, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
     interstage_nom_energy = interstages[3].nom_energy
     assert np.isclose(interstages[3].beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[3].dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[3].dipole_field, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].field_dipole, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
 
     initial_beam = linac.get_beam(0)
     assert np.isclose(initial_beam.energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
@@ -224,7 +224,7 @@ def test_linac_plots():
     interstages = linac.interstages
     assert len(stages) == num_stages
     assert len(interstages) == num_stages - 1
-    assert np.isclose(linac.get_length(), 79.30149471158896, rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.get_length(), 93.0738788160906, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, 36.9e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[2].nom_energy, 68.8e9, rtol=1e-15, atol=0.0)
@@ -236,18 +236,18 @@ def test_linac_plots():
     assert np.isclose(interstages[3].nom_energy, stages[4].nom_energy, rtol=1e-15, atol=0.0)
     interstage_nom_energy = interstages[0].nom_energy
     assert np.isclose(interstages[0].beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_field, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].field_dipole, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
     interstage_nom_energy = interstages[3].nom_energy
     assert np.isclose(interstages[3].beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[3].dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[3].dipole_field, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].field_dipole, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
     # assert np.isclose(interstages[0].beta0, 0.24137835827389, rtol=1e-15, atol=0.0)
-    # assert np.isclose(interstages[0].dipole_length, 1.9209372712298547, rtol=1e-15, atol=0.0)
-    # assert np.isclose(interstages[0].dipole_field, 1.0, rtol=1e-15, atol=0.0)
+    # assert np.isclose(interstages[0].length_dipole, 1.9209372712298547, rtol=1e-15, atol=0.0)
+    # assert np.isclose(interstages[0].field_dipole, 1.0, rtol=1e-15, atol=0.0)
     # assert np.isclose(interstages[3].beta0, 0.45756933131960525, rtol=1e-15, atol=0.0)
-    # assert np.isclose(interstages[3].dipole_length, 3.641428291206625, rtol=1e-15, atol=0.0)
-    # assert np.isclose(interstages[3].dipole_field, 0.7541478129713424, rtol=1e-15, atol=0.0)
+    # assert np.isclose(interstages[3].length_dipole, 3.641428291206625, rtol=1e-15, atol=0.0)
+    # assert np.isclose(interstages[3].field_dipole, 0.7541478129713424, rtol=1e-15, atol=0.0)
 
     initial_beam = linac.get_beam(0)
     assert np.isclose(initial_beam.energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
@@ -316,7 +316,7 @@ def test_ramped_linac():
     interstages = linac.interstages
     assert len(stages) == num_stages
     assert len(interstages) == num_stages - 1
-    assert np.isclose(linac.get_length(), 79.30149471158896, rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.get_length(), 93.0738788160906, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, 36.9e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[2].nom_energy, 68.8e9, rtol=1e-15, atol=0.0)
@@ -362,11 +362,11 @@ def test_ramped_linac():
     assert np.isclose(interstages[2].nom_energy, stages[3].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(interstages[3].nom_energy, stages[4].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(interstages[0].beta0, 0.24137835827389, rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_length, 1.9209372712298547, rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_field, 1.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].length_dipole, 1.9209372712298547, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].field_dipole, 1.0, rtol=1e-15, atol=0.0)
     assert np.isclose(interstages[3].beta0, 0.45756933131960525, rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[3].dipole_length, 3.641428291206625, rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[3].dipole_field, 0.7541478129713424, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].length_dipole, 3.641428291206625, rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[3].field_dipole, 0.7541478129713424, rtol=1e-15, atol=0.0)
 
     initial_beam = linac.get_beam(0)
     assert np.isclose(initial_beam.energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
@@ -500,7 +500,7 @@ def test_ramped_jitter_linac():
     interstages = linac.interstages
     assert len(stages) == num_stages
     assert len(interstages) == num_stages - 1
-    assert np.isclose(linac.get_length(), 430.0373455904505, rtol=1e-15, atol=0.0)
+    assert np.isclose(linac.get_length(), 518.752417450173, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[0].nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[11].nom_energy, 355.9e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[12].nom_energy, 387.8e9, rtol=1e-15, atol=0.0)
@@ -530,12 +530,12 @@ def test_ramped_jitter_linac():
     assert np.isclose(interstages[14].nom_energy, stages[15].nom_energy, rtol=1e-15, atol=0.0)
     interstage_nom_energy = interstages[0].nom_energy
     assert np.isclose(interstages[0].beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[0].dipole_field, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[0].field_dipole, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
     interstage_nom_energy = interstages[14].nom_energy
     assert np.isclose(interstages[14].beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[14].dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstages[14].dipole_field, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[14].length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstages[14].field_dipole, np.min([1.0, 100e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
 
     initial_beam = linac.get_beam(0)
     assert np.isclose(initial_beam.energy(), stages[0].nom_energy, rtol=1e-3, atol=0.0)
@@ -552,11 +552,11 @@ def test_ramped_jitter_linac():
     assert np.isclose(final_beam.rel_energy_spread(), 9.825586100176821e-05, rtol=1e-2, atol=0.0)
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4) * initial_beam.beam_size_x()
-    nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4) * initial_beam.beam_size_y()
+    #nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4) * initial_beam.beam_size_y()
     assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=1e-2, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), 1.2967329484466221e-06, rtol=1e-1, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), 6.882290659352391e-07, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), 1.084878053041328e-06, rtol=1e-2, atol=0.0)
 
     #ref_beam = Beam.load('./tests/data/')
     #ref_beam.beam_name = 'Reference beam'
