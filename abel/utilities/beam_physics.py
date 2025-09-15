@@ -223,7 +223,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
     """
     
     # overwrite fast-calculation toggle if plotting 
-    if plot and fast:
+    if plot:
         fast = False
         
     if not fast:
@@ -272,7 +272,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
         ax.plot(evolution[0,:], evolution[1,:])
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Dispersion (m)')
-        
+    
     return Dx, Dpx, evolution
 
 
@@ -379,7 +379,7 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
     return DDx, DDpx, evolution
 
 
-def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
+def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False, evolution_disp=None):
     """
     Evolution of longitudinal dispersion, R56.
     """
@@ -389,7 +389,8 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res
         fast = False
        
     # get the dispersion evolution
-    _, _, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=high_res)
+    if evolution_disp is None:
+        _, _, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=high_res)
     ss = evolution_disp[0]
     Dxs = evolution_disp[1]
     R56s = np.empty_like(ss)
