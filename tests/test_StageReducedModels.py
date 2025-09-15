@@ -60,7 +60,7 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0, energy=3.0
 
     main = SourceBasic()
     main.bunch_length = 40.0e-06                                                  # [m], rms. Standard value
-    main.num_particles = 10000                                               
+    main.num_particles = 5000                                               
     main.charge = -SI.e * 1.0e10                                                  # [C]
 
     # Energy parameters
