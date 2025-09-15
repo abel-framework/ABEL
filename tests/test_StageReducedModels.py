@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ABEL : StageReducedModels tests
+ABEL : StageReducedModels unit tests
 =======================================
 
 This file is a part of ABEL.
