@@ -202,7 +202,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         
         # match the beta function
         from scipy.optimize import minimize
-        result_beta = minimize(minfun_beta, k_lens0, tol=1e-20, options={'maxiter': 200})
+        result_beta = minimize(minfun_beta, k_lens0, tol=1e-16, options={'maxiter': 200})
         self._strength_plasma_lens = result_beta.x[0]*self.length_plasma_lens
 
     
@@ -219,24 +219,24 @@ class InterstagePlasmaLens(Interstage, ABC):
         from abel.utilities.beam_physics import evolve_dispersion, evolve_R56
         def minfun_dispersion_R56(params):
             ls, inv_rhos, ks, _, _ = self.matrix_lattice(tau_lens=0, B_chic1=params[0], B_chic2=params[1], m_sext=0, half_lattice=True)
-            _, Dpx_mid, _ = evolve_dispersion(ls, inv_rhos, ks, fast=True) 
-            R56_mid, _ = evolve_R56(ls, inv_rhos, ks, high_res=high_res) 
+            _, Dpx_mid, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, fast=True) 
+            R56_mid, _ = evolve_R56(ls, inv_rhos, ks, high_res=high_res, fast=True, evolution_disp=evolution_disp)
             return (Dpx_mid/Dpx_scale)**2 + ((R56_mid - nom_R56/2)/R56_scale)**2
 
         # initial guess for the chicane dipole fields
-        B_chic1_guess = self.field_dipole/2
-        B_chic2_guess = -self.field_dipole/2
+        B_chic1_guess = self.field_dipole/4
+        B_chic2_guess = -self.field_dipole/4
         
         # match the beta function
         from scipy.optimize import minimize
-        result_dispersion_R56 = minimize(minfun_dispersion_R56, [B_chic1_guess, B_chic2_guess], tol=1e-16, options={'maxiter': 50})
+        result_dispersion_R56 = minimize(minfun_dispersion_R56, [B_chic1_guess, B_chic2_guess], tol=1e-8, options={'maxiter': 50})
         self._field_ratio_chicane_dipole1 = result_dispersion_R56.x[0]/self.field_dipole
         self._field_ratio_chicane_dipole2 = result_dispersion_R56.x[1]/self.field_dipole
     
     
     def match_chromatic_amplitude(self):
         "Matching the chroaticity of function by adjusting the plasma-lens nonlinearity."
-
+        
         # stop if nonlinearity is turned off
         if not self.cancel_chromaticity:
             self._nonlinearity_plasma_lens = 0.0
