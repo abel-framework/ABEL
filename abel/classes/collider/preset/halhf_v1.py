@@ -101,6 +101,7 @@ class HALHFv1(Collider):
         elinac.interstage = interstage
         elinac.bds = ebds
         elinac.num_stages = 16
+        elinac.alternate_interstage_polarity = True
 
         # define positron source
         psource = SourceBasic()

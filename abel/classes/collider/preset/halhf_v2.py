@@ -64,7 +64,7 @@ class HALHFv2(Collider):
         self.positron_linac_num_structures_per_klystron_warm = 1.0
         self.positron_linac_num_rf_cells_warm = 75
 
-        self.num_particles = 10000
+        self.num_particles = 3000
         self.electron_ip_bunch_length = 150e-6#230e-6
         self.positron_ip_bunch_length = 150e-6#100e-6
         self.enable_waist_shift = True
@@ -272,6 +272,7 @@ class HALHFv2(Collider):
         elinac.interstage = interstage
         elinac.bds = ebds
         elinac.num_stages = self.pwfa_num_stages
+        elinac.alternate_interstage_polarity = True
         
         
         # define interaction point
