@@ -196,7 +196,9 @@ def test_get_cost_breakdown():
     stage.length = 1.0
     stage.driver_source = driver_source
     interstage = InterstagePlasmaLensBasic()
-    interstage.length = 2.1
+    interstage.length_dipole = 0.35
+    interstage.field_dipole = 1
+    interstage.nom_energy = source.energy
     linac.source = source
     linac.trackables = []
     linac.trackables.append(source)
@@ -251,7 +253,9 @@ def test_get_length():
     stage.length = 1.0
     stage.driver_source = driver_source
     interstage = InterstagePlasmaLensBasic()
-    interstage.length = 2.1
+    interstage.length_dipole = 0.35
+    interstage.field_dipole = 1
+    interstage.nom_energy = source.energy
     linac.source = source
 
     linac.trackables = []
@@ -281,7 +285,9 @@ def test_get_cost_breakdown_civil_construction():
     stage.length = 1.0
     stage.driver_source = driver_source
     interstage = InterstagePlasmaLensBasic()
-    interstage.length = 2.1
+    interstage.length_dipole = 0.35
+    interstage.field_dipole = 1
+    interstage.nom_energy = source.energy
     linac.source = source
     linac.trackables = []
     linac.trackables.append(source)
@@ -316,7 +322,10 @@ def test_surveys():
     stage.length = 1.0
     stage.driver_source = driver_source
     interstage = InterstagePlasmaLensBasic()
-    interstage.length = 2.0
+    interstage.length_dipole = 0.35
+    interstage.field_dipole = 1
+    interstage.beta0 = 0.01
+    interstage.nom_energy = source.energy
     linac.source = source
     linac.trackables = []
     
