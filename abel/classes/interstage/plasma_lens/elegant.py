@@ -35,7 +35,7 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
         filename_runscript, filename_inputbeam = self.make_run_script(filename_lattice, tmpfolder)
 
         # run ELEGANT
-        from abel.apis.elegant.elegant_api import elegant_run
+        from abel.wrappers.elegant.elegant_wrapper import elegant_run
         beam, self.evolution = elegant_run(filename_runscript, beam0, filename_inputbeam, filename_outputbeam, verbose=verbose, runnable=runnable, tmpfolder=tmpfolder)
         #self.beam0_charge_sign = beam0.charge_sign()  # patch due to ELEGANT not setting correct charge sign
 
@@ -53,8 +53,8 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
         filename_inputbeam = os.path.join(tmpfolder, 'input_beam.bun')
 
         # run file template (to be filled)
-        from abel.apis.elegant.elegant_api import __file__ as elegant_api_file
-        filename_runfile_template = os.path.join(os.path.dirname(elegant_api_file), 'templates', 'runscript_interstage.ele')
+        from abel.wrappers.elegant.elegant_wrapper import __file__ as elegant_wrapper_file
+        filename_runfile_template = os.path.join(os.path.dirname(elegant_wrapper_file), 'templates', 'runscript_interstage.ele')
 
         # template inputs
         inputs = {'nom_energy_MeV': self.nom_energy/1e6,
@@ -78,11 +78,13 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
         filename_outputbeam = os.path.join(tmpfolder, 'output_beam.bun')
         
         # make lens field
-        filename_lens = elegant_apl_fieldmap2D(self.nonlinearity_plasma_lens, dx=self.lens_offset_x, dy=self.lens_offset_y, tmpfolder=tmpfolder)
+        filename_lens = elegant_apl_fieldmap2D(self.nonlinearity_plasma_lens, lens_x_offset=self.lens1_offset_x, lens_y_offset=self.lens1_offset_y, tmpfolder=tmpfolder) 
+        # TODO: implement two separate lenses with different offsets (the above is only number 1)
+        # TODO: add lens offset jitter
         
         # make lattice file from template
-        from abel.apis.elegant.elegant_api import __file__ as elegant_api_file
-        filename_lattice_template = os.path.join(os.path.dirname(elegant_api_file), 'templates', 'lattice_interstage.lte')
+        from abel.wrappers.elegant.elegant_wrapper import __file__ as elegant_wrapper_file
+        filename_lattice_template = os.path.join(os.path.dirname(elegant_wrapper_file), 'templates', 'lattice_interstage.lte')
 
         # calculate angles
         from abel.utilities.relativity import energy2momentum

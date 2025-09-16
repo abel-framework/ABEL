@@ -207,7 +207,7 @@ def test_elegant_apl_fieldmap2D():
 
     sdds_file_name = elegant_apl_fieldmap2D(tau_lens=tau_lens,
                                             lensdim_x=lensdim_x, lensdim_y=lensdim_y, 
-                                            dx=lens_x_offset, dy=lens_y_offset, 
+                                            lens_x_offset=lens_x_offset, lens_y_offset=lens_y_offset, 
                                             tmpfolder=tmpfolder)
     print(sdds_file_name)
     # Convert the output SDDS file to a CSV file for later comparison
@@ -221,8 +221,8 @@ def test_elegant_apl_fieldmap2D():
     Bys_test = fieldmap[:,3]
 
     # Create a fieldmap for comparison
-    xs = np.linspace(-lensdim_x, lensdim_x, 2001)
-    ys = np.linspace(-lensdim_y, lensdim_y, 201)
+    xs = np.linspace(-lensdim_x, lensdim_x, 501)
+    ys = np.linspace(-lensdim_y, lensdim_y, 501)
 
     X, Y = np.meshgrid(xs, ys, indexing="xy")  # Shape: (len(ys), len(xs))
     Xo = X + lens_x_offset

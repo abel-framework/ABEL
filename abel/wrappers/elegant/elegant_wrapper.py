@@ -311,7 +311,7 @@ def extract_beams_and_evolution(tmpfolder, evolution_folder, runnable, save_beam
     return evol
     
 
-def elegant_apl_fieldmap2D(tau_lens, lensdim_x=2e-3, lensdim_y=2e-3, dx=0.0, dy=0.0, tmpfolder=None):
+def elegant_apl_fieldmap2D(tau_lens, lensdim_x=2e-3, lensdim_y=2e-3, lens_x_offset=0.0, lens_y_offset=0.0, tmpfolder=None):
     """
     Generates a 2D magnetic field map for an APL (Active Plasma Lens) and export 
     it in ELEGANT-compatible SDDS format.
@@ -333,10 +333,10 @@ def elegant_apl_fieldmap2D(tau_lens, lensdim_x=2e-3, lensdim_y=2e-3, dx=0.0, dy=
     lensdim_y : [m] float, default=1e-3
         Half-width of the transverse field map in the y-direction.
         
-    dx : [m] float, default=0.0
+    lens_x_offset : [m] float, default=0.0
         Lens transverse offset in x.
 
-    dy : [m] float, default=0.0
+    lens_y_offset : [m] float, default=0.0
         Lens transverse offset in y.
 
     tmpfolder : str, optional
@@ -352,15 +352,17 @@ def elegant_apl_fieldmap2D(tau_lens, lensdim_x=2e-3, lensdim_y=2e-3, dx=0.0, dy=
     # transverse dimensions
     xs = np.linspace(-lensdim_x, lensdim_x, 501)
     ys = np.linspace(-lensdim_y, lensdim_y, 501)
-    
-    # create map
-    Bmap = np.zeros((len(xs)*len(ys), 4));
-    for i, x in enumerate(xs):
-        for j, y in enumerate(ys):
-            Bx = (y+dy) + tau_lens*(x+dx)*(y+dy)
-            By = -((x+dx) + tau_lens*(((x+dx)**2 + (y+dy)**2)/2))
-            Bmap[i + j*len(xs),:] = [x, y, Bx, By]
 
+    X, Y = np.meshgrid(xs, ys, indexing="xy")  # Shape: (len(ys), len(xs))
+    Xo = X + lens_x_offset
+    Yo = Y + lens_y_offset
+
+    Bx = Yo + Xo * Yo * tau_lens
+    By = -(Xo + ((Xo**2 + Yo**2) / 2) * tau_lens)
+
+    # create map
+    Bmap = np.column_stack((X.ravel(), Y.ravel(), Bx.ravel(), By.ravel()))
+    
     # make temporary CSV file
     make_new_tmpfolder = tmpfolder is None
     if make_new_tmpfolder:
