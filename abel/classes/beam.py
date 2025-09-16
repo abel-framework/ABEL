@@ -19,7 +19,7 @@ from abel.physics_models.betatron_motion import evolve_betatron_motion
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, allow_low_energy_particles=True):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, allow_low_energy_particles=True, particle_mass=SI.m_e):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -42,6 +42,8 @@ class Beam():
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
         self.location = 0
+
+        self.particle_mass = particle_mass
 
         self.allow_low_energy_particles = allow_low_energy_particles  # Flag for allowing particles to have low energies.
     

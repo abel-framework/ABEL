@@ -9,7 +9,7 @@ from abel.classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from abel.classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
 from abel.classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
 from abel.classes.stage.impl.stage_basic import StageBasic
-from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.interstage.plasma_lens.basic import InterstagePlasmaLensBasic
 from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
@@ -64,7 +64,7 @@ class HALHFv2(Collider):
         self.positron_linac_num_structures_per_klystron_warm = 1.0
         self.positron_linac_num_rf_cells_warm = 75
 
-        self.num_particles = 10000
+        self.num_particles = 3000
         self.electron_ip_bunch_length = 150e-6#230e-6
         self.positron_ip_bunch_length = 150e-6#100e-6
         self.enable_waist_shift = True
@@ -172,10 +172,10 @@ class HALHFv2(Collider):
         esource.bunch_separation = colliding_bunch_separation
         
         # define interstage
-        interstage = InterstageBasic()
+        interstage = InterstagePlasmaLensBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 0.8 * np.sqrt(E/10e9) # [m(eV)]
-        interstage.dipole_field = 0.5 # [T]
+        interstage.length_dipole = lambda E: 0.8 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.field_dipole = 0.5 # [T]
         
         # define electron BDS
         ebds = BeamDeliverySystemBasic()
@@ -272,6 +272,7 @@ class HALHFv2(Collider):
         elinac.interstage = interstage
         elinac.bds = ebds
         elinac.num_stages = self.pwfa_num_stages
+        elinac.alternate_interstage_polarity = True
         
         
         # define interaction point

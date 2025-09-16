@@ -202,17 +202,16 @@ def test_elegant_apl_fieldmap2D():
         os.makedirs(parent_dir)
     tmpfolder = os.path.join(parent_dir, str(uuid.uuid4())) + os.sep
     os.mkdir(tmpfolder)
-
-    lensfile = tmpfolder + 'map.csv'
+    
     tmpfile =  tmpfolder + os.sep + 'stream_' + str(uuid.uuid4()) + '.tmp'
 
-    sdds_file_name = elegant_apl_fieldmap2D(tau_lens=tau_lens, filename=lensfile, 
+    sdds_file_name = elegant_apl_fieldmap2D(tau_lens=tau_lens,
                                             lensdim_x=lensdim_x, lensdim_y=lensdim_y, 
                                             lens_x_offset=lens_x_offset, lens_y_offset=lens_y_offset, 
                                             tmpfolder=tmpfolder)
-
+    print(sdds_file_name)
     # Convert the output SDDS file to a CSV file for later comparison
-    subprocess.run(CONFIG.elegant_exec + 'sdds2stream ' + lensfile + ' -columns=x,y,Bx,By > ' + tmpfile, shell=True)
+    subprocess.run(CONFIG.elegant_exec + 'sdds2stream ' + sdds_file_name + ' -columns=x,y,Bx,By > ' + tmpfile, shell=True)
 
     # Load feildmap from CSV file
     fieldmap = np.loadtxt(open(tmpfile, "rb"), delimiter=' ')
@@ -222,8 +221,8 @@ def test_elegant_apl_fieldmap2D():
     Bys_test = fieldmap[:,3]
 
     # Create a fieldmap for comparison
-    xs = np.linspace(-lensdim_x, lensdim_x, 2001)
-    ys = np.linspace(-lensdim_y, lensdim_y, 201)
+    xs = np.linspace(-lensdim_x, lensdim_x, 501)
+    ys = np.linspace(-lensdim_y, lensdim_y, 501)
 
     X, Y = np.meshgrid(xs, ys, indexing="xy")  # Shape: (len(ys), len(xs))
     Xo = X + lens_x_offset

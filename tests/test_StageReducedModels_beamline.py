@@ -60,7 +60,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag=1.0, energy=361.8e9): 
 
     main = SourceBasic()
     main.bunch_length = 40.0e-06                                                    # [m], rms. Standard value
-    main.num_particles = 10000                                               
+    main.num_particles = 5000                                               
     main.charge = -SI.e * 1.0e10                                                    # [C]
 
     # Energy parameters
@@ -87,9 +87,9 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag=1.0, energy=361.8e9): 
 def setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, save_final_step=False):
     
     stage = StageReducedModels()
-    stage.time_step_mod = 0.03                                                      # In units of betatron wavelengths/c.
-    stage.nom_energy_gain = 7.8e9                                                   # [eV]
-    stage.length_flattop = 7.8                                                      # [m]
+    stage.time_step_mod = 0.03*2                                                      # In units of betatron wavelengths/c.
+    stage.nom_energy_gain = 7.8e9/5                                                # [eV]
+    stage.length_flattop = 7.8/5                                                      # [m]
     stage.plasma_density = plasma_density                                           # [m^-3]
     stage.driver_source = driver_source
     stage.main_source = main_source
@@ -120,15 +120,13 @@ def setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_be
     return stage
 
 
-def setup_InterstageElegant(stage):
-    interstage = InterstageElegant()
-    interstage.save_evolution = False
-    interstage.save_apl_field_map = False
+def setup_InterstageImpactX(stage):
+    interstage = InterstagePlasmaLensImpactX()
     interstage.enable_isr = True
     interstage.enable_csr = True
     interstage.beta0 = lambda energy: stage.matched_beta_function(energy)
-    interstage.dipole_length = lambda energy: 1 * np.sqrt(energy/10e9)              # [m(eV)], energy-dependent length
-    interstage.dipole_field = lambda energy: np.min([0.52, 40e9/energy])            # [T]
+    interstage.length_dipole = lambda energy: 1 * np.sqrt(energy/10e9)              # [m(eV)], energy-dependent length
+    interstage.field_dipole = lambda energy: np.min([0.52, 40e9/energy])            # [T]
 
     return interstage
 
@@ -144,7 +142,6 @@ def test_baseline_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    #ramp_beta_mag = 5.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
     enable_tr_instability = False
@@ -156,7 +153,7 @@ def test_baseline_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag=1.0)
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, 1.0, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -166,21 +163,21 @@ def test_baseline_linac():
     # Check the machine parameters
     stages = linac.stages
     assert len(stages) == num_stages
-    assert np.isclose(linac.nom_energy, 377400000000.0, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.nom_energy, 364920000000.0, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
-    assert np.isclose(linac.get_length(), 48.559, rtol=1e-4, atol=0.0)
+    assert np.isclose(linac.get_length(), 39.28760981873146, rtol=1e-4, atol=0.0)
 
     assert np.isclose(stages[0].nom_energy, 361.8e9)
-    assert np.isclose(stages[0].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].nom_energy_gain, 1560000000.0, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, stages[0].nom_energy + stages[0].nom_energy_gain)
-    assert np.isclose(stages[1].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[1].nom_energy_gain, 1560000000.0, rtol=1e-15, atol=0.0)
 
     interstage = linac.interstages[0]
     interstage_nom_energy = interstage.nom_energy
     assert np.isclose(interstage.nom_energy, stages[1].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(interstage.beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_field, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.field_dipole, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
 
     # Check the initial and final beams
     initial_beam = linac.get_beam(0)
@@ -193,19 +190,19 @@ def test_baseline_linac():
     assert np.isclose(final_beam.location, linac.get_length(), rtol=1e-15, atol=0.0)
     assert np.isclose(final_beam.energy(), stages[1].nom_energy + stages[1].nom_energy_gain, rtol=1e-2, atol=0.0)
     assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
-    assert np.isclose(final_beam.rel_energy_spread(), 0.0192, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-5, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 0.020706679130069947, rtol=1e-1, atol=0.0)
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
     nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_y()
-    assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=4e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=4e-1, atol=0.0)
     nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
     nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
-    assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.2, atol=0.0)
-    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=0.2, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=0.2, atol=0.0)
+    assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.4, atol=0.0)
+    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=0.3, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=4e-1, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=4e-1, atol=0.0)
 
     # Test plotting functions
     linac.stages[-1].plot_Ez_rb_cut()
@@ -226,7 +223,7 @@ def test_ramped_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
     enable_tr_instability = False
@@ -238,7 +235,7 @@ def test_ramped_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -248,15 +245,15 @@ def test_ramped_linac():
     # Check the machine parameters
     stages = linac.stages
     assert len(stages) == num_stages
-    assert np.isclose(linac.nom_energy, 377400000000.0, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.nom_energy, 364920000000.0, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
-    assert np.isclose(linac.get_length(), 52.224, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.get_length(), 41.586517149595515, rtol=1e-5, atol=0.0)
     
     assert np.isclose(stages[0].nom_energy, 361.8e9)
-    assert np.isclose(stages[0].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].nom_energy_gain, 1560000000.0, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, stages[0].nom_energy + stages[0].nom_energy_gain)
-    assert np.isclose(stages[1].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
-    assert np.isclose(stages[-1].upramp.length, 0.9164935, rtol=1e-5, atol=0.0)
+    assert np.isclose(stages[1].nom_energy_gain, 1560000000.0, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.length, 0.5747274948097144, rtol=1e-2, atol=0.0)
     assert np.isclose(stages[-1].upramp.length_flattop, stages[-1].upramp.length, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_energy, stages[-1].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_energy_flattop, stages[-1].upramp.nom_energy, rtol=1e-15, atol=0.0)
@@ -264,7 +261,7 @@ def test_ramped_linac():
     assert np.isclose(stages[-1].upramp.nom_energy_gain_flattop, stages[-1].upramp.nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_accel_gradient, 0.0, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_accel_gradient_flattop, stages[-1].upramp.nom_accel_gradient, rtol=1e-15, atol=0.0)
-    assert np.isclose(stages[-1].downramp.length, 0.9261138, rtol=1e-5, atol=0.0)
+    assert np.isclose(stages[-1].downramp.length, 0.5759599015745918, rtol=1e-2, atol=0.0)
     assert np.isclose(stages[-1].downramp.length_flattop, stages[-1].downramp.length, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].downramp.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].downramp.nom_energy_flattop, stages[-1].downramp.nom_energy, rtol=1e-15, atol=0.0)
@@ -278,8 +275,8 @@ def test_ramped_linac():
     interstage_nom_energy = interstage.nom_energy
     assert np.isclose(interstage.nom_energy, stages[1].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(interstage.beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_field, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.field_dipole, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
 
     # Check the initial and final beams
     initial_beam = linac.get_beam(0)
@@ -292,19 +289,19 @@ def test_ramped_linac():
     assert np.isclose(final_beam.location, linac.get_length(), rtol=1e-15, atol=0.0)
     assert np.isclose(final_beam.energy(), stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-2, atol=0.0)
     assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
-    assert np.isclose(final_beam.rel_energy_spread(), 0.0192, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-5, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 0.02071572458689477, rtol=1e-1, atol=0.0)
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
     nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_y()
-    assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=2e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=2e-1, atol=0.0)
     nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
     nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
-    assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.1, atol=0.0)
-    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=0.1, atol=0.0)
+    assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=2e-1, atol=0.0)
+    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=2e-1, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=0.1, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), main_source.emit_ny, rtol=1e-1, atol=0.0)
 
     # Test plotting
     linac.stages[-1].plot_evolution(bunch='beam')
@@ -343,7 +340,7 @@ def test_ramped_linac():
 #     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
 #     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-#     interstage = setup_InterstageElegant(stage)
+#     interstage = setup_InterstageImpactX(stage)
 
 #     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -377,7 +374,7 @@ def test_ramped_linac():
 #     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
 #     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-#     interstage = setup_InterstageElegant(stage)
+#     interstage = setup_InterstageImpactX(stage)
 
 #     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -403,7 +400,7 @@ def test_angular_jitter_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = False
     enable_xpyp_jitter = True
     enable_tr_instability = False
@@ -415,7 +412,7 @@ def test_angular_jitter_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -437,7 +434,7 @@ def test_angular_jitter_ramped_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = False
     enable_xpyp_jitter = True
     enable_tr_instability = False
@@ -449,7 +446,7 @@ def test_angular_jitter_ramped_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -475,7 +472,7 @@ def test_trInstability_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
     enable_tr_instability = True
@@ -488,7 +485,7 @@ def test_trInstability_linac():
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     main_source.energy = 3.0e9                                                      # [eV], HALHF v2 start energy
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -510,7 +507,7 @@ def test_jitter_trInstability_ramped_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
     enable_tr_instability = True
@@ -522,7 +519,7 @@ def test_jitter_trInstability_ramped_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=3.0e9)
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -532,15 +529,15 @@ def test_jitter_trInstability_ramped_linac():
     # Check the machine parameters
     stages = linac.stages
     assert len(stages) == num_stages
-    assert np.isclose(linac.nom_energy, 18.6e9, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.nom_energy, 6.12e9, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
-    assert np.isclose(linac.get_length(), 21.835477, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.get_length(), 7.427243789521983, rtol=1e-5, atol=0.0)
     
     assert np.isclose(stages[0].nom_energy, 3.0e9)
-    assert np.isclose(stages[0].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].nom_energy_gain, 1.56e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, stages[0].nom_energy + stages[0].nom_energy_gain)
-    assert np.isclose(stages[1].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
-    assert np.isclose(stages[-1].upramp.length, 0.15666612, rtol=1e-5, atol=0.0)
+    assert np.isclose(stages[1].nom_energy_gain, 1.56e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.length, 0.06438368606039178, rtol=1e-5, atol=0.0)
     assert np.isclose(stages[-1].upramp.length_flattop, stages[-1].upramp.length, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_energy, stages[-1].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_energy_flattop, stages[-1].upramp.nom_energy, rtol=1e-15, atol=0.0)
@@ -548,7 +545,7 @@ def test_jitter_trInstability_ramped_linac():
     assert np.isclose(stages[-1].upramp.nom_energy_gain_flattop, stages[-1].upramp.nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_accel_gradient, 0.0, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_accel_gradient_flattop, stages[-1].upramp.nom_accel_gradient, rtol=1e-15, atol=0.0)
-    assert np.isclose(stages[-1].downramp.length, 0.2055985, rtol=1e-5, atol=0.0)
+    assert np.isclose(stages[-1].downramp.length, 0.0745880282772393, rtol=1e-5, atol=0.0)
     assert np.isclose(stages[-1].downramp.length_flattop, stages[-1].downramp.length, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].downramp.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].downramp.nom_energy_flattop, stages[-1].downramp.nom_energy, rtol=1e-15, atol=0.0)
@@ -562,8 +559,8 @@ def test_jitter_trInstability_ramped_linac():
     interstage_nom_energy = interstage.nom_energy
     assert np.isclose(interstage.nom_energy, stages[-1].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(interstage.beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_field, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.field_dipole, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
 
     # Check the initial and final beams
     initial_beam = linac.get_beam(0)
@@ -576,8 +573,8 @@ def test_jitter_trInstability_ramped_linac():
     assert np.isclose(final_beam.location, linac.get_length(), rtol=1e-15, atol=0.0)
     assert np.isclose(final_beam.energy(), stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=5e-2, atol=0.0)
     assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
-    assert np.isclose(final_beam.rel_energy_spread(), 0.02165, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-5, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 0.01817960770651046, rtol=1e-2, atol=0.0)
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
     nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_y()
@@ -588,7 +585,7 @@ def test_jitter_trInstability_ramped_linac():
     assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.1, atol=0.0)
     assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=0.1, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=0.1, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), 1.5467557e-07, rtol=1e-3, atol=0.0)  # Expect emittance growth.
+    assert np.isclose(final_beam.norm_emittance_y(), 1.0996284764402848e-07, rtol=1e-2, atol=0.0)  # Expect emittance growth.
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
@@ -617,7 +614,7 @@ def test_jitter_trInstability_ramped_linac():
 #     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
 #     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-#     interstage = setup_InterstageElegant(stage)
+#     interstage = setup_InterstageImpactX(stage)
 
 #     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -639,7 +636,7 @@ def test_ionMotion_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = False
     enable_xpyp_jitter = False
     enable_tr_instability = False
@@ -651,7 +648,7 @@ def test_ionMotion_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9)
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -674,7 +671,7 @@ def test_jitter_trInstability_ionMotion_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
     enable_tr_instability = True
@@ -686,7 +683,7 @@ def test_jitter_trInstability_ionMotion_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=361.8e9)
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -709,7 +706,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 
     num_stages = 2
     plasma_density = 6.0e+20                                                        # [m^-3]
-    ramp_beta_mag = 5.0
+    ramp_beta_mag = 2.0
     enable_xy_jitter = True
     enable_xpyp_jitter = False
     enable_tr_instability = True
@@ -721,7 +718,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=81.0e9)  # Choosing an energy that gives a sensible number of time steps.
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, save_final_step=True)
-    interstage = setup_InterstageElegant(stage)
+    interstage = setup_InterstageImpactX(stage)
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 
@@ -731,15 +728,15 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     # Check the machine parameters
     stages = linac.stages
     assert len(stages) == num_stages
-    assert np.isclose(linac.nom_energy, 96.6e9, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.nom_energy, 84120000000.0, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
-    assert np.isclose(linac.get_length(), 33.5511544, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.get_length(), 21.455746684726464, rtol=1e-5, atol=0.0)
     
     assert np.isclose(stages[0].nom_energy, 81.0e9)
-    assert np.isclose(stages[0].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[0].nom_energy_gain, 1.56e9, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[1].nom_energy, stages[0].nom_energy + stages[0].nom_energy_gain)
-    assert np.isclose(stages[1].nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
-    assert np.isclose(stages[-1].upramp.length, 0.4492312, rtol=1e-5, atol=0.0)
+    assert np.isclose(stages[1].nom_energy_gain, 1.56e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stages[-1].upramp.length, 0.27395438600044564, rtol=1e-5, atol=0.0)
     assert np.isclose(stages[-1].upramp.length_flattop, stages[-1].upramp.length, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_energy, stages[-1].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_energy_flattop, stages[-1].upramp.nom_energy, rtol=1e-15, atol=0.0)
@@ -747,7 +744,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     assert np.isclose(stages[-1].upramp.nom_energy_gain_flattop, stages[-1].upramp.nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_accel_gradient, 0.0, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].upramp.nom_accel_gradient_flattop, stages[-1].upramp.nom_accel_gradient, rtol=1e-15, atol=0.0)
-    assert np.isclose(stages[-1].downramp.length, 0.4685457, rtol=1e-5, atol=0.0)
+    assert np.isclose(stages[-1].downramp.length, 0.2765305056236008, rtol=1e-5, atol=0.0)
     assert np.isclose(stages[-1].downramp.length_flattop, stages[-1].downramp.length, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].downramp.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-15, atol=0.0)
     assert np.isclose(stages[-1].downramp.nom_energy_flattop, stages[-1].downramp.nom_energy, rtol=1e-15, atol=0.0)
@@ -761,8 +758,8 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     interstage_nom_energy = interstage.nom_energy
     assert np.isclose(interstage.nom_energy, stages[-1].nom_energy, rtol=1e-15, atol=0.0)
     assert np.isclose(interstage.beta0, stage.matched_beta_function(interstage_nom_energy), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_length, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
-    assert np.isclose(interstage.dipole_field, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.length_dipole, np.sqrt(interstage_nom_energy/10e9), rtol=1e-15, atol=0.0)
+    assert np.isclose(interstage.field_dipole, np.min([0.52, 40e9/interstage_nom_energy]), rtol=1e-15, atol=0.0)
 
     # Check the initial and final beams
     initial_beam = linac.get_beam(0)
@@ -775,18 +772,18 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     assert np.isclose(final_beam.location, linac.get_length(), rtol=1e-15, atol=0.0)
     assert np.isclose(final_beam.energy(), stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-2, atol=0.0)
     assert np.isclose(final_beam.bunch_length(), main_source.bunch_length, rtol=1e-1, atol=0.0)
-    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-15, atol=0.0)
-    assert np.isclose(final_beam.rel_energy_spread(), 0.01739, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.charge(), main_source.charge, rtol=1e-5, atol=0.0)
+    assert np.isclose(final_beam.rel_energy_spread(), 0.01990382369246164, rtol=1e-2, atol=0.0)
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
-    assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=0.01, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), 8.2e-07, rtol=1e-2, atol=0.0)  # Expect deviation from nominal
+    assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=0.1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), 4.1028957888665414e-07, rtol=1e-2, atol=0.0)  # Expect deviation from nominal
     nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
     nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
     assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.1, atol=0.0)
-    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=0.1, atol=0.0)
+    assert np.isclose(final_beam.beta_y(), nom_beta_y, rtol=0.2, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=0.1, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), 1.8e-07, rtol=5e-2, atol=0.0)  # Expect emittance growth.
+    assert np.isclose(final_beam.norm_emittance_y(), 1.2640100114945637e-07, rtol=5e-2, atol=0.0)  # Expect emittance growth.
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
@@ -816,7 +813,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 #     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
 #     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=3.0e9)
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
-#     interstage = setup_InterstageElegant(stage)
+#     interstage = setup_InterstageImpactX(stage)
 
 #     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
 

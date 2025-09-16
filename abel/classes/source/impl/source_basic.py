@@ -43,7 +43,8 @@ class SourceBasic(Source):
             if self.energy_spread is None:
                 self.energy_spread = self.energy * self.rel_energy_spread
             elif abs(self.energy_spread - self.energy * self.rel_energy_spread) > 0:
-                raise Exception("Both absolute and relative energy spread defined.")
+                self.energy_spread = self.energy * self.rel_energy_spread
+                #raise Exception("Both absolute and relative energy spread defined")
 
         if self.symmetrize_6d is False:
             

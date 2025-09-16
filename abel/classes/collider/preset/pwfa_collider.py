@@ -8,7 +8,7 @@ from abel.classes.beamline.impl.driver_complex import DriverComplex
 from abel.classes.combiner_ring.impl.combiner_ring_basic import CombinerRingBasic
 from abel.classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from abel.classes.stage.impl.stage_basic import StageBasic
-from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.interstage.plasma_lens.basic import InterstagePlasmaLensBasic
 from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.ip.impl.ip_basic import InteractionPointBasic
@@ -119,10 +119,10 @@ class PWFACollider(Collider):
         esource.beta_y = esource.beta_x
         
         # define interstage
-        interstage = InterstageBasic()
+        interstage = InterstagePlasmaLensBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 1.2 * np.sqrt(E/10e9) # [m(eV)]
-        interstage.dipole_field = 0.5 # [T]
+        interstage.length_dipole = lambda E: 1.2 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.field_dipole = 0.5 # [T]
         
         # define electron BDS
         ebds = BeamDeliverySystemBasic()

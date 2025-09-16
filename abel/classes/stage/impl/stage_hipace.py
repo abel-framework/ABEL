@@ -17,8 +17,8 @@ except:
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=True, do_spin_tracking=False, run_path=None):
-        
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing=False, mesh_refinement=True, do_spin_tracking=False, run_path=None):
+
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # simulation specifics
@@ -32,7 +32,8 @@ class StageHipace(Stage):
         self.no_plasma = no_plasma
 
         # external focusing (APL-like) [T/m]
-        self.external_focusing_radial = external_focusing_radial
+        self.external_focusing = external_focusing
+        self._external_focusing_gradient = None
 
         # plasma profile
         self.plasma_profile = SimpleNamespace()
@@ -75,6 +76,13 @@ class StageHipace(Stage):
         # and flattop nominal energy if not already done
         self._prepare_ramps()
         self._make_ramp_profile(tmpfolder)
+        
+        # set external focusing
+        if self.external_focusing == False:
+            self.external_focusing_gradient = 0
+        if self.external_focusing == True and self._external_focusing_gradient is None:
+            num_half_oscillations = 1
+            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2
         
         beam0 = beam_incoming
         driver0 = driver_incoming
@@ -120,7 +128,10 @@ class StageHipace(Stage):
         
         # calculate number of cells in x to get similar resolution
         dr = box_size_xy/self.num_cell_xy
-        num_cell_z = round((box_max_z-box_min_z)/dr)
+        if self.mesh_refinement:
+            num_cell_z = 2*round((box_max_z-box_min_z)/dr)
+        else:
+            num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # calculate the time step
         beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
@@ -148,7 +159,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
         
         ## RUN SIMULATION
@@ -185,6 +196,9 @@ class StageHipace(Stage):
             driver_outgoing.location = beam_outgoing.location
             driver_outgoing.trackable_number = 1
             self.save_driver_to_file(driver_outgoing, runnable)
+
+        # reset location 
+        beam_outgoing.location = beam_incoming.location
         
         # clean nan particles and extreme outliers
         beam_outgoing.remove_nans()
