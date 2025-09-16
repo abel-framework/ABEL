@@ -435,8 +435,10 @@ def update_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_s
 
 ###################################################
 def push_driver(wake_t_driver, wake_t_fields, time_step, pusher='boris'):
-    "Evolves a Wake-T drive beam ``wake_t_driver``for one time step "
-    "``time_step``."
+    """
+    Evolves a Wake-T drive beam ``wake_t_driver`` for one time step defined by
+    ``time_step``.
+    """
     wake_t_driver.evolve([wake_t_fields], t=wake_t_driver.prop_distance/SI.c, dt=time_step, pusher=pusher)
 
     #return wake_t_driver
@@ -560,7 +562,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     ############# Beam propagation through the plasma cell #############
     time_step_count = 0
     prop_length = 0.0
-    filtered_beam = Beam()
+    filtered_beam = Beam(allow_low_energy_particles=False)  # Cannot allow low energy particles.
 
     # Progress bar
     if show_prog_bar is True:
