@@ -2542,15 +2542,6 @@ class StageReducedModels(Stage):
         with open(self.run_path + 'output.txt', 'w') as f:
             print('============================================================================', file=f)
             print(f"Time step [betatron wavelength/c]:\t\t {self.time_step_mod :.3f}", file=f)
-            
-            if self.main_source is None:
-                print(f"Symmetrised main beam:\t\t\t\t Not registered", file=f)
-            elif self.main_source.symmetrize:
-                print(f"Symmetrised main beam:\t\t\t\t x, y, xp, yp symmetrised", file=f)
-            elif self.main_source.symmetrize_6d:
-                print(f"Symmetrised main beam:\t\t\t\t 6D symmetrised", file=f)
-            else:
-                print(f"Symmetrised main beam:\t\t\t\t Not symmetrised.", file=f)
 
             if self.driver_source.symmetrize:
                 print(f"Symmetrised drive beam:\t\t\t\t x, y, xp, yp symmetrised\n", file=f)
