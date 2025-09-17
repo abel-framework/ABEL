@@ -498,11 +498,11 @@ class Runnable(ABC):
     # plot value of beam parameters across a scan
     def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear', legend=None, add_scans=None, clean=False):
         import inspect
-        if 'clean' in inspect.signature(beam_fcn).parameters:  # Check if the input list contains clean.
-            beam_fcn = lambda obj : beam_fcn(obj.get_beam(index=index), clean=clean)
+        if clean and ('clean' in inspect.signature(beam_fcn).parameters):  # Check if the input list contains 'clean'.
+            beam_fcn_prep = lambda obj : beam_fcn(obj.get_beam(index=index), clean=clean)
         else:
-            beam_fcn = lambda obj : beam_fcn(obj.get_beam(index=index))
-        self.plot_function(beam_fcn, label=label, scale=scale, xscale=xscale, yscale=yscale, legend=legend, add_scans=add_scans)    
+            beam_fcn_prep = lambda obj : beam_fcn(obj.get_beam(index=index))
+        self.plot_function(beam_fcn_prep, label=label, scale=scale, xscale=xscale, yscale=yscale, legend=legend, add_scans=add_scans)    
 
     def plot_energy(self, index=-1):
         self.plot_beam_function(Beam.energy, scale=1e9, label='Energy [GeV]', index=index)
