@@ -2329,8 +2329,43 @@ class Stage(Trackable, CostModeled):
 ###################################################
 class PlasmaRamp(Stage):
     """
-    Contains the implementation for ramps as a Stage class.
-    Only meant to store information.
+    Represents a plasma density ramp as a specialized Stage.
+
+    ``PlasmaRamp`` is a subclass of Stage intended to **store ramp information** 
+    for use in tracking with a parent Stage. It does not support direct tracking,
+    nor can it have upramp or downramp stages attached.  
+
+    The class currently supports uniform ramps; other ramp shapes such as 
+    'gaussian' or 'from_file' are not yet implemented.
+
+    Attributes
+    ----------
+    ramp_shape : str
+        The shape of the ramp. Currently, only ``'uniform'`` is supported.
+
+    length : [m] float
+        Length of the ramp .
+
+    ramp_beta_mag : float
+        Betatron magnification used to define ramp plasma densities. Overrides 
+        the parent stage's ``ramp_beta_mag`` if set.
+
+    nom_energy_gain : [eV] float
+        Nominal energy gain of the ramp.
+    
+    Notes
+    -----
+    - PlasmaRamp objects are designed to be used in conjunction with 
+      Stage.track_upramp() or Stage.track_downramp().
+    - Attempting to call track() directly will raise a ``StageError``.
+    - Cannot attach additional upramp or downramp stages.
+
+    Methods
+    -------
+    track()
+        Raises a ``StageError``. Use ``track_upramp()`` or ``track_downramp()`` in Stage instead.
+
+    print_summary()
     """
     
     # ==================================================
@@ -2382,6 +2417,7 @@ class PlasmaRamp(Stage):
         The betatron magnification used to define ramp plasma densities. 
         Overrides the ramp_beta_mag of the parent stage.
         """
+
         if self._ramp_beta_mag is not None:
             ramp_beta_mag = self._ramp_beta_mag
         elif self.parent.ramp_beta_mag is not None:
@@ -2400,6 +2436,10 @@ class PlasmaRamp(Stage):
 
     # ==================================================
     def print_summary(self):
+        """
+        Print a summary of the ramp.
+        """
+
         if self.is_upramp():
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
