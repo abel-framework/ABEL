@@ -44,6 +44,12 @@ class Stage(Trackable, CostModeled):
     downramp : ``Stage`` or None
         Optional ``Stage`` object representing the downramp.
 
+    nom_accel_gradient_flattop : [V/m] float
+        Accelerating gradient in the plasma stage only, excluding any ramps.
+
+    nom_energy_gain_flattop : [eV] float
+        Energy gain across the plasma stage only, excluding any ramps.
+
     length : [m] float
         Total length of the plasma stage and its ramps if any.
 
@@ -56,12 +62,6 @@ class Stage(Trackable, CostModeled):
 
     nom_energy_flattop : [eV] float
         Nominal energy at the start of the plasma stage, excluding any ramps.
-
-    nom_energy_gain_flattop : [eV] float
-        Energy gain across the plasma stage only, excluding any ramps.
-
-    nom_accel_gradient_flattop : [V/m] float
-        Accelerating gradient in the plasma stage only, excluding any ramps.
 
     efficiency : ``SimpleNamespace``
         Contains efficiency metrics:
