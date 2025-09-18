@@ -45,10 +45,11 @@ class IonMotionConfig():
             Mass of ions. Default set to helium mass.
         
         num_z_cells_main : int, optional
-            Number of grid cells along z. If set to ``None``, the value is 
+            Determines the binning of the z-coordinates used to probe main beam 
+            electric fields using ``RF-Track``. If set to ``None``, the value is 
             calculated from the drive beam and main beam properties. 
 
-        num_x(y)_cells_rft : int, optional
+        num_x_cells_rft, num_y_cells_rft : int, optional
             Number of grid cells along x and y used in RF-Track for calculating 
             beam electric fields. Default set to 50.
             
