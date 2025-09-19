@@ -164,8 +164,6 @@ class StageReducedModels(Stage):
 
     longitudinal_number_distribution(beam, bin_number=None, make_plot=False)
 
-    matched_beta_function(energy)
-
     trim_attr_reduce_pickle_size()
 
     plot_wakefield(saveToFile=None, includeWakeRadius=True)
@@ -338,7 +336,7 @@ class StageReducedModels(Stage):
     # Track the particles through. Note that when called as part of a Linac object, a copy of the original stage (where no changes has been made) is sent to track() every time. All changes done to self here are saved to a separate stage under the Linac object.
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
         """
-        Tracks the particles through the stage.
+        Track the particles through the stage.
         """
 
         # Set the diagnostics directory
@@ -489,16 +487,16 @@ class StageReducedModels(Stage):
     # ==================================================
     def main_tracking_procedure(self, beam0, driver0, shot_path=None, tmpfolder=None):
         """
-        Prepares and performs the main reduced model beam tracking.
-        - Performs single time step Wake-T simulation and extracts relevant 
+        Prepare and perform the main reduced model beam tracking.
+        - Perform single time step Wake-T simulation and extracts relevant 
             information.
-        - Filters out beam particles outside of the plasma bubble.
-        - Sets up the configuration for the reduced model tracking.
-        - Makes corrections to the Wake-T r-coordinate before saving the initial 
+        - Filter out beam particles outside of the plasma bubble.
+        - Set up the configuration for the reduced model tracking.
+        - Make corrections to the Wake-T r-coordinate before saving the initial 
             time step.
-        - Calls on the physics model to perform the tracking.
-        - Stores beam parameter evolution as a stage attribute.
-        - Stores the final time step if desired.
+        - Call on the physics model to perform the tracking.
+        - Store beam parameter evolution as a stage attribute.
+        - Store the final time step if desired.
         
 
         Parameters
@@ -811,12 +809,17 @@ class StageReducedModels(Stage):
     # ==================================================
     def copy_config2blank_stage(self, probe_evol_period=1):
         """
-        Makes a deepcopy of the stage to copy the configurations and settings,
+        Make a deepcopy of the stage to copy the configurations and settings,
         but most of the parameters in the deepcopy are set to ``None``.
     
         Parameters
         ----------
-        N/A
+        probe_evol_period : int, optional (default=1)
+            Time step interval for probing beam evolution. Set to larger than 0 
+            to record beam parameters for beam evolution diagnostics. The
+              probing interval is given in units of time steps, so that e.g. 
+            ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
+            step.
             
         Returns
         ----------
@@ -843,8 +846,10 @@ class StageReducedModels(Stage):
     
 
     # ==================================================
-    # Save initial electric field, plasma and beam quantities
     def __save_initial_step(self, Ez0_axial, zs_Ez0, rho0, metadata_rho0, driver0, beam0):
+        """
+        Save initial electric field, plasma and beam quantities
+        """
         
         # ========== Save initial axial wakefield info ========== 
         self.initial.plasma.wakefield.onaxis.zs = zs_Ez0
@@ -893,8 +898,10 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Save final electric field, plasma and beam quantities
     def __save_final_step(self, Ez_axial, zs_Ez, rho, metadata_rho, driver, beam):
+        """
+        Save final electric field, plasma and beam quantities.
+        """
         
         # ========== Save final axial wakefield info ========== 
         self.final.plasma.wakefield.onaxis.zs = zs_Ez
@@ -957,8 +964,11 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Filter out particles that collide into bubble
     def bubble_filter(self, beam, sort_zs=True):
+        """
+        Filter out particles that collide into bubble.
+        """
+
         xs = beam.xs()
         ys = beam.ys()
         zs = beam.zs()
@@ -1020,8 +1030,8 @@ class StageReducedModels(Stage):
     # ==================================================
     def Ez_shift_fit(self, Ez, zs_Ez, beam, z_slices=None):
         """
-        Cuts out the longitudinal axial E-field Ez over the beam region and 
-        makes a fit using the z-coordinates for the region.
+        Cut out the longitudinal axial E-field Ez over the beam region and make 
+        a fit using the z-coordinates for the region.
 
         Parameters
         ----------
@@ -1295,7 +1305,7 @@ class StageReducedModels(Stage):
     # ==================================================
     def rb_shift_fit(self, rb, zs_rb, beam, z_slices=None):
         """
-        Cuts out the bubble radius over the beam region and makes a fit using 
+        Cut out the bubble radius over the beam region and make a fit using 
         the z-coordinates for the region.
 
         Parameters
@@ -1375,7 +1385,7 @@ class StageReducedModels(Stage):
     # ==================================================
     def store_rb_Ez_2stage(self, wake_t_evolution, drive_beam, beam):
         """
-        Traces the longitudinal electric field, bubble radius and store them 
+        Trace the longitudinal electric field, bubble radius and store them 
         as a stage attribute.
 
     
@@ -1441,9 +1451,12 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Determine the number of beam slices based on the Freedman–Diaconis rule
+    # 
     # TODO: put this inside longitudinal_number_distribution()
     def FD_rule_num_slice(self, zs=None):
+        """
+        Determine the number of beam slices based on the Freedman–Diaconis rule
+        """
         if zs is None:
             zs = self.initial.beam.instance.zs()
         q3, q1 = np.percentile(zs, [75 ,25])
@@ -1454,8 +1467,10 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Return the longitudinal number distribution using the beam particles' z-coordinates.
     def longitudinal_number_distribution(self, beam, bin_number=None, make_plot=False):
+        """
+        Return the longitudinal number distribution using the beam particles' z-coordinates.
+        """
 
         zs = beam.zs()
         if bin_number is None:
@@ -1479,9 +1494,9 @@ class StageReducedModels(Stage):
         return num_profile, z_ctrs
 
     
-    # ==================================================
-    def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
+    # # ==================================================
+    # def matched_beta_function(self, energy):
+    #     return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
     
     
     # # ==================================================
@@ -1515,6 +1530,27 @@ class StageReducedModels(Stage):
     # ==================================================
     # Overloads the plot_wakefield method in the Stage class.
     def plot_wakefield(self, saveToFile=None, includeWakeRadius=True):
+        """
+        Plot the wakefield, beam current profile, and optionally the plasma-wake 
+        radius.
+
+        This function generates a set of plots showing:
+        - Longitudinal electric field (wakefield) along the beam axis.
+        - Beam current profile.
+        - Plasma bubble radius (if ``includeWakeRadius`` is ``True``).
+
+        The data is taken from the stage's initial state by default, and from 
+        the final state if it is available.
+
+        Parameters
+        ----------
+        saveToFile : str, optional
+            If provided, the figure is saved to the given file path in PDF format.
+            If ``None`` (default), the plot is displayed but not saved.
+
+        includeWakeRadius : bool, optional (default=``True``)
+            If ``True``, also plot the plasma bubble (wake) radius.
+        """
 
         assert self.initial is not None, 'No data.'
         
@@ -1593,26 +1629,25 @@ class StageReducedModels(Stage):
         
         Other parameters
         ----------------
-        show_Ez : bool
+        show_Ez : bool, optional (default=``True``)
             Flag for including the axial longitudinal electric field in the 
             plot.
 
-        trace_rb : bool
+        trace_rb : bool, optional (default=``False``)
             Flag for including the traced bubble radius in the plot.
             
-        savefig : str or None
-            If not None, defines the path to save the figure.
-            Defaults to None.
+        savefig : str, optional (default=``None``)
+            If not ``None``, defines the path to save the figure.
+            Defaults to ``None``.
 
-        aspect : str
-            The aspect ratio of the plots.
-            Defaults to 'equal' which is also the matplotlib default; can also 
-            use 'auto'. Set to 'auto' to plot the entire simulation box.
+        aspect : str, optional (default=``'auto'``)
+            The aspect ratio of the plots. Set to 'auto' to plot the entire 
+            simulation box.
 
             
         Returns:
         --------
-        None
+        ``None``
         """
         
         from matplotlib.colors import LogNorm
@@ -1708,6 +1743,10 @@ class StageReducedModels(Stage):
 
     # ==================================================
     def plot_Ez_rb_cut(self):
+        """
+        Plot beam number profiles together with cut-out wakefield and bubble 
+        radius.
+        """
 
         z_slices = self.z_slices
         main_num_profile = self.main_num_profile
@@ -1904,6 +1943,33 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the horizontal sideview (top view)
     def animate_sideview_x(self, evolution_folder):
+        """
+        Create and save an animation of the horizontal side view (x–z plane) 
+        of the beam evolving through the stage.
+
+        The animation shows the evolution of beam properties such as:
+        - Mean energy versus propagation length
+        - Normalized emittance versus bunch length
+        - Horizontal phase space density
+        - Current profile along the beam
+        - Transverse beam size and offset evolution
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+
+        Notes
+        -----
+        - The output file is saved as a GIF in ``<self.run_path>/plots``.
+        - The function currently depends on ``self.evolution`` for beam locations.
+        A TODO item exists to make it independent of this attribute.
+        """
         
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -2079,6 +2145,20 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the vertical sideview
     def animate_sideview_y(self, evolution_folder):
+        """
+        Create and save an animation of the vertical side view (y-z plane) 
+        along with other parameters of the beam evolving through the stage.
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+        """
 
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -2246,6 +2326,20 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the horizontal phase space
     def animate_phasespace_x(self, evolution_folder):
+        """
+        Create and save an animation of the horizontal phase space (x-px plane) 
+        along with other parameters of the beam evolving through the stage.
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+        """
 
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -2439,6 +2533,20 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the vertical phase space
     def animate_phasespace_y(self, evolution_folder):
+        """
+        Create and save an animation of the vertical phase space (y-py plane) 
+        along with other parameters of the beam evolving through the stage.
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+        """
 
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -2754,6 +2862,10 @@ class StageReducedModels(Stage):
 
     # ==================================================
     def print_summary(self):
+        """
+        Print a summary of the stage.
+        """
+
         if self.is_upramp():
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
