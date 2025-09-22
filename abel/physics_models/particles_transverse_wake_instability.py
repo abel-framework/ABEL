@@ -432,8 +432,10 @@ def update_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_s
 
 ###################################################
 def push_driver(wake_t_driver, wake_t_fields, time_step, pusher='boris'):
-    "Evolves a Wake-T drive beam ``wake_t_driver``for one time step "
-    "``time_step``."
+    """
+    Evolves a Wake-T drive beam ``wake_t_driver`` for one time step defined by
+    ``time_step``.
+    """
     wake_t_driver.evolve([wake_t_fields], t=wake_t_driver.prop_distance/SI.c, dt=time_step, pusher=pusher)
 
     #return wake_t_driver
