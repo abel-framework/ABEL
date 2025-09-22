@@ -69,7 +69,7 @@ class StageReducedModels(Stage):
     """
 
     # ==================================================
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, drive_beam=None, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
         TODO: Short description
         None of lines in the docstring text should exceed this length ..........
@@ -146,8 +146,6 @@ class StageReducedModels(Stage):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
-        self.main_source = main_source
-        self.drive_beam = drive_beam
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
 
@@ -245,11 +243,7 @@ class StageReducedModels(Stage):
 
         
         # ========== Get the drive beam ==========
-        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    # TODO: delete ##################
-            driver_incoming = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
-        else:
-            driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
-            #self.drive_beam = driver_incoming                    # TODO: delete ######################
+        driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
         
         original_driver = copy.deepcopy(driver_incoming)
         original_beam = copy.deepcopy(beam_incoming)
@@ -1406,7 +1400,6 @@ class StageReducedModels(Stage):
             self.downramp.initial = None
             self.downramp.final = None
 
-        self.drive_beam = None
         #self.upramp = None
         #self.downramp = None
         #self.final = None
