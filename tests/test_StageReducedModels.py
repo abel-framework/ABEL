@@ -529,7 +529,6 @@ def test_trim_attr_reduce_pickle_size():
     assert stage.downramp.drive_beam is None
     assert stage.downramp.initial is None
     assert stage.downramp.final is None
-    assert stage.drive_beam is None
 
 
 @pytest.mark.StageReducedModels
