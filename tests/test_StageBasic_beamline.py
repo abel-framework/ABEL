@@ -140,7 +140,7 @@ def test_baseline_linac():
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=False, probe_evolution=False)
     interstage = setup_interstage(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
@@ -214,7 +214,7 @@ def test_linac_plots():
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
     interstage = setup_interstage(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_linac_plots', overwrite=True, verbose=False)
@@ -306,7 +306,7 @@ def test_ramped_linac():
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
     interstage = setup_interstage(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_ramped_linac', overwrite=True, verbose=False)
@@ -417,7 +417,7 @@ def test_ramped_linac_vs_old_method():
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, probe_evolution=False)
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
     interstage = setup_interstage(stage)
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
 
     # Ramps constructed with stage.__class__()
@@ -427,7 +427,7 @@ def test_ramped_linac_vs_old_method():
     stage_old.upramp.ramp_beta_mag = 10.0
     stage_old.downramp.ramp_beta_mag = 10.0
     interstage_old = setup_interstage(stage_old)
-    linac_old = PlasmaLinac(source=main_source, stage=stage_old, interstage=interstage_old, num_stages=num_stages)
+    linac_old = PlasmaLinac(source=main_source, stage=stage_old, interstage=interstage_old, num_stages=num_stages, alternate_interstage_polarity=False)
     linac_old.run('test_baseline_linac', overwrite=True, verbose=False)
     
     # Check the output beams
@@ -463,7 +463,7 @@ def test_ramped_norm_emitt_jitter_linac():
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
     interstage = setup_interstage(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_ramped_norm_emitt_jitter_linac', overwrite=True, verbose=False)
@@ -490,7 +490,7 @@ def test_ramped_jitter_linac():
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
     interstage = setup_interstage(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_ramped_jitter_linac', overwrite=True, verbose=False)

@@ -17,7 +17,7 @@ from matplotlib import pyplot as plt
 
 class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=True, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -1454,19 +1454,22 @@ class PlasmaLinac(Linac):
         print('\n== Driver source ==========')
         self.stage.driver_source.print_summary()
 
+        print('\n== Source ==========')
+        self.source.print_summary()
+
         print('\n== Stage ==========')
         self.stage.print_summary()
 
         if self.stage.upramp is not None:
             print('\n== Upramp ==========')
-            self.stage.upramp.print_summary()
+            self.stage.upramp.print_summary(print_params=False)
 
         if self.stage.downramp is not None:
             print('\n== Downramp ==========')
-            self.stage.downramp.print_summary()
+            self.stage.downramp.print_summary(print_params=False)
 
         print('\n== Interstage ==========')
-        self.interstage.print_summary()
-
-        print('\n== Source ==========')
-        self.source.print_summary()
+        if self.interstage is None:
+            print('Type: ', 'None')
+        else:
+            self.interstage.print_summary()

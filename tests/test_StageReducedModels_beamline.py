@@ -155,7 +155,7 @@ def test_baseline_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, 1.0, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_baseline_linac', overwrite=True, verbose=False)
@@ -237,7 +237,7 @@ def test_ramped_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_ramped_linac', overwrite=True, verbose=False)
@@ -342,7 +342,7 @@ def test_ramped_linac():
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
 #     interstage = setup_InterstageImpactX(stage)
 
-#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
 #     # Perform tracking
 #     linac.run('test_driverEvol_linac', overwrite=True, verbose=False)
@@ -376,7 +376,7 @@ def test_ramped_linac():
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
 #     interstage = setup_InterstageImpactX(stage)
 
-#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
 #     # Perform tracking
 #     linac.run('test_driverEvol_ramped_linac', overwrite=True, verbose=False)
@@ -414,7 +414,7 @@ def test_angular_jitter_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_angular_jitter_linac', overwrite=True, verbose=False)
@@ -448,7 +448,7 @@ def test_angular_jitter_ramped_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_angular_jitter_ramped_linac', overwrite=True, verbose=False)
@@ -487,7 +487,7 @@ def test_trInstability_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_trInstability_linac', overwrite=True, verbose=False)
@@ -521,7 +521,7 @@ def test_jitter_trInstability_ramped_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_jitter_trInstability_ramped_linac', overwrite=True, verbose=False)
@@ -616,7 +616,7 @@ def test_jitter_trInstability_ramped_linac():
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
 #     interstage = setup_InterstageImpactX(stage)
 
-#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
 #     # Perform tracking
 #     linac.run('test_driverEvol_jitter_trInstability_ramped_linac', overwrite=True, verbose=False)
@@ -650,7 +650,7 @@ def test_ionMotion_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_ionMotion_linac', overwrite=True, verbose=False)
@@ -685,7 +685,7 @@ def test_jitter_trInstability_ionMotion_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_trInstability_ionMotion_linac', overwrite=True, verbose=False)
@@ -720,7 +720,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, save_final_step=True)
     interstage = setup_InterstageImpactX(stage)
 
-    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+    linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
     # Perform tracking
     linac.run('test_jitter_trInstability_ionMotion_ramped_linac', overwrite=True, verbose=False)
@@ -815,7 +815,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 #     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period)
 #     interstage = setup_InterstageImpactX(stage)
 
-#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages)
+#     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
 #     # Perform tracking
 #     linac.run('test_driverEvol_jitter_trInstability_ionMotion_ramped_linac', overwrite=True, verbose=False)
