@@ -480,8 +480,9 @@ def test_longitudinal_number_distribution():
 @pytest.mark.StageReducedModels
 def test_matched_beta_function():
     """
-    Tests for ``StageReducedModels.matched_beta_function()``.
+    Tests for ``Stage.matched_beta_function()``.
     """
+    #TODO: move to tests for the Stage class
 
     from abel.utilities.relativity import energy2gamma
 
@@ -495,9 +496,20 @@ def test_matched_beta_function():
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag)
 
     kp = np.sqrt(plasma_density*SI.e**2/(SI.epsilon_0*SI.m_e*SI.c**2))  # plasma wavenumber [m^-1]
-    beta_mat = np.sqrt(2*energy2gamma(main_source.energy))/kp * ramp_beta_mag
-
+    beta_mat = np.sqrt(2*energy2gamma(main_source.energy))/kp
     assert np.allclose(stage.matched_beta_function(main_source.energy), beta_mat, rtol=1e-15, atol=0.0)
+
+    stage_upramp = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag)
+    stage_upramp.upramp = PlasmaRamp()
+    beta_mat_upramp = np.sqrt(2*energy2gamma(main_source.energy))/kp * ramp_beta_mag
+    assert np.allclose(stage_upramp.matched_beta_function(main_source.energy), beta_mat_upramp, rtol=1e-15, atol=0.0)
+
+    stage_ramped = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag)
+    stage_ramped.upramp = PlasmaRamp()
+    stage_ramped.downramp = PlasmaRamp()
+    stage_ramped.downramp.ramp_beta_mag = 4.0
+    beta_mat_ramped = np.sqrt(2*energy2gamma(main_source.energy))/kp * 4.0
+    assert np.allclose(stage_ramped.matched_beta_function(main_source.energy, match_entrance=False), beta_mat_ramped, rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.StageReducedModels
