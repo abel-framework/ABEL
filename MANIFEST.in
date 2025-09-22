@@ -2,3 +2,4 @@ include abel/wrappers/elegant/templates/*.lte
 include abel/wrappers/elegant/templates/*.ele
 include abel/wrappers/guineapig/templates/*.dat
 include abel/wrappers/hipace/*_template
+include abel/abelconfig.toml
