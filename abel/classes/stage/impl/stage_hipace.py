@@ -17,8 +17,8 @@ except:
 
 class StageHipace(Stage):
     
-    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing_radial=0, mesh_refinement=True):
-        
+    def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing=False, mesh_refinement=True, do_spin_tracking=False, run_path=None):
+
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # simulation specifics
@@ -32,7 +32,13 @@ class StageHipace(Stage):
         self.no_plasma = no_plasma
 
         # external focusing (APL-like) [T/m]
-        self.external_focusing_radial = external_focusing_radial
+        self.external_focusing = external_focusing
+        self._external_focusing_gradient = None
+
+        # plasma profile
+        self.plasma_profile = SimpleNamespace()
+        self.plasma_profile.ss = None
+        self.plasma_profile.ns = None
 
         # physics flags
         self.ion_motion = ion_motion
@@ -40,18 +46,24 @@ class StageHipace(Stage):
         self.mesh_refinement = mesh_refinement
         self.beam_ionization = beam_ionization
         self.radiation_reaction = radiation_reaction
+        self.do_spin_tracking = do_spin_tracking
+
+        # other
+        self.run_path = run_path
         
 
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
 
-        from abel.apis.hipace.hipace_api import hipace_write_inputs, hipace_run, hipace_write_jobscript
+        from abel.wrappers.hipace.hipace_wrapper import hipace_write_inputs, hipace_run, hipace_write_jobscript
+
+        self.stage_number = beam_incoming.stage_number
         
         ## PREPARE TEMPORARY FOLDER
         
         # make temp folder
         if not os.path.exists(CONFIG.temp_path):
-            os.mkdir(CONFIG.temp_path)
-        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + '/'
+            os.makedirs(CONFIG.temp_path)
+        tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + os.sep
         
         # make directory
         if not os.path.exists(tmpfolder):
@@ -63,22 +75,17 @@ class StageHipace(Stage):
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
         self._prepare_ramps()
-
-        # plasma-density ramps (de-magnify beta function)
-        location_flattop_start = 0
-        if self.upramp is not None:
-            beam0, driver0 = self.track_upramp(beam_incoming, driver_incoming)
-            location_flattop_start = beam0.location
-        else:
-            # apply plasma-density up ramp (demagnify beta function)
-            driver0 = copy.deepcopy(driver_incoming)
-            beam0 = copy.deepcopy(beam_incoming)
-            if self.ramp_beta_mag is not None:
-                driver0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                beam0.magnify_beta_function(1/self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        self._make_ramp_profile(tmpfolder)
         
-        beam0.location = 0.0
-        driver0.location = 0.0
+        # set external focusing
+        if self.external_focusing == False:
+            self.external_focusing_gradient = 0
+        if self.external_focusing == True and self._external_focusing_gradient is None:
+            num_half_oscillations = 1
+            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2
+        
+        beam0 = beam_incoming
+        driver0 = driver_incoming
         
         # SAVE BEAMS TO BE USED IN HiPACE++ SIMULATION
         
@@ -95,9 +102,10 @@ class StageHipace(Stage):
         # make directory
         if self.plasma_density_from_file is not None:
             density_table_file = os.path.basename(self.plasma_density_from_file)
-            shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
+            if not os.path.exists(tmpfolder + density_table_file):
+                shutil.copyfile(self.plasma_density_from_file, tmpfolder + density_table_file)
 
-            self.length = self.get_length() # TODO: ensure that the length from a density profile is correct
+            #self.length = self.get_length() # TODO: ensure that the length from a density profile is correct
             self.plasma_density = self.get_plasma_density()
         else:
             density_table_file = None
@@ -120,7 +128,10 @@ class StageHipace(Stage):
         
         # calculate number of cells in x to get similar resolution
         dr = box_size_xy/self.num_cell_xy
-        num_cell_z = round((box_max_z-box_min_z)/dr)
+        if self.mesh_refinement:
+            num_cell_z = 2*round((box_max_z-box_min_z)/dr)
+        else:
+            num_cell_z = round((box_max_z-box_min_z)/dr)
         
         # calculate the time step
         beta_matched = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
@@ -136,7 +147,8 @@ class StageHipace(Stage):
             else:  # If remainder is less than 10, round down
                 self.num_steps = self.num_steps - remainder
         
-        time_step = self.length_flattop/(self.num_steps*SI.c)
+        #time_step = self.length_flattop/(self.num_steps*SI.c)
+        time_step = self.length/(self.num_steps*SI.c)
 
         # overwrite output period
         if self.output is not None:
@@ -147,7 +159,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial, mesh_refinement=self.mesh_refinement)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
         
         ## RUN SIMULATION
@@ -166,20 +178,13 @@ class StageHipace(Stage):
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam_incoming.trackable_number
         beam.stage_number = beam_incoming.stage_number
-        beam.location = location_flattop_start + beam0.location
+        beam.location = beam_incoming.location
         driver.trackable_number = beam_incoming.trackable_number
         driver.stage_number = beam_incoming.stage_number
-        driver.location = beam.location
-        
-        # apply plasma-density down ramp (magnify beta function)
-        if self.downramp is not None:
-            beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
-        else:
-            beam_outgoing = copy.deepcopy(beam)
-            driver_outgoing = copy.deepcopy(driver)
-            if self.ramp_beta_mag is not None:
-                beam_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
-                driver_outgoing.magnify_beta_function(self.ramp_beta_mag, axis_defining_beam=driver_incoming)
+        driver.location = beam_incoming.location
+
+        beam_outgoing = beam
+        driver_outgoing = driver
         
         ## SAVE DRIVERS TO FILE
         if self.save_drivers:
@@ -191,6 +196,9 @@ class StageHipace(Stage):
             driver_outgoing.location = beam_outgoing.location
             driver_outgoing.trackable_number = 1
             self.save_driver_to_file(driver_outgoing, runnable)
+
+        # reset location 
+        beam_outgoing.location = beam_incoming.location
         
         # clean nan particles and extreme outliers
         beam_outgoing.remove_nans()
@@ -215,9 +223,11 @@ class StageHipace(Stage):
         else:
             return super().track(beam_outgoing, savedepth, runnable, verbose)
     
-    
+            
     def __extract_evolution(self, tmpfolder, beam0, runnable):
 
+        from abel.wrappers.hipace import read_insitu_diagnostics
+        
         # suppress divide-by-zero errors
         np.seterr(divide='ignore', invalid='ignore')
 
@@ -257,6 +267,16 @@ class StageHipace(Stage):
             evol.emit_nx = read_insitu_diagnostics.emittance_x(average_data)
             evol.emit_ny = read_insitu_diagnostics.emittance_y(average_data)
             evol.plasma_density = self.get_plasma_density(evol.location)
+
+            # add spin information
+            if '[sx]' in np.dtype(average_data.dtype).names:
+                evol.spin_x = average_data['[sx]']
+                evol.spin_y = average_data['[sy]']
+                evol.spin_z = average_data['[sz]']
+            else:
+                evol.spin_x = None
+                evol.spin_y = None
+                evol.spin_z = None
             
             # beta functions (temporary fix)
             evol.beta_x = evol.beam_size_x**2*(evol.energy/0.5109989461e6)/evol.emit_nx # TODO: improve with x-x' correlations instead of x-px
@@ -326,7 +346,7 @@ class StageHipace(Stage):
 
         # delete or move data
         if self.keep_data:
-            destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number) + '/insitu'
+            destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number) + os.sep + 'insitu'
             shutil.move(insitu_path, destination_path)
         
         
@@ -373,13 +393,58 @@ class StageHipace(Stage):
             destination_path = runnable.shot_path() + 'stage_' + str(beam0.stage_number)
             shutil.move(source_path, destination_path)
 
+    
+    def _make_ramp_profile(self, tmpfolder):
+        """Prepare the ramps (local to HiPACE)."""
+        
+        # check that there is not already a plasma density profile set
+        assert self.plasma_density_from_file is None
+
+        # make the plasma ramp profile
+        if self.has_ramp():
+
+            ss_upramp = np.linspace(0, self.upramp.length, 100)
+            if self.upramp.ramp_shape == 'uniform':
+                ns_upramp = np.ones_like(ss_upramp)*self.upramp.plasma_density
+            
+            ss_flattop = max(ss_upramp)+np.linspace(0, self.length_flattop, 100)
+            ns_flattop = np.ones_like(ss_flattop)*self.plasma_density
+                
+            ss_downramp = max(ss_flattop)+np.linspace(0, self.downramp.length, 100)
+            if self.downramp.ramp_shape == 'uniform':
+                ns_downramp = np.ones_like(ss_downramp)*self.downramp.plasma_density
+
+            ss = np.concatenate((ss_upramp, ss_flattop, ss_downramp), axis=0)
+            ns = np.concatenate((ns_upramp, ns_flattop, ns_downramp), axis=0)
+
+            # save to file
+            self.plasma_profile.ss = ss
+            self.plasma_profile.ns = ns
+            
+            # save to file
+            density_table = np.column_stack((ss, ns))
+            filename = os.path.join(tmpfolder, 'plasma_profile.txt')
+            np.savetxt(filename, density_table, delimiter=" ")
+            self.plasma_density_from_file = filename
+            
+        
+    def plot_plasma_density_profile(self):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(1,1)
+        ax.plot(self.plasma_profile.ss, self.plasma_profile.ns/1e6, '-')
+        ax.set_xlim(min(self.plasma_profile.ss), max(self.plasma_profile.ss))
+        ax.set_yscale('log')
+        ax.set_xlabel('Longitudinal position (m)')
+        ax.set_ylabel(r'Plasma density (cm$^{-3}$)')
+        
+
     def get_plasma_density(self, locations=None):
         if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ns = density_table[:,1]
+            ns = self.plasma_profile.ns
             self.plasma_density = ns.max()
             if locations is not None:
-                ss = density_table[:,0]
+                ss = self.plasma_profile.ss
                 return np.interp(locations, ss, ns)
             else:
                 return self.plasma_density
@@ -391,7 +456,172 @@ class StageHipace(Stage):
 
     def get_length(self):
         if self.plasma_density_from_file is not None:
-            density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
-            ss = density_table[:,0]
-            self.length = ss.max()-ss.min()
+            #density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
+            ss = self.plasma_profile.ss
+            #ss = density_table[:,0]
+            return ss.max()-ss.min()
         return super().get_length()
+
+    
+    # ==================================================
+    # Apply waterfall function to all beam dump files
+    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+        """
+        Applies waterfall function to all beam dump files in ``data_dir``.
+
+         Parameters
+        ----------
+        fcns : A list of Beam class methods
+            Beam class profile methods such as ``Beam.current_profile``, ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, ``Beam.transverse_profile_y``.
+
+        edges : float list
+            Specifies the bins to be used to create the histogram(s) in the waterfall plot(s).
+
+        data_dir : str
+            Path to the directory containing all HiPACE++ HDF5 output files.
+
+        species : str, optional
+            Specifies the name of the beam to be extracted.
+
+        clean : bool, optional
+            Determines whether the extracted beams from the HiPACE++ HDF5 output files should be cleaned before further processing.
+
+        remove_halo_nsigma : float, optional
+            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+
+        args : float list, optional
+            Allows passing additional arguments to the functions in fcns.
+            
+            
+        Returns
+        ----------
+        waterfalls : list of 2D float ndarrays
+            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
+        
+        locations : [m] 1D float ndarray
+            Stores the location for each slice of ``waterfalls``.
+        
+        bins : list of 1D float ndarrays
+            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+        """
+
+        from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
+        
+        # find number of beam outputs to plot
+        files = sorted(os.listdir(data_dir))
+        num_outputs = len(files)
+        
+        # declare data structure
+        bins = [None] * len(fcns)
+        waterfalls = [None] * len(fcns)
+        for j in range(len(fcns)):
+            waterfalls[j] = np.empty((len(edges[j])-1, num_outputs))
+        
+        locations = np.empty(num_outputs)
+        
+        # go through files
+        for index in range(num_outputs):
+            # load phase space
+            beam = hipaceHdf5_2_abelBeam(data_dir, index, species=species)
+
+            if clean:
+                beam.remove_halo_particles(nsigma=remove_halo_nsigma)
+            
+            # find beam location
+            locations[index] = beam.location
+            
+            # get all waterfalls (apply argument if it exists)
+            for j in range(len(fcns)):
+                if args[j] is None:
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, bins=edges[j])
+                else:
+                    waterfalls[j][:,index], bins[j] = fcns[j](beam, args[j][index], bins=edges[j])
+                
+        return waterfalls, locations, bins
+
+        
+    # ==================================================
+    def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_fig=False):
+        '''
+        Makes waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+
+        Parameters
+        ----------
+        data_dir : str
+            Path to the directory containing all HiPACE++ HDF5 output files.
+
+        species : str, optional
+            Specifies the name of the beam to be extracted.
+
+        clean : bool, optional
+            Determines whether the extracted beams from the HiPACE++ HDF5 output files should be cleaned before further processing.
+
+        remove_halo_nsigma : float, optional
+            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+
+        save_fig : bool, optional
+            Flag for saving the output figure.
+        '''
+
+        from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
+        
+        files = sorted(os.listdir(data_dir))
+        file_path = data_dir + files[0]
+        beam0 = hipaceHdf5_2_abelBeam(data_dir, 0, species=species)
+        num_bins = int(np.sqrt(len(beam0)*2))
+        nsig = 5
+        
+        if species == 'driver':
+            deltaedges = np.linspace(-0.5, 0.5, num_bins)
+        else:
+            deltaedges = np.linspace(-0.05, 0.05, num_bins)
+        tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
+        xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
+        yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
+        
+        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
+
+        # prepare figure
+        fig, axs = plt.subplots(4,1)
+        fig.set_figwidth(8)
+        fig.set_figheight(2.8*4)
+        
+        # current profile
+        Is = waterfalls[0]
+        ts = bins[0]
+        c0 = axs[0].pcolor(locations, ts*SI.c*1e6, -Is/1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar0 = fig.colorbar(c0, ax=axs[0])
+        axs[0].set_ylabel(r'Longitudinal position [$\mathrm{\mu}$m]')
+        cbar0.ax.set_ylabel('Beam current [kA]')
+        #axs[0].set_title('Shot ' + str(shot+1))
+        
+        # energy profile
+        dQddeltas = waterfalls[1]
+        deltas = bins[1]
+        c1 = axs[1].pcolor(locations, deltas*1e2, -dQddeltas*1e7, cmap=CONFIG.default_cmap, shading='auto')
+        cbar1 = fig.colorbar(c1, ax=axs[1])
+        axs[1].set_ylabel('Relative energy spread [%]')
+        cbar1.ax.set_ylabel('Spectral density [nC/%]')
+        
+        densityX = waterfalls[2]
+        xs = bins[2]
+        c2 = axs[2].pcolor(locations, xs*1e6, -densityX*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar2 = fig.colorbar(c2, ax=axs[2])
+        axs[2].set_ylabel(r'Horizontal position [$\mathrm{\mu}$m]')
+        cbar2.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
+        
+        densityY = waterfalls[3]
+        ys = bins[3]
+        c3 = axs[3].pcolor(locations, ys*1e6, -densityY*1e3, cmap=CONFIG.default_cmap, shading='auto')
+        cbar3 = fig.colorbar(c3, ax=axs[3])
+        axs[3].set_ylabel(r'Vertical position [$\mathrm{\mu}$m]')
+        cbar3.ax.set_ylabel(r'Charge density [nC/$\mathrm{\mu}$m]')
+        axs[3].set_xlabel('Location along the stage [m]')
+        
+        plt.show()
+        if save_fig:
+            plot_path = self.run_path + 'plots' + os.sep
+            if not os.path.exists(plot_path):
+                os.makedirs(plot_path)
+            filename = plot_path + 'waterfalls' + '.png'
+            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)

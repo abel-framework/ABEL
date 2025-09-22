@@ -40,6 +40,9 @@ class Source(Trackable, CostModeled):
         self.jitter.yp = 0
         self.jitter.E = 0
 
+        self.spin_polarization = 0
+        self.spin_polarization_direction = 'z'
+
         self.is_polarized = False
     
     
@@ -48,14 +51,16 @@ class Source(Trackable, CostModeled):
         
         # add offsets and angles and jitter (horizontal)
         if self.norm_jitter_emittance_x is not None:
-            x_jitter, xp_jitter = generate_trace_space(self.norm_jitter_emittance_x/beam.gamma(), beam.beta_x(), beam.alpha_x(), 1)         
+            # Sample a value from a jitter phase space
+            x_jitter, xp_jitter = generate_trace_space(self.norm_jitter_emittance_x/beam.gamma(), beam.beta_x(), beam.alpha_x(), N=1, symmetrize=False)
         else:
             x_jitter, xp_jitter = np.random.normal(scale=self.jitter.x), np.random.normal(scale=self.jitter.xp)
         beam.set_xs(beam.xs() + self.x_offset + x_jitter)
         beam.set_xps(beam.xps() + self.x_angle + xp_jitter)
         
         if self.norm_jitter_emittance_y is not None:
-            y_jitter, yp_jitter = generate_trace_space(self.norm_jitter_emittance_y/beam.gamma(), beam.beta_y(), beam.alpha_y(), 1)
+            # Sample a value from a jitter phase space
+            y_jitter, yp_jitter = generate_trace_space(self.norm_jitter_emittance_y/beam.gamma(), beam.beta_y(), beam.alpha_y(), N=1, symmetrize=False)
         else:
             y_jitter, yp_jitter = np.random.normal(scale=self.jitter.y), np.random.normal(scale=self.jitter.yp)
         beam.set_ys(beam.ys() + self.y_offset + y_jitter)
@@ -76,6 +81,9 @@ class Source(Trackable, CostModeled):
             beam.num_bunches_in_train = self.num_bunches_in_train
         if self.bunch_separation is not None:
             beam.bunch_separation = self.bunch_separation
+
+        # set spin polarization
+        beam.set_arbitrary_spin_polarization(self.spin_polarization, direction=self.spin_polarization_direction)
         
         # set metadata
         beam.location = 0
@@ -135,3 +143,27 @@ class Source(Trackable, CostModeled):
         return x_points, y_points, final_angle, label, color
         
     
+    def print_summary(self):
+        print('Type: ', type(self))
+        print('Number of macro particles: ', self.num_particles)
+        print('Charge [nC]: ', self.charge*1e9)
+        print('Energy [GeV]: ', self.energy/1e9)
+        print('Normalised x emittance [mm mrad]: ', self.emit_nx*1e6)
+        print('Normalised y emittance [mm mrad]: ', self.emit_ny*1e6)
+        print('x beta function [mm]: ', self.beta_x*1e3)
+        print('y beta function [mm]: ', self.beta_y*1e3)
+        print('Relative energy spread [%]: ', self.rel_energy_spread*100)
+        print('Bunch length [um]: ', self.bunch_length*1e6)
+        #print('Gaussian blur [um]: ', self.gaussian_blur*1e6)
+        #print('Current head [A]: ', self.current_head)
+        print('x-offset [um]: ', self.x_offset*1e6)
+        print('y-offset [um]: ', self.y_offset*1e6)
+        print('z-offset [um]: ', self.z_offset*1e6)
+        print('x-jitter [nm]: ', self.jitter.x*1e9)
+        print('y-jitter [nm]: ', self.jitter.y*1e9)
+        print('t-jitter [ns]: ', self.jitter.t*1e9)
+        print('Normalised x emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_x * 1e6 if self.norm_jitter_emittance_x is not None else "None")
+        print('Normalised y emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_y * 1e6 if self.norm_jitter_emittance_y is not None else "None")
+        print('Symmetrisation: ', self.symmetrize)

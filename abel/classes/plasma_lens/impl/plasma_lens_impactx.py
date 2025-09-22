@@ -15,16 +15,20 @@ class PlasmaLensImpactX(PlasmaLens):
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
 
         import impactx
-        import amrex.space3d as amr
-        from abel.apis.impactx.impactx_api import beam2particle_container, particle_container2beam
+        from abel.wrappers.impactx.impactx_wrapper import beam2particle_container, particle_container2beam
         
         # initialize AMReX
         verbose_debug = False
-        amr.initialize(["amrex.omp_threads=1", f"amrex.verbose={int(verbose_debug)}"])
 
         # make simulation object
         sim = impactx.ImpactX()
+
+        # serial run on one CPU core
+        sim.omp_threads = 1
+
+        # set ImpactX verbosity
         sim.verbose = int(verbose_debug)
+        sim.tiny_profiler = verbose_debug
         
         # convert to ImpactX particle container
         _, sim = beam2particle_container(beam0, sim)

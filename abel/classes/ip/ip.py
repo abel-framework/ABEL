@@ -8,8 +8,9 @@ import numpy as np
 
 class InteractionPoint(Runnable, CostModeled):
     
-    def __init__(self, num_ips=1):
+    def __init__(self, num_ips=1, gamma_gamma=False):
         self.num_ips = num_ips
+        self.gamma_gamma = gamma_gamma
         super().__init__()
     
     # run simulation
@@ -77,7 +78,10 @@ class InteractionPoint(Runnable, CostModeled):
                     event.save(self, shot1=shot1, shot2=shot2)
                     
                     if verbose:
-                        print(f">> EVENT {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
+                        if not self.gamma_gamma:
+                            print(f">> EVENT {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
+                        else:
+                            print(f">> EVENT (gamma-gamma) {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
                     
         # return event from last interaction
         return event

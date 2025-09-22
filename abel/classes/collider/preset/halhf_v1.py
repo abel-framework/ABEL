@@ -5,7 +5,7 @@ from abel.classes.damping_ring.impl.damping_ring_basic import DampingRingBasic
 from abel.classes.beamline.impl.driver_complex import DriverComplex
 from abel.classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from abel.classes.stage.impl.stage_basic import StageBasic
-from abel.classes.interstage.impl.interstage_basic import InterstageBasic
+from abel.classes.interstage.plasma_lens.basic import InterstagePlasmaLensBasic
 from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
@@ -81,10 +81,10 @@ class HALHFv1(Collider):
         einjector.beta_y = einjector.beta_x
         
         # define interstage
-        interstage = InterstageBasic()
+        interstage = InterstagePlasmaLensBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 1 * np.sqrt(E/10e9) # [m(eV)]
-        interstage.dipole_field = 0.5 # [T]
+        interstage.length_dipole = lambda E: 1 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.field_dipole = 0.5 # [T]
         
         # define electron BDS
         ebds = BeamDeliverySystemBasic()
@@ -101,6 +101,7 @@ class HALHFv1(Collider):
         elinac.interstage = interstage
         elinac.bds = ebds
         elinac.num_stages = 16
+        elinac.alternate_interstage_polarity = True
 
         # define positron source
         psource = SourceBasic()
@@ -166,7 +167,7 @@ class HALHFv1(Collider):
         self.energy_asymmetry = 4
         self.bunch_separation = 80e-9 # [s]
         self.num_bunches_in_train = 100
-        self.rep_rate_trains = 100 # [Hz]
+        self.rep_rate_trains = 100.0 # [Hz]
 
         # assemble everything
         self.assemble_trackables()

@@ -43,7 +43,8 @@ class SourceBasic(Source):
             if self.energy_spread is None:
                 self.energy_spread = self.energy * self.rel_energy_spread
             elif abs(self.energy_spread - self.energy * self.rel_energy_spread) > 0:
-                raise Exception("Both absolute and relative energy spread defined.")
+                self.energy_spread = self.energy * self.rel_energy_spread
+                #raise Exception("Both absolute and relative energy spread defined")
 
         if self.symmetrize_6d is False:
             
@@ -89,6 +90,9 @@ class SourceBasic(Source):
         pxs = beam.pxs()
         pys = beam.pys()
         pzs = beam.pzs()
+        spxs = beam.spxs()
+        spys = beam.spys()
+        spzs = beam.spzs()
         weights = beam.weightings()
 
         # Apply the filter
@@ -99,19 +103,57 @@ class SourceBasic(Source):
         pxs_filtered = pxs[bool_indices]
         pys_filtered = pys[bool_indices]
         pzs_filtered = pzs[bool_indices]
+        spxs_filtered = spxs[bool_indices]
+        spys_filtered = spys[bool_indices]
+        spzs_filtered = spzs[bool_indices]
         weights_filtered = weights[bool_indices]
 
         # Initialise ABEL Beam object
         beam_out = Beam()
         
         # Set the phase space of the ABEL beam
-        beam_out.set_phase_space(Q=np.sum(weights_filtered)*-SI.e,
+        beam_out.set_phase_space(Q=np.sum(weights_filtered)*np.sign(self.charge)*SI.e,
                              xs=xs_filtered,
                              ys=ys_filtered,
                              zs=zs_filtered, 
                              pxs=pxs_filtered,  # Always use single particle momenta?
                              pys=pys_filtered,
-                             pzs=pzs_filtered)
+                             pzs=pzs_filtered,
+                             spxs=spxs_filtered,
+                             spys=spys_filtered,
+                             spzs=spzs_filtered,
+                             particle_mass=beam.particle_mass
+                             )
 
         return beam_out
     
+
+    # ==================================================
+    def print_summary(self):
+        print('Type: ', type(self))
+        print('Number of macro particles: ', self.num_particles)
+        print('Charge [nC]: ', self.charge*1e9)
+        print('Energy [GeV]: ', self.energy/1e9)
+        print('Normalised x emittance [mm mrad]: ', self.emit_nx*1e6)
+        print('Normalised y emittance [mm mrad]: ', self.emit_ny*1e6)
+        print('x beta function [mm]: ', self.beta_x*1e3)
+        print('y beta function [mm]: ', self.beta_y*1e3)
+        print('Relative energy spread [%]: ', self.rel_energy_spread*100)
+        print('Bunch length [um]: ', self.bunch_length*1e6)
+        print('x-offset [um]: ', self.x_offset*1e6)
+        print('y-offset [um]: ', self.y_offset*1e6)
+        print('z-offset [um]: ', self.z_offset*1e6)
+        print('x-jitter [nm]: ', self.jitter.x*1e9)
+        print('y-jitter [nm]: ', self.jitter.y*1e9)
+        print('t-jitter [ns]: ', self.jitter.t*1e9)
+        print('Normalised x emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_x * 1e6 if self.norm_jitter_emittance_x is not None else "None")
+        print('Normalised y emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_y * 1e6 if self.norm_jitter_emittance_y is not None else "None")
+        if self.symmetrize:
+            print('Symmetrisation: ', self.symmetrize)
+        else:
+            if self.symmetrize_6d:
+                print('6D Symmetrisation: ', self.symmetrize_6d)
+            else:
+                print('Symmetrisation: ', self.symmetrize)

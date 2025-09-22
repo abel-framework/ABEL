@@ -2,7 +2,7 @@ from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.source.source import Source
 from abel.classes.stage.stage import Stage
-from abel.classes.interstage.interstage import Interstage
+from abel.classes.interstage import Interstage
 from abel.classes.bds.bds import BeamDeliverySystem
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.beamline.impl.linac.linac import Linac
@@ -17,7 +17,7 @@ from matplotlib import pyplot as plt
 
 class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=True, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -51,7 +51,10 @@ class PlasmaLinac(Linac):
         
         # figure out the nominal energy gain if not set
         if self.nom_energy is None:
-            self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
+            if self.stage is not None:
+                self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
+            else:
+                self.nom_energy = self.source.energy
         else:
             self.stage.nom_energy_gain = (self.nom_energy - self.source.get_nom_energy()) / self.num_stages
         
@@ -146,7 +149,7 @@ class PlasmaLinac(Linac):
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 
-                stage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
+                stage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                 
                 # reassign the same driver complex
                 if self.driver_complex is not None:
@@ -163,12 +166,17 @@ class PlasmaLinac(Linac):
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
-                    interstage_instance.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
+                    interstage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                     
                     if self.alternate_interstage_polarity:
-                        interstage_instance.dipole_field = (2*(i%2)-1)*interstage_instance.dipole_field
+                        interstage_instance.field_dipole = (2*(i%2)-1)*interstage_instance.field_dipole
                         
                     self.trackables.append(interstage_instance)
+
+        else: # special case where there is only an interstage
+            if self.interstage is not None:
+                self.interstage.nom_energy = self.source.energy
+                self.trackables.append(self.interstage)
 
         
         # add beam delivery system
@@ -304,7 +312,7 @@ class PlasmaLinac(Linac):
 
 
     def trim_attr_reduce_pickle_size(self):
-        "Delete attributes to reduce space in the pickled file."
+        "Clear attributes to reduce space in the pickled file."
         self._first_stage = None
         self._last_stage = None
         self._last_interstage = None
@@ -1435,3 +1443,33 @@ class PlasmaLinac(Linac):
         plt.close()
 
         return filename
+
+
+    def print_summary(self):
+        # TODO: Make print_summary() for each class below and call on these instead.
+        print('== Plasma-linac parameters ==========')
+        print('Number of plasma stages: ', self.num_stages)
+        print('Nominal energy [GeV]: ', self.nom_energy/1e9 if self.nom_energy is not None else "None")
+
+        print('\n== Driver source ==========')
+        self.stage.driver_source.print_summary()
+
+        print('\n== Source ==========')
+        self.source.print_summary()
+
+        print('\n== Stage ==========')
+        self.stage.print_summary()
+
+        if self.stage.upramp is not None:
+            print('\n== Upramp ==========')
+            self.stage.upramp.print_summary(print_params=False)
+
+        if self.stage.downramp is not None:
+            print('\n== Downramp ==========')
+            self.stage.downramp.print_summary(print_params=False)
+
+        print('\n== Interstage ==========')
+        if self.interstage is None:
+            print('Type: ', 'None')
+        else:
+            self.interstage.print_summary()

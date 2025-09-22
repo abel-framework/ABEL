@@ -1,0 +1,27 @@
+! ACHROMATIC STAGING
+
+! beam charge
+C: CHARGE, TOTAL = $charge
+
+! dipoles
+DIPOLE : CSRCSBEND, L = $length_dipole, ANGLE = $angle_dipole, BINS = $num_slices, ISR = $enable_isr, CSR = $enable_csr
+CHICDIPOLE1 : CSRCSBEND, L = $length_chicane_dipole, ANGLE = $angle_chicane_dipole1, BINS = $num_slices, ISR = $enable_isr, CSR = $enable_csr
+CHICDIPOLE2 : CSRCSBEND, L = $length_chicane_dipole, ANGLE = $angle_chicane_dipole2, BINS = $num_slices, ISR = $enable_isr, CSR = $enable_csr
+
+! nonlinear plasma lens
+PLASMALENS : BMAPXY, L = $length_plasma_lens, FILENAME = "$filename_lens", STRENGTH = $field_gradient_plasma_lens, ACCURACY=1E-9, METHOD="runge-kutta"
+
+! gap (drift)
+GAP : DRIF, L = $length_gap
+
+! central sextupole
+SEXTUPOLE: KSEXT, L = $length_central_gap_or_sextupole, K2 = $strength_sextupole, N_SLICES = $num_slices
+
+! output watches
+MONITOR: WATCH, FILENAME = "$monitor_filename", DISABLE = $monitor_disabled
+GAP_M : LINE = (MONITOR, GAP, MONITOR)
+MONITOR_FINAL: WATCH, FILENAME = "$output_filename"
+GAP_FINAL : LINE = (MONITOR, GAP, MONITOR_FINAL)
+
+! beam line
+ACHROMAT : LINE = (C, GAP_M, DIPOLE, GAP_M, PLASMALENS, GAP_M, CHICDIPOLE1, GAP_M, CHICDIPOLE2, GAP_M, SEXTUPOLE, GAP_M, CHICDIPOLE2, GAP_M, CHICDIPOLE1, GAP_M, PLASMALENS, GAP_M, DIPOLE, GAP_FINAL)

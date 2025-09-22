@@ -326,40 +326,122 @@ class Runnable(ABC):
         
         return best_parameters, best_values
     
+
+    def extract_beam_function(self, beam_fcn, index=-1, clean=False):
+        """
+        Extract mean and standard deviation value of beam parameters across a 
+        scan.
     
-    # Extract mean and standard deviation value of beam parameters across a scan
-    def extract_beam_function(self, beam_fcn, index=-1):
-        val_mean, val_std = self.extract_function(lambda obj : beam_fcn(obj.get_beam(index=index)))
+        Parameters
+        ----------
+        beam_fcn : ABEL ``Beam`` method
+            Used to calculate the beam parameter. E.g. ``Beam.charge``, 
+            ``Beam.rel_energy_spread``, ``Beam.norm_emittance_y`` etc.
+
+        index : int, optional
+            Index of the beamline component used to determine which beam to extract. 
+            Default set to -1, i.e. the beam after the last beamline component is 
+            extracted.
+
+        clean : bool, optional
+            Flag for cleaning the beam before calculating the beam parameter. Default 
+            set to False.
+
+            
+        Returns
+        ----------
+        vals : 2D ndarray
+            Each column in ``vals`` corresponds to a scan step, each element in the 
+            column corresponds to a shot.
+        """
+
+        import inspect
+
+        input_list = inspect.signature(beam_fcn).parameters
+        if 'clean' in input_list:  # Check if the input list contains clean.
+            val_mean, val_std = self.extract_function(lambda obj, clean : beam_fcn(obj.get_beam(index=index), clean), clean)
+        else:
+            val_mean, val_std = self.extract_function(lambda obj : beam_fcn(obj.get_beam(index=index)))
         return val_mean, val_std
             
-    def extract_function(self, fcn):
 
-        # prepare the arrays
+    def extract_function(self, fcn, clean=False):
+
+        import inspect
+
+        # Prepare the arrays
         val_mean = np.empty(self.num_steps)
         val_std = np.empty(self.num_steps)
-        
-        # extract values
+
+        # Extract values
         if self.is_scan():
-            
             for step in range(self.num_steps):
                 
-                # get values for this step
+                # Get values for this step
                 val_output = np.empty(self.num_shots_per_step)
                 for shot_in_step in range(self.num_shots_per_step):
-                    val_output[shot_in_step] = fcn(self[step, shot_in_step])
                     
-                # get step mean and error
+                    input_list = inspect.signature(fcn).parameters
+                    if 'clean' in input_list:  # Check if the input list contains clean.
+                        val_output[shot_in_step] = fcn(self[step, shot_in_step], clean=clean)
+                    else:
+                        val_output[shot_in_step] = fcn(self[step, shot_in_step])
+                    
+                # Get step mean and error
                 val_mean[step] = np.mean(val_output)
                 val_std[step] = np.std(val_output)
-        
+
         return val_mean, val_std
 
+
+    def scan_steps_beam_params(self, beam_fcn, clean=False):
+        """
+        Extract beam parameter data across all scan steps and shots.
+    
+        Parameters
+        ----------
+        beam_fcn : ABEL ``Beam`` method
+            Used to calculate the beam parameter. E.g. ``Beam.charge``, 
+            ``Beam.rel_energy_spread``, ``Beam.norm_emittance_y`` etc.
+
+        clean : bool, optional
+            Flag for cleaning the beam before calculating the beam parameter. 
+            Default set to False.
+
+            
+        Returns
+        ----------
+        vals : 2D ndarray
+            Each column in ``vals`` corresponds to a scan step, each element in 
+            the column corresponds to a shot.
+        """
+
+        import inspect
+
+        vals = np.empty((self.num_shots_per_step, self.num_steps))
+
+        for step in range(self.num_steps):
+            
+            # get values for this step
+            for shot_in_step in range(self.num_shots_per_step):
+                
+                input_list = inspect.signature(beam_fcn).parameters
+
+                if 'clean' in input_list:  # Check if the input list contains clean.
+                    beam = self[step, shot_in_step].get_beam(index=-1)
+                    vals[shot_in_step, step] = beam_fcn(beam, clean=clean)
+                else:
+                    fcn = lambda obj : beam_fcn(obj.get_beam(index=-1))
+                    vals[shot_in_step, step] = fcn(self[step, shot_in_step])
+
+        return vals
+    
 
     
     ## PLOT FUNCTIONS
 
     # plot value of beam parameters across a scan
-    def plot_function(self, fcns, label=None, scale=1, xscale='linear', yscale='linear', legend=None):
+    def plot_function(self, fcns, label=None, scale=1, xscale='linear', yscale='linear', legend=None, add_scans=None):
 
         from matplotlib import pyplot as plt
         
@@ -368,35 +450,59 @@ class Runnable(ABC):
         
         if not isinstance(legend, list):
             legend = [legend]
-    
+
+        scans = [self]
+        if add_scans is not None:
+            if isinstance(add_scans, list):
+                scans.extend(add_scans)
+            else:
+                scans.append(add_scans)
+        
         # plot evolution
         fig, ax = plt.subplots(1)
         fig.set_figwidth(CONFIG.plot_width_default)
         fig.set_figheight(CONFIG.plot_width_default*0.6)
-        
-        for i, fcn in enumerate(fcns):
-            
-            # extract values
-            val_mean, val_std = self.extract_function(fcn)
-            
-            if not hasattr(self, 'scale'):
-                self.scale = 1
-            if not hasattr(self, 'label'):
-                self.label = ''
-            
-            ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend[i])
-            if legend[i] is not None:
-                ax.legend()
-            
+
+        for j, scan in enumerate(scans):
+                
+            for i, fcn in enumerate(fcns):
+                
+                # extract values
+                val_mean, val_std = scan.extract_function(fcn)
+                
+                if not hasattr(self, 'scale'):
+                    self.scale = 1
+                if not hasattr(self, 'label'):
+                    self.label = ''
+
+                # identify the legend/label
+                if legend is not None and len(legend) > len(fcns)*j+i:
+                    legend_label = legend[len(fcns)*j+i]
+                else:
+                    legend_label = None
+
+                # plot the values (with or without errorbars)
+                if abs(np.sum(val_std)) == 0 or np.isnan(val_std).any():
+                    ax.plot(scan.vals/self.scale, val_mean/scale, ls='-', label=legend_label)
+                else:
+                    ax.errorbar(self.vals/self.scale, val_mean/scale, abs(val_std/scale), ls=':', capsize=5, label=legend_label)
+                
         ax.set_xlabel(self.label)
         ax.set_ylabel(label)
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
+        if legend is not None:
+            ax.legend()
 
     
     # plot value of beam parameters across a scan
-    def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear'):
-        self.plot_function(lambda obj : beam_fcn(obj.get_beam(index=index)), label=label, scale=scale, xscale=xscale, yscale=yscale)
+    def plot_beam_function(self, beam_fcn, index=-1, label=None, scale=1, xscale='linear', yscale='linear', legend=None, add_scans=None, clean=False):
+        import inspect
+        if clean and ('clean' in inspect.signature(beam_fcn).parameters):  # Check if the input list contains 'clean'.
+            beam_fcn_prep = lambda obj : beam_fcn(obj.get_beam(index=index), clean=clean)
+        else:
+            beam_fcn_prep = lambda obj : beam_fcn(obj.get_beam(index=index))
+        self.plot_function(beam_fcn_prep, label=label, scale=scale, xscale=xscale, yscale=yscale, legend=legend, add_scans=add_scans)    
 
     def plot_energy(self, index=-1):
         self.plot_beam_function(Beam.energy, scale=1e9, label='Energy [GeV]', index=index)

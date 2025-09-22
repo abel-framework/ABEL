@@ -1038,3 +1038,11 @@ D = np.array([[20, 40, 110],
 F = np.array([0.08, 0.17, 0.25, 0.39, 0.48, 0.56, 0.68, 0.78, 0.86, 1])
 C = np.vstack([np.interp(np.linspace(0, 1, 1000), F, D[:, i]) for i in range(3)]).T
 FLASHForward_nowhite = colors.ListedColormap(C)
+
+D = np.array([[228, 47, 44],
+              [103, 182, 7],
+              [1, 130, 236]])/255
+F = np.array([0.05, 0.47, 0.95])
+C = np.vstack([np.interp(np.linspace(0, 1, 1000), F, D[:, i]) for i in range(3)]).T
+RGB = colors.ListedColormap(C)
+

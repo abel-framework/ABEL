@@ -61,6 +61,8 @@ class Trackable(ABC):
         return self._bunch_separation
     @bunch_separation.setter
     def bunch_separation(self, bunch_separation : float):
+        if bunch_separation is not None and bunch_separation < 0.0:
+             raise ValueError('bunch_separation cannot be negative.')
         self._bunch_separation = bunch_separation
 
     @property
@@ -71,6 +73,8 @@ class Trackable(ABC):
         return 1.0/self.bunch_separation
     @bunch_frequency.setter
     def bunch_frequency(self, bunch_frequency):
+        if bunch_frequency is not None and bunch_frequency < 0.0:
+             raise ValueError('bunch_frequency cannot be negative.')
         self.bunch_separation = 1.0/bunch_frequency
     
     @property
@@ -125,6 +129,8 @@ class Trackable(ABC):
         return self._rep_rate_trains
     @rep_rate_trains.setter
     def rep_rate_trains(self,rep_rate_trains : float):
+        if rep_rate_trains is not None and rep_rate_trains < 0.0:
+             raise ValueError('rep_rate_trains cannot be negative.')
         self._rep_rate_trains = rep_rate_trains
     def get_rep_rate_trains(self):
         "Get the train repetition rate [Hz] - alias for self.rep_rate_trains"
@@ -195,7 +201,7 @@ class Trackable(ABC):
                     stage_word = f" #{beam.stage_number}"
                 else:
                     stage_word = ''
-
+                
                 # print string
                 print(f"{col_lgray}{tracking_word} #{str(beam.trackable_number).ljust(2)}{col_reset} {bold}{(type(self).__name__+stage_word).ljust(23)}{reset_bold} {col_lgray}(s ={col_reset} {bold}{beam.location:6.1f}{reset_bold} m{col_lgray}){col_reset} :   {col_lgray}E ={col_reset}{bold}{beam.energy()/1e9:6.1f}{reset_bold} GeV{col_lgray}, Q ={col_reset}{bold}{beam.charge()*1e9:6.2f}{reset_bold} nC{col_lgray}, σz ={col_reset} {bold}{beam.bunch_length()/1e-6:5.1f}{reset_bold} µm{col_lgray}, σE ={col_reset}{bold}{beam.rel_energy_spread()/1e-2:5.1f}%{reset_bold}{col_lgray}, ε ={col_reset}{bold}{beam.norm_emittance_x()/1e-6:6.1f}{reset_bold}/{bold}{beam.norm_emittance_y()/1e-6:.1f}{reset_bold} mm-mrad{reset}")
                 

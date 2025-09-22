@@ -2,9 +2,10 @@ from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
-from abel.classes.source.impl.source_capsule import SourceCapsule
+from abel.classes.source.impl.source_capsule import Source
+from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
-import copy
+import copy, warnings
 import scipy.constants as SI
 from types import SimpleNamespace
 from abel.utilities.plasma_physics import beta_matched
@@ -67,18 +68,57 @@ class Stage(Trackable, CostModeled):
         self.final.plasma.wakefield.onaxis = SimpleNamespace()
 
         self.name = 'Plasma stage'
-
+        
 
     # ==================================================
+    @property
+    def driver_source(self) -> Source | DriverComplex | None:
+        "Returns the driver source or the driver complex of the stage."
+        return self._driver_source
+    @driver_source.setter
+    def driver_source(self, source : Source | DriverComplex | None):
+        if source is not None and not isinstance(source, (Source, DriverComplex)):
+            raise TypeError("driver_source must be a Source, DriverComplex, or None")
+        self._driver_source = source
+    _driver_source = None
+
+    def get_driver_source(self):
+        """
+        Returns the driver source of the stage or the driver source of the 
+        associated driver complex of the stage.
+    
+        Parameters
+        ----------
+        N/A
+
+
+        Returns
+        ----------
+        driver_source : ``Source``object
+        """
+    
+        if isinstance(self.driver_source, DriverComplex):
+            driver_source = self.driver_source.source
+        elif isinstance(self.driver_source, Source):
+            driver_source = self.driver_source
+        
+        return driver_source
+    
+
+    
     ## Define upramp and downramp, if present
+
+    # ==================================================
     @property
     def upramp(self) -> Self | None:
         "The upramp of this stage, which also is a Stage"
         return self._upramp
     @upramp.setter
     def upramp(self, upramp : Self | None):
-        if not isinstance(upramp, Stage) and upramp is not None:
-            raise StageError("The upramp must be an instance of Stage or None")    
+        if upramp is not None:
+            if not isinstance(upramp, Stage):
+                raise StageError("The upramp must be an instance of Stage or None")
+            
         self._upramp = upramp
         if upramp is not None:
             self._upramp.parent = self
@@ -95,8 +135,10 @@ class Stage(Trackable, CostModeled):
         return self._downramp
     @downramp.setter
     def downramp(self, downramp : Self | None):
-        if not isinstance(downramp, Stage) and downramp is not None:
-            raise StageError("The downramp must be an instance of Stage or None")
+        if downramp is not None:
+            if not isinstance(downramp, Stage):
+                raise StageError("The downramp must be an instance of Stage or None")
+
         self._downramp = downramp
         if downramp is not None:
             self._downramp.parent = self
@@ -107,27 +149,55 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def stage2ramp(self, ramp_plasma_density=None, ramp_length=None):
+    @property
+    def ramp_beta_mag(self) -> Self:
         """
-        Used for copying a predefined stage's settings and configurations to set up flat ramps.
+        The betatron magnification used to define ramp plasma densities. Can be 
+        overriden with the ramps' own ramp_beta_mag.
+        """
+        return self._ramp_beta_mag
+    @ramp_beta_mag.setter
+    def ramp_beta_mag(self, ramp_beta_mag : float | None):
+        if ramp_beta_mag is not None:
+            if not isinstance(ramp_beta_mag, (float, int)) or ramp_beta_mag < 0.0:
+                raise VariablesOutOfRangeError("ramp_beta_mag must be a positive number.")
+
+            # Check if upramp or downramp already has defined ramp_beta_mag
+            if self.has_ramp():
+                if self.upramp.ramp_beta_mag is not None:
+                    warnings.warn('ramp_beta_mag for the upramp is already defined.')
+                if self.downramp.ramp_beta_mag is not None:
+                    warnings.warn('ramp_beta_mag for the downramp is already defined.')
+
+        self._ramp_beta_mag = ramp_beta_mag
+    _ramp_beta_mag = None
+
+
+    # ==================================================
+    def copy_config2blank_stage(self):
+        """
+        Makes a deepcopy of the stage to copy the configurations and settings,
+        but most of the parameters in the deepcopy are set to ``None``.
     
         Parameters
         ----------
-        ramp_plasma_density : [m^-3] float, optional
-            Plasma density for the ramp.
-
-        ramp_length : [m] float, optional
-            Length of the ramp.
-    
+        N/A
             
         Returns
         ----------
         stage_copy : ``Stage`` object
-            A modified deep copy of the original stage.
+            A modified deep copy of the original stage. 
+            ``stage_copy.plasma_density``, ``stage_copy.length``, 
+            ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
+            ``stage_copy.nom_energy_gain_flattop``, 
+            ``stage_copy.nom_accel_gradient``, 
+            ``stage_copy.nom_accel_gradient_flattop``, 
+            ``stage_copy.driver_source`` and its ramps are all set to ``None``. 
+            All other attributes of the original stage are retained.
         """
 
         stage_copy = copy.deepcopy(self)
-        stage_copy.ramp_beta_mag = 1.0
+        stage_copy.ramp_beta_mag = None
 
         # Delete any upramps and downramps that might be present
         if stage_copy.upramp is not None:
@@ -135,7 +205,7 @@ class Stage(Trackable, CostModeled):
         if stage_copy.downramp is not None:
             stage_copy.downramp = None
 
-        # Can set energy gain and gradient parameters to None to let track_upramp() and track_downramp() determine these.
+        # Set energy gain, gradient and length parameters to None to let track_upramp() and track_downramp() determine these.
         # Do try/except to allow zeroing everything.
         try:
             stage_copy.nom_accel_gradient = None
@@ -153,12 +223,29 @@ class Stage(Trackable, CostModeled):
             stage_copy.nom_energy_gain_flattop = None
         except VariablesOverspecifiedError:
             pass
-            
-        # Everything else now unset, can set this safely.
-        # Will also trigger reset/recalc if needed
-        stage_copy.length_flattop = None
-        stage_copy.length = ramp_length
-        stage_copy.plasma_density = ramp_plasma_density
+        try:
+            stage_copy.length = None
+        except VariablesOverspecifiedError:
+            pass
+        try:
+            stage_copy.length_flattop = None
+        except VariablesOverspecifiedError:
+            pass
+
+        if stage_copy.nom_accel_gradient_flattop is not None:
+            raise ValueError('stage_copy.nom_accel_gradient is not None.')
+        if stage_copy.nom_accel_gradient_flattop is not None:
+            raise ValueError('stage_copy.nom_accel_gradient_flattop is not None.')
+        if stage_copy.nom_energy_gain is not None:
+            raise ValueError('stage_copy.nom_energy_gain is not None.')
+        if stage_copy.nom_energy_gain_flattop is not None:
+            raise ValueError('stage_copy.nom_energy_gain_flattop is not None.')
+        if stage_copy.length is not None:
+            raise ValueError('stage_copy.length is not None.')
+        if stage_copy.length_flattop is not None:
+            raise ValueError('stage_copy.length_flattop is not None.')
+
+        stage_copy.plasma_density = None
          
         # Remove the driver source, as this will be replaced with SourceCapsule in track_upramp() and track_downramp()
         stage_copy.driver_source = None
@@ -167,30 +254,184 @@ class Stage(Trackable, CostModeled):
     
 
     # ==================================================
+    def convert_PlasmaRamp(self, ramp):
+        """
+        Convert a ``PlasmaRamp`` object to a ``Stage`` subclass object of the 
+        same type as ``self`` in order to construct a uniform ramp that can be 
+        tracked.
+
+        Needed in most ``Stage`` subclasses as these do not track the 
+        ``PlasmaRamps`` internally, but actually construct another stage of the 
+        same type with the same configurations on tracking time and use that for 
+        tracking.
+    
+        Parameters
+        ----------
+        ramp : ``PlasmaRamp`` object
+            Contains all parameters for the ramp.
+
+
+        Returns
+        ----------
+        trackable_ramp : ``Stage``object
+            A uniform ramp that can be used for tracking.
+        """
+
+        # Construct a ramp of the same type as self
+        trackable_ramp = self.copy_config2blank_stage()
+
+        # Copy the parameters in ramp to trackable_ramp
+        trackable_ramp.plasma_density = ramp.plasma_density
+        trackable_ramp.nom_energy = ramp.nom_energy
+
+        if trackable_ramp.nom_energy != trackable_ramp.nom_energy_flattop:
+            raise StageError('Ramp nominal energy is not equal to ramp flattop nominal energy.')
+
+        trackable_ramp.nom_energy_gain = ramp.nom_energy_gain
+        # trackable_ramp.nom_energy_gain_flattop = ramp.nom_energy_gain_flattop
+
+        if trackable_ramp.nom_energy_gain != trackable_ramp.nom_energy_gain_flattop:
+            raise StageError('Ramp nominal energy gain is not equal to ramp flattop nominal energy gain.')
+        
+        trackable_ramp.length_flattop = ramp.length_flattop
+        # trackable_ramp.length = ramp.length
+
+        if trackable_ramp.length != trackable_ramp.length_flattop:
+            raise StageError('Ramp length is not equal to ramp flattop length.')
+        
+        # trackable_ramp.nom_accel_gradient = ramp.nom_accel_gradient
+        # trackable_ramp.nom_accel_gradient_flattop = ramp.nom_accel_gradient_flattop
+
+        if trackable_ramp.nom_accel_gradient != trackable_ramp.nom_accel_gradient_flattop:
+            raise StageError('Ramp nominal accereleration gradient is not equal to ramp flattop nominal accereleration gradient.')
+
+        return trackable_ramp
+    
+
+    # ==================================================
     def _prepare_ramps(self):
-        "Set ramp lengths and nominal energy gains if the ramps exist (both upramp and downramp lengths have to be set up before track_upramp())."
+        """
+        Set ramp lengths, nominal energies and nominal energy gains if the ramps 
+        exist (both upramp and downramp lengths have to be set up before being 
+        tracked).
+        """
+        
         if self.nom_energy is None:
             #Should be set in linac.track()
             raise StageError('Stage nominal energy is None.')
 
         if self.upramp is not None:
-            if self.upramp.nom_energy_gain is None:
-                self.upramp.nom_energy_gain = 0.0
+            if self.upramp.plasma_density is None and self.plasma_density is not None:
+                if self.upramp.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.upramp.ramp_beta_mag
+                elif self.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.ramp_beta_mag
+                else:
+                    raise ValueError('No ramp_beta_mag defined.')
+                self.upramp.plasma_density = self.plasma_density/ramp_beta_mag
+            if self.upramp.nom_energy_gain_flattop is None:
+                self.upramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.upramp.nom_energy is None:
                 self.upramp.nom_energy = self.nom_energy
+                self.upramp.nom_energy_flattop = self.upramp.nom_energy
                 self.nom_energy_flattop = self.nom_energy + self.upramp.nom_energy_gain
-            if self.upramp.length is None:
-                self.upramp.length = self._calc_ramp_length(self.upramp)
-        else:
-            self.nom_energy_flattop = self.nom_energy
+
+            # Can calculate and set the ramp length after the nominal energy of the ramp is determined
+            if self.upramp.length_flattop is None:
+                self.upramp.length_flattop = self._calc_ramp_length(self.upramp)
             
         if self.downramp is not None:
-            if self.downramp.nom_energy_gain is None:
-                self.downramp.nom_energy_gain = 0.0
+            if self.downramp.plasma_density is None and self.plasma_density is not None:
+                if self.downramp.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.downramp.ramp_beta_mag
+                elif self.ramp_beta_mag is not None:
+                    ramp_beta_mag = self.ramp_beta_mag
+                else:
+                    raise ValueError('No ramp_beta_mag defined.')
+                self.downramp.plasma_density = self.plasma_density/ramp_beta_mag
+            if self.downramp.nom_energy_gain_flattop is None:
+                self.downramp.nom_energy_gain_flattop = 0.0  # Default energy gain in the ramps is zero.
             if self.downramp.nom_energy is None:
                 self.downramp.nom_energy = self.nom_energy_flattop + self.nom_energy_gain_flattop
-            if self.downramp.length is None:
-                self.downramp.length = self._calc_ramp_length(self.downramp)
+                
+            # Can calculate and set the ramp length after the nominal energy of the ramp is determined
+            if self.downramp.length_flattop is None:
+                self.downramp.length_flattop = self._calc_ramp_length(self.downramp)
+    
+    
+    # ==================================================
+    def is_upramp(self):
+        "Checks if self is an upramp."
+
+        if self.parent is not None:
+            if self.parent.upramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def is_downramp(self):
+        "Checks if self is an downramp."
+
+        if self.parent is not None:
+            if self.parent.downramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def has_ramp(self):
+        "Checks if there are any ramps attached to the stage."
+
+        if self.upramp is not None or self.downramp is not None:
+            return True
+        else:
+            return False
+
+        self._resetLengthEnergyGradient()
+        self._recalcLengthEnergyGradient()
+
+    
+    # ==================================================
+    def is_upramp(self):
+        "Checks if self is an upramp."
+
+        if self.parent is not None:
+            if self.parent.upramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def is_downramp(self):
+        "Checks if self is an downramp."
+
+        if self.parent is not None:
+            if self.parent.downramp == self:
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+
+    # ==================================================
+    def has_ramp(self):
+        "Checks if there are any ramps attached to the stage."
+
+        if self.upramp is not None or self.downramp is not None:
+            return True
+        else:
+            return False
 
 
     # ==================================================
@@ -198,7 +439,15 @@ class Stage(Trackable, CostModeled):
         "Calculate and set the up/down ramp (uniform step ramp) length [m] based on stage nominal energy."
         if ramp.nom_energy is None:
             raise StageError('Ramp nominal energy is None.')
-        ramp_length = beta_matched(self.plasma_density, ramp.nom_energy)*np.pi/(2*np.sqrt(1/self.ramp_beta_mag))
+        
+        if ramp.ramp_beta_mag is not None:
+            ramp_beta_mag = ramp.ramp_beta_mag
+        elif self.ramp_beta_mag is not None:
+            ramp_beta_mag = self.ramp_beta_mag
+        else:
+            raise ValueError('No ramp_beta_mag defined.')
+        
+        ramp_length = beta_matched(self.plasma_density, ramp.nom_energy)*np.pi/(2*np.sqrt(1/ramp_beta_mag))
         if ramp_length < 0.0:
             raise ValueError(f"ramp_length = {ramp_length} [m] < 0.0")
         return ramp_length
@@ -258,56 +507,6 @@ class Stage(Trackable, CostModeled):
         return super().track(beam, savedepth, runnable, verbose)
 
 
-    # ==================================================
-    # upramp to be tracked before the main tracking
-    def track_upramp(self, beam0, driver0=None):
-        if self.upramp is not None:
-
-            # set driver
-            self.upramp.driver_source = SourceCapsule(beam=driver0)
-
-            # determine density if not already set
-            if self.upramp.plasma_density is None:
-                self.upramp.plasma_density = self.plasma_density/self.ramp_beta_mag
-
-            # perform tracking
-            self.upramp._return_tracked_driver = True
-            beam, driver = self.upramp.track(beam0)
-            beam.stage_number -= 1
-            driver.stage_number -= 1
-            
-        else:
-            beam = beam0
-            driver = driver0
-        
-        return beam, driver
-
-
-    # ==================================================
-    # downramp to be tracked after the main tracking
-    def track_downramp(self, beam0, driver0):
-        if self.downramp is not None:
-
-            # set driver
-            self.downramp.driver_source = SourceCapsule(beam=driver0)
-            
-            # determine density if not already set
-            if self.downramp.plasma_density is None:
-                # set ramp density
-                self.downramp.plasma_density = self.plasma_density/self.ramp_beta_mag           
-            
-            # perform tracking
-            self.downramp._return_tracked_driver = True
-            beam, driver = self.downramp.track(beam0)
-            beam.stage_number -= 1
-            driver.stage_number -= 1
-            
-        else:
-            beam = beam0
-            driver = driver0
-            
-        return beam, driver
-
 
     ## Mutually consistent calculation for length, nom_accel_gradient, nom_energy gain,
     #  their flattop counterparts, and (if existing) their stage counterparts.
@@ -344,6 +543,18 @@ class Stage(Trackable, CostModeled):
     # Traversing and keeping track of the hierarchy of Stages is done using the properties parent, upramp, and downramp.
     # These are ensured to be a Stage or None. The parent cannot be unset, but upramp and downramp can be removed (set to None).
     # Helper methods _getOtherRamp() and _getOverallestStage() are used to traverse the hierarchy.
+
+    #  self.nom_energy_gain, self.length, self.nom_accel_gradient
+    # <-------------------------------------------------------------------------->
+    #
+    #                           stage flattop
+    #               <--------------------------------------->
+    #                _______________________________________
+    #   upramp      |                                       | downramp
+    #  <----------->|                                       |<------------------>
+    #  _____________|                                       |____________________
+    # |                                                                          |
+    # E0            E1                                      E2
 
 
     # Methods for setting and getting the variables
@@ -388,6 +599,7 @@ class Stage(Trackable, CostModeled):
         "Alias of length"
         return self.length
 
+
     # ==================================================
     @property
     def nom_energy_gain(self) -> float:
@@ -415,6 +627,7 @@ class Stage(Trackable, CostModeled):
     def get_nom_energy_gain(self):
         "Alias of nom_energy_gain"
         return self.nom_energy_gain
+
 
     # ==================================================
     @property
@@ -466,6 +679,7 @@ class Stage(Trackable, CostModeled):
     _length_flattop      = None
     _length_flattop_calc = None
 
+
     # ==================================================
     @property
     def nom_energy_gain_flattop(self) -> float:
@@ -513,8 +727,63 @@ class Stage(Trackable, CostModeled):
     _nom_accel_gradient_flattop      = None
     _nom_accel_gradient_flattop_calc = None
 
-    ## Recalculation methods
 
+    # ==================================================
+    @property
+    def nom_energy(self) -> float:
+        "Nominal energy for the tracking [eV], or None if not set/calculateable"
+        return self._nom_energy_calc
+    @nom_energy.setter
+    def nom_energy(self, nom_energy : float):
+        if self._nom_energy_calc is not None and self._nom_energy is None:
+            raise VariablesOverspecifiedError("nom_energy already known/calculateable, cannot set")
+        if nom_energy is not None:
+            if nom_energy < 0.0:
+                raise VariablesOutOfRangeError(f"Setting nom_energy = {nom_energy} < 0; check variables.")
+        
+        nom_energy_old = self._nom_energy
+        try:
+            self._nom_energy = nom_energy
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._nom_energy = nom_energy_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
+    _nom_energy      = None
+    _nom_energy_calc = None
+
+
+    # ==================================================
+    @property
+    def nom_energy_flattop(self) -> float:
+        "Nominal energy in the flattop for the tracking [eV], or None if not set/calculateable"
+        return self._nom_energy_flattop_calc
+    @nom_energy_flattop.setter
+    def nom_energy_flattop(self, nom_energy_flattop : float):
+        if self._nom_energy_flattop_calc is not None and self._nom_energy_flattop is None:
+            raise VariablesOverspecifiedError("nom_energy_flattop already known/calculateable, cannot set")
+        if nom_energy_flattop is not None:
+            if nom_energy_flattop < 0.0:
+                raise VariablesOutOfRangeError(f"Setting nom_energy_flattop = {nom_energy_flattop} < 0; check variables.")
+        
+        nom_energy_flattop_old = self._nom_energy_flattop
+        try:
+            self._nom_energy_flattop = nom_energy_flattop
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+        except VariablesOutOfRangeError:
+            self._nom_energy_flattop = nom_energy_flattop_old
+            self._resetLengthEnergyGradient()
+            self._recalcLengthEnergyGradient()
+            raise
+    _nom_energy_flattop      = None
+    _nom_energy_flattop_calc = None
+
+
+    # ==================================================
+    ## Recalculation methods
     # ==================================================
     def _resetLengthEnergyGradient(self):
         "Reset all the calculated values in the current Stage hierarchy"
@@ -533,12 +802,17 @@ class Stage(Trackable, CostModeled):
         self._nom_energy_gain_flattop_calc    = self._nom_energy_gain_flattop
         self._nom_accel_gradient_flattop_calc = self._nom_accel_gradient_flattop
 
+        self._nom_energy_calc         = self._nom_energy
+        self._nom_energy_flattop_calc = self._nom_energy_flattop
+
         self._printVerb("length                     (1)>", self.length)
         self._printVerb("nom_energy_gain            (1)>", self.nom_energy_gain)
         self._printVerb("nom_accel_gradient         (1)>", self.nom_accel_gradient)
         self._printVerb("length_flattop             (1)>", self.length_flattop)
         self._printVerb("nom_energy_gain_flattop    (1)>", self.nom_energy_gain_flattop)
         self._printVerb("nom_accel_gradient_flattop (1)>", self.nom_accel_gradient_flattop)
+        self._printVerb("nom_energy                 (1)>", self.nom_energy)
+        self._printVerb("nom_energy_flattop         (1)>", self.nom_energy_flattop)
 
         if self.upramp is not None:
             self._printVerb("Upramp:")
@@ -608,7 +882,7 @@ class Stage(Trackable, CostModeled):
                     self._nom_accel_gradient_flattop_calc = self.nom_energy_gain_flattop / self.length_flattop
                     self._printVerb("nom_accel_gradient_flattop (2)>",self.nom_accel_gradient_flattop)
                     updateCounter += 1
-
+            
             #Relationships total <-> flattop+ramp
             if self.length is None:
                 if self.length_flattop is not None:
@@ -652,6 +926,27 @@ class Stage(Trackable, CostModeled):
                         self._length_flattop_calc = L
                         updateCounter += 1
 
+
+            #  dE, total energy gain
+            # <-------------------------------------------------------------------------->
+            #
+            #                dE1, flattop energy gain of stage
+            #               <--------------------------------------->
+            #                _______________________________________
+            #   dE0         |                                       | dE2
+            #  <----------->|                                       |<------------------>
+            #  _____________|                                       |____________________
+            # |                                                                          |
+            # E0            E1                                      E2
+            # 
+            # E0 = stage.nom_energy
+            # E1 = stage.nom_energy_flattop 
+            # E1 = E0 + dE0 = stage.nom_energy + stage.upramp.nom_energy_gain
+            # E2 = stage.downramp.nom_energy
+            # E2 = E1 + dE1 = stage.nom_energy_flattop + stage.energy_gain_flattop
+            # dE = dE0 + dE1 +dE2
+
+            # Try to calculate nom_energy_gain = nom_energy_gain_flattop +(upramp.nom_energy_gain) +(downramp.nom_energy_gain)
             if self.nom_energy_gain is None:
                 if self.nom_energy_gain_flattop is not None:
                     dE = self.nom_energy_gain_flattop
@@ -671,6 +966,7 @@ class Stage(Trackable, CostModeled):
                         self._nom_energy_gain_calc = dE
                         updateCounter += 1
 
+            # Try to calculate nom_energy_gain_flattop = nom_energy_gain -(upramp.nom_energy_gain) -(downramp.nom_energy_gain)
             if self.nom_energy_gain_flattop is None:
                 if self.nom_energy_gain is not None:
                     dE = self.nom_energy_gain
@@ -689,6 +985,78 @@ class Stage(Trackable, CostModeled):
                         self._printVerb("nom_energy_gain_flattop    (3)>",dE)
                         self._nom_energy_gain_flattop_calc = dE
                         updateCounter += 1
+
+            # Try to calculate nom_energy_flattop = nom_energy +(upramp.nom_energy_gain)
+            if self.nom_energy_flattop is None:
+                if self.nom_energy is not None:
+                    E0 = self.nom_energy
+                    E1 = E0
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE0 = self.upramp.nom_energy_gain
+                            E1 = E0 + dE0
+                    if isDef:
+                        self._printVerb("nom_energy_flattop   (3)>", E1)
+                        if E1 < 0.0:
+                            raise VariablesOutOfRangeError(f"Calculated nominal energy = {E1} < 0; check variables.")
+                        self._nom_energy_flattop_calc = E1
+                        updateCounter += 1
+
+            # Try to calculate nom_energy = nom_energy_flattop -(upramp.nom_energy_gain)
+            if self.nom_energy is None:
+                if self.nom_energy_flattop is not None:
+                    E1 = self.nom_energy_flattop
+                    E0 = E1
+                    isDef = True
+                    if self.upramp is not None:
+                        if self.upramp.nom_energy_gain is None:
+                            isDef = False
+                        else:
+                            dE0 = self.upramp.nom_energy_gain
+                            E0 = E1 - dE0
+                    if isDef:
+                        self._printVerb("nom_energy           (3)>", E0)
+                        if E0 < 0.0:
+                            raise VariablesOutOfRangeError(f"Calculated nominal energy = {E0} < 0; check variables.")
+                        self._nom_energy_calc = E0
+                        updateCounter += 1
+
+            # Try to set the nominal energy to be equal to the upramp nominal energy
+            if self.nom_energy is None:
+                if self.upramp is not None:
+                    if self.upramp.nom_energy is not None:
+                        if self.upramp.nom_energy < 0.0:
+                                raise VariablesOutOfRangeError(f"Calculated nominal energy = {self.upramp.nom_energy} < 0; check variables.")
+                        self._printVerb("nom_energy                (3)>", self.nom_energy)
+                        self._nom_energy_calc = self.upramp.nom_energy
+                        updateCounter += 1
+            
+            # Try to calculate nom_energy_flattop = downramp.nom_energy - nom_energy_gain_flattop
+            if self.nom_energy_flattop is None:
+                if self.downramp is not None:
+                    if self.downramp.nom_energy is not None and self.nom_energy_gain_flattop is not None:
+                        E2 = self.downramp.nom_energy
+                        dE1 = self.nom_energy_gain_flattop
+                        E1 = E2 - dE1
+                        self._printVerb("nom_energy_flattop           (3)>", E1)
+                        if E1 < 0.0:
+                            raise VariablesOutOfRangeError(f"Calculated nominal energy = {E1} < 0; check variables.")
+                        self._nom_energy_flattop_calc = E1
+                        self._printVerb("nom_energy_flattop        (3)>", self.nom_energy_flattop)
+                        updateCounter += 1
+
+
+            # Try to set the nom_energy_gain_flattop using self.downramp.nom_energy - self.nom_energy_flattop
+            # dE1 = E2-E1
+            if self.nom_energy_gain_flattop is None and self.downramp is not None:
+                if self.downramp.nom_energy is not None and self.nom_energy_flattop is not None:
+                    self._nom_energy_gain_flattop_calc = self.downramp.nom_energy - self.nom_energy_flattop
+                    self._printVerb("nom_energy_gain_flattop (4)>", self.nom_energy_gain_flattop)
+                    updateCounter += 1
+                
 
             #Note:
             #   Nom_accel_gradient from flattop+upramp+downramp gradients is implicitly set
@@ -736,6 +1104,38 @@ class Stage(Trackable, CostModeled):
                                 self._nom_energy_gain_calc = self.parent.nom_energy_gain - self.parent.nom_energy_gain_flattop - otherRamp.nom_energy_gain
                                 self._printVerb("nom_energy_gain (4)>", self.nom_energy_gain)
                                 updateCounter += 1
+                
+                # Try to set the upramp nominal energy gain using self.parent.nom_energy_flattop - self.parent.nom_energy
+                # dE0 = E1-E0
+                if self.nom_energy_gain is None and self.is_upramp():
+                    if self.parent.nom_energy is not None and \
+                       self.parent.nom_energy_flattop is not None:
+                        self._nom_energy_gain_calc = self.parent.nom_energy_flattop - self.parent.nom_energy
+                        self._printVerb("nom_energy_gain (4)>", self.nom_energy_gain)
+                        updateCounter += 1
+                
+                # Try to set the upramp nominal energy using self.parent.nom_energy
+                if self.nom_energy is None and self.is_upramp():
+                    if self.parent.nom_energy is not None:
+                        if self.parent.nom_energy < 0.0:
+                            raise VariablesOutOfRangeError(f"Calculated nominal energy = {self.parent.nom_energy} < 0; check variables.")
+                        self._nom_energy_calc = self.parent.nom_energy
+                        self._printVerb("nom_energy.    (4)>", self.nom_energy)
+                        updateCounter += 1
+                
+                # Try to set the downramp nominal energy using self.parent.nom_energy_flattop + self.parent.nom_energy_gain_flattop
+                if self.nom_energy is None and self.is_downramp():
+                    if self.parent.nom_energy_flattop is not None and \
+                       self.parent.nom_energy_gain_flattop is not None:
+                        E1 = self.parent.nom_energy_flattop
+                        dE1 = self.parent.nom_energy_gain_flattop
+                        E2 = E1 + dE1
+                        if E2 < 0.0:
+                            raise VariablesOutOfRangeError(f"Calculated nominal energy = {E2} < 0; check variables.")
+                        self.nom_energy = E2
+                        self._printVerb("nom_energy     (4)>", self.nom_energy)
+                        updateCounter += 1
+
 
             #Dig down and try to calculate more
             if self.upramp is not None:
@@ -789,11 +1189,38 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def matched_beta_function(self, energy_incoming):
-        if self.ramp_beta_mag is not None:
-            return beta_matched(self.plasma_density, energy_incoming)*self.ramp_beta_mag
+    def matched_beta_function(self, energy_incoming, match_entrance=True):
+        '''
+        Calculates the matched beta function of the stage. If there is an 
+        upramp, the beta function is matched to the upramp by default.
+    
+        
+        Parameters
+        ----------
+        energy_incoming : [eV] float
+            The energy used for matching.
+
+        match_entrance : bool, optional
+            Matches the beta function to the upramp or the stage entrance if 
+            `True`. Otherwise, will match the beta function to the downramp. 
+            Default set to `True`.
+            
+        Returns
+        ----------
+        beta_function : [m], float
+            The matched beta function.
+        '''
+
+        if match_entrance:
+            if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
+                return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
+            else:
+                return beta_matched(self.plasma_density, energy_incoming)
         else:
-            return beta_matched(self.plasma_density, energy_incoming)
+            if self.downramp.ramp_beta_mag is not None:
+                return beta_matched(self.plasma_density, energy_incoming)*self.downramp.ramp_beta_mag
+            else:
+                raise ValueError('Downramp ramp_beta_mag not defined.')
 
     
     # ==================================================
@@ -850,6 +1277,163 @@ class Stage(Trackable, CostModeled):
             self.final.beam.current.zs = ts*SI.c
             self.final.beam.current.Is = Is
 
+
+    # ==================================================
+    def rotate_beam_coordinate_systems(self, driver_incoming, beam_incoming):
+        """
+        Rotates the coordinate systems of the incoming drive beam and main
+        beam using passive transformation such that z-axis in the new frame 
+        is aligned with the drive beam propagation direction.
+
+        Currently does not support drive beam tilt not aligned with beam 
+        propagation direction.
+        
+
+        Parameters
+        ----------
+        driver_incoming : ``Beam`` object
+            The incoming drive beam before any rotation and ramps.
+
+        beam_incoming : ``Beam`` object
+            The incoming drive beam before any rotation and ramps.
+
+
+        Returns
+        ----------
+        drive_beam_rotated : ``Beam`` object
+            Rotated drive beam. Returns the input ``driver_incoming`` if the 
+            driver source of the stage does not have neither angular jitter nor 
+            angular offset.
+
+        beam_rotated : ``Beam`` object
+            Rotated main beam. Returns the input ``beam_incoming`` if the driver 
+            source of the stage does not have neither angular jitter nor angular 
+            offset.
+        """
+        import sys
+        machine_zero = sys.float_info.epsilon
+
+        drive_beam_rotated = driver_incoming
+        beam_rotated = beam_incoming
+
+        # Check if the driver source of the stage has angular offset
+        driver_source = self.get_driver_source()
+        has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
+
+        # Perform rotation if there is angular offset
+        if has_angular_offset:
+
+            driver_x_angle = driver_incoming.x_angle()
+            driver_y_angle = driver_incoming.y_angle()
+            
+            beam0_x_angle = beam_incoming.x_angle()
+            beam0_y_angle = beam_incoming.y_angle()
+
+            # Calculate the angles that will be used to rotate the beams' frame
+            rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
+            rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+            # The model currently does not support drive beam tilt not aligned with beam propagation, so need to first ensure that the drive beam is aligned to its own propagation direction. This is done using active transformation to rotate the beam around x- and y-axis
+            drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+
+            # Use passive transformation to rotate the frame of the beams
+            drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
+            beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)
+
+            if np.abs( drive_beam_rotated.x_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zx-plane.\n' + 'driver_incoming x_angle before coordinate transformation: ' + str(driver_x_angle) + '\ndrive_beam_rotated x_angle after coordinate transformation: ' + str(drive_beam_rotated.x_angle())
+                warnings.warn(driver_error_string)
+
+            if np.abs( drive_beam_rotated.y_angle() ) > 5e-10:
+                driver_error_string = 'Drive beam may not have been accurately rotated in the zy-plane.\n' + 'driver_incoming y_angle before coordinate transformation: ' + str(driver_y_angle) + '\ndrive_beam_rotated y_angle after coordinate transformation: ' + str(drive_beam_rotated.y_angle())
+                warnings.warn(driver_error_string)
+    
+            if np.abs( -(beam_rotated.x_angle() - beam0_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zx-plane.')
+                
+            if np.abs( (beam_rotated.y_angle() - beam0_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the zy-plane.')
+
+        return drive_beam_rotated, beam_rotated
+    
+
+    # ==================================================
+    def undo_beam_coordinate_systems_rotation(self, driver_incoming, driver_outgoing, beam_outgoing):
+        """
+        Undoes the passive coordinate transformation performed on the drive beam
+        and main beam at the start of the stage. Also adds drift to the beams.
+
+
+        Parameters
+        ----------
+        driver_incoming : ``Beam`` object
+            The incoming drive beam before any rotation and ramps.
+
+        driver_outgoing : ``Beam`` object
+            The outgoing drive beam after downramp.
+
+        beam_outgoing : ``Beam`` object
+            The outgoing main beam after downramp.
+
+
+        Returns
+        ----------
+        driver_outgoing : ``Beam`` object
+            Drive beam rotated back to its original coordinate system before the 
+            stage. Returns the input ``driver_outgoing`` if the driver source of 
+            the stage does not have neither angular jitter nor angular offset.
+
+        beam_outgoing : ``Beam`` object
+            Main beam rotated back to its original coordinate system before the 
+            stage. Returns the input ``beam_incoming`` if the driver source of 
+            the stage does not have neither angular jitter nor angular offset.
+        """
+
+        import sys
+        machine_zero = sys.float_info.epsilon
+
+        # Check if the driver source of the stage has angular offset
+        driver_source = self.get_driver_source()
+        has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
+        
+        if has_angular_offset:
+
+            driver_x_angle = driver_incoming.x_angle()
+            driver_y_angle = driver_incoming.y_angle()
+
+            # Calculate the angles that will be used to rotate the beams' frame
+            rotation_angle_x, rotation_angle_y = driver_incoming.beam_alignment_angles()
+            rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
+
+            # Angles of beam before rotating back to original coordinate system
+            beam_x_angle = beam_outgoing.x_angle()
+            beam_y_angle = beam_outgoing.y_angle()
+
+            driver_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+            beam_outgoing.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y, invert=True)
+            
+            # Add drifts to the beam
+            x_drift = self.length * np.tan(driver_x_angle)
+            y_drift = self.length * np.tan(driver_y_angle)
+            xs = beam_outgoing.xs()
+            ys = beam_outgoing.ys()
+            beam_outgoing.set_xs(xs + x_drift)
+            beam_outgoing.set_ys(ys + y_drift)
+            xs_driver = driver_outgoing.xs()
+            ys_driver = driver_outgoing.ys()
+            driver_outgoing.set_xs(xs_driver + x_drift)
+            driver_outgoing.set_ys(ys_driver + y_drift)
+            
+            #drive_beam_ramped.yx_rotate_coord_sys(-rotation_angle_x, -rotation_angle_y)
+        
+            if np.abs(driver_incoming.x_angle()) > machine_zero and np.abs( (beam_outgoing.x_angle() - beam_x_angle) / rotation_angle_x - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the xz-plane.')
+                
+            if np.abs(driver_incoming.y_angle()) > machine_zero and np.abs( -(beam_outgoing.y_angle() - beam_y_angle) / rotation_angle_y - 1) > 1e-3:
+                warnings.warn('Main beam may not have been accurately rotated in the yz-plane.')
+
+        return driver_outgoing, beam_outgoing
+
     
     # ==================================================
     def save_driver_to_file(self, driver, runnable):
@@ -905,7 +1489,7 @@ class Stage(Trackable, CostModeled):
             
         # extract wakefield if not already existing
         if not hasattr(evol, 'location'):
-            print('No evolution calculated')
+            print('Stage::plot_evolution(): No evolution calculated.')
             return
 
         # add upramp evolution
@@ -1031,17 +1615,90 @@ class Stage(Trackable, CostModeled):
         plt.show()
 
 
+    # ==================================================
+    def plot_spin_evolution(self, bunch='beam'):
+
+        from matplotlib import pyplot as plt
+        
+        # select bunch
+        if bunch == 'beam':
+            evol = copy.deepcopy(self.evolution.beam)
+        elif bunch == 'driver':
+            evol = copy.deepcopy(self.evolution.driver)
+            
+        # extract wakefield if not already existing
+        if not hasattr(evol, 'location'):
+            print('Stage::plot_spin_evolution(): No evolution calculated.')
+            return
+
+        if not hasattr(evol, 'spin_x') or evol.spin_x is None:
+            print('Stage::plot_spin_evolution(): No spin evolution calculated.')
+            return
+        
+        # add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                upramp_evol = self.upramp.evolution.beam
+            elif bunch == 'driver':
+                upramp_evol = self.upramp.evolution.driver
+            evol.location = np.append(upramp_evol.location, evol.location-np.min(evol.location)+np.max(upramp_evol.location))
+            evol.spin_x = np.append(upramp_evol.spin_x, evol.spin_x)
+            evol.spin_y = np.append(upramp_evol.spin_y, evol.spin_y)
+            evol.spin_z = np.append(upramp_evol.spin_z, evol.spin_z)
+            
+
+        # add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                downramp_evol = self.downramp.evolution.beam
+            elif bunch == 'driver':
+                downramp_evol = self.downramp.evolution.driver
+            evol.location = np.append(evol.location, downramp_evol.location-np.min(downramp_evol.location)+np.max(evol.location))
+            evol.spin_x = np.append(evol.spin_x, downramp_evol.spin_x)
+            evol.spin_y = np.append(evol.spin_y, downramp_evol.spin_y)
+            evol.spin_z = np.append(evol.spin_z, downramp_evol.spin_z)
+        
+        # preprate plot
+        fig, axs = plt.subplots(1,1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+        colx = "tab:blue"
+        coly = "tab:orange"
+        colz = "tab:green"
+        long_label = 'Location [m]'
+        long_limits = [min(evol.location), max(evol.location)]
+
+        # plot energy
+        axs.plot(evol.location, evol.spin_x, color=colx, label='x')
+        axs.plot(evol.location, evol.spin_y, color=coly, label='y')
+        axs.plot(evol.location, evol.spin_z, color=colz, label='z')
+        axs.set_ylabel('Spin polarization')
+        axs.set_xlabel(long_label)
+        axs.set_xlim(long_limits)
+        axs.set_ylim(-1.02, 1.02)
+        axs.legend()
+        
+        if self.stage_number is not None:
+            fig.suptitle('Stage ' + str(self.stage_number+1) + ', ' + bunch)
+        
+        plt.show()
+
+
     # ==================================================  
     def plot_wakefield(self):
 
         from matplotlib import pyplot as plt
         
+        if self.initial is None:
+            print('Stage::plot_wakefield(): No data.')
+            return
+        
         # extract wakefield if not already existing
         if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
-            print('No wakefield calculated')
+            print('Stage::plot_wakefield(): No wakefield data.')
             return
         if not hasattr(self.initial.beam.current, 'Is'):
-            print('No beam current calculated')
+            print('Stage::plot_wakefield(): No beam current data.')
             return
 
         # preprate plot
@@ -1056,7 +1713,8 @@ class Stage(Trackable, CostModeled):
         # extract wakefields and beam currents
         zs0 = self.initial.plasma.wakefield.onaxis.zs
         Ezs0 = self.initial.plasma.wakefield.onaxis.Ezs
-        has_final = hasattr(self.final.plasma.wakefield.onaxis, 'Ezs')
+        has_final = self.final is not None and hasattr(self.final, 'plasma.wakefield.onaxis.zs') and hasattr(self.final, 'plasma.wakefield.onaxis.Ezs')
+
         if has_final:
             zs = self.final.plasma.wakefield.onaxis.zs
             Ezs = self.final.plasma.wakefield.onaxis.Ezs
@@ -1075,9 +1733,76 @@ class Stage(Trackable, CostModeled):
         axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
-        if self.driver_source.energy is not None:
-            Ez_driver_max = self.driver_source.energy/self.length_flattop
-            axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
+        if self.driver_source is not None:  # A ramp may not have a driver source
+            driver_source = self.get_driver_source()
+            if driver_source.energy is not None:
+                Ez_driver_max = driver_source.energy/self.length_flattop
+                axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
+        if has_final:
+            axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
+        axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
+        axs[0].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
+        axs[0].set_ylabel('Longitudinal electric field [GV/m]')
+        zlims = [min(zs0)*1e6, max(zs0)*1e6]
+        axs[0].set_xlim(zlims)
+        axs[0].set_ylim(bottom=-1.7*np.max([np.abs(Ez_beam), Ez_driver])/1e9, top=1.3*Ez_driver/1e9)
+        
+        # plot beam current
+        axs[1].fill(np.concatenate((zs_I, np.flip(zs_I)))*1e6, np.concatenate((-Is, np.zeros(Is.shape)))/1e3, color=col1, alpha=af)
+        axs[1].plot(zs_I*1e6, -Is/1e3, '-', color=col1)
+        axs[1].set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
+        axs[1].set_ylabel('Beam current [kA]')
+        axs[1].set_xlim(zlims)
+        axs[1].set_ylim(bottom=1.2*min(-Is)/1e3, top=1.2*max(-Is)/1e3)
+
+
+    # ==================================================  
+    def plot_final_wakefield(self):
+        
+        # extract wakefield if not already existing
+        if not hasattr(self.final.plasma.wakefield.onaxis, 'Ezs'):
+            print('Stage::plot_final_wakefield(): No wakefield calculated.')
+            return
+        if not hasattr(self.final.beam.current, 'Is'):
+            print('Stage::plot_final_wakefield(): No beam current calculated.')
+            return
+
+        # preprate plot
+        fig, axs = plt.subplots(2, 1)
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*1)
+        col0 = "xkcd:light gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        af = 0.1
+        
+        # extract wakefields and beam currents
+        zs0 = self.final.plasma.wakefield.onaxis.zs
+        Ezs0 = self.final.plasma.wakefield.onaxis.Ezs
+        has_final = hasattr(self.final.plasma.wakefield.onaxis, 'Ezs')
+        if has_final:
+            zs = self.final.plasma.wakefield.onaxis.zs
+            Ezs = self.final.plasma.wakefield.onaxis.Ezs
+        zs_I = self.final.beam.current.zs
+        Is = self.final.beam.current.Is
+
+        # find field at the driver and beam
+        z_mid = zs_I.min() + (zs_I.max()-zs_I.min())*0.3
+        mask = zs_I < z_mid
+        zs_masked = zs_I[mask]
+        z_beam = zs_masked[np.abs(Is[mask]).argmax()]
+        Ez_driver = Ezs0[zs0 > z_mid].max()
+        Ez_beam = np.interp(z_beam, zs0, Ezs0)
+        
+        # get wakefield
+        axs[0].plot(zs0*1e6, np.zeros(zs0.shape), '-', color=col0)
+        if self.nom_energy_gain is not None:
+            axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
+        if self.driver_source is not None:  # A ramp may not have a driver source
+            driver_source = self.get_driver_source()
+            if driver_source.energy is not None:
+                Ez_driver_max = driver_source.energy/self.get_length()
+                axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
         if has_final:
             axs[0].plot(zs*1e6, Ezs/1e9, '-', color=col1, alpha=0.2)
         axs[0].plot(zs0*1e6, Ezs0/1e9, '-', color=col1)
@@ -1102,34 +1827,50 @@ class Stage(Trackable, CostModeled):
         """
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
+
         Other parameters
         ----------------
         aspect : str
             The aspect ratio of the plots.
-            Defaults to 'equal' which is also the matplotlib default; can also use 'auto'.
-            Set to 'auto' to plot the entire simulation box.
+            Defaults to 'equal' which is also the matplotlib default; can also 
+            use 'auto'. Set to 'auto' to plot the entire simulation box.
+
+        show_beam : bool
+            Flag for including the beam charge densities in the plot
+            
         savefig : str or None
-            If not None, the path to save the figure.
+            If not None, defines the path to save the figure.
             Defaults to None
+
 
         Returns:
         --------
-          None
+        None
         """
 
         from matplotlib import pyplot as plt
         from matplotlib.colors import LogNorm
+
+        if self.initial is None:
+            print('Stage::plot_wake(): No data.')
+            return
         
         # extract density if not already existing
         if not hasattr(self.initial.plasma.density, 'rho'):
-            print('No wake calculated')
+            print('Stage::plot_wake(): No wake calculated.')
             return
         if not hasattr(self.initial.plasma.wakefield.onaxis, 'Ezs'):
-            print('No wakefield calculated')
+            print('Stage::plot_wake(): No wakefield calculated.')
             return
         
         # make figures
-        has_final_step = hasattr(self.final.plasma.density, 'rho')
+        has_final_step = self.final is not None \
+            and hasattr(self.final, 'plasma.density.extent') \
+            and hasattr(self.final, 'plasma.wakefield.onaxis.zs') \
+            and hasattr(self.final, 'plasma.wakefield.onaxis.Ezs') \
+            and hasattr(self.final, 'plasma.density.rho') \
+            and hasattr(self.final, 'beam.density.rho')
+
         num_plots = 1 + int(has_final_step)
         fig, ax = plt.subplots(num_plots,1)
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
@@ -1199,11 +1940,14 @@ class Stage(Trackable, CostModeled):
             
             # plot beam electrons
             if show_beam:
-                p_beam = ax1.imshow(rho0_beam/1e6, extent=extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
+                p_beam = ax1.imshow(rho0_beam/1e6, extent=data_struct.beam.density.extent*1e6,  norm=LogNorm(), origin='lower', cmap='Oranges', alpha=np.array(rho0_beam>clims.min()*2, dtype=float), aspect=aspect)
                 p_beam.set_clim(clims/1e6)
                 cb_beam = plt.colorbar(p_beam, cax=cax1)
                 cb_beam.set_ticklabels([])
                 cb_beam.ax.tick_params(axis='y', which='both', direction='in')
+
+            # ensure that the extent is the same as data_struct.plasma.density.extent
+            p_electrons.set_extent(extent*1e6)
             
             # set labels
             if i==(num_plots-1):
@@ -1217,7 +1961,7 @@ class Stage(Trackable, CostModeled):
         if savefig is not None:
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
         
-        return 
+        return
 
     
     # ==================================================
@@ -1229,8 +1973,152 @@ class Stage(Trackable, CostModeled):
         label = 'Plasma stage'
         color = 'red'
         return x_points, y_points, final_angle, label, color
-        
+    
 
+    # ==================================================
+    def print_summary(self):
+        
+        print('Class: ', type(self))
+
+        if self.plasma_density  is None:
+            print(f"Plasma density [m^-3]:\t\t\t\t\t Not set")
+        else:
+            print(f"Plasma density [m^-3]:\t\t\t\t\t {self.plasma_density :.3e}")
+        if self.length  is None:
+            print(f"Stage total length [m]:\t\t\t\t\t Not set")
+        else:
+            print(f"Stage total length [m]:\t\t\t\t\t {self.length  :.3f}")
+        if self.length_flattop  is None:
+            print(f"Stage flattop length [m]:\t\t\t\t Not set")
+        else:
+            print(f"Stage flattop length [m]:\t\t\t\t {self.length_flattop  :.3f}")
+        if self.nom_energy is None:
+            print(f"Nominal energy [GeV]:\t\t\t\t\t Not set")
+        else:
+            print(f"Nominal energy [GeV]:\t\t\t\t\t {self.nom_energy/1e9 :.3f}")
+
+        if self.nom_energy_flattop is None:
+            print(f"Nominal energy flattop [GeV]:\t\t\t\t Not set")
+        else:
+            print(f"Nominal energy flattop [GeV]:\t\t\t\t {self.nom_energy_flattop/1e9 :.3f}")
+        
+        nom_energy_gain = self.nom_energy_gain 
+        if nom_energy_gain is None:
+            print(f"Nominal energy gain [GeV]:\t\t\t\t Not set")
+        else:
+            print(f"Nominal energy gain [GeV]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")
+
+        if self.nom_energy_gain_flattop is None:
+            print(f"Nominal energy gain flattop [GeV]:\t\t\t Not set")
+        else:
+            print(f"Nominal energy gain flattop [GeV]:\t\t\t {self.nom_energy_gain_flattop/1e9 :.3f}")
+
+        if self.nom_accel_gradient is None:
+            print(f"Nominal acceleration gradient [GV/m]:\t\t\t Not set")
+        else:
+            print(f"Nominal acceleration gradient [GV/m]:\t\t\t {self.nom_accel_gradient/1e9 :.3f}")
+
+        if self.nom_accel_gradient_flattop is None:
+            print(f"Nominal acceleration gradient flattop [GV/m]:\t\t Not set")
+        else:
+            print(f"Nominal acceleration gradient flattop [GV/m]:\t\t {self.nom_accel_gradient_flattop/1e9 :.3f}")
+
+        if self.driver_source is None:
+            print(f"Driver source type:\t\t\t\t\t Not set")
+        else:
+            print(f"Driver source type: {type(self.driver_source)}")
+
+        if self.has_ramp():
+            print(f"Has ramp(s):\t\t\t\t\t\t Yes")
+        else:
+            print(f"Has ramp(s):\t\t\t\t\t\t No")
+
+        print('\n')
+
+
+###################################################
+class PlasmaRamp(Stage):
+    """
+    Contains the implementation for ramps as a Stage class.
+    Only meant to store information.
+    """
+    
+    # ==================================================
+    def __init__(self, nom_energy_gain=None, ramp_beta_mag=None, ramp_length=None, ramp_shape='uniform'):
+
+        super().__init__(nom_accel_gradient=None, nom_energy_gain=nom_energy_gain, plasma_density=None, driver_source=None, ramp_beta_mag=ramp_beta_mag)
+
+        if ramp_shape != 'uniform':
+            raise NotImplementedError('Ramp shape not yet implemented')
+        # TODO: Need code to handle ramp_shape='from_file' etc. ... need to ignore ramp_length, ramp_plasma_density. These need to be calculated.
+        
+        if ramp_shape != 'uniform' and ramp_shape != 'from_file' and ramp_shape != 'gaussian':
+            raise StageError('Invalid ramp shape.')
+
+        self.ramp_shape = ramp_shape
+        self.length = ramp_length
+
+        # Acceleration gradient and length cannot be set until the ramp nominal 
+        # energy is known. These calculation are done by Stage._prepare_ramps().
+
+
+    # ==================================================
+    def track(self):
+        raise StageError('track() is not implemented for PlasmaRamp. Use track_upramp() or track_downramp() from the Stage class instead.')
+    
+
+     # ==================================================
+    @property
+    def upramp(self) -> Self | None:
+        return None
+    @upramp.setter
+    def upramp(self, upramp : Self | None):
+        raise StageError('Cannot add a ramp to PlasmaRamp.')
+
+
+    # ==================================================
+    @property
+    def downramp(self) -> Self:
+        return None
+    @downramp.setter
+    def downramp(self, downramp : Self | None):
+        raise StageError('Cannot add a ramp to PlasmaRamp.')
+    
+
+    # ==================================================
+    @property
+    def ramp_beta_mag(self) -> Self:
+        """
+        The betatron magnification used to define ramp plasma densities. 
+        Overrides the ramp_beta_mag of the parent stage.
+        """
+        if self._ramp_beta_mag is not None:
+            ramp_beta_mag = self._ramp_beta_mag
+        elif self.parent.ramp_beta_mag is not None:
+            ramp_beta_mag = self.parent.ramp_beta_mag
+        else:
+            ramp_beta_mag = None
+        return ramp_beta_mag
+    @ramp_beta_mag.setter
+    def ramp_beta_mag(self, ramp_beta_mag : float | None):
+        if ramp_beta_mag is not None:
+            if not isinstance(ramp_beta_mag, (float, int)) or ramp_beta_mag < 0.0:
+                raise VariablesOutOfRangeError("ramp_beta_mag must be a positive number.")
+        self._ramp_beta_mag = ramp_beta_mag
+    _ramp_beta_mag = None
+    
+
+    # ==================================================
+    def print_summary(self):
+        if self.is_upramp():
+            print('Ramp type: \t\t\t\t\t\t upramp')
+        if self.is_downramp():
+            print('Ramp type: \t\t\t\t\t\t downramp')
+        print('Ramp shape: \t\t\t\t\t\t', self.ramp_shape)
+        super().print_summary()
+
+
+###################################################
 class VariablesOverspecifiedError(Exception):
     "Exception class to throw when trying to set too many overlapping variables."
     pass
@@ -1239,4 +2127,6 @@ class VariablesOutOfRangeError(Exception):
 class StageError(Exception):
     "Exception class for ``Stage`` to throw in other cases."
 
-    
+class SimulationDomainSizeError(Exception):
+    "Exception class to throw when the simulation domain size is too small."
+    pass
