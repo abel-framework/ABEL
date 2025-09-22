@@ -69,7 +69,7 @@ class StageReducedModels(Stage):
     """
 
     # ==================================================
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
         TODO: Short description
         None of lines in the docstring text should exceed this length ..........
@@ -80,7 +80,7 @@ class StageReducedModels(Stage):
 
         driver_source : ``Source`` object of drive beam.
 
-        driver_beam : ``Beam`` object of drive beam.
+        #driver_beam : ``Beam`` object of drive beam.
 
         #main_beam : ``Beam`` object of main beam.
         
@@ -167,12 +167,12 @@ class StageReducedModels(Stage):
         self.drive_beam_update_period = drive_beam_update_period
 
         # Longitudinal electric field and plasma ion bubble radius
-        self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
-        self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
+        self.Ez_fit_obj = None  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
+        self.Ez_roi = None  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
         #self.Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
         #self.zs_Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.zs
-        self.rb_fit_obj = rb_fit_obj  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
-        self.bubble_radius_roi = bubble_radius_roi  # [m] bubble radius in the region of interest.
+        self.rb_fit_obj = None  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
+        self.bubble_radius_roi = None  # [m] bubble radius in the region of interest.
         self.bubble_radius_axial = None
         self.zs_bubble_radius_axial = None
         self.estm_R_blowout = None  # [m] estimated (max) blowout radius to be calculated.
