@@ -126,7 +126,7 @@ def test_stage_length_gradient_energyGain():
     stage.length_flattop = 4.82                                                   # [m]
     stage.nom_energy_gain = 31.9e9                                                # [eV]
 
-    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1, alternate_interstage_polarity=False)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
 
     assert np.allclose(stage.nom_energy_gain, 31.9e9, rtol=1e-15, atol=0.0)
@@ -144,7 +144,7 @@ def test_stage_length_gradient_energyGain():
     stage.nom_accel_gradient = None                                               # [V/m]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
     
-    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
+    linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1, alternate_interstage_polarity=False)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
 
     assert np.allclose(stage.nom_energy_gain, 7.8e9, rtol=1e-15, atol=0.0)
