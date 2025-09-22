@@ -5,7 +5,7 @@
 The ABEL simulation framework is a particle-tracking framework for multi-element particle accelerators (such as plasma-accelerator linacs, colliders, experimental test facilities, etc.), implemented at varying levels of complexity, for fast investigations or optimizations. As a systems code, it can be used for physics simulations as well as generating (and optimizing for) cost estimates.
 
 ## Installation with `pip`
-1. (Optional) Make and activate a new Python (version 3.11) virtual environment for ABEL: `python3.11 -m venv your_abel_venv`
+1. (Optional) Make and activate a new Python (version 3.11) virtual environment for ABEL: `python3.11 -m venv your_abel_venv` and `source your_abel_venv/bin/activate`
 2. Clone the repository to a local folder, e.g., `git clone https://github.com/abel-framework/ABEL`
 3. In your target python environment, run `pip install path-to-ABEL` where `path-to-ABEL` is where you have cloned ABEL to.
    If you want to be able to modify ABEL without uninstalling and reinstalling, you can run `pip install -e path-to-abel`, and the `abel`
