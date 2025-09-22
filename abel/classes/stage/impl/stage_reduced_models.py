@@ -1349,9 +1349,9 @@ class StageReducedModels(Stage):
         return num_profile, z_ctrs
 
     
-    # ==================================================
-    def matched_beta_function(self, energy):
-        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
+    # # ==================================================
+    # def matched_beta_function(self, energy):
+    #     return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
     
     
     # ==================================================
