@@ -44,9 +44,6 @@ readme = "README.md"
 #[tool.setuptools]
 #package-dir = {"" = "Python"}
 
-#[tool.setuptools.packages.find]
-#where = ["Python"]
-
 [tool.pytest.ini_options]
 addopts = [
     "--import-mode=importlib",
