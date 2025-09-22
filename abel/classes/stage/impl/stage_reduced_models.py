@@ -61,7 +61,7 @@ class StageReducedModels(Stage):
         Flag for enabling radiation reaction effects.
 
     enable_ion_motion : bool
-        Flag for plasma ion motion effects.
+        Flag for enabling plasma ion motion effects.
 
     Ez_fit_obj : [V/m] interpolation object
         1D interpolation object of longitudinal electric field fitted to axial 
@@ -188,82 +188,104 @@ class StageReducedModels(Stage):
     """
 
     # ==================================================
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, time_step_mod=0.05, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0, show_prog_bar=None, probe_evol_period=0, save_final_step=False, make_animations=False, store_beams_for_tests=False):
         """
-        TODO: Short description
-        None of lines in the docstring text should exceed this length ..........
+        Constructor for the ``StageReducedModels`` class.
+
 
         Parameters
         ----------
-        ...
+        nom_accel_gradient : [V/m] float, optional (default=``None``)
+            Nominal acceleration gradient.
 
-        driver_source : ``Source`` object of drive beam.
-        
-        main_source : ``Source`` object of main beam.
+        nom_energy_gain : [eV] float, optional (default=``None``)
+            Nominal energy gain across the plasma stage.
 
-        driver_beam : ``Beam`` object of drive beam.
+        plasma_density : [m^-3] float, optional (default=``None``)
+            The plasma density of the plasma stage.
+        
+        driver_source : ``Source`` or ``DriverComplex``, optional (default=``None``)
+            The source of the drive beam.
 
-        #main_beam : ``Beam`` object of main beam.
-        
-        #length : [m] float
-            Length of the plasma stage.
-        
-        nom_energy_gain : [eV] float
-            Nominal/target energy gain of the acceleration stage.
-        
-        plasma_density : [m^-3] float
-            Plasma density.
+        ramp_beta_mag : float, optional (default=1.0)
+            Betatron magnification used for defining ramps.
 
-        time_step_mod : [beta_wave_length/c] float, optional
+        time_step_mod : [beta_wave_length/c] float, optional (default=0.05)
             Determines the time step of the instability tracking in units of 
-            beta_wave_length/c.
+            betatron wave length/c.
             
-        #Ez_fit_obj : [V/m] interpolation object
-            1D interpolation object of longitudinal E-field fitted to axial 
-            E-field using a selection of zs along the main beam. Used to 
-            determine the value of the longitudinal E-field for all beam zs.
+        enable_tr_instability : bool, optional (default=``True``)
+            Flag for enabling transverse intra-beam instability calculations.
 
-        #Ez_roi : [V/m] 1D ndarray
-            Longitudinal E-field in the region of interest fitted to a selection 
-            of zs along the main beam (main beam head to tail).
+        enable_radiation_reaction : bool, optional (default=``True``)
+            Flag for enabling radiation reaction effects.
 
-        #rb_fit_obj : [m] interpolation object
-            1D interpolation object of plasma bubble radius fitted to axial 
-            bubble radius using a selection of zs along the main beam. Used to 
-            determine the value of the bubble radius for all beam zs.
+        enable_ion_motion : bool, optional (default=``False``)
+            Flag for enabling plasma ion motion effects.
+
+        ion_charge_num : [e] float, optional
+            Charge number of ions. Default set by the ion motion physics model.
+
+        ion_mass : [kg] float, optional
+            Ion mass. Default set by the ion motion physics model.
+
+        num_z_cells_main : int, optional
+            Determines the binning of the z-coordinates used to probe main beam 
+            electric fields using ``RF-Track``. Used in calculating wakefield 
+            perturbation due to ion motion. Default set by the ion motion 
+            physics model.
+
+        num_x_cells_rft : int, optional (default=50)
+            Number of grid cells along x used in ``RF-Track`` for calculating 
+            beam electric fields used in calculating wakefield perturbation due to 
+            ion motion.
         
-        #bubble_radius_roi : [m] 1D ndarray
-            The bubble radius in the region of interest fitted to a selection of 
-            zs along the main beam.
+        num_y_cells_rft : int, optional (default=50)
+            Number of grid cells along y used in ``RF-Track`` for calculating 
+            beam electric fields used in calculating wakefield perturbation due to 
+            ion motion.
 
-        ramp_beta_mag : float, optional
-            Used for demagnifying and magnifying beams passing through entrance 
-            and exit plasma ramps. Default value: 5.0.
+        num_xy_cells_probe : int, optional (default=41)
+            Number of grid cells along x and y used to probe beam electric fields 
+            calculated by ``RF-Track``. Used in calculating wakefield perturbation 
+            due to ion motion.
 
-        enable_radiation_reaction : bool, optional
-            Flag for enabling radiation reactions. Defaults to ``True``.
+        uniform_z_grid : bool, optional (default=``False``)
+            Flag to determine whether the grid along z is uniform (``True``) or finely 
+            resolved along the drive beam and main beam regions, while the region 
+            between the beams are coarsely resolved (``False``).
 
-        ...
+        ion_wkfld_update_period : int, optional (default=1)
+            Determines the ion wakefield perturbation update period. This is given 
+            in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will 
+            update the ion wakefield perturbation every 3rd time step.
 
-        probe_evol_period : int, optional
-            Set to larger than 0 to determine the probing period for beam 
-            evolution diagnostics. This is given in units of time steps, so that 
-            e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd 
-            time step. Default value: 0.
+        show_prog_bar : bool, optional
+            Flag for displaying the progress bar for beam tracking. Set to 
+            ``None`` to let ``StageReducedModels.track()`` decide whether to 
+            display the progress bar.
 
-        ...
+        probe_evol_period : int, optional (default=0)
+            Time step interval for probing beam evolution. Set to larger than 0 to 
+            record beam parameters for beam evolution diagnostics. The probing 
+            interval is given in units of time steps, so that e.g. 
+            ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
+            step.
 
-        ion_wkfld_update_period : int, optional
-            Determines the ion wakefield perturbation update period. This is 
-            given in units of time steps, so that e.g. 
-            ``ion_wkfld_update_period=3`` will update the ion wakefield 
-            perturbation every 3rd time step. Default value: 1.
-        
-        drive_beam_update_period : int, optional
-            Set to larger than 0 to activate driver evolution and determine 
-            the drive beam update period. Default value: 0.
+        save_final_step : bool, optional (default=``False``)
+            Flag for storing the output data including beam, driver, and plasma 
+            quantities.
 
+        make_animations : bool, optional (default=``False``)
+            Flag for creating side-view and phase-space animations.
+
+        store_beams_for_tests : bool, optional (default=``False``)
+            Flag for storing intermediate beam states for testing.
         """
+
+        #drive_beam_update_period : int, optional
+            # Set to larger than 0 to activate driver evolution and determine 
+            # the drive beam update period. Default value: 0.
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
