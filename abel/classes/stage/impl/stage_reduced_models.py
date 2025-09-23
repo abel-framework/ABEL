@@ -510,12 +510,11 @@ class StageReducedModels(Stage):
     def main_tracking_procedure(self, beam0, driver0, shot_path=None, tmpfolder=None):
         """
         Prepare and perform the main reduced model beam tracking.
-        - Perform single time step Wake-T simulation and extracts relevant 
-            information.
+        
+        - Perform single time step Wake-T simulation and extracts relevant information.
         - Filter out beam particles outside of the plasma bubble.
         - Set up the configuration for the reduced model tracking.
-        - Make corrections to the Wake-T r-coordinate before saving the initial 
-            time step.
+        - Make corrections to the Wake-T r-coordinate before saving the initial time step.
         - Call on the physics model to perform the tracking.
         - Store beam parameter evolution as a stage attribute.
         - Store the final time step if desired.
