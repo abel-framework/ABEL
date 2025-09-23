@@ -1,3 +1,7 @@
+# Copyright 2022-, The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.cost_modeled import CostModeled
 from abel.CONFIG import CONFIG

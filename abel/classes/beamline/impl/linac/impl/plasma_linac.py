@@ -1,3 +1,7 @@
+# Copyright 2022-, The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.source.source import Source

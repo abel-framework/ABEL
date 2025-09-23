@@ -1,3 +1,7 @@
+# Copyright 2022-, The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 from abc import ABC, abstractmethod
 import warnings
 import numpy as np

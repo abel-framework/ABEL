@@ -1,3 +1,7 @@
+# Copyright 2022-, The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 from abel.classes.collider.collider import Collider
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti

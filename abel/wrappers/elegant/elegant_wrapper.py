@@ -1,3 +1,7 @@
+# Copyright 2022-, The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 import uuid, os, subprocess, csv, shutil
 import numpy as np
 from abel.CONFIG import CONFIG

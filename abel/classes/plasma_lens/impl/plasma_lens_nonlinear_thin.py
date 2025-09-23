@@ -1,3 +1,7 @@
+# Copyright 2022-, The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 from abel.classes.plasma_lens.plasma_lens import PlasmaLens
 import numpy as np
 import scipy.constants as SI

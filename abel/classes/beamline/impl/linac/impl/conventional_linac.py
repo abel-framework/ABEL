@@ -1,3 +1,7 @@
+# Copyright 2022-, The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.source.source import Source
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
