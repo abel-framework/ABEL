@@ -134,57 +134,6 @@ class StageReducedModels(Stage):
 
     show_prog_bar : bool
         Flag for displaying the progress bar for beam tracking.
-
-
-    Methods
-    -------
-    track(beam_incoming, savedepth=0, runnable=None, verbose=False)
-
-    main_tracking_procedure(beam0, driver0, shot_path=None, tmpfolder=None)
-
-    track_upramp(beam0, driver0, shot_path=None)
-
-    track_downramp(beam0, driver0, shot_path=None)
-
-    copy_config2blank_stage(probe_evol_period=1)
-
-    bubble_filter(beam, sort_zs=True)
-
-    Ez_shift_fit(Ez, zs_Ez, beam, z_slices=None)
-
-    trace_bubble_radius(plasma_num_density, plasma_tr_coord, plasma_z_coord, drive_beam_peak_current, driver_offset, threshold=0.8)
-
-    mask_bubble_radius_spikes(bubble_radius, zs_bubble_radius, make_plot=False)
-
-    trace_bubble_radius_WakeT(plasma_num_density, plasma_tr_coord, plasma_z_coord, drive_beam_peak_current, threshold=0.8)
-
-    rb_shift_fit(rb, zs_rb, beam, z_slices=None)
-
-    store_rb_Ez_2stage(wake_t_evolution, drive_beam, beam)
-
-    longitudinal_number_distribution(beam, bin_number=None, make_plot=False)
-
-    trim_attr_reduce_pickle_size()
-
-    plot_wakefield(saveToFile=None, includeWakeRadius=True)
-
-    plot_wake(show_Ez=True, trace_rb=False, savefig=None, aspect='auto')
-
-    plot_Ez_rb_cut()
-
-    plot_flattop_evolution(beam='beam')
-
-    animate_sideview_x(evolution_folder)
-
-    animate_sideview_y(evolution_folder)
-
-    animate_phasespace_x(evolution_folder)
-
-    animate_phasespace_y(evolution_folder)
-
-    print_stage_beam_summary(initial_main_beam, beam_out, clean=False)
-
-    print_summary()
     """
 
     # ==================================================
