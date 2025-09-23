@@ -11,7 +11,7 @@ AUTHORS = "C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli"
 LICENSE = "GPL-3.0-or-later"
 
 BLURB =\
-f"""# Copyright 2025 The ABEL Authors
+f"""# Copyright 2022-, The ABEL Authors
 # Authors: {AUTHORS}
 # License: {LICENSE}"""
 
@@ -148,6 +148,8 @@ if __name__ == "__main__":
                     if re.fullmatch(r, f):
                         toCheck = True
                         print("filename match...", end='')
+                    else:
+                        print("no filename match.", end='')
                 if toCheck and not (fp in EXCLUDE_EXPLICIT_FILES):
                     print("\n\t",end='')
                     treat_file(fp, doIt)
