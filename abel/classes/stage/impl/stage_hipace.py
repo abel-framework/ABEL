@@ -16,8 +16,159 @@ except:
     print(f"Could not import HiPACE++ tools from {os.path.join(CONFIG.hipace_path, 'tools')}")
 
 class StageHipace(Stage):
+    """
+    Plasma acceleration stage implemented with the HiPACE++ PIC code.
+
+    This class runs fully kinetic plasma wakefield acceleration (PWFA) 
+    simulations using HiPACE++. It prepares input files, launches HiPACE++ runs, 
+    extracts beam and plasma diagnostics, and post-processes simulation data.
+    
+
+    Attributes
+    ----------
+    length : [m] float
+            Total length of the plasma stage.
+
+    nom_energy_gain : [eV] float
+        Nominal beam energy gain.
+
+    plasma_density : [m^-3] float
+        Uniform plasma density. Ignored if ``plasma_density_from_file`` is given.
+
+    driver_source : ``Beam``
+        Beam object used as the plasma driver.
+
+    ramp_beta_mag : float
+        Beta function magnitude used in ramp design.
+
+    keep_data : bool
+        Flag for whether to keep raw HiPACE++ output after simulation.
+
+    save_drivers : bool
+        Flag for whether to save input and output driver beams to disk.
+
+    output : int, optional
+        Frequency (in simulation steps) for HiPACE++ field/particle outputs.
+
+    ion_motion : bool
+        Flag to include ion motion in the plasma.
+
+    ion_species : str
+        Ion species used in the plasma (e.g. 'H', 'He', 'Li').
+
+    beam_ionization : bool
+        Flag for enabling beam-induced ionization.
+
+    radiation_reaction : bool
+        Flag for enabling radiation reaction effects.
+
+    num_nodes : int
+        Number of compute nodes to request in the job script.
+
+    num_cell_xy : int
+        Number of transverse grid cells in HiPACE++.
+
+    driver_only : bool
+        Flag for running simulation with only the driver (no witness beam).
+
+    plasma_density_from_file : str
+        Path to plasma density profile file (overrides uniform density).
+
+    no_plasma : bool
+        If ``True``, runs the stage without plasma.
+
+    external_focusing : bool
+        Flag for whether to include external focusing (APL-like quadrupoles).
+
+    mesh_refinement : bool
+        Enable HiPACE++ mesh refinement.
+
+    do_spin_tracking : bool
+        Flag for enabling particle spin tracking.
+
+    run_path : str
+        Path to store plots and outputs.
+
+    plasma_profile : SimpleNamespace
+        Holds arrays for longitudinal positions (`ss`) and densities (`ns`)
+        when ramps are generated internally.
+
+    evolution : SimpleNamespace
+        Stores in-situ diagnostics of beam/driver evolution after simulation.
+
+    initial, final : SimpleNamespace
+        Store field and density data at the beginning and end of the stage.
+    """
     
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing=False, mesh_refinement=True, do_spin_tracking=False, run_path=None):
+        """
+        The constructor for the ``StageHipace`` class.
+
+        Parameters
+        ----------
+        length : [m] float, optional
+            Total length of the plasma stage.
+
+        nom_energy_gain : [eV] float, optional
+            Nominal beam energy gain.
+
+        plasma_density : [m^-3] float, optional
+            Uniform plasma density. Ignored if ``plasma_density_from_file`` is given.
+
+        driver_source : ``Beam``
+            Beam object used as the plasma driver.
+
+        ramp_beta_mag : float, optional
+            Beta function magnitude used in ramp design.
+
+        keep_data : bool, optional (default=``False``)
+            Flag for whether to keep raw HiPACE++ output after simulation.
+
+        save_drivers : bool, optional (default=``False``)
+            Flag for whether to save input and output driver beams to disk.
+
+        output : int, optional
+            Frequency (in simulation steps) for HiPACE++ field/particle outputs.
+
+        ion_motion : bool, optional (default=``True``)
+            Flag to include ion motion in the plasma.
+
+        ion_species : str, optional (default=``'H'``)
+            Ion species used in the plasma (e.g. 'H', 'He', 'Li').
+
+        beam_ionization : bool, optional (default=``True``)
+            Flag for enabling beam-induced ionization.
+
+        radiation_reaction : bool, optional (default=``False``)
+            Flag for enabling radiation reaction effects.
+
+        num_nodes : int, optional (default=1)
+            Number of compute nodes to request in the job script.
+
+        num_cell_xy : int, optional (default=511)
+            Number of transverse grid cells in HiPACE++.
+
+        driver_only : bool, optional (default=``False``)
+            Flag for running simulation with only the driver (no witness beam).
+
+        plasma_density_from_file : str, optional (default=``None``)
+            Path to plasma density profile file (overrides uniform density).
+
+        no_plasma : bool, optional (default=``False``)
+            If ``True``, runs the stage without plasma.
+
+        external_focusing : bool, optional (default=``False``)
+            Flag for whether to include external focusing (APL-like quadrupoles).
+
+        mesh_refinement : bool, optional (default=``True``)
+            Enable HiPACE++ mesh refinement.
+
+        do_spin_tracking : bool, optional (default=``False``)
+            Flag for enabling particle spin tracking.
+
+        run_path : str, optional (default=``None``)
+            Path to store plots and outputs.
+        """
 
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
@@ -53,6 +204,9 @@ class StageHipace(Stage):
         
 
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the particles through the stage.
+        """
 
         from abel.wrappers.hipace.hipace_wrapper import hipace_write_inputs, hipace_run, hipace_write_jobscript
 
@@ -455,6 +609,11 @@ class StageHipace(Stage):
                 return self.plasma_density
 
     def get_length(self):
+        """
+        Return the length of the plasma stage. This is determined by the 
+        longitudinal coordinates of the plasma density file if it exists. 
+        Otherwise, it is given by the parent class' ``get_length()``.
+        """
         if self.plasma_density_from_file is not None:
             #density_table = np.loadtxt(self.plasma_density_from_file, delimiter=" ", dtype=float)
             ss = self.plasma_profile.ss
@@ -543,7 +702,8 @@ class StageHipace(Stage):
     # ==================================================
     def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_fig=False):
         '''
-        Makes waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+        Create waterfall plots for current profile, relative energy spectrum, 
+        horizontal transverse profile and vertical transverse profile.
 
         Parameters
         ----------
@@ -554,16 +714,19 @@ class StageHipace(Stage):
             Specifies the name of the beam to be extracted.
 
         clean : bool, optional
-            Determines whether the extracted beams from the HiPACE++ HDF5 output files should be cleaned before further processing.
+            Determines whether the extracted beams from the HiPACE++ HDF5 output 
+            files should be cleaned before further processing.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+            Defines a threshold for identifying and removing "halo" particles 
+            based on their deviation from the core of the particle beam.
 
         save_fig : bool, optional
             Flag for saving the output figure.
         '''
 
         from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
+        from matplotlib import pyplot as plt
         
         files = sorted(os.listdir(data_dir))
         file_path = data_dir + files[0]
