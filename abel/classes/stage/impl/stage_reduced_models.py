@@ -786,8 +786,8 @@ class StageReducedModels(Stage):
         ----------
         probe_evol_period : int, optional (default=1)
             Time step interval for probing beam evolution. Set to larger than 0 
-            to record beam parameters for beam evolution diagnostics. The
-              probing interval is given in units of time steps, so that e.g. 
+            to record beam parameters for beam evolution diagnostics. The 
+            probing interval is given in units of time steps, so that e.g. 
             ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
             step.
             
@@ -1059,10 +1059,10 @@ class StageReducedModels(Stage):
     # ==================================================
     def trace_bubble_radius(self, plasma_num_density, plasma_tr_coord, plasma_z_coord, drive_beam_peak_current, driver_offset, threshold=0.8):
         """
-        - For extracting the plasma ion bubble radius by finding the coordinates
-        in which the plasma number density goes from zero to a threshold value.
-        - The symmetry axis is determined using the transverse offset of the 
-        drive beam.
+        Extract the plasma ion bubble radius by finding the coordinates in which 
+        the plasma number density goes from zero to a threshold value.
+        
+        - The symmetry axis is determined using the transverse offset of the drive beam.
         - z is the propagation direction pointing to the right.
         
         Parameters
