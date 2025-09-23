@@ -8,6 +8,9 @@
 #
 # This is default abelconfig.toml version 1, 19/11/2024, K. Sjobak
 #
+# Copyright 2025 The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
 
 
 [cluster] # COMPUTE CLUSTER CONFIGURATION

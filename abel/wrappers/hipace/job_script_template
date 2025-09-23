@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Copyright 2025 The ABEL Authors
+# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
+# License: GPL-3.0-or-later
+
 #SBATCH -A $project_name
 #SBATCH -J "HiPACE++"
 #SBATCH -o hipace-%j.out
