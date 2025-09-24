@@ -7,12 +7,15 @@
 #This is the licensifier - it crawls the ABEL source tree,
 # and inserts the license blurb if it is missing.
 
-AUTHORS = "C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli"
+AUTHORS = "C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)"
+AFFILIATIONS = "1) University of Oslo, 2) LBNL"
 LICENSE = "GPL-3.0-or-later"
 
 BLURB =\
-f"""# Copyright 2022-, The ABEL Authors
+f"""# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
 # Authors: {AUTHORS}
+# Affiliations: {AFFILIATIONS}
 # License: {LICENSE}"""
 
 BLURB_RE = [r"(?i)#\.*copyright", r"(?i)GNU General Public License"]
