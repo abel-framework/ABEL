@@ -32,57 +32,8 @@ class StageWakeT(Stage):
     run_path : str
         Path to store plots and outputs.
 
-        
-
-
-
-    save_drivers : bool
-        Flag for whether to save input and output driver beams to disk.
-
-    output : int
-        Frequency (in simulation steps) for Wake-T field/particle outputs.
-
-    
-
-    ion_species : str
-        Ion species used in the plasma (e.g. 'H', 'He', 'Li').
-
-    beam_ionization : bool
-        Flag for enabling beam-induced ionization.
-
-    radiation_reaction : bool
-        Flag for enabling radiation reaction effects.
-
-    num_nodes : int
-        Number of compute nodes to request in the job script.
-
-    
-
-    driver_only : bool
-        Flag for running simulation with only the driver (no witness beam).
-
-    plasma_density_from_file : str
-        Path to plasma density profile file (overrides uniform density).
-
-    no_plasma : bool
-        If ``True``, runs the stage without plasma.
-
-    external_focusing : bool
-        Flag for whether to include external focusing (APL-like quadrupoles).
-
-    mesh_refinement : bool
-        Enable Wake-T mesh refinement.
-
-    do_spin_tracking : bool
-        Flag for enabling particle spin tracking.
-
-    
-
-    evolution : SimpleNamespace
-        Stores in-situ diagnostics of beam/driver evolution after simulation.
-
-    initial, final : SimpleNamespace
-        Store field and density data at the beginning and end of the stage.
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
     """
     
     def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False, run_path=None):
@@ -356,7 +307,10 @@ class StageWakeT(Stage):
 
 
     def get_plasma_profile(self):
-        """Prepare the ramps (local to WakeT)."""
+        """
+        Prepare the ramps (local to WakeT) by setting up a plasma density 
+        profile function.
+        """
         
         # make the plasma ramp profile
         if self.has_ramp():
