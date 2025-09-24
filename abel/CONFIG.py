@@ -71,8 +71,7 @@ class CONFIG:
         cls.cluster_name = cfdata['cluster']['cluster_name']
         #Load default cluster settings
         if cls.cluster_name == 'lumi':
-            #cls.project_name = 'project_465001375' # PLASMACOLLIDER project (E. Adli)
-            cls.project_name = 'project_465001379' # SPARTA project (C. A. Lindstrøm)
+            cls.project_name = 'project_000000000' # Project number on cluster
             cls.partition_name_standard = 'standard-g'
             cls.partition_name_small = 'small-g'
             cls.partition_name_devel = 'dev-g'
