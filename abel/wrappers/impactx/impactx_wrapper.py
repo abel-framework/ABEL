@@ -136,30 +136,11 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     return evol
 
 
-def initialize_amrex(verbose=False, verbose_debug=False):
-    """Initialize AMReX."""
-    
-    import amrex.space3d as amr
-
-    # add before the simulation setup
-    pp_prof = amr.ParmParse("tiny_profiler")
-    pp_prof.add("enabled", int(verbose))
-    
-    if not amr.initialized():
-        if verbose:
-            amr.initialize(['amrex.omp_threads=1', f'amrex.verbose={int(verbose_debug)}'])
-        else:
-            eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
-
-
 def initialize_impactx_sim(verbose=False):
     """Initialize the ImpactX simulation."""
     
     #import amrex.space3d as amr
     from impactx import ImpactX
-    
-    # set AMReX verbosity
-    initialize_amrex(verbose=verbose)
 
     # make simulation object
     sim = ImpactX()
