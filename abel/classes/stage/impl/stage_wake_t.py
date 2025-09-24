@@ -344,7 +344,7 @@ class StageWakeT(Stage):
         return None # TODO
 
 
-    # ==================================================
+    # ================================================== TODO: remove this in a separate PR in order to always use the parent's matched_beta_function().
     def matched_beta_function(self, energy):
         from abel.utilities.plasma_physics import beta_matched
         return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
