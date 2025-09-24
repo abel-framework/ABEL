@@ -39,7 +39,7 @@ authors = [
   {name = "Eir Eline Hørlyk"}
 ]
 readme = "README.md"
-#license = {text="LGPL3+"}
+license = "GPL-3.0-or-later"
 
 #[tool.setuptools]
 #package-dir = {"" = "Python"}
