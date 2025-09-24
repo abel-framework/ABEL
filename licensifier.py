@@ -18,7 +18,8 @@ f"""# This file is part of ABEL
 # Affiliations: {AFFILIATIONS}
 # License: {LICENSE}"""
 
-BLURB_RE = [r"(?i)#\.*copyright", r"(?i)GNU General Public License"]
+BLURB_RE = [r"(?i)#\.*copyright", r"(?i)GNU General Public License", r"(?i)#\sLicense:"]
+#Note: "(?i)" is the inline flag to ignore case
 
 SEARCH_FOLDERS = ["abel", "tests"]
 SEARCH_FILETYPES_RE = [r".*\.py",]
