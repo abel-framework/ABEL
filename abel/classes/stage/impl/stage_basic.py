@@ -8,6 +8,30 @@ import copy, warnings
 SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
+    """
+    Basic implementation of a plasma stage. Solves Hill's equation, increases 
+    the energy of all main beam macro particles with a homogeneous energy gain, 
+    and decreases the energy of all drive beam macro particles with the same 
+    energy gain.
+
+    Inherits all attributes from ``Stage``.
+    
+
+    Attributes
+    ----------
+    transformer_ratio : float
+        Transformer ratio. Default set to 1.0.
+
+    depletion_efficiency : float
+        Energy depletion efficiency for the drive beam. Default set to 0.75.
+
+    probe_evolution : bool
+        Flag for storing the beam parameter evolution data. Default set to 
+        ``False``.
+
+    store_beams_for_tests : bool
+        Flag for storing intermediate beam states for testing.
+    """
     
     def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1.0, depletion_efficiency=0.75, probe_evolution=False, store_beams_for_tests=False):
         """
@@ -25,24 +49,21 @@ class StageBasic(Stage):
         driver_source : ``Source`` object
             Driver source for the acceleration stage.
 
-        ramp_beta_mag : float, optional
+        ramp_beta_mag : float, optional (default= ``None``)
             Used for demagnifying and magnifying beams passing through entrance 
-            and exit plasma ramps. Default set to ``None``.
+            and exit plasma ramps.
 
-        transformer_ratio : float, optional
-            Transformer ratio. Default set to 1.0.
+        transformer_ratio : float, optional (default=1.0)
+            Transformer ratio.
 
-        depletion_efficiency : float, optional
-            Energy depletion efficiency for the drive beam. Default set to 0.75.
+        depletion_efficiency : float, optional (default=0.75)
+            Energy depletion efficiency for the drive beam.
 
-        probe_evolution : bool, optional
-            Flag for storing the beam parameter evolution data. Default set to 
-            ``False``.
+        probe_evolution : bool, optional (default= ``False``)
+            Flag for storing the beam parameter evolution data.
 
-        store_beams_for_tests : bool, optional
-            Flag for storing the beams between ramps and stage in order to 
-            perform tests for assuring beams being correctly transferred. 
-            Default set to ``False``.
+        store_beams_for_tests : bool, optional (default= ``False``)
+            Flag for storing intermediate beam states for testing..
         """
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
@@ -210,19 +231,19 @@ class StageBasic(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
     
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -289,10 +310,10 @@ class StageBasic(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
     
             
