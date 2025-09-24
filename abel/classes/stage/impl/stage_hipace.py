@@ -22,32 +22,19 @@ class StageHipace(Stage):
     This class runs fully kinetic plasma wakefield acceleration (PWFA) 
     simulations using HiPACE++. It prepares input files, launches HiPACE++ runs, 
     extracts beam and plasma diagnostics, and post-processes simulation data.
+
+    Inherits all attributes from ``Stage``.
     
 
     Attributes
     ----------
-    length : [m] float
-            Total length of the plasma stage.
-
-    nom_energy_gain : [eV] float
-        Nominal beam energy gain.
-
-    plasma_density : [m^-3] float
-        Uniform plasma density. Ignored if ``plasma_density_from_file`` is given.
-
-    driver_source : ``Beam``
-        Beam object used as the plasma driver.
-
-    ramp_beta_mag : float
-        Beta function magnitude used in ramp design.
-
     keep_data : bool
         Flag for whether to keep raw HiPACE++ output after simulation.
 
     save_drivers : bool
         Flag for whether to save input and output driver beams to disk.
 
-    output : int, optional
+    output : int
         Frequency (in simulation steps) for HiPACE++ field/particle outputs.
 
     ion_motion : bool
@@ -115,31 +102,31 @@ class StageHipace(Stage):
         plasma_density : [m^-3] float, optional
             Uniform plasma density. Ignored if ``plasma_density_from_file`` is given.
 
-        driver_source : ``Beam``
-            Beam object used as the plasma driver.
+        driver_source : ``Source`` or ``DriverComplex``, optional (default= ``None``)
+            The source of the drive beam.
 
         ramp_beta_mag : float, optional
             Beta function magnitude used in ramp design.
 
-        keep_data : bool, optional (default=``False``)
+        keep_data : bool, optional (default= ``False``)
             Flag for whether to keep raw HiPACE++ output after simulation.
 
-        save_drivers : bool, optional (default=``False``)
+        save_drivers : bool, optional (default= ``False``)
             Flag for whether to save input and output driver beams to disk.
 
         output : int, optional
             Frequency (in simulation steps) for HiPACE++ field/particle outputs.
 
-        ion_motion : bool, optional (default=``True``)
+        ion_motion : bool, optional (default= ``True``)
             Flag to include ion motion in the plasma.
 
-        ion_species : str, optional (default=``'H'``)
+        ion_species : str, optional (default= ``'H'``)
             Ion species used in the plasma (e.g. 'H', 'He', 'Li').
 
-        beam_ionization : bool, optional (default=``True``)
+        beam_ionization : bool, optional (default= ``True``)
             Flag for enabling beam-induced ionization.
 
-        radiation_reaction : bool, optional (default=``False``)
+        radiation_reaction : bool, optional (default= ``False``)
             Flag for enabling radiation reaction effects.
 
         num_nodes : int, optional (default=1)
@@ -148,25 +135,25 @@ class StageHipace(Stage):
         num_cell_xy : int, optional (default=511)
             Number of transverse grid cells in HiPACE++.
 
-        driver_only : bool, optional (default=``False``)
+        driver_only : bool, optional (default= ``False``)
             Flag for running simulation with only the driver (no witness beam).
 
-        plasma_density_from_file : str, optional (default=``None``)
+        plasma_density_from_file : str, optional (default= ``None``)
             Path to plasma density profile file (overrides uniform density).
 
-        no_plasma : bool, optional (default=``False``)
+        no_plasma : bool, optional (default= ``False``)
             If ``True``, runs the stage without plasma.
 
-        external_focusing : bool, optional (default=``False``)
+        external_focusing : bool, optional (default= ``False``)
             Flag for whether to include external focusing (APL-like quadrupoles).
 
-        mesh_refinement : bool, optional (default=``True``)
+        mesh_refinement : bool, optional (default= ``True``)
             Enable HiPACE++ mesh refinement.
 
-        do_spin_tracking : bool, optional (default=``False``)
+        do_spin_tracking : bool, optional (default= ``False``)
             Flag for enabling particle spin tracking.
 
-        run_path : str, optional (default=``None``)
+        run_path : str, optional (default= ``None``)
             Path to store plots and outputs.
         """
 
@@ -594,6 +581,33 @@ class StageHipace(Stage):
         
 
     def get_plasma_density(self, locations=None):
+        """
+        Return the plasma density, optionally interpolated at given locations.
+
+        If a plasma density profile has been provided from file, the maximum 
+        density from the profile is stored as ``self.plasma_density`` and 
+        interpolation is performed when ``locations`` is given to return a 1D 
+        ndarray containing the plasma density profile evaluated at positions 
+        given by ``locations``.
+        
+        If a plasma density profile has not been provided from file, the method 
+        returns the stored uniform plasma density either as a 1D ndarray when 
+        ``locations`` is given, or as a float when ``locations`` is not given.
+
+        Parameters
+        ----------
+        locations : [m] array_like of float, optional
+            Positions at which to evaluate the plasma density. If ``None`` 
+            (default), the method returns a single scalar representing the 
+            maximum (or uniform) plasma density.
+
+        Returns
+        -------
+        [m^-3] float or ndarray
+            Plasma density. A scalar is returned if ``locations`` is ``None``. 
+            If ``locations`` is an array, returns an array of the same shape
+            with the density values evaluated at positions given by ``locations``.
+        """
         if self.plasma_density_from_file is not None:
             ns = self.plasma_profile.ns
             self.plasma_density = ns.max()
@@ -607,6 +621,7 @@ class StageHipace(Stage):
                 return self.plasma_density*np.ones(locations.shape)
             else:
                 return self.plasma_density
+
 
     def get_length(self):
         """
