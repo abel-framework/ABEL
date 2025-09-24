@@ -471,10 +471,10 @@ class StageReducedModels(Stage):
 
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
 
         driver_x_offset : [m] float
@@ -497,10 +497,10 @@ class StageReducedModels(Stage):
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        drive_beam : ABEL ``Beam`` object
+        drive_beam : ``Beam``
             Drive beam after tracking.
         """
         
@@ -606,10 +606,10 @@ class StageReducedModels(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
 
         shot_path : ``string``, optional
@@ -618,10 +618,10 @@ class StageReducedModels(Stage):
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -700,10 +700,10 @@ class StageReducedModels(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
 
         shot_path : ``string``, optional
@@ -712,10 +712,10 @@ class StageReducedModels(Stage):
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -793,7 +793,7 @@ class StageReducedModels(Stage):
             
         Returns
         ----------
-        stage_copy : ``StageReducedModels`` object
+        stage_copy : ``StageReducedModels``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
@@ -1012,7 +1012,7 @@ class StageReducedModels(Stage):
             z-coordinates for ``Ez``. Monotonically increasing from first to 
             last element.
 
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             
         z_slices : [m] 1D float ndarray, optional
             Co-moving coordinates of the beam slices.
@@ -1287,7 +1287,7 @@ class StageReducedModels(Stage):
             z-coordinates for ``rb``. Monotonically increasing from first to 
             last element.
 
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             
         z_slices : [m] 1D float ndarray, optional
             Co-moving coordinates of the beam slices.
@@ -1365,10 +1365,10 @@ class StageReducedModels(Stage):
             Contains the 2D plasma density and wakefields for the initial and 
             final time steps.
 
-        drive_beam : ABEL ``Beam`` object
+        drive_beam : ``Beam``
             Drive beam.
 
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam.
     
             
