@@ -79,12 +79,6 @@ class StageHipace(Stage):
     plasma_profile : SimpleNamespace
         Holds arrays for longitudinal positions (`ss`) and densities (`ns`)
         when ramps are generated internally.
-
-    evolution : SimpleNamespace
-        Stores in-situ diagnostics of beam/driver evolution after simulation.
-
-    initial, final : SimpleNamespace
-        Store field and density data at the beginning and end of the stage.
     """
     
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing=False, mesh_refinement=True, do_spin_tracking=False, run_path=None):
@@ -155,6 +149,9 @@ class StageHipace(Stage):
 
         run_path : str, optional (default= ``None``)
             Path to store plots and outputs.
+
+        stage_number : int
+            Keeps track of which stage it is in the beamline.
         """
 
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
