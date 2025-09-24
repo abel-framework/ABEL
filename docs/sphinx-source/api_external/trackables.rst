@@ -16,6 +16,9 @@ Trackable elements
 .. autoclass:: abel.StageReducedModels
  :members:
 
+.. autoclass:: abel.StageWakeT
+ :members:
+
 ``Interstage``
 ---------------------
 .. autoclass:: abel.Interstage
