@@ -144,16 +144,16 @@ class StageReducedModels(Stage):
 
         Parameters
         ----------
-        nom_accel_gradient : [V/m] float, optional (default=``None``)
+        nom_accel_gradient : [V/m] float, optional (default= ``None``)
             Nominal acceleration gradient.
 
-        nom_energy_gain : [eV] float, optional (default=``None``)
+        nom_energy_gain : [eV] float, optional (default= ``None``)
             Nominal energy gain across the plasma stage.
 
-        plasma_density : [m^-3] float, optional (default=``None``)
+        plasma_density : [m^-3] float, optional (default= ``None``)
             The plasma density of the plasma stage.
         
-        driver_source : ``Source`` or ``DriverComplex``, optional (default=``None``)
+        driver_source : ``Source`` or ``DriverComplex``, optional (default= ``None``)
             The source of the drive beam.
 
         ramp_beta_mag : float, optional (default=1.0)
@@ -163,13 +163,13 @@ class StageReducedModels(Stage):
             Determines the time step of the instability tracking in units of 
             betatron wave length/c.
             
-        enable_tr_instability : bool, optional (default=``True``)
+        enable_tr_instability : bool, optional (default= ``True``)
             Flag for enabling transverse intra-beam instability calculations.
 
-        enable_radiation_reaction : bool, optional (default=``True``)
+        enable_radiation_reaction : bool, optional (default= ``True``)
             Flag for enabling radiation reaction effects.
 
-        enable_ion_motion : bool, optional (default=``False``)
+        enable_ion_motion : bool, optional (default= ``False``)
             Flag for enabling plasma ion motion effects.
 
         ion_charge_num : [e] float, optional
@@ -199,7 +199,7 @@ class StageReducedModels(Stage):
             calculated by ``RF-Track``. Used in calculating wakefield perturbation 
             due to ion motion.
 
-        uniform_z_grid : bool, optional (default=``False``)
+        uniform_z_grid : bool, optional (default= ``False``)
             Flag to determine whether the grid along z is uniform (``True``) or finely 
             resolved along the drive beam and main beam regions, while the region 
             between the beams are coarsely resolved (``False``).
@@ -221,14 +221,14 @@ class StageReducedModels(Stage):
             ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
             step.
 
-        save_final_step : bool, optional (default=``False``)
+        save_final_step : bool, optional (default= ``False``)
             Flag for storing the output data including beam, driver, and plasma 
             quantities.
 
-        make_animations : bool, optional (default=``False``)
+        make_animations : bool, optional (default= ``False``)
             Flag for creating side-view and phase-space animations.
 
-        store_beams_for_tests : bool, optional (default=``False``)
+        store_beams_for_tests : bool, optional (default= ``False``)
             Flag for storing intermediate beam states for testing.
         """
 
@@ -1518,7 +1518,7 @@ class StageReducedModels(Stage):
             If provided, the figure is saved to the given file path in PDF format.
             If ``None`` (default), the plot is displayed but not saved.
 
-        includeWakeRadius : bool, optional (default=``True``)
+        includeWakeRadius : bool, optional (default= ``True``)
             If ``True``, also plot the plasma bubble (wake) radius.
         """
 
@@ -1599,18 +1599,18 @@ class StageReducedModels(Stage):
         
         Other parameters
         ----------------
-        show_Ez : bool, optional (default=``True``)
+        show_Ez : bool, optional (default= ``True``)
             Flag for including the axial longitudinal electric field in the 
             plot.
 
-        trace_rb : bool, optional (default=``False``)
+        trace_rb : bool, optional (default= ``False``)
             Flag for including the traced bubble radius in the plot.
             
-        savefig : str, optional (default=``None``)
+        savefig : str, optional (default= ``None``)
             If not ``None``, defines the path to save the figure.
             Defaults to ``None``.
 
-        aspect : str, optional (default=``'auto'``)
+        aspect : str, optional (default= ``'auto'``)
             The aspect ratio of the plots. Set to 'auto' to plot the entire 
             simulation box.
 
@@ -1918,6 +1918,7 @@ class StageReducedModels(Stage):
         of the beam evolving through the stage.
 
         The animation shows the evolution of beam properties such as:
+
         - Mean energy versus propagation length
         - Normalized emittance versus bunch length
         - Horizontal phase space density
@@ -1938,6 +1939,7 @@ class StageReducedModels(Stage):
         -----
         - The output file is saved as a GIF in ``<self.run_path>/plots``.
         - The function currently depends on ``self.evolution`` for beam locations.
+
         A TODO item exists to make it independent of this attribute.
         """
         
