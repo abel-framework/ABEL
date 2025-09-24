@@ -60,6 +60,9 @@ class StageReducedModels(Stage):
     
     ...
 
+    main_source : ``Source`` object
+        Main beam source.
+
     ...
 
 
@@ -75,7 +78,7 @@ class StageReducedModels(Stage):
     """
 
     # ==================================================
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, main_source=None, drive_beam=None, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, Ez_fit_obj=None, Ez_roi=None, rb_fit_obj=None, bubble_radius_roi=None, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
         """
         TODO: Short description
         None of lines in the docstring text should exceed this length ..........
@@ -85,8 +88,10 @@ class StageReducedModels(Stage):
         ...
 
         driver_source : ``Source`` object of drive beam.
+        
+        main_source : ``Source`` object of main beam.
 
-        #driver_beam : ``Beam`` object of drive beam.
+        driver_beam : ``Beam`` object of drive beam.
 
         #main_beam : ``Beam`` object of main beam.
         
@@ -152,6 +157,8 @@ class StageReducedModels(Stage):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
+        self.main_source = main_source
+        self.drive_beam = drive_beam
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
 
@@ -173,12 +180,12 @@ class StageReducedModels(Stage):
         self.drive_beam_update_period = drive_beam_update_period
 
         # Longitudinal electric field and plasma ion bubble radius
-        self.Ez_fit_obj = None  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
-        self.Ez_roi = None  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
+        self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
+        self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
         #self.Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
         #self.zs_Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.zs
-        self.rb_fit_obj = None  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
-        self.bubble_radius_roi = None  # [m] bubble radius in the region of interest.
+        self.rb_fit_obj = rb_fit_obj  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
+        self.bubble_radius_roi = bubble_radius_roi  # [m] bubble radius in the region of interest.
         self.bubble_radius_axial = None
         self.zs_bubble_radius_axial = None
         self.estm_R_blowout = None  # [m] estimated (max) blowout radius to be calculated.
@@ -249,7 +256,11 @@ class StageReducedModels(Stage):
 
         
         # ========== Get the drive beam ==========
-        driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
+        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    # TODO: delete ##################
+            driver_incoming = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
+        else:
+            driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
+            #self.drive_beam = driver_incoming                    # TODO: delete ######################
         
         original_driver = copy.deepcopy(driver_incoming)
         original_beam = copy.deepcopy(beam_incoming)
@@ -1355,9 +1366,9 @@ class StageReducedModels(Stage):
         return num_profile, z_ctrs
 
     
-    # # ==================================================
-    # def matched_beta_function(self, energy):
-    #     return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
+    # ==================================================
+    def matched_beta_function(self, energy):
+        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
     
     
     # ==================================================
@@ -1406,6 +1417,7 @@ class StageReducedModels(Stage):
             self.downramp.initial = None
             self.downramp.final = None
 
+        self.drive_beam = None
         #self.upramp = None
         #self.downramp = None
         #self.final = None
@@ -2541,6 +2553,15 @@ class StageReducedModels(Stage):
         with open(self.run_path + 'output.txt', 'w') as f:
             print('============================================================================', file=f)
             print(f"Time step [betatron wavelength/c]:\t\t {self.time_step_mod :.3f}", file=f)
+            
+            if self.main_source is None:
+                print(f"Symmetrised main beam:\t\t\t\t Not registered", file=f)
+            elif self.main_source.symmetrize:
+                print(f"Symmetrised main beam:\t\t\t\t x, y, xp, yp symmetrised", file=f)
+            elif self.main_source.symmetrize_6d:
+                print(f"Symmetrised main beam:\t\t\t\t 6D symmetrised", file=f)
+            else:
+                print(f"Symmetrised main beam:\t\t\t\t Not symmetrised.", file=f)
 
             if self.driver_source.symmetrize:
                 print(f"Symmetrised drive beam:\t\t\t\t x, y, xp, yp symmetrised\n", file=f)
@@ -2657,6 +2678,6 @@ class StageReducedModels(Stage):
         print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
         print(f"Ion motion enabled:\t\t\t\t\t {str(self.enable_ion_motion) :s}")
 
-        print('')
+        print('\n')
         
     

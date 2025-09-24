@@ -23,7 +23,8 @@ from abel.classes.beam import Beam
 from abel.utilities.relativity import momentum2gamma, velocity2gamma, momentum2energy, gamma2momentum, energy2gamma
 from abel.utilities.plasma_physics import k_p
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
-from abel.wrappers.wake_t.wake_t_wrapper import wake_t_bunch2beam, beam2wake_t_bunch, wakeT_r_E_filter 
+from abel.wrappers.wake_t.wake_t_wrapper import wake_t_bunch2beam, beam2wake_t_bunch, wakeT_r_E_filter #, wake_t_remove_halo_particles
+#from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig, probe_driver_beam_field, assemble_main_sc_fields_obj, probe_main_beam_field, ion_wakefield_perturbation, intplt_ion_wakefield_perturbation, push_driver
 from abel.physics_models.ion_motion_wakefield_perturbation import IonMotionConfig
 import abel.physics_models.ion_motion_wakefield_perturbation as ion_motion
 
@@ -326,6 +327,8 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
     
     # Set the coordinates used to probe beam electric fields from RF-Track
     ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam, set_driver_sc_coords=False)
+    
+    #ion_motion_config.update_ion_wakefield = True #######<- Override
 
     # Check if ion wakefield perturbation should be updated for the current time step
     if ion_motion_config.update_ion_wakefield:
@@ -438,10 +441,8 @@ def update_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_s
 
 ###################################################
 def push_driver(wake_t_driver, wake_t_fields, time_step, pusher='boris'):
-    """
-    Evolves a Wake-T drive beam ``wake_t_driver`` for one time step defined by
-    ``time_step``.
-    """
+    "Evolves a Wake-T drive beam ``wake_t_driver``for one time step "
+    "``time_step``."
     wake_t_driver.evolve([wake_t_fields], t=wake_t_driver.prop_distance/SI.c, dt=time_step, pusher=pusher)
 
     #return wake_t_driver
@@ -593,6 +594,8 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
     use_wake_t_driver = enable_driver_evolution  # Use Wake-T ParticleBunch driver if using driver evolution.
     if use_wake_t_driver:
         drive_beam = beam2wake_t_bunch(drive_beam0, name='driver')
+        #pz_thres = 0.01 * np.mean(drive_beam.pz)  # [beta*gamma], later used to remove drive beam particles with too low momentum.
+        #pz_thres = 5.5e-20/(SI.c*SI.m_e)  # [beta*gamma], later used to remove drive beam particles with too low momentum. Corresponds to 0.1 GeV.
         energy_thres = 50*SI.m_e*SI.c**2/SI.e  # [eV], 50 * electron rest energy.
         pz_thres = gamma2momentum(energy2gamma(energy_thres))/(SI.c*SI.m_e)  # [beta*gamma], later used to remove drive beam particles with too low momentum. 
     else:
@@ -665,6 +668,8 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         gammas = momentum2gamma( np.sqrt(pxs_sorted**2 + pys_sorted**2 + pzs_sorted**2) )  # Lorentz factor for each particle.
         tot_axis_offsets_sqr = (xs_sorted - x_axis)**2 + (ys_sorted - y_axis)**2
 
+        #ion_start_time = time.time()
+
         # Calculate the ion wakefield perturbations
         if trans_wake_config.enable_ion_motion:
             # temporary workaround. TODO: make set_probing_coordinates() compatible with Wake-T driver
@@ -679,12 +684,21 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         else:  # No ion motion
             intpl_Wx_perts = np.zeros_like(filtered_beam.zs())
             intpl_Wy_perts = np.zeros_like(filtered_beam.zs())
+
+        
+        #ion_end_time = time.time()
+        #print('Ion wake calc time taken:', ion_end_time - ion_start_time, 'seconds')
         
 
         # Update the transverse momenta components
         pxs_sorted = update_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=xs_sorted-x_axis, tr_momenta_comp=pxs_sorted, ion_wakefield_perts=intpl_Wx_perts)
             
         pys_sorted = update_tr_momenta_comp(trans_wake_config, skin_depth, plasma_density, time_step, bubble_radius, zs_sorted, weights_sorted, gammas, tot_axis_offsets_sqr, offsets=ys_sorted-y_axis, tr_momenta_comp=pys_sorted, ion_wakefield_perts=intpl_Wy_perts)
+        
+        
+        #Ez = -3.35e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
+        #Ez = -3.20e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ###########################
+        #Ez = -2.0e9*np.ones(len(pzs_sorted))  # [V/m] Overload with constant field to see how this affects instability. # <- ######################
 
         
         # Update longitudinal momenta.
@@ -706,6 +720,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         xs_sorted = xs_sorted + x_angles*1/2*c*time_step
         y_angles = pys_sorted/pzs_sorted
         ys_sorted = ys_sorted + y_angles*1/2*c*time_step
+        #time_step_count = time_step_count + 1/2
         prop_length = prop_length + 1/2*c*time_step
         
         time_step_count = time_step_count + 1
@@ -723,6 +738,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
                 push_driver(drive_beam, trans_wake_config.wake_t_fields, drive_beam_update_period*time_step, pusher='boris')
                 
                 if time_step_count % (drive_beam_update_period * 5) == 0:  # It is time to clean drive_beam.
+                    #drive_beam = wake_t_remove_halo_particles(drive_beam, nsigma=20)
 
                     # Remove particles that are too far out or have too low energy
                     drive_beam = wakeT_r_E_filter(drive_beam, r_thres=1.5*max_bubble_radius, pz_thres=pz_thres)
@@ -733,11 +749,22 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         #if probe_evolution and time_step_count % probe_evol_period == 0:
             #file_path = trans_wake_config.shot_path[0:-1] + '_tr_wake_data' + os.sep + str(trans_wake_config.stage_num).zfill(3) + '_' + str(time_step_count).zfill(len(str(int(num_time_steps)))) + '.csv'
             #save_time_step([xs_sorted, ys_sorted, zs_sorted, pxs_sorted, pys_sorted, pzs_sorted, weights_sorted, Ez, bubble_radius, intpl_Wx_perts, intpl_Wy_perts], file_path)
+
+        
+                
+        # RK4
+        #xs_sorted = RK4(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, xs_sorted, pxs_sorted, Ez, pzs_sorted)
+        #ys_sorted = RK4(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, ys_sorted, pys_sorted, Ez, pzs_sorted)
+        #time_step_count = time_step_count + 1
+        #prop_length = prop_length + c*time_step
         
         
         # Progress bar
         if show_prog_bar is True:
             pbar.update(prop_length/stage_length*100 - pbar.n)
+
+        #print(time_step_count)
+        #break #####################< override
         
         ############# End of loop #############
     
@@ -776,6 +803,7 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         drive_beam_out = wake_t_bunch2beam(drive_beam)
     else:
         drive_beam_out = drive_beam
+    #drive_beam_out.remove_halo_particles(nsigma=20)
     
 
     # ============= Save evolution =============
@@ -802,6 +830,7 @@ def bool_indices_filter(bool_indices, zs_sorted, xs_sorted, ys_sorted, pxs_sorte
     pxs_sorted = pxs_sorted[bool_indices]
     pys_sorted = pys_sorted[bool_indices]
     pzs_sorted = pzs_sorted[bool_indices]
+    #energs_sorted = energs_sorted[bool_indices]
     weights_sorted = weights_sorted[bool_indices]
     Ez = Ez[bool_indices]
     bubble_radius = bubble_radius[bool_indices]
@@ -871,3 +900,240 @@ def save_time_step(arrays, file_path):
 
         # File is automatically closed when exiting the 'with' block
 
+
+
+#vvvvvvvvvvvvvvvvvvvvvv Not currently in use vvvvvvvvvvvvvvvvvvvvvv
+'''
+###################################################
+#def wakefunc_Stupakov(xi_lead, xi_ref, a):
+#    return 2/(np.pi*eps0*a**4)*np.abs(xi_lead - xi_ref)  # [V/Cm^2]
+
+
+
+###################################################
+# Simplified loop integration option
+def integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
+    
+    a = bubble_radius + 0.75*skin_depth
+    
+    # Assemble an array f used for the dot product (Based on Stupakov's wake function)
+    f = -e*2/(np.pi*eps0*a**4)*weights_sorted*offsets
+    
+    # Calculate the wakefield on each macroparticle
+    wakefield = np.zeros(len(zs_sorted))
+    for idx_particle in range(len(zs_sorted)):
+        wakefield[idx_particle] = np.sum((zs_sorted[idx_particle+1:] - zs_sorted[idx_particle]) * f[idx_particle+1:])
+    
+    # Calculate the total transverse force on macroparticles
+    tr_force = -e*(wakefield + plasma_density*e*offsets/(2*eps0))
+    
+    # Update momenta
+    tr_momenta = tr_momenta + tr_force*time_step
+    return tr_momenta
+
+
+
+###################################################
+# Single pass integration option (Stupakov's wake function)
+def single_pass_integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta):
+    
+    a = bubble_radius + 0.75*skin_depth
+    zzs = np.diff(zs_sorted)  # [m] z distance between neighbouring particles.
+
+    # Calculate the derivative of the wakefield (Stupakov's wake function)
+    dwakefields_dz_contribs = np.flip(2 / (np.pi * eps0 * a**4) * -e * weights_sorted * offsets)
+    dwakefields_dz_contribs[0] = 0
+    dwakefields_dz = np.cumsum(dwakefields_dz_contribs)  # Cumulative sum from 1st to last element.
+    dwakefields_dz = np.flip(dwakefields_dz)
+    
+    # Calculate the wakefield on each macroparticle
+    wakefields = np.zeros(len(zs_sorted))
+    
+    for idx_particle in range(len(zs_sorted)-2, -1, -1):
+        wakefields[idx_particle] = wakefields[idx_particle+1] + zzs[idx_particle] * dwakefields_dz[idx_particle+1]
+
+    # Calculate the total transverse force on macroparticles
+    tr_force = -e*(wakefields + plasma_density*e*offsets/(2*eps0))
+    
+    # Update momenta
+    tr_momenta = tr_momenta + tr_force*time_step
+    return tr_momenta
+
+    
+    
+###################################################
+#def doffset_dt(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta, Ez, pzs_sorted):
+#    tr_force = np.zeros(len(zs_sorted))  # [N] transverse force on each particle.
+#    for idx_particle in range(len(zs_sorted)-1,-1,-1):  # Loops through all macroparticles
+#
+#        a = bubble_radius[-1:idx_particle:-1] + 0.75*skin_depth
+#        z_preceding_particles = zs_sorted[-1:idx_particle:-1]
+#        z_ref_particle = zs_sorted[idx_particle]
+#        weights_preceding_particles = weights_sorted[-1:idx_particle:-1]
+#        
+#        offsets_preceding_particles = offsets[-1:idx_particle:-1]
+#        contributions = -e * wakefunc_Stupakov(z_preceding_particles, z_ref_particle, a) * weights_preceding_particles * offsets_preceding_particles
+#        E_field = np.sum(contributions, axis=0)  # Sum the contributions from all preceding slices.
+#        tr_force[idx_particle] = -e*(E_field + plasma_density*e*offsets[idx_particle]/(2*eps0))  # Total transverse force on beam particle at zs_sorted[idx_particle].
+#        
+#    # Update momenta
+#    tr_momenta = tr_momenta + tr_force*time_step
+#    pzs_sorted = pzs_sorted - e*Ez*time_step
+#    
+#    return tr_momenta/pzs_sorted*c
+#
+#
+###################################################
+#def RK4(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tr_momenta, Ez, pzs_sorted):
+#    #ys_sorted = ys_sorted + pys_sorted/pzs_sorted*1/2*c*time_step
+#    #
+#    #pxs_sorted = pxs_sorted + Fx*time_step
+#    #tr_momenta = tr_momenta + Fy*time_step   
+#    #pzs_sorted = pzs_sorted - e*Ez*time_step
+#    #
+#    #dydt = tr_momenta/pzs_sorted*c
+##
+#    #pzs_sorted = pzs_sorted - e*Ez*time_step
+#    #dydt = integrate_wake_func(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets=ys_sorted, tr_momenta=tr_momenta)/pzs_sorted*c
+#    
+#    k1 = time_step*tr_momenta/pzs_sorted*c
+#    k2 = time_step * doffset_dt(skin_depth, plasma_density, time_step/2, zs_sorted, bubble_radius, weights_sorted, offsets+k1/2, tr_momenta, Ez, pzs_sorted)
+#    k3 = time_step * doffset_dt(skin_depth, plasma_density, time_step/2, zs_sorted, bubble_radius, weights_sorted, offsets+k2/2, tr_momenta, Ez, pzs_sorted)
+#    k4 = time_step * doffset_dt(skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets+k3, tr_momenta, Ez, pzs_sorted)
+#    
+#    offsets = offsets + k1/6 + k2/3 + k3/3 + k4/6
+#    return offsets
+
+
+
+###################################################
+# Single pass integration of (Stupakov's wake function)
+def calc_tr_momenta(beam, skin_depth, plasma_density, time_step, zs_sorted, bubble_radius, weights_sorted, offsets, tot_offsets_sqr, tr_momenta, gammas, tr_direction, trans_wake_config):
+
+    enable_tr_instability = trans_wake_config.enable_tr_instability
+    enable_radiation_reaction = trans_wake_config.enable_radiation_reaction
+    enable_ion_motion = trans_wake_config.enable_ion_motion
+    
+    a = bubble_radius + 0.75*skin_depth
+    zzs = np.diff(zs_sorted)  # [m] z distance between neighbouring particles. zs_sorted[i+1]-zs_sorted[i]. zs_sorted increases towards larger indicies. I.e. coincide with beam head at the end of the array.
+    
+    # ============= Calculate the transverse intra-beam wakefield =============
+    if enable_tr_instability:  # TODO: Calculate the transverse wakefield using the split integral method instead.
+
+        # ------------- Calculate the derivative of the wakefield (Stupakov's wake function) -------------
+        dwakefields_dz_contribs = 2 / (np.pi * eps0 * a**4) * -e * weights_sorted * offsets
+        dwakefields_dz_contribs[-1] = 0  # Set the contribution from the beam head to 0.
+    
+        # Cumulative sum from last to first element, i.e. from beam head to beam tail. This results in a reversed order where contributions from beam head are placed at the start of the dwakefields_dz array
+        dwakefields_dz = np.cumsum(dwakefields_dz_contribs[::-1])
+        
+        # Flip the array to coincide with beam head facing the end of the array like all the other beam arrays
+        dwakefields_dz = np.flip(dwakefields_dz)
+        
+        # ------------- Calculate the wakefield on each macroparticle -------------
+        # Cumulative sum from last to first element, i.e. from beam head to beam tail. This results in a reversed order where contributions from beam head are placed at the start of the array
+        wakefields = np.cumsum( (zzs * dwakefields_dz[:-1])[::-1] )
+
+        # Flip the array to coincide with beam head facing the end of the array like all the other beam arrays
+        wakefields = np.flip(wakefields)
+
+        # Insert 0 at beam head wakefield
+        wakefields = np.insert(arr=wakefields, obj=-1, values=0.0)
+    else:
+        wakefields = np.zeros(len(offsets))
+        
+        
+    # ============= Calculate the effects of ion motion =============
+    if enable_ion_motion:
+
+        ion_motion_config = trans_wake_config.ion_motion_config
+        drive_beam = ion_motion_config.drive_beam
+        
+        # Set the coordinates used to probe beam electric fields from RF-Track
+        ion_motion_config.set_probing_coordinates(drive_beam, main_beam=beam)
+
+        #ion_motion_config.update_ion_wakefield = True #######<- Override
+
+        if ion_motion_config.update_ion_wakefield:
+
+            # Extract drive beam RF-Track SpaceCharge_Field object
+            driver_sc_fields_obj = ion_motion_config.driver_sc_fields_obj
+
+            # Probe drive beam field component in 3D
+            driver_E_comp_3d = probe_driver_beam_field_comp(ion_motion_config, driver_sc_fields_obj, field_comp=tr_direction)
+
+            # Update the RF-Track SpaceCharge_Field object for the main beam
+            sc_fields_obj = assemble_main_sc_fields_obj(ion_motion_config, main_beam=beam)
+
+            # Probe main beam field component in 3D
+            main_E_comp_3d = probe_main_beam_field(ion_motion_config, sc_fields_obj, field_comp=tr_direction)
+            
+            # Calculate the ion wakefield perturbation. Component given by tr_direction.
+            #W_perts = ion_wakefield_perturbation_parallel(ion_motion_config, sc_fields_obj, tr_direction=tr_direction)  # [V/m], 3D array, parallel calculation.
+            W_perts = ion_wakefield_perturbation(ion_motion_config, main_E_comp_3d, driver_E_comp_3d, field_comp=tr_direction)  # [V/m], 3D array
+    
+            # Interpolate the ion wakefield perturbation to macroparticle positions
+            intpl_W_perts, _ = intplt_ion_wakefield_perturbation(beam, W_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+
+            # ion_wakefield_perturbation() ensures that tr_direction is either 'x' or 'y'.
+            if tr_direction == 'x':
+                trans_wake_config.ion_motion_config.Wx_perts = W_perts
+                if trans_wake_config.ion_motion_config.Wx_perts is None:
+                    raise ValueError('trans_wake_config.ion_motion_config.Wx_perts set to None.')
+            else:  
+                trans_wake_config.ion_motion_config.Wy_perts = W_perts
+                if trans_wake_config.ion_motion_config.Wy_perts is None:
+                    raise ValueError('trans_wake_config.ion_motion_config.Wy_perts set to None.')
+        
+        else:
+            if tr_direction == 'x':
+                W_perts = ion_motion_config.Wx_perts
+                intpl_W_perts, _ = intplt_ion_wakefield_perturbation(beam, W_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+            
+            # ion_wakefield_perturbation() / ion_wakefield_perturbation_parallel() ensures that tr_direction is either 'x' or 'y'.
+            else:
+                W_perts = ion_motion_config.Wy_perts
+                intpl_W_perts, _ = intplt_ion_wakefield_perturbation(beam, W_perts, ion_motion_config, intplt_beam_region_only=True)  # [V/m], 1D array
+
+        # Calculate the perturbed ion wakefield at macroparticle positions
+        background_fields = plasma_density*e/(2*eps0)*offsets - intpl_W_perts  # [V/m], 1D array 
+        
+    else:
+        background_fields = plasma_density*e/(2*eps0)*offsets
+        W_perts = None
+        intpl_W_perts = np.zeros_like(offsets)
+
+    
+    # ============= Calculate the total transverse force on macroparticles =============
+    tr_force = -e*(wakefields + background_fields)
+    
+    
+    # ============= Include radiation reaction if chosen and update momenta =============
+    if enable_radiation_reaction:
+        # Backward differentiation option (implicit method)
+        denominators = 1 + c*1.87863e-15 * time_step * (1/skin_depth)**2/2 * (1+(1/skin_depth)**2/2*gammas*tot_offsets_sqr)
+        tr_momenta = (tr_momenta + tr_force*time_step)/denominators
+        
+        # Forward differentiation option (direct method)
+        #tr_momenta = tr_momenta + tr_force*time_step - c*1.87863e-15*(1/skin_depth)**2/2*tr_momenta*(1+(1/skin_depth)**2/2*gammas*tot_offsets_sqr)*time_step
+    else:
+        tr_momenta = tr_momenta + tr_force*time_step
+        
+    return tr_momenta, W_perts, intpl_W_perts
+
+
+
+###################################################
+#def calc_tr_force_comp(plasma_density, offsets, intra_beam_wakefields, ion_wakefield_perts):
+#    """
+#    Calculates the transverse force component acting on each beam macroparticle.
+#    """
+#    
+#    # Calculate the perturbed ion wakefield at macroparticle positions
+#    ion_wakefields = plasma_density*e/(2*eps0)*offsets - ion_wakefield_perts  # [V/m], 1D array
+#    
+#    # Calculate the transverse force component on macroparticles
+#    tr_forces_comp = -e*(intra_beam_wakefields + ion_wakefields)  # [N], 1D array
+#
+#    return tr_forces_comp
+'''
