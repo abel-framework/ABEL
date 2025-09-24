@@ -2039,7 +2039,7 @@ class Stage(Trackable, CostModeled):
         else:
             print(f"Has ramp(s):\t\t\t\t\t\t No")
 
-        print('')
+        print('\n')
 
 
 ###################################################
@@ -2115,15 +2115,13 @@ class PlasmaRamp(Stage):
     
 
     # ==================================================
-    def print_summary(self, print_params=True):
+    def print_summary(self):
         if self.is_upramp():
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
             print('Ramp type: \t\t\t\t\t\t downramp')
         print('Ramp shape: \t\t\t\t\t\t', self.ramp_shape)
-
-        if print_params:
-            super().print_summary()
+        super().print_summary()
 
 
 ###################################################
