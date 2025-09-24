@@ -236,9 +236,6 @@ class IonMotionConfig():
 
             if np.any(np.diff(xs_probe)) < 0 or np.any(np.diff(ys_probe)) < 0:
                 raise ValueError('xs_probe and/or ys_probe are not in ascending order.')
-            #if self.num_xy_cells_probe_updated is False:
-            #    self.num_xy_cells_probe = len(xs_probe)
-            #    self.num_xy_cells_probe_updated = True
 
         self.xs_probe = xs_probe
         self.ys_probe = ys_probe
