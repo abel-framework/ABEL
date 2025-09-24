@@ -122,6 +122,9 @@ class StageReducedModels(Stage):
     evolution : dict
         Contains the beam parameter evolution across the stage.
 
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
+
     save_final_step : bool
         Flag for storing the output data including beam, driver, and plasma 
         quantities.
