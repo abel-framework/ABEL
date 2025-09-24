@@ -71,13 +71,12 @@ class CONFIG:
         cls.cluster_name = cfdata['cluster']['cluster_name']
         #Load default cluster settings
         if cls.cluster_name == 'lumi':
-            cls.project_name = 'project_000000000' # Project number on cluster
+            cls.project_name = cfdata['cluster']['project_name'] #Must set for lumi
             cls.partition_name_standard = 'standard-g'
             cls.partition_name_small = 'small-g'
             cls.partition_name_devel = 'dev-g'
         elif cls.cluster_name == 'betzy':
-            cls.project_name = 'your_project_number_here'
-            #cls.project_name = 'nn11003k'
+            cls.project_name = cfdata['cluster']['project_name'] #Must set for betzy
             cls.partition_name_standard = ''
             cls.partition_name_small = ''
             cls.partition_name_devel = ''
