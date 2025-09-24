@@ -18,9 +18,10 @@
 [cluster] # COMPUTE CLUSTER CONFIGURATION
 
 cluster_name = "LOCAL" # Set to lumi/betzy/LOCAL/etc
+project_name = "your_project_number_here"
+
 #Normally these variables are autoset by CONFIG.py based on cluster_name,
 # but can also override them here
-# project_name = "your_project_number_here"
 # partition_name_standard = "standard-g"
 # partition_name_small = "small-g"
 
