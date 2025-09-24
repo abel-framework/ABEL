@@ -1,7 +1,3 @@
-# Copyright 2022-, The ABEL Authors
-# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
-# License: GPL-3.0-or-later
-
 """
 Stage class with the transverse wake instability model as described in thesis 
 "Instability and Beam-Beam Study for Multi-TeV PWFA e+e- and gamma gamma Linear 

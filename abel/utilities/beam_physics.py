@@ -1,7 +1,3 @@
-# Copyright 2022-, The ABEL Authors
-# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
-# License: GPL-3.0-or-later
-
 import numpy as np
 
 # generate trace space from geometric emittance and twiss parameters

@@ -1,7 +1,3 @@
-# Copyright 2022-, The ABEL Authors
-# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
-# License: GPL-3.0-or-later
-
 from abel.classes.collider.collider import Collider
 import scipy.constants as SI
 import numpy as np

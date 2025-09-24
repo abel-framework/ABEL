@@ -1,7 +1,3 @@
-# Copyright 2022-, The ABEL Authors
-# Authors: C.A. Lindstrøm, B. Chen, K. Sjobak, E. Adli
-# License: GPL-3.0-or-later
-
 from abel.classes.stage.stage import Stage, PlasmaRamp
 from abel.classes.source.impl.source_capsule import SourceCapsule
 import numpy as np
