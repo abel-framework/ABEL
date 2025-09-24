@@ -182,7 +182,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         ----------
-        driver_source : ``Source``object
+        driver_source : ``Source``
         """
     
         if isinstance(self.driver_source, DriverComplex):
@@ -272,7 +272,7 @@ class Stage(Trackable, CostModeled):
             
         Returns
         ----------
-        stage_copy : ``Stage`` object
+        stage_copy : ``Stage``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
@@ -354,13 +354,13 @@ class Stage(Trackable, CostModeled):
     
         Parameters
         ----------
-        ramp : ``PlasmaRamp`` object
+        ramp : ``PlasmaRamp``
             Contains all parameters for the ramp.
 
 
         Returns
         ----------
-        trackable_ramp : ``Stage``object
+        trackable_ramp : ``Stage``
             A uniform ramp that can be used for tracking.
         """
 
@@ -560,10 +560,10 @@ class Stage(Trackable, CostModeled):
         savedepth : int (default=0)
             Depth of data saving.
 
-        runnable : ``Runnable``, (default=``None``)
+        runnable : ``Runnable``, (default= ``None``)
             ``Runnable`` object.
 
-        verbose : bool (default=``False``)
+        verbose : bool (default= ``False``)
             Print tracking information.
 
         Returns
@@ -1441,21 +1441,21 @@ class Stage(Trackable, CostModeled):
 
         Parameters
         ----------
-        driver_incoming : ``Beam`` object
+        driver_incoming : ``Beam``
             The incoming drive beam before any rotation and ramps.
 
-        beam_incoming : ``Beam`` object
+        beam_incoming : ``Beam``
             The incoming drive beam before any rotation and ramps.
 
 
         Returns
         ----------
-        drive_beam_rotated : ``Beam`` object
+        drive_beam_rotated : ``Beam``
             Rotated drive beam. Returns the input ``driver_incoming`` if the 
             driver source of the stage does not have neither angular jitter nor 
             angular offset.
 
-        beam_rotated : ``Beam`` object
+        beam_rotated : ``Beam``
             Rotated main beam. Returns the input ``beam_incoming`` if the driver 
             source of the stage does not have neither angular jitter nor angular 
             offset.
@@ -1516,24 +1516,24 @@ class Stage(Trackable, CostModeled):
 
         Parameters
         ----------
-        driver_incoming : ``Beam`` object
+        driver_incoming : ``Beam``
             The incoming drive beam before any rotation and ramps.
 
-        driver_outgoing : ``Beam`` object
+        driver_outgoing : ``Beam``
             The outgoing drive beam after downramp.
 
-        beam_outgoing : ``Beam`` object
+        beam_outgoing : ``Beam``
             The outgoing main beam after downramp.
 
 
         Returns
         ----------
-        driver_outgoing : ``Beam`` object
+        driver_outgoing : ``Beam``
             Drive beam rotated back to its original coordinate system before the 
             stage. Returns the input ``driver_outgoing`` if the driver source of 
             the stage does not have neither angular jitter nor angular offset.
 
-        beam_outgoing : ``Beam`` object
+        beam_outgoing : ``Beam``
             Main beam rotated back to its original coordinate system before the 
             stage. Returns the input ``beam_incoming`` if the driver source of 
             the stage does not have neither angular jitter nor angular offset.
