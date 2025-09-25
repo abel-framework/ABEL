@@ -52,6 +52,9 @@ class StageWakeT(Stage):
 
     # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the particles through the stage.
+        """
 
         import wake_t
         from abel.utilities.plasma_physics import blowout_radius, k_p
