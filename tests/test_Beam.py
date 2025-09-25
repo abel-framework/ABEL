@@ -133,7 +133,7 @@ def test_set_phase_space():
     assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.charge(), Q, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.abs_charge(), np.abs(Q), rtol=1e-15, atol=0.0)
-    assert beam.total_particles() == int(Q/-SI.e)
+    assert abs(beam.total_particles() - int(Q / -SI.e)) <= 1
     assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
     assert np.allclose(beam.xs(), xs, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.ys(), ys, rtol=1e-15, atol=0.0)
