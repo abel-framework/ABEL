@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 import os
 
 class CONFIG:
@@ -71,14 +77,12 @@ class CONFIG:
         cls.cluster_name = cfdata['cluster']['cluster_name']
         #Load default cluster settings
         if cls.cluster_name == 'lumi':
-            #cls.project_name = 'project_465001375' # PLASMACOLLIDER project (E. Adli)
-            cls.project_name = 'project_465001379' # SPARTA project (C. A. Lindstrøm)
+            cls.project_name = cfdata['cluster']['project_name'] #Must set for lumi
             cls.partition_name_standard = 'standard-g'
             cls.partition_name_small = 'small-g'
             cls.partition_name_devel = 'dev-g'
         elif cls.cluster_name == 'betzy':
-            cls.project_name = 'your_project_number_here'
-            #cls.project_name = 'nn11003k'
+            cls.project_name = cfdata['cluster']['project_name'] #Must set for betzy
             cls.partition_name_standard = ''
             cls.partition_name_small = ''
             cls.partition_name_devel = ''

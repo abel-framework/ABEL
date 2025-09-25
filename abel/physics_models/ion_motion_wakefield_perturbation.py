@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 """
 Ion wakefield perturbation caused by ion motion
 
@@ -231,9 +237,6 @@ class IonMotionConfig():
 
             if np.any(np.diff(xs_probe)) < 0 or np.any(np.diff(ys_probe)) < 0:
                 raise ValueError('xs_probe and/or ys_probe are not in ascending order.')
-            #if self.num_xy_cells_probe_updated is False:
-            #    self.num_xy_cells_probe = len(xs_probe)
-            #    self.num_xy_cells_probe_updated = True
 
         self.xs_probe = xs_probe
         self.ys_probe = ys_probe

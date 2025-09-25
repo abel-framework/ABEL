@@ -1,23 +1,11 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 """
 ABEL : Beam class tests
-=======================================
-
-This file is a part of ABEL.
-Copyright 2022– C.A.Lindstrøm, J.B.B.Chen, O.G.Finnerud,
-D.Kallvik, E.Hørlyk, K.N.Sjobak, E.Adli, University of Oslo
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pytest
@@ -128,7 +116,7 @@ def test_set_phase_space():
     "Verify that the phase space is set correctly."
     beam = Beam()
     num_particles = 10042
-    Q = -SI.e * 1.0e10
+    Q = -SI.e * 1.2e10
     xs = np.random.rand(num_particles)
     ys = np.random.rand(num_particles)
     zs = np.random.rand(num_particles)
@@ -145,7 +133,7 @@ def test_set_phase_space():
     assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.charge(), Q, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.abs_charge(), np.abs(Q), rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.total_particles(), 1.0e10, rtol=1e-15, atol=0.0)
+    assert abs(beam.total_particles() - int(Q / -SI.e)) <= 1
     assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
     assert np.allclose(beam.xs(), xs, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.ys(), ys, rtol=1e-15, atol=0.0)

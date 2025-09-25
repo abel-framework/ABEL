@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
@@ -2254,7 +2260,7 @@ class Stage(Trackable, CostModeled):
         else:
             print(f"Has ramp(s):\t\t\t\t\t\t No")
 
-        print('\n')
+        print('')
 
 
 ###################################################
@@ -2363,17 +2369,18 @@ class PlasmaRamp(Stage):
     
 
     # ==================================================
-    def print_summary(self):
+    def print_summary(self, print_params=True):
         """
         Print a summary of the ramp.
         """
-
         if self.is_upramp():
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
             print('Ramp type: \t\t\t\t\t\t downramp')
         print('Ramp shape: \t\t\t\t\t\t', self.ramp_shape)
-        super().print_summary()
+
+        if print_params:
+            super().print_summary()
 
 
 ###################################################

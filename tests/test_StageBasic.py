@@ -1,24 +1,13 @@
 # -*- coding: utf-8 -*-
+
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 """
 ABEL : StageBasic unit tests
-=======================================
-
-This file is a part of ABEL.
-Copyright 2022– C.A.Lindstrøm, J.B.B.Chen, O.G.Finnerud,
-D.Kallvik, E.Hørlyk, K.N.Sjobak, E.Adli, University of Oslo
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pytest

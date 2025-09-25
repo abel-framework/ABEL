@@ -1,24 +1,12 @@
 # -*- coding: utf-8 -*-
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 """
 ABEL : StageReducedModels unit tests
-=======================================
-
-This file is a part of ABEL.
-Copyright 2022– C.A.Lindstrøm, J.B.B.Chen, O.G.Finnerud,
-D.Kallvik, E.Hørlyk, K.N.Sjobak, E.Adli, University of Oslo
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pytest
@@ -480,8 +468,9 @@ def test_longitudinal_number_distribution():
 @pytest.mark.StageReducedModels
 def test_matched_beta_function():
     """
-    Tests for ``StageReducedModels.matched_beta_function()``.
+    Tests for ``Stage.matched_beta_function()``.
     """
+    #TODO: move to tests for the Stage class
 
     from abel.utilities.relativity import energy2gamma
 
@@ -495,9 +484,20 @@ def test_matched_beta_function():
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag)
 
     kp = np.sqrt(plasma_density*SI.e**2/(SI.epsilon_0*SI.m_e*SI.c**2))  # plasma wavenumber [m^-1]
-    beta_mat = np.sqrt(2*energy2gamma(main_source.energy))/kp * ramp_beta_mag
-
+    beta_mat = np.sqrt(2*energy2gamma(main_source.energy))/kp
     assert np.allclose(stage.matched_beta_function(main_source.energy), beta_mat, rtol=1e-15, atol=0.0)
+
+    stage_upramp = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag)
+    stage_upramp.upramp = PlasmaRamp()
+    beta_mat_upramp = np.sqrt(2*energy2gamma(main_source.energy))/kp * ramp_beta_mag
+    assert np.allclose(stage_upramp.matched_beta_function(main_source.energy), beta_mat_upramp, rtol=1e-15, atol=0.0)
+
+    stage_ramped = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag)
+    stage_ramped.upramp = PlasmaRamp()
+    stage_ramped.downramp = PlasmaRamp()
+    stage_ramped.downramp.ramp_beta_mag = 4.0
+    beta_mat_ramped = np.sqrt(2*energy2gamma(main_source.energy))/kp * 4.0
+    assert np.allclose(stage_ramped.matched_beta_function(main_source.energy, match_entrance=False), beta_mat_ramped, rtol=1e-15, atol=0.0)
 
 
 @pytest.mark.StageReducedModels
@@ -529,7 +529,6 @@ def test_trim_attr_reduce_pickle_size():
     assert stage.downramp.drive_beam is None
     assert stage.downramp.initial is None
     assert stage.downramp.final is None
-    assert stage.drive_beam is None
 
 
 @pytest.mark.StageReducedModels

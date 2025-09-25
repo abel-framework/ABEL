@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 """
 Stage class with the transverse wake instability model as described in thesis 
 "Instability and Beam-Beam Study for Multi-TeV PWFA e+e- and gamma gamma Linear 
@@ -243,8 +249,6 @@ class StageReducedModels(Stage):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
-        self.main_source = main_source
-        self.drive_beam = drive_beam
 
         self.time_step_mod = time_step_mod  # Determines the time step of the instability tracking in units of beta_wave_length/c.
 
@@ -266,12 +270,12 @@ class StageReducedModels(Stage):
         self.drive_beam_update_period = drive_beam_update_period
 
         # Longitudinal electric field and plasma ion bubble radius
-        self.Ez_fit_obj = Ez_fit_obj  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
-        self.Ez_roi = Ez_roi  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
+        self.Ez_fit_obj = None  # [V/m] 1d interpolation object of longitudinal E-field fitted to Ez_axial using a selection of zs along the main beam.
+        self.Ez_roi = None  # [V/m] longitudinal E-field in the region of interest (main beam head to tail).
         #self.Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.Ezs
         #self.zs_Ez_axial = None  # Moved to self.initial.plasma.wakefield.onaxis.zs
-        self.rb_fit_obj = rb_fit_obj  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
-        self.bubble_radius_roi = bubble_radius_roi  # [m] bubble radius in the region of interest.
+        self.rb_fit_obj = None  # [m] 1d interpolation object of bubble radius fitted to bubble_radius_axial using a selection of zs along the main beam.
+        self.bubble_radius_roi = None  # [m] bubble radius in the region of interest.
         self.bubble_radius_axial = None
         self.zs_bubble_radius_axial = None
         self.estm_R_blowout = None  # [m] estimated (max) blowout radius to be calculated.
@@ -342,11 +346,7 @@ class StageReducedModels(Stage):
 
         
         # ========== Get the drive beam ==========
-        if self.driver_source.jitter.x == 0 and self.driver_source.jitter.y == 0 and self.drive_beam is not None:    # TODO: delete ##################
-            driver_incoming = self.drive_beam  # This guarantees zero drive beam jitter between stages, as identical drive beams are used in every stage and not re-sampled.
-        else:
-            driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
-            #self.drive_beam = driver_incoming                    # TODO: delete ######################
+        driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
         
         original_driver = copy.deepcopy(driver_incoming)
         original_beam = copy.deepcopy(beam_incoming)
@@ -1496,7 +1496,6 @@ class StageReducedModels(Stage):
             self.downramp.initial = None
             self.downramp.final = None
 
-        self.drive_beam = None
         #self.upramp = None
         #self.downramp = None
         #self.final = None
@@ -2727,15 +2726,6 @@ class StageReducedModels(Stage):
         with open(self.run_path + 'output.txt', 'w') as f:
             print('============================================================================', file=f)
             print(f"Time step [betatron wavelength/c]:\t\t {self.time_step_mod :.3f}", file=f)
-            
-            if self.main_source is None:
-                print(f"Symmetrised main beam:\t\t\t\t Not registered", file=f)
-            elif self.main_source.symmetrize:
-                print(f"Symmetrised main beam:\t\t\t\t x, y, xp, yp symmetrised", file=f)
-            elif self.main_source.symmetrize_6d:
-                print(f"Symmetrised main beam:\t\t\t\t 6D symmetrised", file=f)
-            else:
-                print(f"Symmetrised main beam:\t\t\t\t Not symmetrised.", file=f)
 
             if self.driver_source.symmetrize:
                 print(f"Symmetrised drive beam:\t\t\t\t x, y, xp, yp symmetrised\n", file=f)
@@ -2856,6 +2846,6 @@ class StageReducedModels(Stage):
         print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")
         print(f"Ion motion enabled:\t\t\t\t\t {str(self.enable_ion_motion) :s}")
 
-        print('\n')
+        print('')
         
     
