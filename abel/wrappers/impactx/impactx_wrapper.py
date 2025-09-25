@@ -237,6 +237,7 @@ def extract_evolution(path=''):
     
     from abel.utilities.relativity import gamma2energy
     import pandas as pd
+    import impactx
 
     # read CSV file
     try:
@@ -246,6 +247,12 @@ def extract_evolution(path=''):
         ref = pd.read_csv(path+"diags/ref_particle.0", delimiter=r"\s+")
         diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0", delimiter=r"\s+")
     
+    # breaking change in CSV files in ImpactX 25.10+
+    impactx_major, impactx_minor = impactx.__version__.split(".")
+    is_new_impactx = (
+        float(impactx_major) == 25 and float(impactx_minor) >= 10
+    ) or float(impactx_major) >= 26 
+
     # extract numbers
     evol = SimpleNamespace()
     evol.location = diags["s"]
@@ -253,14 +260,24 @@ def extract_evolution(path=''):
     evol.emit_ny = diags["emittance_yn"]
     evol.beta_x = diags["beta_x"]
     evol.beta_y = diags["beta_y"]
-    evol.rel_energy_spread = diags["sig_pt"]
-    evol.beam_size_x = diags["sig_x"]
-    evol.beam_size_y = diags["sig_y"]
-    evol.bunch_length = diags["sig_t"]
-    evol.x = diags["x_mean"]
-    evol.y = diags["y_mean"]
-    evol.z = diags["t_mean"]
-    evol.energy = gamma2energy(-ref["pt"]*(1-diags["pt_mean"]))#ref["pt"])#gamma2energy(diags["pt_mean"]-ref["pt"])
+    if is_new_impactx:
+        evol.rel_energy_spread = diags["sigma_pt"]
+        evol.beam_size_x = diags["sigma_x"]
+        evol.beam_size_y = diags["sigma_y"]
+        evol.bunch_length = diags["sigma_t"]
+        evol.x = diags["mean_x"]
+        evol.y = diags["mean_y"]
+        evol.z = diags["mean_t"]
+        evol.energy = gamma2energy(-ref["pt"]*(1-diags["mean_pt"]))#ref["pt"])#gamma2energy(diags["mean_pt"]-ref["pt"])
+    else:
+        evol.rel_energy_spread = diags["sig_pt"]
+        evol.beam_size_x = diags["sig_x"]
+        evol.beam_size_y = diags["sig_y"]
+        evol.bunch_length = diags["sig_t"]
+        evol.x = diags["x_mean"]
+        evol.y = diags["y_mean"]
+        evol.z = diags["t_mean"]
+        evol.energy = gamma2energy(-ref["pt"]*(1-diags["pt_mean"]))#ref["pt"])#gamma2energy(diags["mean_pt"]-ref["pt"])
     evol.charge = diags["charge_C"]
     evol.dispersion_x = diags["dispersion_x"]
     evol.dispersion_y = diags["dispersion_y"]
