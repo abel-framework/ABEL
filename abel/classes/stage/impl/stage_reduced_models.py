@@ -33,14 +33,16 @@ class StageReducedModels(Stage):
     tracking of particle beams.
 
     The reduced physics models include
+
     - Transverse intra-beam instability.
     - Radiation reaction.
     - Ion motion.
+
     See the files ``abel/physics_models/particles_transverse_wake_instability.py`` 
     and ``abel/physics_models/ion_motion_wakefield_perturbation.py`` for more 
     details.
 
-    The tracking first performs a single time step ``Wake-T`` simulation to 
+    The tracking first performs a single time step Wake-T simulation to 
     calculate and extract the longitudinal electric field and blow-out bubble 
     radius, which are used as inputs in the transverse intra-beam instability. 
     The drive beam, longitudinal electric field and blow-out bubble radius are 
