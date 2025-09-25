@@ -116,7 +116,7 @@ def test_set_phase_space():
     "Verify that the phase space is set correctly."
     beam = Beam()
     num_particles = 10042
-    Q = -SI.e * 1.0e10
+    Q = -SI.e * 1.2e10
     xs = np.random.rand(num_particles)
     ys = np.random.rand(num_particles)
     zs = np.random.rand(num_particles)
@@ -133,7 +133,7 @@ def test_set_phase_space():
     assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.charge(), Q, rtol=1e-15, atol=0.0)
     assert np.isclose(beam.abs_charge(), np.abs(Q), rtol=1e-15, atol=0.0)
-    assert np.isclose(beam.total_particles(), 1.0e10, rtol=1e-15, atol=0.0)
+    assert beam.total_particles() == int(Q/-SI.e)
     assert np.allclose(beam.weightings(), np.ones_like(xs)*Q/num_particles/(-SI.e))
     assert np.allclose(beam.xs(), xs, rtol=1e-15, atol=0.0)
     assert np.allclose(beam.ys(), ys, rtol=1e-15, atol=0.0)
