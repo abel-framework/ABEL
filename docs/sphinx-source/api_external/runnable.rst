@@ -1,5 +1,5 @@
 Runnable
 ==========
 
-.. autoclass:: abel.classes.Runnable
+.. autoclass:: abel.Runnable
  :members:

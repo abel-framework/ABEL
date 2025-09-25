@@ -12,6 +12,29 @@ from abel.utilities.plasma_physics import *
 import os, shutil, uuid, copy, sys
 
 class StageQuasistatic2d(Stage):
+    """
+    Simple implementation of a plasma stage. Solves Hill's equation, increases 
+    the energy of all main beam macro particles and decreases the energy of all 
+    drive beam macro particles using a longitudinal field calculated using a 
+    short Wake-T simulation.
+
+    Inherits all attributes from ``Stage``.
+    
+
+    Attributes
+    ----------
+    enable_radiation_reaction : bool
+        Flag for enabling radiation reaction effects.
+
+    probe_evolution : bool
+        Flag for storing the beam parameter evolution data.
+
+    store_beams_for_tests : bool
+        Flag for storing intermediate beam states for testing.
+
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
+    """
     
     def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_radiation_reaction=False, probe_evolution=False, store_beams_for_tests=False):
         
@@ -28,6 +51,9 @@ class StageQuasistatic2d(Stage):
     # ==================================================
     # track the particles through
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the particles through the stage.
+        """
 
         self.stage_number = beam_incoming.stage_number
         
@@ -121,19 +147,19 @@ class StageQuasistatic2d(Stage):
 
         Parameters
         ----------
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
 
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -228,19 +254,19 @@ class StageQuasistatic2d(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
     
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -310,19 +336,19 @@ class StageQuasistatic2d(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
     
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
