@@ -2286,17 +2286,10 @@ class PlasmaRamp(Stage):
     
     Notes
     -----
-    - PlasmaRamp objects are designed to be used in conjunction with 
-      Stage.track_upramp() or Stage.track_downramp().
-    - Attempting to call track() directly will raise a ``StageError``.
+    - ``PlasmaRamp`` objects are designed to be used in conjunction with 
+      ``Stage.track_upramp()`` or ``Stage.track_downramp()``.
+    - Attempting to call ``track()`` directly will raise a ``StageError``.
     - Cannot attach additional upramp or downramp stages.
-
-    Methods
-    -------
-    track()
-        Raises a ``StageError``. Use ``track_upramp()`` or ``track_downramp()`` in Stage instead.
-
-    print_summary()
     """
     
     # ==================================================
@@ -2320,6 +2313,10 @@ class PlasmaRamp(Stage):
 
     # ==================================================
     def track(self):
+        """
+        Raises a ``StageError``. Use ``track_upramp()`` or ``track_downramp()`` 
+        in ``Stage`` instead.
+        """
         raise StageError('track() is not implemented for PlasmaRamp. Use track_upramp() or track_downramp() from the Stage class instead.')
     
 
