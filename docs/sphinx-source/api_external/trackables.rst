@@ -10,7 +10,13 @@ Trackable elements
 .. autoclass:: abel.Stage
  :members:
 
+.. autoclass:: abel.StageBasic
+ :members:
+
 .. autoclass:: abel.StageHipace
+ :members:
+
+.. autoclass:: abel.StageQuasistatic2d
  :members:
 
 .. autoclass:: abel.StageReducedModels
