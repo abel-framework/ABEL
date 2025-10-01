@@ -14,6 +14,64 @@ from abel.utilities.beam_physics import generate_trace_space
 from abel.utilities.relativity import energy2gamma
 
 class Source(Trackable, CostModeled):
+    """
+    Abstract base class representing particle beam sources.
+
+    The ``Source`` class defines shared parameters and functionality for 
+    generating particle distributions or simulating a particle beam source.
+
+    Attributes
+    ----------
+    length : [m] float
+        Physical length of the source component
+
+    energy : [eV] float
+        Nominal mean beam energy.
+
+    charge : [C] float
+        Total beam charge.
+
+    accel_gradient : [V/m] float
+        Acceleration gradient. If provided, ``Source.get_length()`` will compute 
+        source length as ``energy / accel_gradient``.
+
+    wallplug_efficiency : float
+        Efficiency factor used when converting beam energy usage to wallplug
+        energy usage.
+
+    x_offset, y_offset : [m] float
+        Transverse centroid offsets applied to the beam.
+
+    x_angle, y_angle : [rad] float
+        Transverse angular offsets applied to the beam.
+
+    norm_jitter_emittance_x, norm_jitter_emittance_y : [m rad] float
+        Used to generate jitter in position and angle by samling from a jitter 
+        phase space defined by Twiss functions and the given emittance jitter.
+
+    waist_shift_x, waist_shift_y : [m] float
+        Multiplicative factor applied to shift the location of the waist. 
+        Particle x and y coordinates are modified by subtracting 
+        ``waist_shift_x * x'`` and ``waist_shift_y * y'`` respectively.
+
+    jitter : SimpleNamespace
+        Container for jitter scales with fields:
+            x, y, z      (position jitter scales)
+            t            (time jitter scale)
+            xp, yp       (angular jitter scales)
+            E            (energy jitter scale)
+
+    spin_polarization : float
+        Spin polarization magnitude. Mean value of projection in the defined 
+        direction ``spin_polarization_direction``.
+
+    spin_polarization_direction : str
+        Defines the orientation of the spin. Can be ``'x'``, ``'y'`` or ``'z'``.
+
+    is_polarized : bool
+        Whether the source produces polarized particles.
+    """
+    #TODO: Why is accel_gradient needed??
     
     @abstractmethod
     def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
@@ -49,7 +107,7 @@ class Source(Trackable, CostModeled):
         self.spin_polarization = 0
         self.spin_polarization_direction = 'z'
 
-        self.is_polarized = False
+        self.is_polarized = False #TODO shouldn't this rather be a function that checks whether spin_polarization > 0?
     
     
     @abstractmethod
