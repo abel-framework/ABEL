@@ -26,8 +26,9 @@ class StageHipace(Stage):
     Plasma acceleration stage implemented with the HiPACE++ PIC code.
 
     This class runs fully kinetic plasma wakefield acceleration (PWFA) 
-    simulations using HiPACE++. It prepares input files, launches HiPACE++ runs, 
-    extracts beam and plasma diagnostics, and post-processes simulation data.
+    simulations using HiPACE++ (https://hipace.readthedocs.io/en/latest/). It 
+    prepares input files, launches HiPACE++ runs, extracts beam and plasma 
+    diagnostics, and post-processes simulation data.
 
     Inherits all attributes from ``Stage``.
     
