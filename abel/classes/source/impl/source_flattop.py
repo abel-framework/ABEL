@@ -124,19 +124,4 @@ class SourceFlatTop(Source):
         # add jitters and offsets in super function
         return super().track(beam, savedepth, runnable, verbose)
     
-    
-    def get_length(self):
-        if self.accel_gradient is not None:
-            return self.energy/self.accel_gradient
-        else:
-            return self.length
-    
-    def get_charge(self):
-        return self.charge
-    
-    def get_energy(self):
-        return self.energy
-    
-    def energy_efficiency(self):
-        return self.wallplug_efficiency
 
