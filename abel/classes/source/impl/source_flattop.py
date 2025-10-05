@@ -9,6 +9,51 @@ import scipy.constants as SI
 from abel.classes.source.source import Source
 
 class SourceFlatTop(Source):
+    """
+    Beam particle source implementation that generates a longitudinally uniform, 
+    transversely Gaussian particle distribution.
+
+    Inherits all attributes from ``Source``.
+
+    Attributes
+    ----------
+    num_particles : int
+        Number of macro-particles to sample.
+        
+    rel_energy_spread : float
+        Relative energy spread, defined as the ratio of the standard deviation 
+        of the energy distribution to the mean energy. If provided, 
+        ``energy_spread`` will be set to ``energy * rel_energy_spread`` during 
+        ``track()`` (overriding any previously-set absolute ``energy_spread``).
+        
+    energy_spread : [eV] float
+        Absolute energy spread (standard deviation). If ``rel_energy_spread`` is 
+        supplied, this value is overwritten to ``energy * rel_energy_spread`` 
+        when ``track()`` is called.
+
+    bunch_length : [m] float
+        Longitudinal bunch length used as the standard deviation for
+        Gaussian sampling of z-positions.
+
+    z_offset : [m] float
+        Mean longitudinal offset for the sampled z-positions.
+
+    emit_nx, emit_ny : [m rad] float
+        Normalized transverse emittances.
+
+    beta_x, beta_y : [m] float
+        Twiss beta functions.
+
+    alpha_x, alpha_y : float
+        Twiss alpha functions.
+
+    angular_momentum : [m rad] float
+        Normalized angular momentum.
+
+    symmetrize : bool
+        If ``True`` and ``symmetrize_6d`` is ``False``, the generated particle 
+        distribution is transversely symmetrised in x, y, x' and y'.
+    """
     
     def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False):
         
@@ -30,6 +75,9 @@ class SourceFlatTop(Source):
 
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
+        """
+        Generate a ``Beam`` object.
+        """
 
         from abel.classes.beam import Beam
         from abel.utilities.beam_physics import generate_trace_space_xy
