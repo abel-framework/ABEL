@@ -14,8 +14,7 @@ from types import SimpleNamespace
 
 class StageWakeT(Stage):
     """
-    Plasma acceleration stage implemented with the Wake-T 
-    (https://github.com/AngelFP/Wake-T) code.
+    Plasma acceleration stage implemented with `Wake-T <https://github.com/AngelFP/Wake-T>`_.
 
     This class runs fully kinetic plasma wakefield acceleration (PWFA) 
     simulations using Wake-T. It prepares input files, launches Wake-T runs, 
