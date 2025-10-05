@@ -5,6 +5,7 @@
 # License: GPL-3.0-or-later
 
 from abel.classes.source.source import Source
+from abel import Source, Beam
 import os
 
 class SourceFromFile(Source):
@@ -31,8 +32,6 @@ class SourceFromFile(Source):
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
-
-        from abel.classes.beam import Beam
         
         # make empty beam
         beam = Beam.load(self.file)
