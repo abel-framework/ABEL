@@ -210,6 +210,9 @@ class SourceBasic(Source):
 
     # ==================================================
     def print_summary(self):
+        """
+        Print a summary for the source.
+        """
         print('Type: ', type(self))
         print('Number of macro particles: ', self.num_particles)
         print('Charge [nC]: ', self.charge*1e9)
