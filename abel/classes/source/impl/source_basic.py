@@ -89,6 +89,9 @@ class SourceBasic(Source):
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
+        """
+        Generate a ``Beam`` object.
+        """
         
         # make empty beam
         beam = Beam()
