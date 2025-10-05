@@ -44,9 +44,8 @@ class StageReducedModels(Stage):
     - Radiation reaction.
     - Ion motion.
 
-    See the files ``abel/physics_models/particles_transverse_wake_instability.py`` 
-    and ``abel/physics_models/ion_motion_wakefield_perturbation.py`` for more 
-    details.
+    See the files `particles_transverse_wake_instability.py <https://github.com/abel-framework/ABEL/blob/main/abel/physics_models/particles_transverse_wake_instability.py>`_ 
+    and `ion_motion_wakefield_perturbation.py <https://github.com/abel-framework/ABEL/blob/main/abel/physics_models/ion_motion_wakefield_perturbation.py>`_ for more details.
 
     The tracking first performs a single time step Wake-T simulation to 
     calculate and extract the longitudinal electric field and blow-out bubble 
