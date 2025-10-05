@@ -18,7 +18,7 @@ class SourceBasic(Source):
 
     Inherits all attributes from ``Source``.
 
-    Parameters
+    Attributes
     ----------
     num_particles : int
         Number of macro-particles to sample.
