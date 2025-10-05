@@ -8,8 +8,8 @@ from abel.classes.source.source import Source
 
 class SourceCapsule(Source):
     """
-    Source class used for "encapsulating" a predefined beam to be passed into 
-    e.g. a ``Stage``. used e.g. between ramps in plasma stages.
+    ``Source`` subclass used for "encapsulating" a predefined beam to be passed 
+    into e.g. a ``Stage``. used e.g. between ramps in plasma stages.
 
     Attributes
     ----------
