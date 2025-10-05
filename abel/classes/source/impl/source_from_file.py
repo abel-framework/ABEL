@@ -9,6 +9,16 @@ from abel import Source, Beam
 import os
 
 class SourceFromFile(Source):
+    """
+    Beam particle source implementation that initializes a ``Beam`` object 
+    directly from a previously saved file.
+
+    Attributes
+    ----------
+    file : str
+        Path to the file containing a ``Beam`` object. The file must be readable 
+        by ``Beam.load(file)``.
+    """
     
     def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, file=None, x_offset=0, y_offset=0, x_angle=0, y_angle=0, waist_shift_x=0, waist_shift_y=0):
 
@@ -22,6 +32,10 @@ class SourceFromFile(Source):
     
     @property
     def file(self) -> str | None:
+        """
+        Path to the file containing a ``Beam`` object. The file must be readable 
+        by ``Beam.load(file)``.
+        """
         return self._file
     @file.setter
     def file(self, file_path : str):
@@ -32,6 +46,10 @@ class SourceFromFile(Source):
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
+        """
+        Load a beam from file, optionally rescale its charge and energy, and
+        propagate it through ``Source.track()``.
+        """
         
         # make empty beam
         beam = Beam.load(self.file)
@@ -53,6 +71,19 @@ class SourceFromFile(Source):
 
     
     def get_charge(self):
+        """
+        Return the beam charge, loading from file if not already defined.
+
+        If ``charge`` is ``None``, the method loads the ``Beam`` from 
+        ``file`` and retrieves its stored charge. The result is stored in 
+        ``self.charge``.
+
+        Returns
+        -------
+        charge : [C] float
+            Total charge of the beam loaded from file or stored in memory.
+        """
+
         if self.charge is None:
             beam = Beam.load(self.file)
             self.charge = beam.charge()
@@ -60,6 +91,19 @@ class SourceFromFile(Source):
 
     
     def get_energy(self):
+        """
+        Return the mean beam energy, loading from file if not already defined.
+
+        If ``energy`` is ``None``, the method loads the ``Beam`` from 
+        ``file`` and retrieves its stored mean energy. The result is stored in 
+        ``self.energy``.
+
+        Returns
+        -------
+        energy : [eV] float
+            Mean beam energy loaded from file or stored in memory.
+        """
+
         if self.energy is None:
             beam = Beam.load(self.file)
             self.energy = beam.energy()
