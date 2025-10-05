@@ -396,7 +396,7 @@ class StageBasic(Stage):
         Parameters
         ----------
         source : ``Source``
-            ...
+            ``Source`` object.
 
         Returns
         ----------
