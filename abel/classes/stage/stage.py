@@ -566,7 +566,7 @@ class Stage(Trackable, CostModeled):
         savedepth : int (default=0)
             Depth of data saving.
 
-        runnable : ``Runnable``, (default= ``None``)
+        runnable : ``Runnable`` (default= ``None``)
             ``Runnable`` object.
 
         verbose : bool (default= ``False``)
