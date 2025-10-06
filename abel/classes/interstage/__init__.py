@@ -12,6 +12,61 @@ import numpy as np
 import scipy.constants as SI
 
 class Interstage(Trackable, CostModeled):
+    """
+    Abstract base class representing an interstage section between two 
+    accelerator stages. 
+    
+    Defines common physical parameters and attributes, as well as methods such 
+    as optics matching, beam evolution and optics layout visualization.
+
+
+    Attributes
+    ----------
+    nom_energy : [eV] float
+        Nominal beam energy at the entrance of the interstage.
+
+    beta0 : [m] float or callable
+        Initial beta function at the entrance of the interstage. If callable, it 
+        is evaluated as ``beta0(nom_energy)``.
+
+    length_dipole : [m] float or callable
+        Magnetic length of each dipole element. If callable, it is evaluated as 
+        ``length_dipole(nom_energy)``.
+
+    field_dipole : [T] float or callable
+        Magnetic field of dipole elements. If callable, it is evaluated as 
+        ``field_dipole(nom_energy)``.
+
+    R56 : [m] float or callable
+        Longitudinal dispersion term, relating relative momentum deviation to 
+        path length difference. If callable, it is evaluated as 
+        ``R56(nom_energy)``.
+
+    charge_sign : int
+        Particle charge sign: -1 for electrons, +1 for positrons or protons.
+
+    cancel_chromaticity : bool
+        Whether to automatically match and cancel first-order chromatic effects.
+
+    cancel_sec_order_dispersion : bool
+        Whether to match and cancel second-order dispersion.
+
+    use_apertures : bool
+        If ``True``, applies aperture clipping to the beam distribution.
+
+    enable_csr : bool
+        Enables coherent synchrotron adiation (CSR) modeling during tracking.
+
+    enable_isr : bool
+        Enables incoherent synchrotron radiation (ISR) modeling during tracking.
+
+    enable_space_charge : bool
+        Enables space charge effects.
+
+    uses_plasma_lenses : bool
+        Indicates whether the interstage contains plasma lenses instead of magnetic 
+        quadrupoles.
+    """
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, charge_sign=-1,
