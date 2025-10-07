@@ -237,7 +237,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         beta0_x = self.beta0_x
         beta0_y = self.beta0_y
 
-        k_bound = 15
+        k_bound = 10
         if not ks_matched:
             f0 = (self.length_stage+self.delay_per_stage*SI.c)/2
             if n_quads%2==0:
@@ -308,7 +308,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                 return (beta_x-beta0_x)**2 + (beta_y-beta0_y)**2 + (Dx*1e3)**2 + (R56*1e3)**2 +\
                     alpha_x**2 + alpha_y**2 + (Dpx*1e3)**2
             else:
-                return  (Dx*1e2)**2 #+ alpha_x**2 + alpha_y**2
+                return alpha_x**2 + alpha_y**2 + (Dpx*1e3)**2 + (R56*1e3)**2 #+ \
                     # max(beta_x-50*beta0_x, 0)**2 + max(beta_y-50*beta0_y, 0)**2 #+ max(max(evo_y[1,:])-beta_y*300,0) + max(max(evo_x[1,:])-beta_x*300,0)
         print(self.indices_quads)
         opt = minimize(optimizer, x0=k0, bounds=k_bounds)

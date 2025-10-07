@@ -167,7 +167,7 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
         fast = False
         
     if not fast:
-        Nres = 100
+        Nres = 200
         evolution = np.empty([3, Nres*len(ls)])
     else:
         evolution = None
@@ -207,6 +207,7 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
         ax.plot(evolution[0,:], np.sqrt(evolution[1,:]))
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Square root of beta function (m^0.5)]')
+        ax.grid()
         plt.show()
         
     return beta, alpha, evolution
@@ -219,7 +220,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
         fast = False
         
     if not fast:
-        Nres_high = 100
+        Nres_high = 200
         Nres_low = 10
         if high_res:
             Nres_high = Nres_high*10
@@ -264,7 +265,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
         ax.plot(evolution[0,:], evolution[1,:])
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Dispersion (m)')
-
+        ax.grid()
         plt.show()
         
     return Dx, Dpx, evolution
@@ -426,6 +427,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, 
         ax.plot(evolution[0,:], evolution[1,:])
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Longitudinal dispersion, R56 (m)')
+        ax.grid()
 
         plt.show()
 
@@ -437,7 +439,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, 
 def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
 
     # points per dipole
-    num_steps = 25
+    num_steps = 100
     
     # calculate the orbit
     xs = np.array([x0])
