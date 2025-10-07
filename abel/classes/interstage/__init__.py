@@ -14,7 +14,11 @@ import scipy.constants as SI
 class Interstage(Trackable, CostModeled):
     """
     Abstract base class representing an interstage section between two 
-    accelerator stages. 
+    accelerator stages. The interstage lattice consists of a bending dipole, a 
+    nonlinear plasma lens, two chicane dipoles, a sextupole and the mentioned 
+    elements repeated in the opposite order to form a symmetric lattice. This is 
+    designed to provide achromatic staging [1]_ and to apply the self-correction 
+    effect [2]_ to the beam.
     
     Defines common physical parameters and attributes, as well as methods such 
     as optics matching, beam evolution and optics layout visualization.
@@ -23,18 +27,19 @@ class Interstage(Trackable, CostModeled):
     Attributes
     ----------
     nom_energy : [eV] float
-        Nominal beam energy at the entrance of the interstage.
+        Nominal beam energy at the entrance of the interstage. Default set to 
+        ``None``, usually set by ``Linac.track()``.
 
     beta0 : [m] float or callable
         Initial beta function at the entrance of the interstage. If callable, it 
         is evaluated as ``beta0(nom_energy)``.
 
     length_dipole : [m] float or callable
-        Magnetic length of each dipole element. If callable, it is evaluated as 
+        Magnetic length of each bending dipole. If callable, it is evaluated as 
         ``length_dipole(nom_energy)``.
 
     field_dipole : [T] float or callable
-        Magnetic field of dipole elements. If callable, it is evaluated as 
+        Magnetic field of the bending dipoles. If callable, it is evaluated as 
         ``field_dipole(nom_energy)``.
 
     R56 : [m] float or callable
@@ -66,6 +71,13 @@ class Interstage(Trackable, CostModeled):
     uses_plasma_lenses : bool
         Indicates whether the interstage contains plasma lenses instead of magnetic 
         quadrupoles.
+
+    References
+    ----------
+    .. [1] Add the interstage manuscript when available.
+
+    .. [2] C. A. Lindstrøm, "Self-correcting longitudinal phase space in a multistage plasma accelerator", 
+    ArXiv (2021), https://arxiv.org/abs/2104.14460
     """
     
     @abstractmethod
@@ -112,6 +124,9 @@ class Interstage(Trackable, CostModeled):
 
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the input beam through the interstage lattice.
+        """
         return super().track(beam, savedepth, runnable, verbose)
     
     
