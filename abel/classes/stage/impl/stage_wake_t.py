@@ -13,6 +13,33 @@ import numpy as np
 from types import SimpleNamespace
 
 class StageWakeT(Stage):
+    """
+    Plasma acceleration stage implemented with `Wake-T <https://github.com/AngelFP/Wake-T>`_.
+
+    This class runs fully kinetic plasma wakefield acceleration (PWFA) 
+    simulations using Wake-T. It prepares input files, launches Wake-T runs, 
+    extracts beam and plasma diagnostics, and post-processes simulation data.
+
+    Inherits all attributes from ``Stage``.
+    
+
+    Attributes
+    ----------
+    num_cell_xy : int
+        Number of transverse grid cells in Wake-T.
+
+    keep_data : bool
+        Flag for whether to keep raw Wake-T output after simulation.
+
+    ion_motion : bool
+        Flag to include ion motion in the plasma.
+
+    run_path : str
+        Path to store plots and outputs.
+
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
+    """
     
     def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False, run_path=None):
         
@@ -30,6 +57,9 @@ class StageWakeT(Stage):
 
     # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the particles through the stage.
+        """
 
         import wake_t
         from abel.utilities.plasma_physics import blowout_radius, k_p
@@ -285,7 +315,10 @@ class StageWakeT(Stage):
 
 
     def get_plasma_profile(self):
-        """Prepare the ramps (local to WakeT)."""
+        """
+        Prepare the ramps (local to WakeT) by setting up a plasma density 
+        profile function.
+        """
         
         # make the plasma ramp profile
         if self.has_ramp():
@@ -319,7 +352,7 @@ class StageWakeT(Stage):
         return None # TODO
 
 
-    # ==================================================
+    # ================================================== TODO: remove this in a separate PR in order to always use the parent's matched_beta_function().
     def matched_beta_function(self, energy):
         from abel.utilities.plasma_physics import beta_matched
         return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
@@ -329,15 +362,19 @@ class StageWakeT(Stage):
     # Apply waterfall function to all beam dump files
     def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
         """
-        Applies waterfall function to all Wake-T HDF5 output files in ``data_dir``.
+        Applies waterfall function to all Wake-T HDF5 output files in 
+        ``data_dir``.
 
          Parameters
         ----------
-        fcns : A list of Beam class methods
-            Beam class profile methods such as ``Beam.current_profile``, ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, ``Beam.transverse_profile_y``.
+        fcns : A list of ``Beam`` class methods
+            Beam class profile methods such as ``Beam.current_profile``, 
+            ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, 
+            ``Beam.transverse_profile_y``.
 
         edges : float list
-            Specifies the bins to be used to create the histogram(s) in the waterfall plot(s).
+            Specifies the bins to be used to create the histogram(s) in the 
+            waterfall plot(s).
 
         data_dir : str
             Path to the directory containing all Wake-T HDF5 output files.
@@ -346,10 +383,12 @@ class StageWakeT(Stage):
             Specifies the name of the beam to be extracted.
 
         clean : bool, optional
-            Determines whether the extracted beams from the Wake-T HDF5 output files should be cleaned before further processing.
+            Determines whether the extracted beams from the Wake-T HDF5 output 
+            files should be cleaned before further processing.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+            Defines a threshold for identifying and removing "halo" particles 
+            based on their deviation from the core of the particle beam.
 
         args : float list, optional
             Allows passing additional arguments to the functions in ``fcns``.
@@ -358,13 +397,17 @@ class StageWakeT(Stage):
         Returns
         ----------
         waterfalls : list of 2D float ndarrays
-            Each element in ``waterfalls`` corresponds to the output of one function in ``fcns`` applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one 
+            function in ``fcns`` applied across all files (i.e., simulation 
+            outputs). The dimension of element i is determined by the length of 
+            ``edges`` and the number of simulation outputs.
         
         locations : [m] 1D float ndarray
             Stores the location for each slice of ``waterfalls``.
         
         bins : list of 1D float ndarrays
-            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+            Each element contains the bins used for the slices/histograms in 
+            ``waterfalls``.
         """
 
         from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
@@ -409,7 +452,8 @@ class StageWakeT(Stage):
     # ==================================================
     def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, nsig=5, args=None):
         '''
-        Extracts data for waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+        Extracts data for waterfall plots for current profile, relative energy 
+        spectrum, horizontal transverse profile and vertical transverse profile.
 
         Parameters
         ----------
@@ -420,28 +464,35 @@ class StageWakeT(Stage):
             Specifies the name of the beam to be extracted.
 
         clean : bool, optional
-            Determines whether the extracted beams from the Wake-T HDF5 output files should be cleaned before further processing.
+            Determines whether the extracted beams from the Wake-T HDF5 output 
+            files should be cleaned before further processing.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+            Defines a threshold for identifying and removing "halo" particles 
+            based on their deviation from the core of the particle beam.
 
         nsig : float, optional
-            Helps define the range of the histograms. E.g. the range in x is defined by the beam x offset +- nsig * x beam size.
+            Helps define the range of the histograms. E.g. the range in x is 
+            defined by the beam x offset +- ``nsig`` * x beam size.
 
         args : float list, optional
-            Allows passing additional arguments to the functions in fcns.
+            Allows passing additional arguments to the functions in ``fcns``.
 
             
         Returns
         ----------
         waterfalls : list of 2D float ndarrays
-            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one 
+            function in ``fcns`` applied across all files (i.e., simulation 
+            outputs). The dimension of element i is determined by the length of 
+            edges and the number of simulation outputs.
         
         locations : [m] 1D float ndarray
             Stores the location for each slice of the ``waterfalls``.
         
         bins : list of 1D float ndarrays
-            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+            Each element contains the bins used for the slices/histograms in 
+            ``waterfalls``.
         '''
 
         from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
@@ -467,18 +518,23 @@ class StageWakeT(Stage):
     # ==================================================
     def plot_waterfalls(self, waterfalls, locations, bins, save_fig=False):
         '''
-        Makes waterfall plots for current profile, relative energy spectrum, horizontal transverse profile and vertical transverse profile.
+        Makes waterfall plots for current profile, relative energy spectrum, 
+        horizontal transverse profile and vertical transverse profile.
 
         Parameters
         ----------
         waterfalls : list of 2D float ndarrays
-            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of edges and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one 
+            function in ``fcns`` applied across all files (i.e., simulation 
+            outputs). The dimension of element i is determined by the length of 
+            edges and the number of simulation outputs.
         
         locations : [m] 1D float ndarray
             Stores the location for each slice of the ``waterfalls``.
         
         bins : list of 1D float ndarrays
-            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+            Each element contains the bins used for the slices/histograms in 
+            ``waterfalls``.
 
         save_fig : bool, optional
             Flag for saving the output figure.
@@ -486,7 +542,7 @@ class StageWakeT(Stage):
 
         Returns
         ----------
-        N/A
+        ``None``
         '''
 
         from matplotlib import pyplot as plt
