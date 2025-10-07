@@ -140,6 +140,34 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     # full lattice 
     def matrix_lattice(self, k_lens=None, tau_lens=None, B_chic1=None, B_chic2=None, m_sext=None, half_lattice=False, orbit_only=False):
+        """
+        Return the optical lattice representation of the interstage.
+
+        Parameters
+        ----------
+        ...
+
+        orbit_only : bool, optional
+            If ``True``, only returns orbit-related matrices and omits focusing 
+            or chromatic terms. Defaults to ``False``.
+
+        Returns
+        -------
+        ls : [m] 1D float ndarray
+            Lattice element lengths.
+
+        inv_rhos : [m^-1] 1D float ndarray
+            Inverse bending radii.
+
+        ks : [m^-2] 1D float ndarray
+            Plasma lens focusing strengths.
+
+        ms : [m^-3] 1D float ndarray
+            Sextupole strengths.
+
+        taus : [m^-1] 1D float ndarray
+            Plasma lens nonlinearities.
+        """
         
         # fast solution for orbit only
         if orbit_only:
