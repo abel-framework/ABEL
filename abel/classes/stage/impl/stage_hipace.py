@@ -542,8 +542,20 @@ class StageHipace(Stage):
     def _make_ramp_profile(self, tmpfolder):
         """Prepare the ramps (local to HiPACE)."""
         
-        # check that there is not already a plasma density profile set
-        assert self.plasma_density_from_file is None
+        # If there is already a density file open and make the plasma profile
+        if self.plasma_density_from_file:
+            ss, ns = [], []
+            with open(self.plasma_density_from_file, 'r') as f:
+                for line in f:
+                    s, n = line.strip().split()
+                    ss.append(float(s))
+                    ns.append(float(n))
+
+                ss = np.array(ss)
+                ns = np.array(ns)
+                self.plasma_profile.ss = ss
+                self.plasma_profile.ns = ns
+            return
 
         # make the plasma ramp profile
         if self.has_ramp():
