@@ -18,10 +18,103 @@ from abel.utilities.plasma_physics import beta_matched
 from typing import Self
 
 class Stage(Trackable, CostModeled):
+    """
+    Abstract class representing a plasma acceleration stage.
+
+    This class defines the framework for plasma stages, ensuring consistency 
+    between stage parameters (energy gain, acceleration gradient, and length) 
+    both for a ``Stage`` and its optional ramps.
+    
+
+    Attributes
+    ----------
+    nom_accel_gradient : [V/m] float
+        Nominal acceleration gradient.
+
+    nom_energy_gain : [eV] float
+        Nominal energy gain across the plasma stage or across the stage and its
+        ramps if there are any.
+
+    plasma_density : [m^-3] float
+        The plasma density of the plasma stage.
+    
+    driver_source : ``Source`` or ``DriverComplex``, optional
+        The source of the drive beam. Default set to ``None``.
+
+    ramp_beta_mag : float, optional
+        Betatron magnification used for defining ramps. Default set to ``None``.
+        
+    upramp : ``Stage`` or None
+        Optional ``Stage`` object representing the upramp.
+
+    downramp : ``Stage`` or None
+        Optional ``Stage`` object representing the downramp.
+
+    nom_accel_gradient_flattop : [V/m] float
+        Accelerating gradient in the plasma stage only, excluding any ramps.
+
+    nom_energy_gain_flattop : [eV] float
+        Energy gain across the plasma stage only, excluding any ramps.
+
+    length : [m] float
+        Total length of the plasma stage and its ramps if any.
+
+    length_flattop : [m] float
+        Length of the plasma stage only, excluding any ramps.
+
+    nom_energy : [eV] float
+        Nominal energy at the start of the plasma stage or at the start of the 
+        upramp if there is one.
+
+    nom_energy_flattop : [eV] float
+        Nominal energy at the start of the plasma stage, excluding any ramps.
+
+    efficiency : ``SimpleNamespace``
+        Contains efficiency metrics:
+        - driver_to_wake : fraction of driver energy transferred to the wakefield.
+        - wake_to_beam : fraction of wakefield energy transferred to beam.
+        - driver_to_beam : overall energy transfer efficiency.
+        - dumped_power : remaining driver power.
+
+    evolution : ``SimpleNamespace``
+        Contains the beam parameter evolution across the stage.
+
+    initial : ``SimpleNamespace``
+        Initial state of the stage including beam, driver, and plasma 
+        quantities.
+
+    final : ``SimpleNamespace``
+        Final state of the stage after tracking. Includes beam, driver, and 
+        plasma quantities.
+
+    name : str
+        Name of the stage, default is 'Plasma stage'.
+    """
+
     
     # ==================================================
     @abstractmethod
     def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None):
+        """
+        Abstract base class for plasma acceleration stages.
+
+        Parameters
+        ----------
+        nom_accel_gradient : [V/m] float
+            Nominal acceleration gradient.
+
+        nom_energy_gain : [eV] float
+            Nominal energy gain across the plasma stage.
+
+        plasma_density : [m^-3] float
+            The plasma density of the plasma stage.
+        
+        driver_source : ``Source`` or ``DriverComplex``, optional
+            The source of the drive beam. Default set to ``None``.
+
+        ramp_beta_mag : float, optional
+            Betatron magnification used for ramps. Default set to ``None``.
+        """
 
         super().__init__()
         
@@ -79,7 +172,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     @property
     def driver_source(self) -> Source | DriverComplex | None:
-        "Returns the driver source or the driver complex of the stage."
+        "Get or set the the driver source or the driver complex of the stage."
         return self._driver_source
     @driver_source.setter
     def driver_source(self, source : Source | DriverComplex | None):
@@ -90,17 +183,12 @@ class Stage(Trackable, CostModeled):
 
     def get_driver_source(self):
         """
-        Returns the driver source of the stage or the driver source of the 
+        Return the driver source of the stage or the driver source of the 
         associated driver complex of the stage.
-    
-        Parameters
-        ----------
-        N/A
-
 
         Returns
         ----------
-        driver_source : ``Source``object
+        driver_source : ``Source``
         """
     
         if isinstance(self.driver_source, DriverComplex):
@@ -117,7 +205,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     @property
     def upramp(self) -> Self | None:
-        "The upramp of this stage, which also is a Stage"
+        "Get or set the upramp."
         return self._upramp
     @upramp.setter
     def upramp(self, upramp : Self | None):
@@ -137,7 +225,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     @property
     def downramp(self) -> Self:
-        "The downramp of this stage, which also is a Stage"
+        "Get or set the downramp."
         return self._downramp
     @downramp.setter
     def downramp(self, downramp : Self | None):
@@ -158,8 +246,8 @@ class Stage(Trackable, CostModeled):
     @property
     def ramp_beta_mag(self) -> Self:
         """
-        The betatron magnification used to define ramp plasma densities. Can be 
-        overriden with the ramps' own ramp_beta_mag.
+        The betatron magnification used to define ramp plasma densities relative 
+        to the plasma stage. Can be overriden with the ramps' own ``ramp_beta_mag``.
         """
         return self._ramp_beta_mag
     @ramp_beta_mag.setter
@@ -182,16 +270,15 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def copy_config2blank_stage(self):
         """
-        Makes a deepcopy of the stage to copy the configurations and settings,
-        but most of the parameters in the deepcopy are set to ``None``.
-    
-        Parameters
-        ----------
-        N/A
+        Return a deep copy of the stage with most physics parameters reset to 
+        ``None``.
+
+        This is used to create ramp stages with consistent configuration but no 
+        preset parameters.
             
         Returns
         ----------
-        stage_copy : ``Stage`` object
+        stage_copy : ``Stage``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
@@ -273,13 +360,13 @@ class Stage(Trackable, CostModeled):
     
         Parameters
         ----------
-        ramp : ``PlasmaRamp`` object
+        ramp : ``PlasmaRamp``
             Contains all parameters for the ramp.
 
 
         Returns
         ----------
-        trackable_ramp : ``Stage``object
+        trackable_ramp : ``Stage``
             A uniform ramp that can be used for tracking.
         """
 
@@ -317,9 +404,10 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def _prepare_ramps(self):
         """
-        Set ramp lengths, nominal energies and nominal energy gains if the ramps 
-        exist (both upramp and downramp lengths have to be set up before being 
-        tracked).
+        Prepare upramp and downramp parameters before tracking.
+        - Set plasma density, nominal energies, and lengths if missing.
+        - Default ramp energy gain to 0.0.
+        - Compute ramp lengths using ``Stage_calc_ramp_length()``.
         """
         
         if self.nom_energy is None:
@@ -367,7 +455,7 @@ class Stage(Trackable, CostModeled):
     
     # ==================================================
     def is_upramp(self):
-        "Checks if self is an upramp."
+        "Check if this stage is the upramp of its parent."
 
         if self.parent is not None:
             if self.parent.upramp == self:
@@ -380,7 +468,7 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def is_downramp(self):
-        "Checks if self is an downramp."
+        "Check if this stage is the downramp of its parent"
 
         if self.parent is not None:
             if self.parent.downramp == self:
@@ -393,46 +481,7 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def has_ramp(self):
-        "Checks if there are any ramps attached to the stage."
-
-        if self.upramp is not None or self.downramp is not None:
-            return True
-        else:
-            return False
-
-        self._resetLengthEnergyGradient()
-        self._recalcLengthEnergyGradient()
-
-    
-    # ==================================================
-    def is_upramp(self):
-        "Checks if self is an upramp."
-
-        if self.parent is not None:
-            if self.parent.upramp == self:
-                return True
-            else:
-                return False
-        else:
-            return False
-        
-
-    # ==================================================
-    def is_downramp(self):
-        "Checks if self is an downramp."
-
-        if self.parent is not None:
-            if self.parent.downramp == self:
-                return True
-            else:
-                return False
-        else:
-            return False
-        
-
-    # ==================================================
-    def has_ramp(self):
-        "Checks if there are any ramps attached to the stage."
+        "Check if there are any ramps attached to this stage."
 
         if self.upramp is not None or self.downramp is not None:
             return True
@@ -462,7 +511,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     @property
     def parent(self) -> Self | None:
-        "The parent of this stage (which is then an upramp or downramp), or None"
+        "Get or set the parent stage of a ramp."
         return self._parent
     @parent.setter
     def parent(self, parent : Self):
@@ -476,7 +525,7 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def _getOtherRamp(self, aRamp : Self) -> Self:
-        "Lets the upramp get hold of the downramp in the same pair, and vise versa"
+        "Return the opposite ramp in the same pair."
         if aRamp == self.upramp:
             return self.downramp
         elif aRamp == self.downramp:
@@ -487,7 +536,7 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def _getOverallestStage(self) -> Self:
-        "Find and return the most overall stage in the hierachy"
+        "Find the top-level parent stage in the hierarchy."
         bottom_Stage = self
         itrCtr_pSearch = 0
         while bottom_Stage.parent is not None:
@@ -505,6 +554,27 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        """
+        Abstract method for tracking a beam through the stage.
+
+        Parameters
+        ----------
+
+        beam : ``Beam``
+            Beam object to propagate.
+
+        savedepth : int (default=0)
+            Depth of data saving.
+
+        runnable : ``Runnable`` (default= ``None``)
+            ``Runnable`` object.
+
+        verbose : bool (default= ``False``)
+            Print tracking information.
+
+        Returns
+            Beam (modified)
+        """
         beam.stage_number += 1
         if self.length < 0.0:
             raise ValueError(f"Length = {self.length} [m] < 0.0")
@@ -737,7 +807,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     @property
     def nom_energy(self) -> float:
-        "Nominal energy for the tracking [eV], or None if not set/calculateable"
+        "Nominal energy for the tracking [eV], or ``None`` if not set/calculateable"
         return self._nom_energy_calc
     @nom_energy.setter
     def nom_energy(self, nom_energy : float):
@@ -764,7 +834,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     @property
     def nom_energy_flattop(self) -> float:
-        "Nominal energy in the flattop for the tracking [eV], or None if not set/calculateable"
+        "Nominal energy in the flattop for the tracking [eV], or ``None`` if not set/calculateable"
         return self._nom_energy_flattop_calc
     @nom_energy_flattop.setter
     def nom_energy_flattop(self, nom_energy_flattop : float):
@@ -1188,6 +1258,9 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def get_cost_breakdown(self):
+        """
+        Get the cost breakdown of the plasma stage.
+        """
         breakdown = []
         breakdown.append(('Plasma cell', self.get_length() * CostModeled.cost_per_length_plasma_stage))
         #breakdown.append(('Driver dump', CostModeled.cost_per_driver_dump))
@@ -1208,8 +1281,8 @@ class Stage(Trackable, CostModeled):
 
         match_entrance : bool, optional
             Matches the beta function to the upramp or the stage entrance if 
-            `True`. Otherwise, will match the beta function to the downramp. 
-            Default set to `True`.
+            ``True``. Otherwise, will match the beta function to the downramp. 
+            Default set to ``True``.
             
         Returns
         ----------
@@ -1231,6 +1304,21 @@ class Stage(Trackable, CostModeled):
     
     # ==================================================
     def matched_beta_function_flattop(self, energy):
+        '''
+        Calculates the matched beta function of the flattop stage.
+    
+        
+        Parameters
+        ----------
+        energy : [eV] float
+            The energy used for matching.
+            
+        Returns
+        ----------
+        beta_function : [m], float
+            The matched beta function.
+        '''
+
         return beta_matched(self.plasma_density, energy)
     
 
@@ -1252,6 +1340,37 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_efficiency(self, beam0, driver0, beam, driver):
+        """
+        Calculate the efficiency of energy transfer in the stage.
+
+        This method computes the following efficiency metrics:
+        
+        - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
+        - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
+        - ``driver_to_beam``: Overall efficiency from driver to beam (product of the above).  
+        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over 
+        the repetition rate if available.
+
+        Parameters
+        ----------
+        beam0 : ``Beam``
+            Input beam before the stage.
+
+        driver0 : ``Beam``
+            Input drive beam before the stage.
+
+        beam : ``Beam``
+            Output beam after the stage.
+
+        driver : ``Beam``
+            Output drive beam after the stage.
+
+        Returns
+        -------
+        ``None``
+            Results are stored in ``self.efficiency``.
+        """
+
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
         Etot0_driver = driver0.total_energy()
@@ -1267,6 +1386,37 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
+        """
+        Calculate and store the beam current profile.
+
+        This method computes the current profile of the initial (input) and 
+        optionally final (output) beams using a temporal binning scheme based on 
+        the RMS bunch lengths of the driver and beam. The results are stored in 
+        ``self.initial.beam.current`` and, if output beams are provided, in 
+        ``self.final.beam.current``.
+
+        Parameters
+        ----------
+        beam0 : ``Beam``
+            Input beam before the stage.
+
+        driver0 : ``Beam``
+            Input drive beam before the stage.
+
+        beam : ``Beam``, optional
+            Output beam after the stage.
+
+        driver : ``Beam``, optional
+            Output drive beam after the stage.
+
+        Returns
+        -------
+        ``None``
+            Results are stored in ``self.initial.beam.current`` and, if provided, 
+            ``self.final.beam.current`` with attributes:
+            - ``zs`` : longitudinal positions [m]  
+            - ``Is`` : beam current profile [A]
+        """
         
         dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
         num_sigmas = 6
@@ -1297,21 +1447,21 @@ class Stage(Trackable, CostModeled):
 
         Parameters
         ----------
-        driver_incoming : ``Beam`` object
+        driver_incoming : ``Beam``
             The incoming drive beam before any rotation and ramps.
 
-        beam_incoming : ``Beam`` object
+        beam_incoming : ``Beam``
             The incoming drive beam before any rotation and ramps.
 
 
         Returns
         ----------
-        drive_beam_rotated : ``Beam`` object
+        drive_beam_rotated : ``Beam``
             Rotated drive beam. Returns the input ``driver_incoming`` if the 
             driver source of the stage does not have neither angular jitter nor 
             angular offset.
 
-        beam_rotated : ``Beam`` object
+        beam_rotated : ``Beam``
             Rotated main beam. Returns the input ``beam_incoming`` if the driver 
             source of the stage does not have neither angular jitter nor angular 
             offset.
@@ -1372,24 +1522,24 @@ class Stage(Trackable, CostModeled):
 
         Parameters
         ----------
-        driver_incoming : ``Beam`` object
+        driver_incoming : ``Beam``
             The incoming drive beam before any rotation and ramps.
 
-        driver_outgoing : ``Beam`` object
+        driver_outgoing : ``Beam``
             The outgoing drive beam after downramp.
 
-        beam_outgoing : ``Beam`` object
+        beam_outgoing : ``Beam``
             The outgoing main beam after downramp.
 
 
         Returns
         ----------
-        driver_outgoing : ``Beam`` object
+        driver_outgoing : ``Beam``
             Drive beam rotated back to its original coordinate system before the 
             stage. Returns the input ``driver_outgoing`` if the driver source of 
             the stage does not have neither angular jitter nor angular offset.
 
-        beam_outgoing : ``Beam`` object
+        beam_outgoing : ``Beam``
             Main beam rotated back to its original coordinate system before the 
             stage. Returns the input ``beam_incoming`` if the driver source of 
             the stage does not have neither angular jitter nor angular offset.
@@ -1448,6 +1598,40 @@ class Stage(Trackable, CostModeled):
     
     # ==================================================
     def save_evolution_to_file(self, bunch='beam'):
+        """
+        Save the evolution of beam or driver slices to a CSV file.
+
+        The method extracts the tracked evolution data (positions, charge, 
+        energy, beam sizes, emittances, beta functions, and spectral density) 
+        for each slice and writes it to a CSV file named 
+        ``<bunch>_evolution.csv``. Each row corresponds to a longitudinal slice.
+
+        Parameters
+        ----------
+        bunch : str, optional
+            Specifies which bunch to save. Options are:
+            - ``'beam'`` : save the beam evolution (default)
+            - ``'driver'`` : save the driver evolution
+
+        Returns
+        -------
+        None
+            The CSV file is saved to the current working directory with 14 columns:
+            0. Slice location [m]  
+            1. Slice charge [C]  
+            2. Slice energy [eV]  
+            3. x-position [m]  
+            4. y-position [m]  
+            5. Relative energy spread (RMS)  
+            6. Relative energy spread (FWHM)  
+            7. Beam size x [m]  
+            8. Beam size y [m]  
+            9. Normalized emittance x [m·rad]  
+            10. Normalized emittance y [m·rad]  
+            11. Beta function x [m]  
+            12. Beta function y [m]  
+            13. Peak spectral density
+        """
     
         # select bunch
         if bunch == 'beam':
@@ -1484,6 +1668,20 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def plot_evolution(self, bunch='beam'):
+        """
+        Plot the evolution of beam parameters along the stage.
+
+        Parameters
+        ----------
+        bunch : str, optional
+            Specifies which bunch to plot. Options are:
+            - ``'beam'`` : plot the beam evolution (default)
+            - ``'driver'`` : plot the drive beam evolution
+
+        Returns
+        -------
+        ``None``
+        """
 
         from matplotlib import pyplot as plt
         
@@ -1623,6 +1821,20 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def plot_spin_evolution(self, bunch='beam'):
+        """
+        Plot the spin evolution along the stage.
+
+        Parameters
+        ----------
+        bunch : str, optional
+            Specifies which bunch to plot. Options are:
+            - ``'beam'`` : plot the beam evolution (default)
+            - ``'driver'`` : plot the drive beam evolution
+
+        Returns
+        -------
+        ``None``
+        """
 
         from matplotlib import pyplot as plt
         
@@ -1692,6 +1904,12 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================  
     def plot_wakefield(self):
+        """
+        Plot the longitudinal wakefield and beam current of the stage.
+        
+        Plots both the initial quantities and, if available, the final 
+        quantities after beam propagation.
+        """
 
         from matplotlib import pyplot as plt
         
@@ -1983,6 +2201,9 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def print_summary(self):
+        """
+        Print a summary of the stage.
+        """
         
         print('Class: ', type(self))
 
@@ -2045,8 +2266,36 @@ class Stage(Trackable, CostModeled):
 ###################################################
 class PlasmaRamp(Stage):
     """
-    Contains the implementation for ramps as a Stage class.
-    Only meant to store information.
+    Represents a plasma density ramp as a specialized Stage.
+
+    ``PlasmaRamp`` is a subclass of Stage intended to **store ramp information** 
+    for use in tracking with a parent Stage. It does not support direct tracking,
+    nor can it have upramp or downramp stages attached.  
+
+    The class currently supports uniform ramps; other ramp shapes such as 
+    'gaussian' or 'from_file' are not yet implemented.
+
+    Attributes
+    ----------
+    ramp_shape : str
+        The shape of the ramp. Currently, only ``'uniform'`` is supported.
+
+    length : [m] float
+        Length of the ramp .
+
+    ramp_beta_mag : float
+        Betatron magnification used to define ramp plasma densities. Overrides 
+        the parent stage's ``ramp_beta_mag`` if set.
+
+    nom_energy_gain : [eV] float
+        Nominal energy gain of the ramp.
+    
+    Notes
+    -----
+    - ``PlasmaRamp`` objects are designed to be used in conjunction with 
+      ``Stage.track_upramp()`` or ``Stage.track_downramp()``.
+    - Attempting to call ``track()`` directly will raise a ``StageError``.
+    - Cannot attach additional upramp or downramp stages.
     """
     
     # ==================================================
@@ -2070,6 +2319,10 @@ class PlasmaRamp(Stage):
 
     # ==================================================
     def track(self):
+        """
+        Raises a ``StageError``. Use ``track_upramp()`` or ``track_downramp()`` 
+        in ``Stage`` instead.
+        """
         raise StageError('track() is not implemented for PlasmaRamp. Use track_upramp() or track_downramp() from the Stage class instead.')
     
 
@@ -2098,6 +2351,7 @@ class PlasmaRamp(Stage):
         The betatron magnification used to define ramp plasma densities. 
         Overrides the ramp_beta_mag of the parent stage.
         """
+
         if self._ramp_beta_mag is not None:
             ramp_beta_mag = self._ramp_beta_mag
         elif self.parent.ramp_beta_mag is not None:
@@ -2116,6 +2370,9 @@ class PlasmaRamp(Stage):
 
     # ==================================================
     def print_summary(self, print_params=True):
+        """
+        Print a summary of the ramp.
+        """
         if self.is_upramp():
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
