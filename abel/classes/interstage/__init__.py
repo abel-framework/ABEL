@@ -42,30 +42,30 @@ class Interstage(Trackable, CostModeled):
         Magnetic field of the bending dipoles. If callable, it is evaluated as 
         ``field_dipole(nom_energy)``.
 
-    R56 : [m] float or callable
+    R56 : [m] float or callable (default=0)
         Longitudinal dispersion term, relating relative momentum deviation to 
         path length difference. If callable, it is evaluated as 
         ``R56(nom_energy)``.
 
-    charge_sign : int
+    charge_sign : int (default=-1)
         Particle charge sign: -1 for electrons, +1 for positrons or protons.
 
-    cancel_chromaticity : bool
+    cancel_chromaticity : bool (default=``True``)
         Whether to automatically match and cancel first-order chromatic effects.
 
-    cancel_sec_order_dispersion : bool
+    cancel_sec_order_dispersion : bool (default=``False``)
         Whether to match and cancel second-order dispersion.
 
-    use_apertures : bool
+    use_apertures : bool (default=``True``)
         If ``True``, applies aperture clipping to the beam distribution.
 
-    enable_csr : bool
+    enable_csr : bool (default=``True``)
         Enables coherent synchrotron adiation (CSR) modeling during tracking.
 
-    enable_isr : bool
+    enable_isr : bool (default=``True``)
         Enables incoherent synchrotron radiation (ISR) modeling during tracking.
 
-    enable_space_charge : bool
+    enable_space_charge : bool (default=``False``)
         Enables space charge effects.
 
     uses_plasma_lenses : bool
@@ -205,6 +205,20 @@ class Interstage(Trackable, CostModeled):
     ## MATCHING
     
     def match(self):
+        """
+        Perform matching of key optical functions within the interstage.
+
+        This combines matching of beta functions, first-order dispersion and R56.
+        Can also optionally match chromatic amplitude and second order 
+        dispersion depending on ``self.cancel_chromaticity`` and 
+        ``self.cancel_sec_order_dispersion``.
+
+        Returns
+        -------
+        None
+            Updates the internal lattice configuration in place.
+        """
+
         "Combined matching the beta function, first- and second-order dispersion and the R56"
         self.match_beta_function()
         self.match_dispersion_and_R56()
@@ -233,6 +247,9 @@ class Interstage(Trackable, CostModeled):
     ## PLOTTING
     
     def plot_evolution(self):
+        """
+        Plot the evolution of various beam parameters inside the interstage.
+        """
 
         from matplotlib import pyplot as plt
         
@@ -629,6 +646,15 @@ class Interstage(Trackable, CostModeled):
     ## SURVEY PLOTS
     
     def total_bend_angle(self):
+        """
+        Compute the total bending angle of the interstage lattice.
+
+        Returns
+        -------
+        final_angle : [rad] float
+            Net angular deflection of the reference trajectory through the 
+            interstage.
+        """
         ls, inv_rhos, ks, ms, taus = self.matrix_lattice(orbit_only=True)
         from abel.utilities.beam_physics import evolve_orbit
         final_angle, _ = evolve_orbit(ls, inv_rhos, theta0=0)
@@ -651,6 +677,16 @@ class Interstage(Trackable, CostModeled):
     ## COST MODEL
     
     def get_cost_breakdown(self):
+        """
+        Compute the estimated cost of the interstage section based on its length.
+
+        Returns
+        -------
+        Tuple 
+            Containing:
+                - Name of the cost component (``'Interstage'``)
+                - Total estimated cost.
+        """
         return ('Interstage', self.get_length() * CostModeled.cost_per_length_interstage)
 
     
