@@ -14,6 +14,33 @@ import copy, warnings
 SI.r_e = SI.physical_constants['classical electron radius'][0]
 
 class StageBasic(Stage):
+    """
+    Basic implementation of a plasma stage. Solves Hill's equation, increases 
+    the energy of all main beam macro particles with a homogeneous energy gain, 
+    and decreases the energy of all drive beam macro particles with the same 
+    energy gain.
+
+    Inherits all attributes from ``Stage``.
+    
+
+    Attributes
+    ----------
+    transformer_ratio : float
+        Transformer ratio. Default set to 1.0.
+
+    depletion_efficiency : float
+        Energy depletion efficiency for the drive beam. Default set to 0.75.
+
+    probe_evolution : bool
+        Flag for storing the beam parameter evolution data. Default set to 
+        ``False``.
+
+    store_beams_for_tests : bool
+        Flag for storing intermediate beam states for testing.
+
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
+    """
     
     def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, transformer_ratio=1.0, depletion_efficiency=0.75, probe_evolution=False, store_beams_for_tests=False):
         """
@@ -28,27 +55,24 @@ class StageBasic(Stage):
         plasma_density : [m^-3] float
             Plasma density.
 
-        driver_source : ``Source`` object
+        driver_source : ``Source``
             Driver source for the acceleration stage.
 
-        ramp_beta_mag : float, optional
+        ramp_beta_mag : float, optional (default= ``None``)
             Used for demagnifying and magnifying beams passing through entrance 
-            and exit plasma ramps. Default set to ``None``.
+            and exit plasma ramps.
 
-        transformer_ratio : float, optional
-            Transformer ratio. Default set to 1.0.
+        transformer_ratio : float, optional (default=1.0)
+            Transformer ratio.
 
-        depletion_efficiency : float, optional
-            Energy depletion efficiency for the drive beam. Default set to 0.75.
+        depletion_efficiency : float, optional (default=0.75)
+            Energy depletion efficiency for the drive beam.
 
-        probe_evolution : bool, optional
-            Flag for storing the beam parameter evolution data. Default set to 
-            ``False``.
+        probe_evolution : bool, optional (default= ``False``)
+            Flag for storing the beam parameter evolution data.
 
-        store_beams_for_tests : bool, optional
-            Flag for storing the beams between ramps and stage in order to 
-            perform tests for assuring beams being correctly transferred. 
-            Default set to ``False``.
+        store_beams_for_tests : bool, optional (default= ``False``)
+            Flag for storing intermediate beam states for testing..
         """
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
@@ -72,7 +96,7 @@ class StageBasic(Stage):
         
         # set ideal plasma density if not defined
         if self.plasma_density is None:
-            self.optimize_plasma_density()
+            self.optimize_plasma_density() # TODO: this lacks an input parameter. Fix in separate PR.
 
 
         # ========== Rotate the coordinate system of the beams ==========
@@ -166,19 +190,19 @@ class StageBasic(Stage):
 
         Parameters
         ----------
-        beam_ramped : ABEL ``Beam`` object
+        beam_ramped : ``Beam``
             Main beam.
 
-        drive_beam_ramped : ABEL ``Beam`` object
+        drive_beam_ramped : ``Beam``
             Drive beam.
 
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam`` 
             Main beam after tracking.
 
-        drive_beam : ABEL ``Beam`` object
+        drive_beam : ``Beam``
             Drive beam after tracking.
         """
 
@@ -216,19 +240,19 @@ class StageBasic(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
     
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -295,19 +319,19 @@ class StageBasic(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
     
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -364,6 +388,20 @@ class StageBasic(Stage):
 
     # ==================================================
     def optimize_plasma_density(self, source):
+        """
+        Optimize the stage plasma density (float) based on parameters for a 
+        given ``source``. The optimised value is stored in 
+        ``self.plasma_density``.
+
+        Parameters
+        ----------
+        source : ``Source``
+            ``Source`` object.
+
+        Returns
+        ----------
+        ``None``
+        """
         
         # approximate extraction efficiency
         extraction_efficiency = (self.transformer_ratio/0.75)*abs(source.get_charge()/self.driver_source.get_charge())
@@ -387,15 +425,20 @@ class StageBasic(Stage):
     
         Parameters
         ----------
-        ...
+        transformer_ratio : float
+            Transformer ratio. Default set to ``None``.
+
+        depletion_efficiency : float
+            Energy depletion efficiency for the drive beam. Default set to 
+            ``None``.
 
         probe_evolution : bool, optional
             Flag for recording the beam parameter evolution. Default set to the
-            same value as ``self``.
+            same value as ``self.probe_evolution``.
             
         Returns
         ----------
-        stage_copy : ``Stage`` object
+        stage_copy : ``Stage``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 

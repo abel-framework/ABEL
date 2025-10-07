@@ -34,121 +34,217 @@ from abel.CONFIG import CONFIG
 
 class StageReducedModels(Stage):
     """
-    TODO: Short description
-    None of lines in the docstring text should exceed this length ..........
+    Reduced model implementation of a plasma acceleration stage. This class 
+    extends the ``Stage`` class to include simplified physics models for fast 
+    tracking of particle beams.
 
-        
+    The reduced physics models include
+
+    - Transverse intra-beam instability.
+    - Radiation reaction.
+    - Ion motion.
+
+    See the files `particles_transverse_wake_instability.py <https://github.com/abel-framework/ABEL/blob/main/abel/physics_models/particles_transverse_wake_instability.py>`_ 
+    and `ion_motion_wakefield_perturbation.py <https://github.com/abel-framework/ABEL/blob/main/abel/physics_models/ion_motion_wakefield_perturbation.py>`_ for more details.
+
+    The tracking first performs a single time step Wake-T simulation to 
+    calculate and extract the longitudinal electric field and blow-out bubble 
+    radius, which are used as inputs in the transverse intra-beam instability. 
+    The drive beam, longitudinal electric field and blow-out bubble radius are 
+    assumed unchanged throughout the tracking process through the stage.
+
+    Inherits all attributes from ``Stage``.
+
+    
     Attributes
     ----------
-    nom_energy_gain : [eV] float
-        The total energy gain of the stage and its ramps.
-    
-    nom_accel_gradient : [eV/m] float
-        The effective nominal acceleration gradient for the stage and its ramps.
+    time_step_mod : [betatron wavelength/c] float
+        Time step modifier that sets the time step in units of betatron wavelength/c for beam tracking.
 
-    length : [m] float
-        The total length of the stage and its ramps.
+    enable_tr_instability : bool
+        Flag for enabling transverse intra-beam instability calculations.
 
-    nom_energy_gain_flattop : [eV] float
-        The total energy gain of the stage.
+    enable_radiation_reaction : bool
+        Flag for enabling radiation reaction effects.
 
-    nom_accel_gradient_flattop : [eV/m] float
-        The nominal acceleration gradient for the stage.
+    enable_ion_motion : bool
+        Flag for enabling plasma ion motion effects.
 
-    length : [m] float
-        The total length of the stage.
-    
-    ...
+    Ez_fit_obj : [V/m] interpolation object
+        1D interpolation object of longitudinal electric field fitted to axial 
+        electric field using a selection of longitudinal coordinates ``zs`` 
+        along the main beam. Used to determine the value of the longitudinal 
+        electric field for all beam ``zs``.
 
-    ...
+    Ez_roi : [V/m] 1D ndarray
+        Longitudinal E-field in the region of interest fitted to a selection of 
+        ``zs`` along the main beam (main beam head to tail).
 
+    rb_fit_obj : [m] interpolation object
+        1D interpolation object of plasma bubble radius fitted to axial bubble 
+        radius using a selection of ``zs`` along the main beam. Used to 
+        determine the value of the bubble radius for all beam ``zs``.
 
-    Methods
-    -------
-    __init__(...)
-        Class constructor...
+    bubble_radius_roi : [m] 1D ndarray
+        Plasma bubble radius in the region of interest.
 
-    track(beam_incoming, savedepth=0, runnable=None, verbose=False)
-        Tracks the particles through the stage.
+    ion_charge_num : [e] float
+        Charge number of ions.
 
-    ...
+    ion_mass : [kg] float
+        Ion mass.
+
+    num_z_cells_main : int
+        Determines the binning of the z-coordinates used to probe main beam 
+        electric fields using ``RF-Track``. Used in calculating wakefield 
+        perturbation due to ion motion.
+
+    num_x_cells_rft, num_y_cells_rft : int
+        Number of grid cells along x and y used in ``RF-Track`` for calculating 
+        beam electric fields used in calculating wakefield perturbation due to 
+        ion motion.
+
+    num_xy_cells_probe : int
+        Number of grid cells along x and y used to probe beam electric fields 
+        calculated by ``RF-Track``. Used in calculating wakefield perturbation 
+        due to ion motion.
+
+    uniform_z_grid : bool
+        Flag to determine whether the grid along z is uniform (``True``) or finely 
+        resolved along the drive beam and main beam regions, while the region 
+        between the beams are coarsely resolved (``False``).
+
+    ion_wkfld_update_period : int
+        Determines the ion wakefield perturbation update period. This is given 
+        in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will 
+        update the ion wakefield perturbation every 3rd time step. 
+
+    probe_evol_period : int
+        Time step interval for probing beam evolution. Set to larger than 0 to 
+        record beam parameters for beam evolution diagnostics. The probing 
+        interval is given in units of time steps, so that e.g. 
+        ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
+        step.
+
+    evolution : dict
+        Contains the beam parameter evolution across the stage.
+
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
+
+    save_final_step : bool
+        Flag for storing the output data including beam, driver, and plasma 
+        quantities.
+
+    make_animations : bool
+        Flag for creating side-view and phase-space animations.
+
+    store_beams_for_tests : bool
+        Flag for storing intermediate beam states for testing.
+
+    show_prog_bar : bool
+        Flag for displaying the progress bar for beam tracking.
     """
 
     # ==================================================
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, time_step_mod=0.05, show_prog_bar=None, store_beams_for_tests=False, probe_evol_period=0, save_final_step=True, make_animations=False, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=1.0, time_step_mod=0.05, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, ion_charge_num=1.0, ion_mass=None, num_z_cells_main=None, num_x_cells_rft=50, num_y_cells_rft=50, num_xy_cells_probe=41, uniform_z_grid=False, ion_wkfld_update_period=1, drive_beam_update_period=0, show_prog_bar=None, probe_evol_period=0, save_final_step=False, make_animations=False, store_beams_for_tests=False):
         """
-        TODO: Short description
-        None of lines in the docstring text should exceed this length ..........
+        Constructor for the ``StageReducedModels`` class.
+
 
         Parameters
         ----------
-        ...
+        nom_accel_gradient : [V/m] float, optional (default= ``None``)
+            Nominal acceleration gradient.
 
-        driver_source : ``Source`` object of drive beam.
+        nom_energy_gain : [eV] float, optional (default= ``None``)
+            Nominal energy gain across the plasma stage.
 
-        #driver_beam : ``Beam`` object of drive beam.
-
-        #main_beam : ``Beam`` object of main beam.
+        plasma_density : [m^-3] float, optional (default= ``None``)
+            The plasma density of the plasma stage.
         
-        #length : [m] float
-            Length of the plasma stage.
-        
-        nom_energy_gain : [eV] float
-            Nominal/target energy gain of the acceleration stage.
-        
-        plasma_density : [m^-3] float
-            Plasma density.
+        driver_source : ``Source`` or ``DriverComplex``, optional (default= ``None``)
+            The source of the drive beam.
 
-        time_step_mod : [beta_wave_length/c] float, optional
+        ramp_beta_mag : float, optional (default=1.0)
+            Betatron magnification used for defining ramps.
+
+        time_step_mod : [beta_wave_length/c] float, optional (default=0.05)
             Determines the time step of the instability tracking in units of 
-            beta_wave_length/c.
+            betatron wave length/c.
             
-        #Ez_fit_obj : [V/m] interpolation object
-            1D interpolation object of longitudinal E-field fitted to axial 
-            E-field using a selection of zs along the main beam. Used to 
-            determine the value of the longitudinal E-field for all beam zs.
+        enable_tr_instability : bool, optional (default= ``True``)
+            Flag for enabling transverse intra-beam instability calculations.
 
-        #Ez_roi : [V/m] 1D ndarray
-            Longitudinal E-field in the region of interest fitted to a selection 
-            of zs along the main beam (main beam head to tail).
+        enable_radiation_reaction : bool, optional (default= ``True``)
+            Flag for enabling radiation reaction effects.
 
-        #rb_fit_obj : [m] interpolation object
-            1D interpolation object of plasma bubble radius fitted to axial 
-            bubble radius using a selection of zs along the main beam. Used to 
-            determine the value of the bubble radius for all beam zs.
+        enable_ion_motion : bool, optional (default= ``False``)
+            Flag for enabling plasma ion motion effects.
+
+        ion_charge_num : [e] float, optional
+            Charge number of ions. Default set by the ion motion physics model.
+
+        ion_mass : [kg] float, optional
+            Ion mass. Default set by the ion motion physics model.
+
+        num_z_cells_main : int, optional
+            Determines the binning of the z-coordinates used to probe main beam 
+            electric fields using ``RF-Track``. Used in calculating wakefield 
+            perturbation due to ion motion. Default set by the ion motion 
+            physics model.
+
+        num_x_cells_rft : int, optional (default=50)
+            Number of grid cells along x used in ``RF-Track`` for calculating 
+            beam electric fields used in calculating wakefield perturbation due to 
+            ion motion.
         
-        #bubble_radius_roi : [m] 1D ndarray
-            The bubble radius in the region of interest fitted to a selection of 
-            zs along the main beam.
+        num_y_cells_rft : int, optional (default=50)
+            Number of grid cells along y used in ``RF-Track`` for calculating 
+            beam electric fields used in calculating wakefield perturbation due to 
+            ion motion.
 
-        ramp_beta_mag : float, optional
-            Used for demagnifying and magnifying beams passing through entrance 
-            and exit plasma ramps. Default value: 5.0.
+        num_xy_cells_probe : int, optional (default=41)
+            Number of grid cells along x and y used to probe beam electric fields 
+            calculated by ``RF-Track``. Used in calculating wakefield perturbation 
+            due to ion motion.
 
-        enable_radiation_reaction : bool, optional
-            Flag for enabling radiation reactions. Defaults to ``True``.
+        uniform_z_grid : bool, optional (default= ``False``)
+            Flag to determine whether the grid along z is uniform (``True``) or finely 
+            resolved along the drive beam and main beam regions, while the region 
+            between the beams are coarsely resolved (``False``).
 
-        ...
+        ion_wkfld_update_period : int, optional (default=1)
+            Determines the ion wakefield perturbation update period. This is given 
+            in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will 
+            update the ion wakefield perturbation every 3rd time step.
 
-        probe_evol_period : int, optional
-            Set to larger than 0 to determine the probing period for beam 
-            evolution diagnostics. This is given in units of time steps, so that 
-            e.g. ``probe_evol_period=3`` will probe the beam evolution every 3rd 
-            time step. Default value: 0.
+        show_prog_bar : bool, optional
+            Flag for displaying the progress bar for beam tracking. Set to 
+            ``None`` to let ``StageReducedModels.track()`` decide whether to 
+            display the progress bar.
 
-        ...
+        probe_evol_period : int, optional (default=0)
+            Time step interval for probing beam evolution. Set to larger than 0 to 
+            record beam parameters for beam evolution diagnostics. The probing 
+            interval is given in units of time steps, so that e.g. 
+            ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
+            step.
 
-        ion_wkfld_update_period : int, optional
-            Determines the ion wakefield perturbation update period. This is 
-            given in units of time steps, so that e.g. 
-            ``ion_wkfld_update_period=3`` will update the ion wakefield 
-            perturbation every 3rd time step. Default value: 1.
-        
-        drive_beam_update_period : int, optional
-            Set to larger than 0 to activate driver evolution and determine 
-            the drive beam update period. Default value: 0.
+        save_final_step : bool, optional (default= ``False``)
+            Flag for storing the output data including beam, driver, and plasma 
+            quantities.
 
+        make_animations : bool, optional (default= ``False``)
+            Flag for creating side-view and phase-space animations.
+
+        store_beams_for_tests : bool, optional (default= ``False``)
+            Flag for storing intermediate beam states for testing.
         """
+
+        #drive_beam_update_period : int, optional
+            # Set to larger than 0 to activate driver evolution and determine 
+            # the drive beam update period. Default value: 0.
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
@@ -219,7 +315,7 @@ class StageReducedModels(Stage):
     # Track the particles through. Note that when called as part of a Linac object, a copy of the original stage (where no changes has been made) is sent to track() every time. All changes done to self here are saved to a separate stage under the Linac object.
     def track(self, beam_incoming, savedepth=0, runnable=None, verbose=False):
         """
-        Tracks the particles through the stage.
+        Track the particles through the stage.
         """
 
         # Set the diagnostics directory
@@ -366,24 +462,23 @@ class StageReducedModels(Stage):
     # ==================================================
     def main_tracking_procedure(self, beam0, driver0, shot_path=None, tmpfolder=None):
         """
-        Prepares and performs the main reduced model beam tracking.
-        - Performs single time step Wake-T simulation and extracts relevant 
-            information.
-        - Filters out beam particles outside of the plasma bubble.
-        - Sets up the configuration for the reduced model tracking.
-        - Makes corrections to the Wake-T r-coordinate before saving the initial 
-            time step.
-        - Calls on the physics model to perform the tracking.
-        - Stores beam parameter evolution as a stage attribute.
-        - Stores the final time step if desired.
+        Prepare and perform the main reduced model beam tracking.
+        
+        - Perform single time step Wake-T simulation and extracts relevant information.
+        - Filter out beam particles outside of the plasma bubble.
+        - Set up the configuration for the reduced model tracking.
+        - Make corrections to the Wake-T r-coordinate before saving the initial time step.
+        - Call on the physics model to perform the tracking.
+        - Store beam parameter evolution as a stage attribute.
+        - Store the final time step if desired.
         
 
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
 
         driver_x_offset : [m] float
@@ -406,10 +501,10 @@ class StageReducedModels(Stage):
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        drive_beam : ABEL ``Beam`` object
+        drive_beam : ``Beam``
             Drive beam after tracking.
         """
         
@@ -515,10 +610,10 @@ class StageReducedModels(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
 
         shot_path : ``string``, optional
@@ -527,10 +622,10 @@ class StageReducedModels(Stage):
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -609,10 +704,10 @@ class StageReducedModels(Stage):
         
         Parameters
         ----------
-        driver0 : ABEL ``Beam`` object
+        driver0 : ``Beam``
             Drive beam.
 
-        beam0 : ABEL ``Beam`` object
+        beam0 : ``Beam``
             Main beam.
 
         shot_path : ``string``, optional
@@ -621,10 +716,10 @@ class StageReducedModels(Stage):
             
         Returns
         ----------
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam after tracking.
 
-        driver : ABEL ``Beam`` object
+        driver : ``Beam``
             Drive beam after tracking.
         """
 
@@ -688,16 +783,21 @@ class StageReducedModels(Stage):
     # ==================================================
     def copy_config2blank_stage(self, probe_evol_period=1):
         """
-        Makes a deepcopy of the stage to copy the configurations and settings,
+        Make a deepcopy of the stage to copy the configurations and settings,
         but most of the parameters in the deepcopy are set to ``None``.
     
         Parameters
         ----------
-        N/A
+        probe_evol_period : int, optional (default=1)
+            Time step interval for probing beam evolution. Set to larger than 0 
+            to record beam parameters for beam evolution diagnostics. The 
+            probing interval is given in units of time steps, so that e.g. 
+            ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
+            step.
             
         Returns
         ----------
-        stage_copy : ``StageReducedModels`` object
+        stage_copy : ``StageReducedModels``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
@@ -720,8 +820,10 @@ class StageReducedModels(Stage):
     
 
     # ==================================================
-    # Save initial electric field, plasma and beam quantities
     def __save_initial_step(self, Ez0_axial, zs_Ez0, rho0, metadata_rho0, driver0, beam0):
+        """
+        Save initial electric field, plasma and beam quantities
+        """
         
         # ========== Save initial axial wakefield info ========== 
         self.initial.plasma.wakefield.onaxis.zs = zs_Ez0
@@ -770,8 +872,10 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Save final electric field, plasma and beam quantities
     def __save_final_step(self, Ez_axial, zs_Ez, rho, metadata_rho, driver, beam):
+        """
+        Save final electric field, plasma and beam quantities.
+        """
         
         # ========== Save final axial wakefield info ========== 
         self.final.plasma.wakefield.onaxis.zs = zs_Ez
@@ -834,8 +938,11 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Filter out particles that collide into bubble
     def bubble_filter(self, beam, sort_zs=True):
+        """
+        Filter out particles that collide into bubble.
+        """
+
         xs = beam.xs()
         ys = beam.ys()
         zs = beam.zs()
@@ -897,8 +1004,8 @@ class StageReducedModels(Stage):
     # ==================================================
     def Ez_shift_fit(self, Ez, zs_Ez, beam, z_slices=None):
         """
-        Cuts out the longitudinal axial E-field Ez over the beam region and 
-        makes a fit using the z-coordinates for the region.
+        Cut out the longitudinal axial E-field Ez over the beam region and make 
+        a fit using the z-coordinates for the region.
 
         Parameters
         ----------
@@ -909,7 +1016,7 @@ class StageReducedModels(Stage):
             z-coordinates for ``Ez``. Monotonically increasing from first to 
             last element.
 
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             
         z_slices : [m] 1D float ndarray, optional
             Co-moving coordinates of the beam slices.
@@ -956,10 +1063,10 @@ class StageReducedModels(Stage):
     # ==================================================
     def trace_bubble_radius(self, plasma_num_density, plasma_tr_coord, plasma_z_coord, drive_beam_peak_current, driver_offset, threshold=0.8):
         """
-        - For extracting the plasma ion bubble radius by finding the coordinates
-        in which the plasma number density goes from zero to a threshold value.
-        - The symmetry axis is determined using the transverse offset of the 
-        drive beam.
+        Extract the plasma ion bubble radius by finding the coordinates in which 
+        the plasma number density goes from zero to a threshold value.
+        
+        - The symmetry axis is determined using the transverse offset of the drive beam.
         - z is the propagation direction pointing to the right.
         
         Parameters
@@ -1172,7 +1279,7 @@ class StageReducedModels(Stage):
     # ==================================================
     def rb_shift_fit(self, rb, zs_rb, beam, z_slices=None):
         """
-        Cuts out the bubble radius over the beam region and makes a fit using 
+        Cut out the bubble radius over the beam region and make a fit using 
         the z-coordinates for the region.
 
         Parameters
@@ -1184,7 +1291,7 @@ class StageReducedModels(Stage):
             z-coordinates for ``rb``. Monotonically increasing from first to 
             last element.
 
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             
         z_slices : [m] 1D float ndarray, optional
             Co-moving coordinates of the beam slices.
@@ -1246,13 +1353,13 @@ class StageReducedModels(Stage):
             if smoothness_metric > smoothness_threshold:
                 warnings.warn('The plasma ion bubble radius may not have been extracted correctly.\n', UserWarning)
         
-        return rb_roi, rb_fit    
+        return rb_roi, rb_fit
         
 
     # ==================================================
     def store_rb_Ez_2stage(self, wake_t_evolution, drive_beam, beam):
         """
-        Traces the longitudinal electric field, bubble radius and store them 
+        Trace the longitudinal electric field, bubble radius and store them 
         as a stage attribute.
 
     
@@ -1262,10 +1369,10 @@ class StageReducedModels(Stage):
             Contains the 2D plasma density and wakefields for the initial and 
             final time steps.
 
-        drive_beam : ABEL ``Beam`` object
+        drive_beam : ``Beam``
             Drive beam.
 
-        beam : ABEL ``Beam`` object
+        beam : ``Beam``
             Main beam.
     
             
@@ -1318,8 +1425,12 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Determine the number of beam slices based on the Freedman–Diaconis rule
+    # 
+    # TODO: put this inside longitudinal_number_distribution()
     def FD_rule_num_slice(self, zs=None):
+        """
+        Determine the number of beam slices based on the Freedman–Diaconis rule
+        """
         if zs is None:
             zs = self.initial.beam.instance.zs()
         q3, q1 = np.percentile(zs, [75 ,25])
@@ -1330,8 +1441,10 @@ class StageReducedModels(Stage):
 
 
     # ==================================================
-    # Return the longitudinal number distribution using the beam particles' z-coordinates.
     def longitudinal_number_distribution(self, beam, bin_number=None, make_plot=False):
+        """
+        Return the longitudinal number distribution using the beam particles' z-coordinates.
+        """
 
         zs = beam.zs()
         if bin_number is None:
@@ -1360,38 +1473,14 @@ class StageReducedModels(Stage):
     #     return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
     
     
-    # ==================================================
-    # Calculate the normalised amplitude (Lambda).
-    def calc_norm_amp(self, particle_offsets, particle_angles):
+    # # ==================================================
+    # # Calculate the normalised amplitude (Lambda).
+    # def calc_norm_amp(self, particle_offsets, particle_angles):
 
-        beam_size = np.std(particle_offsets)
-        beam_size_angle = np.std(particle_angles)
+    #     beam_size = np.std(particle_offsets)
+    #     beam_size_angle = np.std(particle_angles)
 
-        return np.sum((particle_offsets/beam_size)**2 + (particle_angles/beam_size_angle)**2)
-
-    
-    # ==================================================
-    def energy_efficiency(self):
-        return None # TODO
-
-    
-    # ==================================================
-    def energy_usage(self):
-        return None # TODO
-        
-    
-    # ==================================================
-    #def __get_initial_driver(self, resample=False):
-    #    if resample or self.driver_initial is None:
-    #        self.driver_initial = self.driver_source.track()
-    #    return self.driver_initial
-
-    
-    # ==================================================
-    def __get_plasma_density(self, resample=False):
-        if resample or self.__n is None:
-            self.__n = self.plasma_density * np.random.normal(loc = 1, scale = self.reljitter.plasma_density)
-        return self.__n
+    #     return np.sum((particle_offsets/beam_size)**2 + (particle_angles/beam_size_angle)**2)
         
 
     # ==================================================
@@ -1414,6 +1503,27 @@ class StageReducedModels(Stage):
     # ==================================================
     # Overloads the plot_wakefield method in the Stage class.
     def plot_wakefield(self, saveToFile=None, includeWakeRadius=True):
+        """
+        Plot the wakefield, beam current profile, and optionally the plasma-wake 
+        radius.
+
+        This function generates a set of plots showing:
+        - Longitudinal electric field (wakefield) along the beam axis.
+        - Beam current profile.
+        - Plasma bubble radius (if ``includeWakeRadius`` is ``True``).
+
+        The data is taken from the stage's initial state by default, and from 
+        the final state if it is available.
+
+        Parameters
+        ----------
+        saveToFile : str, optional
+            If provided, the figure is saved to the given file path in PDF format.
+            If ``None`` (default), the plot is displayed but not saved.
+
+        includeWakeRadius : bool, optional (default= ``True``)
+            If ``True``, also plot the plasma bubble (wake) radius.
+        """
 
         assert self.initial is not None, 'No data.'
         
@@ -1492,26 +1602,25 @@ class StageReducedModels(Stage):
         
         Other parameters
         ----------------
-        show_Ez : bool
+        show_Ez : bool, optional (default= ``True``)
             Flag for including the axial longitudinal electric field in the 
             plot.
 
-        trace_rb : bool
+        trace_rb : bool, optional (default= ``False``)
             Flag for including the traced bubble radius in the plot.
             
-        savefig : str or None
-            If not None, defines the path to save the figure.
-            Defaults to None.
+        savefig : str, optional (default= ``None``)
+            If not ``None``, defines the path to save the figure.
+            Defaults to ``None``.
 
-        aspect : str
-            The aspect ratio of the plots.
-            Defaults to 'equal' which is also the matplotlib default; can also 
-            use 'auto'. Set to 'auto' to plot the entire simulation box.
+        aspect : str, optional (default= ``'auto'``)
+            The aspect ratio of the plots. Set to 'auto' to plot the entire 
+            simulation box.
 
             
         Returns:
         --------
-        None
+        ``None``
         """
         
         from matplotlib.colors import LogNorm
@@ -1607,6 +1716,10 @@ class StageReducedModels(Stage):
 
     # ==================================================
     def plot_Ez_rb_cut(self):
+        """
+        Plot beam number profiles together with cut-out wakefield and bubble 
+        radius.
+        """
 
         z_slices = self.z_slices
         main_num_profile = self.main_num_profile
@@ -1803,6 +1916,35 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the horizontal sideview (top view)
     def animate_sideview_x(self, evolution_folder):
+        """
+        Create and save an animation of the horizontal side view (x–z plane) 
+        of the beam evolving through the stage.
+
+        The animation shows the evolution of beam properties such as:
+
+        - Mean energy versus propagation length
+        - Normalized emittance versus bunch length
+        - Horizontal phase space density
+        - Current profile along the beam
+        - Transverse beam size and offset evolution
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+
+        Notes
+        -----
+        - The output file is saved as a GIF in ``<self.run_path>/plots``.
+        - The function currently depends on ``self.evolution`` for beam locations.
+
+        A TODO item exists to make it independent of this attribute.
+        """
         
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -1978,6 +2120,20 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the vertical sideview
     def animate_sideview_y(self, evolution_folder):
+        """
+        Create and save an animation of the vertical side view (y-z plane) 
+        along with other parameters of the beam evolving through the stage.
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+        """
 
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -2145,6 +2301,20 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the horizontal phase space
     def animate_phasespace_x(self, evolution_folder):
+        """
+        Create and save an animation of the horizontal phase space (x-px plane) 
+        along with other parameters of the beam evolving through the stage.
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+        """
 
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -2338,6 +2508,20 @@ class StageReducedModels(Stage):
     # ==================================================
     # Animate the vertical phase space
     def animate_phasespace_y(self, evolution_folder):
+        """
+        Create and save an animation of the vertical phase space (y-py plane) 
+        along with other parameters of the beam evolving through the stage.
+
+        Parameters
+        ----------
+        evolution_folder : str
+            Path to the folder containing stored beam snapshots.
+
+        Returns
+        -------
+        filename : str
+            Path to the saved animation file (GIF format).
+        """
 
         # Check if the directory in self.run_path exists
         if self.run_path is None or not os.path.exists(self.run_path):
@@ -2644,6 +2828,10 @@ class StageReducedModels(Stage):
 
     # ==================================================
     def print_summary(self):
+        """
+        Print a summary of the stage.
+        """
+
         if self.is_upramp():
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
