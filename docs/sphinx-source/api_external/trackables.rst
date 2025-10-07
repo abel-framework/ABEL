@@ -8,6 +8,22 @@ Trackable elements
 ``Stage``
 ---------------------
 .. autoclass:: abel.Stage
+ :members:
+
+.. autoclass:: abel.StageBasic
+ :members:
+
+.. autoclass:: abel.StageHipace
+ :members:
+
+.. autoclass:: abel.StageQuasistatic2d
+ :members:
+
+.. autoclass:: abel.StageReducedModels
+ :members:
+
+.. autoclass:: abel.StageWakeT
+ :members:
 
 ``Interstage``
 ---------------------
