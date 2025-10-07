@@ -292,13 +292,13 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
     
     Parameters
     ----------
-    beam : ABEL ``Beam`` object
+    beam : ``Beam``
         The main beam to be tracked.
 
-    drive_beam : ABEL ``Beam`` object
+    drive_beam : ``Beam``
         The drive beam.
 
-    trans_wake_config : ``PrtclTransWakeConfig`` object
+    trans_wake_config : ``PrtclTransWakeConfig``
         Contains the configurations for the transverse wake instability 
         calculations.
 
@@ -316,9 +316,9 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
         
     References
     ----------
-    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, 
+    .. [1] C. Benedetti, C. B. Schroeder, E. Esarey and W. P. Leemans, 
     "Emittance preservation in plasma-based accelerators with ion motion", 
-    Phys. Rev. Accel. Beams. 20, 111301 (2017);. 
+    Phys. Rev. Accel. Beams. 20, 111301 (2017), 
     https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
     """
     
@@ -455,10 +455,10 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
 
     Parameters
     ----------
-    beam : ABEL ``Beam`` object
+    beam : ``Beam``
         The main beam to be tracked.
 
-    drive_beam0 : ABEL ``Beam`` object
+    drive_beam0 : ``Beam``
         The input drive beam.
         
     Ez_fit_obj : [V/m] interpolation object
@@ -471,17 +471,17 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         bubble radius using a selection of zs along the main beam. Used to 
         determine the value of the bubble radius for all beam zs.
 
-    trans_wake_config : ``PrtclTransWakeConfig`` object
+    trans_wake_config : ``PrtclTransWakeConfig``
         Contains the configurations for the transverse wake instability 
         calculations.
     
         
     Returns
     ----------
-    beam_out : ABEL ``Beam`` object
+    beam_out : ``Beam``
         ...
     
-    evolution : ``PrtclTransWakeEvolution`` object
+    evolution : ``PrtclTransWakeEvolution``
         ...
     """
 
