@@ -1348,8 +1348,7 @@ class Stage(Trackable, CostModeled):
         - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
         - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
         - ``driver_to_beam``: Overall efficiency from driver to beam (product of the above).  
-        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over 
-        the repetition rate if available.
+        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over the repetition rate if available.
 
         Parameters
         ----------
