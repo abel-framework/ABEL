@@ -340,6 +340,9 @@ class Interstage(Trackable, CostModeled):
     ## PLOTTING OPTICS
 
     def plot_optics(self, show_beta_function=True, show_dispersion=True, show_R56=True, show_chromaticity=True, add_no_central_sextupole=False, add_no_chrom_correction=False, savefig=None):
+        """
+        Plot the beta function, dispersion, R56 and chromaticity along the interstage.
+        """
 
         from matplotlib import pyplot as plt
         from matplotlib import patches
