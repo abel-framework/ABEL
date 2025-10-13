@@ -11,6 +11,38 @@ import numpy as np
 import scipy.constants as SI
 
 class InterstagePlasmaLens(Interstage, ABC):
+    """
+    Abstract subclass of ``Interstage`` implementing interstage beamline sections
+    that use plasma lenses.
+
+    This class defines parameters, matching procedures, and lattice composition 
+    for its subclasses. It handles the optical and field-level configuration of 
+    the lattice components and provides matching functions to ensure proper beam
+    transport and chromatic correction.
+
+    Inherits all attributes from ``Interstage``
+
+    Attributes
+    ----------
+    lens_radius : [m] float
+        Plasma lens physical aperture (radius). Defaults to 2e-3.
+
+    lens1_offset_x : [m] float
+        x-offset of the first plasma lens. Defaults to 0.
+
+    lens2_offset_x : [m] float
+        x-offset of the second plasma lens. Defaults to 0.
+
+    lens1_offset_y : [m] float
+        y-offset of the first plasma lens. Defaults to 0.
+
+    lens2_offset_y : [m] float
+        y-offset of the second plasma lens. Defaults to 0.
+
+    cancel_isr_kicks : bool
+        Flag for mitigating ISR (incoherent synchrotron radiation) kicks on beam 
+        centroid by offseting the plasma lenses. Defaults to ``False``.
+    """
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, lens_radius=2e-3, charge_sign=-1,
@@ -46,6 +78,16 @@ class InterstagePlasmaLens(Interstage, ABC):
     
     # lattice length
     def get_length(self):
+        """
+        Compute the total length of the interstage by summing all lattice 
+        elements.
+
+        Returns
+        -------
+        total_length : [m] float
+            Total geometric length of the plasma-lens interstage. Returns 
+            ``None`` if ``length_dipole`` is not defined.
+        """
         if self.length_dipole is not None:
             ls, *_ = self.matrix_lattice(k_lens=0, tau_lens=0, B_chic1=0, B_chic2=0, m_sext=0, half_lattice=False)
             return np.sum(ls)
@@ -56,19 +98,28 @@ class InterstagePlasmaLens(Interstage, ABC):
     ## RATIO-DEFINED LENGTHS
     
     @property
-    def length_gap(self) -> float:
+    def length_gap(self) -> float:        
         return self.length_dipole * self.length_ratio_gap
         
     @property
     def length_plasma_lens(self) -> float:
+        """
+        The length of a plasma lens.
+        """
         return self.length_dipole * self.length_ratio_plasma_lens
 
     @property
     def length_chicane_dipole(self) -> float:
+        """
+        The length of a chicane dipole.
+        """
         return self.length_dipole * self.length_ratio_chicane_dipole
 
     @property
     def length_central_gap_or_sextupole(self) -> float:
+        """
+        Length of the central element, either a gap or a sextupole.
+        """
         return self.length_dipole * self.length_ratio_central_gap_or_sextupole
 
     
@@ -76,18 +127,45 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     @property
     def strength_plasma_lens(self) -> float:
+        """
+        Effective focusing strength of the plasma lens.
+
+        Returns
+        -------
+        strength_plasma_lens : [1/m] float
+            Focusing strength k = 1/f of the plasma lens, matched via 
+            ``InterstagePlasmaLens.match_beta_function()``.
+        """
         if self._strength_plasma_lens is None:
             self.match_beta_function()
         return self._strength_plasma_lens
 
     @property
     def nonlinearity_plasma_lens(self) -> float:
+        """
+        Plasma lens nonlinearity (taper).
+
+        Returns
+        -------
+        nonlinearity_plasma_lens : [1/m] float
+            Plasma lens nonlinearity focusing term, matched via 
+            ``InterstagePlasmaLens.match_chromatic_amplitude()``.
+        """
         if self._nonlinearity_plasma_lens is None:
             self.match_chromatic_amplitude()
         return self._nonlinearity_plasma_lens
         
     @property
     def strength_sextupole(self) -> float:
+        """
+        Sextupole strength.
+
+        Returns
+        -------
+        strength_sextupole : [1/m^2] float
+            Plasma lens nonlinearity focusing term, matched via 
+            ``InterstagePlasmaLens.match_second_order_dispersion()``.
+        """
         if self._strength_sextupole is None:
             self.match_second_order_dispersion()
         return self._strength_sextupole
@@ -104,6 +182,15 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     @property
     def field_chicane_dipole1(self) -> float:
+        """
+        Field of the outer chicane dipoles.
+
+        Returns
+        -------
+        field_chicane_dipole1 : [T] float
+            Magnetic field strength of the first chicane dipoles, determined via 
+            ``InterstagePlasmaLens.match_dispersion_and_R56()``.
+        """
         if self._field_ratio_chicane_dipole1 is None:
             self.match_dispersion_and_R56()
         return self.field_dipole * self._field_ratio_chicane_dipole1
@@ -241,7 +328,7 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     
     def match_dispersion_and_R56(self, high_res=False):
-        "Cancelling the dispersion and matchign the R56 by adjusting the chicane dipoles."
+        "Cancelling the dispersion and matching the R56 by adjusting the chicane dipoles."
         
         nom_R56 = self.R56
             
