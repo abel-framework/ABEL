@@ -516,7 +516,7 @@ def ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driv
         
     References
     ----------
-    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, "Emittance preservation in plasma-based accelerators with ion motion," Phys. Rev. Accel. Beams. 20, 111301 (2017);. https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
+    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, "Emittance preservation in plasma-based accelerators with ion motion," Phys. Rev. Accel. Beams. 20, 111301 (2017), https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
     """
 
     # Get parameters
