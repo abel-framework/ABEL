@@ -465,6 +465,7 @@ class StageReducedModels(Stage):
         Prepare and perform the main reduced model beam tracking.
         
         - Perform single time step Wake-T simulation and extracts relevant information.
+        - Adds the transverse offsets of ``driver0`` to the Wake-T output coordinates to undo the transverse shift in ``run_single_step_wake_t()``.
         - Filter out beam particles outside of the plasma bubble.
         - Set up the configuration for the reduced model tracking.
         - Make corrections to the Wake-T r-coordinate before saving the initial time step.
@@ -566,6 +567,7 @@ class StageReducedModels(Stage):
             #wake_t_fields=wake_t_fields  # TODO: remove when driver evolution has been implemented.
         )
         
+        #TODO: Modify this test
         inputs = [driver0, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
