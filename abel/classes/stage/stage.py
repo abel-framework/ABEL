@@ -166,6 +166,18 @@ class Stage(Trackable, CostModeled):
         self.final.plasma.wakefield = SimpleNamespace()
         self.final.plasma.wakefield.onaxis = SimpleNamespace()
 
+        self.middle = SimpleNamespace()
+        self.middle.driver = SimpleNamespace()
+        self.middle.driver.instance = SimpleNamespace()
+        self.middle.beam = SimpleNamespace()
+        self.middle.beam.instance = SimpleNamespace()
+        self.middle.beam.current = SimpleNamespace()
+        self.middle.beam.density = SimpleNamespace()
+        self.middle.plasma = SimpleNamespace()
+        self.middle.plasma.density = SimpleNamespace()
+        self.middle.plasma.wakefield = SimpleNamespace()
+        self.middle.plasma.wakefield.onaxis = SimpleNamespace()
+
         self.name = 'Plasma stage'
         
 
@@ -2095,14 +2107,21 @@ class Stage(Trackable, CostModeled):
             and hasattr(self.final.plasma.density, 'rho') \
             and hasattr(self.final.beam.density, 'rho')
 
-        num_plots = 1 + int(has_final_step)
+        has_middle_step = self.middle is not None \
+            and hasattr(self.middle.plasma.density, 'extent') \
+            and hasattr(self.middle.plasma.wakefield.onaxis, 'zs') \
+            and hasattr(self.middle.plasma.wakefield.onaxis, 'Ezs') \
+            and hasattr(self.middle.plasma.density, 'rho') \
+            and hasattr(self.middle.beam.density, 'rho')
+
+        num_plots = 1 + int(has_final_step) + int(has_middle_step)
         fig, ax = plt.subplots(num_plots,1)
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.5*num_plots)
 
         # cycle through initial and final step
         for i in range(num_plots):
-            if not has_final_step:
+            if not (has_final_step or has_middle_step):
                 ax1 = ax
             else:
                 ax1 = ax[i]
@@ -2112,6 +2131,9 @@ class Stage(Trackable, CostModeled):
                 data_struct = self.initial
                 title = 'Initial step'
             elif i==1:
+                data_struct = self.middle
+                title = 'Middle step'
+            elif i==2:
                 data_struct = self.final
                 title = 'Final step'
 
