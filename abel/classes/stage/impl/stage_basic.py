@@ -198,7 +198,7 @@ class StageBasic(Stage):
 
             
         Returns
-        ----------
+        -------
         beam : ``Beam`` 
             Main beam after tracking.
 
@@ -248,7 +248,7 @@ class StageBasic(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -327,7 +327,7 @@ class StageBasic(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -399,8 +399,8 @@ class StageBasic(Stage):
             ``Source`` object.
 
         Returns
-        ----------
-        ``None``
+        -------
+        None
         """
         
         # approximate extraction efficiency
@@ -437,7 +437,7 @@ class StageBasic(Stage):
             same value as ``self.probe_evolution``.
             
         Returns
-        ----------
+        -------
         stage_copy : ``Stage``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
