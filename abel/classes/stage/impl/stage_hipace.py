@@ -672,7 +672,7 @@ class StageHipace(Stage):
             
             
         Returns
-        ----------
+        -------
         waterfalls : list of 2D float ndarrays
             Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
         
