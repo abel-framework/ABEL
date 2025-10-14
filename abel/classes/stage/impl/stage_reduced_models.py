@@ -501,7 +501,7 @@ class StageReducedModels(Stage):
 
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -623,7 +623,7 @@ class StageReducedModels(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -717,7 +717,7 @@ class StageReducedModels(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -798,7 +798,7 @@ class StageReducedModels(Stage):
             step.
             
         Returns
-        ----------
+        -------
         stage_copy : ``StageReducedModels``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
@@ -1300,7 +1300,7 @@ class StageReducedModels(Stage):
 
             
         Returns
-        ----------
+        -------
         rb_roi : [m] 1D float ndarray
             Plasma ion bubble radius for the region of interest shifted to the 
             location of the beam.
@@ -1379,7 +1379,7 @@ class StageReducedModels(Stage):
     
             
         Returns
-        ----------
+        -------
         None
         """
 
@@ -1602,8 +1602,8 @@ class StageReducedModels(Stage):
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
         
-        Other parameters
-        ----------------
+        Parameters
+        ----------
         show_Ez : bool, optional (default= ``True``)
             Flag for including the axial longitudinal electric field in the 
             plot.
@@ -1620,9 +1620,9 @@ class StageReducedModels(Stage):
             simulation box.
 
             
-        Returns:
-        --------
-        ``None``
+        Returns
+        -------
+        None
         """
         
         from matplotlib.colors import LogNorm
