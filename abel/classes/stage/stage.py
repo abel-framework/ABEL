@@ -187,7 +187,7 @@ class Stage(Trackable, CostModeled):
         associated driver complex of the stage.
 
         Returns
-        ----------
+        -------
         driver_source : ``Source``
         """
     
@@ -277,7 +277,7 @@ class Stage(Trackable, CostModeled):
         preset parameters.
             
         Returns
-        ----------
+        -------
         stage_copy : ``Stage``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
@@ -365,7 +365,7 @@ class Stage(Trackable, CostModeled):
 
 
         Returns
-        ----------
+        -------
         trackable_ramp : ``Stage``
             A uniform ramp that can be used for tracking.
         """
@@ -573,6 +573,7 @@ class Stage(Trackable, CostModeled):
             Print tracking information.
 
         Returns
+        -------
             Beam (modified)
         """
         beam.stage_number += 1
@@ -1285,7 +1286,7 @@ class Stage(Trackable, CostModeled):
             Default set to ``True``.
             
         Returns
-        ----------
+        -------
         beta_function : [m], float
             The matched beta function.
         '''
@@ -1314,7 +1315,7 @@ class Stage(Trackable, CostModeled):
             The energy used for matching.
             
         Returns
-        ----------
+        -------
         beta_function : [m], float
             The matched beta function.
         '''
@@ -1348,8 +1349,7 @@ class Stage(Trackable, CostModeled):
         - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
         - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
         - ``driver_to_beam``: Overall efficiency from driver to beam (product of the above).  
-        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over 
-        the repetition rate if available.
+        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over the repetition rate if available.
 
         Parameters
         ----------
@@ -1367,7 +1367,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
+        None
             Results are stored in ``self.efficiency``.
         """
 
@@ -1411,7 +1411,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
+        None
             Results are stored in ``self.initial.beam.current`` and, if provided, 
             ``self.final.beam.current`` with attributes:
             - ``zs`` : longitudinal positions [m]  
@@ -1455,7 +1455,7 @@ class Stage(Trackable, CostModeled):
 
 
         Returns
-        ----------
+        -------
         drive_beam_rotated : ``Beam``
             Rotated drive beam. Returns the input ``driver_incoming`` if the 
             driver source of the stage does not have neither angular jitter nor 
@@ -1533,7 +1533,7 @@ class Stage(Trackable, CostModeled):
 
 
         Returns
-        ----------
+        -------
         driver_outgoing : ``Beam``
             Drive beam rotated back to its original coordinate system before the 
             stage. Returns the input ``driver_outgoing`` if the driver source of 
@@ -1680,7 +1680,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
+        None
         """
 
         from matplotlib import pyplot as plt
@@ -1833,7 +1833,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
+        None
         """
 
         from matplotlib import pyplot as plt
@@ -2052,8 +2052,8 @@ class Stage(Trackable, CostModeled):
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
 
-        Other parameters
-        ----------------
+        Parameters
+        ----------
         aspect : str
             The aspect ratio of the plots.
             Defaults to 'equal' which is also the matplotlib default; can also 
@@ -2067,8 +2067,8 @@ class Stage(Trackable, CostModeled):
             Defaults to None
 
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
 
