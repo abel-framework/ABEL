@@ -121,7 +121,7 @@ class CONFIG:
         cls.elegant_path   = parsePath(cfdata['external_codes']['elegant']['elegant_path'])
         if cls.elegant_use_container:
             cls.bind_path  = parsePath(cfdata['external_codes']['elegant']['bind_path'])
-            cls.elegant_exec = 'singularity exec --bind ' + cls.bind_path + ':' + cls.bind_path + ' ' + cls.elegant_path + 'elegant.sif '
+            cls.elegant_exec = 'singularity exec --bind ' + cls.bind_path + ':' + cls.bind_path + ' ' + cls.elegant_path + os.path.sep + 'elegant.sif '
             cls.elegant_rpnflag = ''
         else:
             cls.elegant_exec = cls.elegant_path
