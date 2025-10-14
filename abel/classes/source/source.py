@@ -23,7 +23,7 @@ class Source(Trackable, CostModeled):
     Attributes
     ----------
     length : [m] float
-        Physical length of the source component
+        Physical length of the source component.
 
     energy : [eV] float
         Nominal mean beam particle energy.
