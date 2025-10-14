@@ -70,7 +70,7 @@ class SourceTrapezoid(Source):
         distribution is transversely symmetrised in x, y, x' and y'.
 
     front_heavy_distribution : bool
-        If ``True``, redistributes the z-distribution to favor the bunch head
+        If ``True``, redistributes the z-distribution to favour the bunch head
         (lower z).
     """
     
