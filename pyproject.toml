@@ -53,6 +53,7 @@ markers = [
   "rft_wrapper_unit_test: Unit tests for the RF-Track wrapper",
   "elegant_wrapper_unit_test: Unit tests for the ELEGANT wrapper",
   "wake_t_wrapper_unit_test : Unit tests for the Wake-T wrapper",
+  "impactx: Tests using the impactx wrapper",
   "stageGeometry: Test stage geometry calculation functionality",
   "spin: Test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
