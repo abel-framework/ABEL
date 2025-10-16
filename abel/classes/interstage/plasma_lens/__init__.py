@@ -162,7 +162,7 @@ class InterstagePlasmaLens(Interstage, ABC):
 
         Returns
         -------
-        strength_sextupole : [1/m^2] float
+        strength_sextupole : [m^-2] float
             Plasma lens nonlinearity focusing term, matched via 
             ``InterstagePlasmaLens.match_second_order_dispersion()``.
         """
@@ -197,13 +197,22 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     @property
     def field_chicane_dipole2(self) -> float:
+        """
+        Field of the inner chicane dipoles, matched to cancel dispersion.
+
+        Returns
+        -------
+        field_chicane_dipole2 : [T] float
+            Magnetic field strength of the second chicane dipoles, determined via 
+            ``InterstagePlasmaLens.match_dispersion_and_R56()``.
+        """
         if self._field_ratio_chicane_dipole2 is None:
             self.match_dispersion_and_R56()
         return self.field_dipole * self._field_ratio_chicane_dipole2
 
     @property
     def field_gradient_sextupole(self) -> float:
-        "Sextupole field gradient [T/m^2]"
+        "Sextupole field gradient [T/m^2]."
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         return self.charge_sign*self.strength_sextupole*p0/(SI.e*self.length_central_gap_or_sextupole)
 
@@ -212,8 +221,16 @@ class InterstagePlasmaLens(Interstage, ABC):
     
     def lens_offset_isr_kick_mitigation(self):
         """
-        Estimates the required lens offset [m] in order to cancel ISR kicks
-        (this value for the first lens, negative of it for the second lens)
+        Estimate the transverse lens offset required to cancel ISR (Incoherent 
+        Synchrotron Radiation) kicks.
+
+        The computed offset value applies to the first plasma lens, with the 
+        second lens offset being in the opposite direction.
+
+        Returns
+        -------
+        dx : [m] float
+            Estimated lens offset for ISR kick mitigation.
         """
         pfit = [2.36256046e-08, 1.09612466e-07, 2.70442278e-07, -1.47004050e-07, 5.08857498e-08]
         R56_scaling = SI.c**2*(self.field_dipole**2*self.length_dipole**3/self.nom_energy**2)
@@ -232,11 +249,34 @@ class InterstagePlasmaLens(Interstage, ABC):
 
         Parameters
         ----------
-        ...
+        k_lens : [m^-2] float, optional
+            Effective focusing strength of the plasma lens. Defaults to 
+            ``self.strength_plasma_lens / self.length_plasma_lens``.
+
+        tau_lens : [m^-1] float, optional
+            Transverse taper coefficient representing plasma lens nonlinearity.
+            Defaults to ``self.nonlinearity_plasma_lens``.
+
+        B_chic1 : [T] float, optional
+            Field strength of the outer chicane dipoles. Defaults to 
+            ``self.field_chicane_dipole1``.
+
+        B_chic2 : [T] float, optional
+            Field strength of the inner chicane dipoles. Defaults to 
+            ``self.field_chicane_dipole2``.
+
+        m_sext : [m^-3] float, optional
+            Sextupole normalized strength. Defaults to 
+            ``self.strength_sextupole / self.length_central_gap_or_sextupole``.
+
+        half_lattice : bool, optional
+            If ``True``, returns only half of the symmetric lattice. Defaults to 
+            ``False``.
 
         orbit_only : bool, optional
-            If ``True``, only returns orbit-related matrices and omits focusing 
-            or chromatic terms. Defaults to ``False``.
+            If ``True``, sets the plasma lens transverse taper coefficient 
+            ``taus`` and sextupole strength arrays ``ms`` to all zeros. Defaults 
+            to ``False``.
 
         Returns
         -------
@@ -253,7 +293,7 @@ class InterstagePlasmaLens(Interstage, ABC):
             Sextupole strengths.
 
         taus : [m^-1] 1D float ndarray
-            Plasma lens nonlinearities.
+            Plasma lens transverse taper coefficients.
         """
         
         # fast solution for orbit only
@@ -308,7 +348,14 @@ class InterstagePlasmaLens(Interstage, ABC):
     ## MATCHING
     
     def match_beta_function(self):
-        "Matching the beta function by adjusting the plasma-lens strength."
+        """
+        Match the beta function by adjusting the plasma-lens focusing strength.
+
+        Returns
+        -------
+        None
+            Updates ``self._strength_plasma_lens`` in place.
+        """
         
         # minimizer function for beta matching (central alpha function is zero)
         from abel.utilities.beam_physics import evolve_beta_function
@@ -328,7 +375,22 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     
     def match_dispersion_and_R56(self, high_res=False):
-        "Cancelling the dispersion and matching the R56 by adjusting the chicane dipoles."
+        """
+        Cancelling the dispersion and matching the R56 by adjusting the chicane 
+        dipole fields.
+
+        Parameters
+        ----------
+        high_res : bool, optional
+            Enables higher-resolution computation of ``R56`` and dispersion evolution.
+            Defaults to ``False``.
+
+        Returns
+        -------
+        None :
+            Updates ``self._field_ratio_chicane_dipole1`` and 
+            ``self._field_ratio_chicane_dipole2``.
+        """
         
         nom_R56 = self.R56
             
@@ -356,7 +418,17 @@ class InterstagePlasmaLens(Interstage, ABC):
     
     
     def match_chromatic_amplitude(self):
-        "Matching the chroaticity of function by adjusting the plasma-lens nonlinearity."
+        """
+        Match the chromatic amplitude by tuning the plasma-lens transverse taper 
+        coefficient.
+
+        Returns
+        -------
+        None : 
+            Updates ``self._nonlinearity_plasma_lens`` in place. If 
+            ``self.cancel_chromaticity`` is ``False``, 
+            ``self._nonlinearity_plasma_lens`` is set to zero.
+        """
         
         # stop if nonlinearity is turned off
         if not self.cancel_chromaticity:
@@ -386,7 +458,16 @@ class InterstagePlasmaLens(Interstage, ABC):
     
         
     def match_second_order_dispersion(self):
-        "Cancelling the second-order dispersion by adjusting the sextupole strength."
+        """
+        Match and cancel the second-order dispersion by adjusting the sextupole strength.
+
+        Returns
+        -------
+        None : 
+            Updates ``self._strength_sextupole`` in place. If 
+            ``self.cancel_sec_order_dispersion`` is ``False``, sets 
+            ``self._strength_sextupole`` to zero.
+        """
 
         # stop if nonlinearity is turned off
         if not self.cancel_sec_order_dispersion:
@@ -417,6 +498,16 @@ class InterstagePlasmaLens(Interstage, ABC):
     ## PRINT INFO
 
     def print_summary(self):
+        """
+        Print a formatted summary of the interstage configuration, including all
+        optical element lengths, fields, and total lattice parameters.
+
+        Returns
+        -------
+        None : 
+            Prints the formatted lattice summary to the console.
+        """
+        
         print('------------------------------------------------')
         print(f'Main dipole (2x):          {self.length_dipole:.3f} m,  B = {self.field_dipole:.2f} T')
         print(f'Plasma lens (2x):          {self.length_plasma_lens:.3f} m,  g = {self.field_gradient_plasma_lens:.1f} T/m')
