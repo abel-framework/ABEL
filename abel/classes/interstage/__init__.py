@@ -125,7 +125,7 @@ class Interstage(Trackable, CostModeled):
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         """
-        Track the input beam through the interstage lattice.
+        Track the input beam through the interstage lattice. Abstract method.
         """
         return super().track(beam, savedepth, runnable, verbose)
     
