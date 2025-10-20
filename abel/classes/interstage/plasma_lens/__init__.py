@@ -20,7 +20,7 @@ class InterstagePlasmaLens(Interstage, ABC):
     the lattice components and provides matching functions to ensure proper beam
     transport and chromatic correction.
 
-    Inherits all attributes from ``Interstage``
+    Inherits all attributes from :class:`Interstage`.
 
     Attributes
     ----------
