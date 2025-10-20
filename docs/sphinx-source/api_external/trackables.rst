@@ -63,6 +63,9 @@ Trackable elements
 .. autoclass:: abel.InterstagePlasmaLensImpactX
  :members:
 
+.. autoclass:: abel.InterstageQuads
+ :members:
+
 .. autoclass:: abel.InterstageQuadsBasic
  :members:
 
