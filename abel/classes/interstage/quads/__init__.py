@@ -73,8 +73,8 @@ class InterstageQuads(Interstage, ABC):
         Returns
         -------
         total_length : [m] float
-            Total geometric length of the plasma-lens interstage. Returns 
-            ``None`` if ``length_dipole`` is not defined.
+            Total geometric length of the interstage. Returns ``None`` if 
+            ``length_dipole`` is not defined.
         """
         if self.length_dipole is not None:
             ls, *_ = self.matrix_lattice(k1=0, k2=0, k3=0, B_chic1=0, B_chic2=0, m1=0, m2=0, m3=0, half_lattice=False)
@@ -119,7 +119,7 @@ class InterstageQuads(Interstage, ABC):
         -------
         field_chicane_dipole1 : [T] float
             Magnetic field strength of the first chicane dipoles, determined via 
-            ``InterstagePlasmaLens.match_dispersion_and_R56()``.
+            ``InterstageQuads.match_dispersion_and_R56()``.
         """
         if self._field_ratio_chicane_dipole1 is None:
             self.match_dispersion_and_R56()
@@ -134,7 +134,7 @@ class InterstageQuads(Interstage, ABC):
         -------
         field_chicane_dipole2 : [T] float
             Magnetic field strength of the second chicane dipoles, determined via 
-            ``InterstagePlasmaLens.match_dispersion_and_R56()``.
+            ``InterstageQuads.match_dispersion_and_R56()``.
         """
         if self._field_ratio_chicane_dipole2 is None:
             self.match_dispersion_and_R56()
@@ -279,15 +279,15 @@ class InterstageQuads(Interstage, ABC):
         Parameters
         ----------
         k1 : [m^-2] float, optional
-            Effective focusing strength of the plasma lens. Defaults to 
+            Effective focusing strength of quadrupole 1. Defaults to 
             ``self.strength_quadrupole1/self.length_quadrupole``.
 
         k2 : [m^-2] float, optional
-            Effective focusing strength of the plasma lens. Defaults to 
+            Effective focusing strength of quadrupole 2. Defaults to 
             ``self.strength_quadrupole2/self.length_quadrupole``.
 
         k3 : [m^-2] float, optional
-            Effective focusing strength of the plasma lens. Defaults to 
+            Effective focusing strength of quadrupole 3. Defaults to 
             ``self.strength_quadrupole3/self.length_quadrupole``.
 
         B_chic1 : [T] float, optional
@@ -315,9 +315,8 @@ class InterstageQuads(Interstage, ABC):
             ``False``.
 
         orbit_only : bool, optional
-            If ``True``, sets the plasma lens transverse taper coefficient 
-            ``taus`` and sextupole strength arrays ``ms`` to all zeros. Defaults 
-            to ``False``.
+            If ``True``, sets the sextupole strength array ``ms`` to all zeros. 
+            Defaults to ``False``.
 
         Returns
         -------
@@ -328,7 +327,7 @@ class InterstageQuads(Interstage, ABC):
             Inverse bending radii.
 
         ks : [m^-2] 1D float ndarray
-            Plasma lens focusing strengths.
+            Quadrupole focusing strengths.
 
         ms : [m^-3] 1D float ndarray
             Sextupole strengths.
