@@ -13,7 +13,7 @@ import scipy.constants as SI
 class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
     """
     Interstage model using ImpactX for full 3D particle tracking through an 
-    interstage lattice using non-linear plasma lenses with optional collective 
+    interstage lattice using nonlinear plasma lenses with optional collective 
     effects.
 
     This subclass of :class:`InterstagePlasmaLens` enables realistic beam 
