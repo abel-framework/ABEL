@@ -12,8 +12,8 @@ import scipy.constants as SI
 
 class InterstagePlasmaLens(Interstage, ABC):
     """
-    Abstract subclass of ``Interstage`` implementing interstage beamline sections
-    that use plasma lenses.
+    Abstract subclass of :class:`Interstage` implementing interstage beamline 
+    sections that use plasma lenses.
 
     This class defines parameters, matching procedures, and lattice composition 
     for its subclasses. It handles the optical and field-level configuration of 
