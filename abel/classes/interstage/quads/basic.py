@@ -9,6 +9,24 @@ import scipy.constants as SI
 import numpy as np
 
 class InterstageQuadsBasic(InterstageQuads):
+    """
+    Basic implementation of a quadrupole-based interstage providing analytical 
+    phase-space rotation and longitudinal compression.
+
+    The :class:`InterstageQuadsBasic` class extends :class:`InterstageQuads` 
+    to provide a minimal model for studying beam envelope evolution and compression 
+    effects without performing full lattice beam tracking. It applies a phase advance 
+    rotation to both transverse planes and a linear compression in longitudinal phase 
+    space by applying longitudinal dispersion using the specified ``R56`` value.
+
+    Inherits all attributes from :class:`InterstageQuads`.
+
+    Attributes
+    ----------
+    phase_advance : [rad] float
+        Total phase-space rotation angle to apply to both transverse planes.
+        Defaults to ``2*np.pi`` (one full betatron oscillation).
+    """
     
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True, enable_csr=False, enable_isr=False, enable_space_charge=False, phase_advance=2*np.pi):
         
@@ -18,6 +36,16 @@ class InterstageQuadsBasic(InterstageQuads):
     
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the input beam through the interstage lattice.
+
+        The beam undergoes:
+        
+        1. Longitudinal compression using ``self.R56`` and nominal energy.
+        2. Transverse phase-space rotation in both x and y planes by a total
+           phase advance ``self.phase_advance`` radians, based on 
+           ``self.beta0``.
+        """
         
         # compress beam
         beam.compress(R_56=self.R56, nom_energy=self.nom_energy)
