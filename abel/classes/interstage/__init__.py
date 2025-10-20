@@ -42,35 +42,42 @@ class Interstage(Trackable, CostModeled):
         Magnetic field of the bending dipoles. If callable, it is evaluated as 
         ``field_dipole(nom_energy)``.
 
-    R56 : [m] float or callable (default=0)
+    R56 : [m] float or callable
         Longitudinal dispersion term, relating relative momentum deviation to 
         path length difference. If callable, it is evaluated as 
-        ``R56(nom_energy)``.
+        ``R56(nom_energy)``. Defaults to 0.
 
     charge_sign : int (default=-1)
-        Particle charge sign: -1 for electrons, +1 for positrons or protons.
+        Particle charge sign: -1 for electrons, +1 for positrons or protons. 
+        Defaults to -1.
 
-    cancel_chromaticity : bool (default=``True``)
+    cancel_chromaticity : bool
         Whether to automatically match and cancel first-order chromatic effects.
+        Defaults to ``True``.
 
     cancel_sec_order_dispersion : bool (default=``False``)
-        Whether to match and cancel second-order dispersion.
+        Whether to match and cancel second-order dispersion. Defaults to 
+        ``False``.
 
-    use_apertures : bool (default=``True``)
+    use_apertures : bool
         If ``True``, applies aperture clipping to the beam distribution.
+        Defaults to ``True``.
 
-    enable_csr : bool (default=``True``)
+    enable_csr : bool
         Enables coherent synchrotron adiation (CSR) modeling during tracking.
+        Defaults to ``True``.
 
-    enable_isr : bool (default=``True``)
+    enable_isr : bool
         Enables incoherent synchrotron radiation (ISR) modeling during tracking.
+        Defaults to ``True``.
 
-    enable_space_charge : bool (default=``False``)
-        Enables space charge effects.
+    enable_space_charge : bool
+        Enables space charge effects. Defaults to ``False``.
 
     uses_plasma_lenses : bool
         Indicates whether the interstage contains plasma lenses instead of magnetic 
-        quadrupoles.
+        quadrupoles. Defaults to ``None`` to let the value be set by the subclasses 
+        :class:`InterstagePlasmaLens` and :class:`InterstageQuads`.
 
     References
     ----------
