@@ -13,7 +13,7 @@ import scipy.constants as SI
 class InterstagePlasmaLens(Interstage, ABC):
     """
     Abstract subclass of :class:`Interstage` implementing interstage beamline 
-    sections that use plasma lenses.
+    sections that use plasma lenses as the main bending dipoles.
 
     This class defines parameters, matching procedures, and lattice composition 
     for its subclasses. It handles the optical and field-level configuration of 
@@ -43,6 +43,8 @@ class InterstagePlasmaLens(Interstage, ABC):
         Flag for mitigating ISR (incoherent synchrotron radiation) kicks on beam 
         centroid by offseting the plasma lenses. Defaults to ``False``.
     """
+
+    # TODO: shouldn't use_apertures be passed to the constructor of the parent class?
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, lens_radius=2e-3, charge_sign=-1,
@@ -143,7 +145,7 @@ class InterstagePlasmaLens(Interstage, ABC):
     @property
     def nonlinearity_plasma_lens(self) -> float:
         """
-        Plasma lens nonlinearity (taper).
+        Plasma lens nonlinearity (transverse taper coefficient).
 
         Returns
         -------
@@ -163,7 +165,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         Returns
         -------
         strength_sextupole : [m^-2] float
-            Plasma lens nonlinearity focusing term, matched via 
+            Sextupole strength, matched via 
             ``InterstagePlasmaLens.match_second_order_dispersion()``.
         """
         if self._strength_sextupole is None:
