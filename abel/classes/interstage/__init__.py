@@ -15,10 +15,10 @@ class Interstage(Trackable, CostModeled):
     """
     Abstract base class representing an interstage section between two 
     accelerator stages. The interstage lattice consists of a bending dipole, a 
-    nonlinear plasma lens, two chicane dipoles, a sextupole and the mentioned 
-    elements repeated in the opposite order to form a symmetric lattice. This is 
-    designed to provide achromatic staging [1]_ and to apply the self-correction 
-    effect [2]_ to the beam.
+    nonlinear plasma lens (or quadrupoles), two chicane dipoles, a sextupole and 
+    the mentioned elements repeated in the opposite order to form a symmetric 
+    lattice. This is designed to provide achromatic staging [1]_ and to apply 
+    the self-correction effect [2]_ to the beam.
     
     Defines common physical parameters and attributes, as well as methods such 
     as optics matching, beam evolution and optics layout visualization.
