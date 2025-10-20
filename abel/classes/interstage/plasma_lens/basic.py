@@ -13,7 +13,7 @@ class InterstagePlasmaLensBasic(InterstagePlasmaLens):
     Basic implementation of a plasma-lens-based interstage providing analytical
     phase-space rotation and longitudinal compression.
 
-    The ``InterstagePlasmaLensBasic`` class extends ``InterstagePlasmaLens``
+    The ``InterstagePlasmaLensBasic`` class extends :class:`InterstagePlasmaLens`
     to provide a minimal model for studying beam envelope evolution and compression
     effects without performing full lattice beam tracking. It applies a phase advance
     rotation to both transverse planes and a linear compression in longitudinal phase
