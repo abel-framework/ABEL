@@ -11,16 +11,16 @@ import numpy as np
 # ==================================================
 def abel_beam2rft_beam(beam):
     """
-    Converts an ABEL ``Beam`` object to a RF-Track ``Bunch6dT`` object.
+    Convert an ABEL ``Beam`` object to a RF-Track ``Bunch6dT`` object.
 
     Parameters
     ----------
-    beam : ABEL ``Beam`` object
+    beam : ``Beam``
         The beam to be converted.
 
     Returns
     ----------
-    beam_rft : RF-Track ``Bunch6dT`` object
+    beam_rft : RF-Track ``Bunch6dT``
     """
 
     from RF_Track import Bunch6dT
@@ -98,7 +98,7 @@ def abel_beam2rft_beam(beam):
 # ==================================================
 def rft_beam2abel_beam(beam_rft):
     """
-    Converts a RF-Track ``Bunch6dT`` object to an ABEL ``Beam`` object.
+    Convert a RF-Track ``Bunch6dT`` object to an ABEL ``Beam`` object.
     """
     
     import warnings
@@ -136,19 +136,24 @@ def rft_beam2abel_beam(beam_rft):
 # ==================================================
 def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1):
     """
-    Creates a RF-Track ``SpaceCharge_Field`` object.
+    Create a RF-Track ``SpaceCharge_Field`` object.
 
     Parameters
     ----------
-    abel_beam : ABEL ``Beam`` object
+    abel_beam : ``Beam``
+        Beam to be used for creating the RF-Track ``SpaceCharge_Field`` object.
 
-    num_x_cells, num_y_cells : int
-        Number of grid cells along x and y used in RF-Track for calculating 
-        beam electric fields. Default set to 50.
+    num_x_cells : int
+        Number of grid cells along x used in RF-Track for calculating beam 
+        electric fields.
+
+    num_y_cells : int
+        Number of grid cells along y used in RF-Track for calculating beam 
+        electric fields.
 
     num_z_cells : int, optional
         Number of grid cells along z. If set to ``None``, the value is 
-        calculated from the ``abel_beam`` properties. 
+        calculated from the ``abel_beam`` properties. Default set to ``None``.
 
     num_t_bins : int, optional
         Number of velocity slices. Default set to 1.
@@ -156,7 +161,7 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
     
     Returns
     ----------
-    RF-Track ``SpaceCharge_Field`` object
+    sc_fields_obj : RF-Track ``SpaceCharge_Field``
     """
 
     from RF_Track import SpaceCharge_Field
@@ -175,6 +180,63 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
     
 # ==================================================
 def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t_bins=1, sort_zs=False):
+    """
+    Compute the space charge fields of a particle beam.
+
+    Create a RF-Track ``SpaceCharge_Field`` object and evaluate the space charge 
+    electric and magnetic field at the beam coordinates to.
+
+    Parameters
+    ----------
+    abel_beam : ``Beam``
+        Beam whose space charge fields are to be computed.
+
+    num_x_cells : int
+        Number of grid cells along x used in RF-Track for calculating beam 
+        electric fields.
+
+    num_y_cells : int
+        Number of grid cells along y used in RF-Track for calculating beam 
+        electric fields.
+
+    num_z_cells : int, optional
+        Number of grid cells along z. If set to ``None``, the value is 
+        calculated from the ``abel_beam`` properties. Default set to ``None``.
+
+    num_t_bins : int, optional
+        Number of velocity slices. Default set to 1.
+
+    sort_zs : bool, optional
+        If ``True``, will sort the beam coordinates according to 
+        ``abel_beam.zs()``, so that the fields are sorted accordingingly.
+    
+    
+    Returns
+    ----------
+    E_fields_beam : [V/m] 3D float ndarray
+        The electric field components. x-components in the first column, 
+        y-components in the second column and z-components in the third column. 
+        The elements in each column corresponts to the the coordinates 
+        ``xs_sorted``, ``ys_sorted`` and ``zs_sorted``.
+    
+    B_fields_beam : [T] 3D float ndarray
+        The magnetic field components. x-components in the first column, 
+        y-components in the second column and z-components in the third column. 
+        The elements in each column corresponts to the the coordinates 
+        ``xs_sorted``, ``ys_sorted`` and ``zs_sorted``.
+    
+    xs_sorted : [m] 1D float array
+        The x-coordinates used to evaluate the spacecharge fields. Sorted 
+        according to ``abel_beam.zs()`` if ``sort_zs`` is ``True``.
+
+    ys_sorted : [m] 1D float array
+        The y-coordinates used to evaluate the spacecharge fields. Sorted 
+        according to ``abel_beam.zs()`` if ``sort_zs`` is ``True``.
+
+    zs_sorted : [m] 1D float array
+        The z-coordinates used to evaluate the spacecharge fields. Sorted if 
+        ``sort_zs`` is ``True``.
+    """
     
     # Set the solver resolution and calculate fields
     sc_fields_obj = calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells, num_t_bins)
@@ -195,7 +257,7 @@ def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t
         xs_sorted = xs
         ys_sorted = ys
 
-    # Evaluate the electric field at the sorted coordinates so that the fields are sorted according to zs
+    # Evaluate the electric and magnetic field at the sorted coordinates so that the fields are sorted according to zs
     E_fields_beam, B_fields_beam = sc_fields_obj.get_field(xs_sorted, ys_sorted, zs_sorted, np.zeros(len(xs_sorted)))
 
     xs_sorted = xs_sorted/1e3  # [m]
@@ -208,7 +270,7 @@ def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t
 # ==================================================
 def wake_t_bunch2rft_beam(wake_t_bunch):
     """
-    Converts a Wake-T ``ParticleBunch`` to a RF-Track ``Bunch6dT`` object.
+    Convert a Wake-T ``ParticleBunch`` to a RF-Track ``Bunch6dT`` object.
 
     Parameters
     ----------
@@ -217,7 +279,7 @@ def wake_t_bunch2rft_beam(wake_t_bunch):
 
     Returns
     ----------
-    beam_rft : RF-Track ``Bunch6dT`` object
+    beam_rft : RF-Track ``Bunch6dT``
     """
 
     from RF_Track import Bunch6dT
