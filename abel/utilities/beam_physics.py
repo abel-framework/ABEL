@@ -284,7 +284,70 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
 
 def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=False):
     """
-    Evolution of the second-order transverse dispersion.
+    Numerically compute the evolution of second- and higher-order horizontal 
+    dispersion functions along a beamline with dipole, quadrupole, and sextupole 
+    fields.
+
+    This routine tracks several particles with different relative momentum 
+    deviations through a sequence of magnetic elements, integrates their 
+    trajectories, and computes the derivatives of transverse displacement with 
+    respect to relative momentum deviation (``delta``) up to fourth order using 
+    a five-point finite difference stencil. 
+
+    It can return the final second-order dispersion values (``DDx``, ``DDpx``) 
+    and, optionally, the full evolution of ``DDx`` and ``DDpx`` along the 
+    beamline.
+
+    Parameters
+    ----------
+    ls : [m] 1D float ndarray
+        Lattice element lengths.
+
+    inv_rhos : [m^-1] 1D float ndarray
+            Inverse bending radii.
+
+    ks : [m^-2] 1D float ndarray
+        Plasma lens focusing strengths.
+
+    ms : [m^-3] 1D float ndarray
+        Sextupole strengths.
+
+    taus : [m^-1] 1D float ndarray
+        Plasma lens transverse taper coefficients.
+
+    fast : bool, optional
+        If ``True``, skips detailed integration within each element for faster 
+        computation (no intermediate data are returned). Defaults to ``False``.
+
+    plot : bool, optional
+        If ``True``, plots the evolution of the second-order dispersion along 
+        the beamline. Defaults to ``False``.
+
+    Returns
+    -------
+    DDx : [m] float
+        Final second-order dispersion at the end of the beamline.
+
+    DDpx : float
+        Final derivative of the second-order dispersion wrt. s.
+
+    evolution : ndarray or None
+        If ``fast=False``, an array of shape (5, N) containing:
+
+            - ``evolution[0, :]``: longitudinal position s [m]
+            - ``evolution[1, :]``: first-order dispersion [m]
+            - ``evolution[2, :]``: second-order dispersion [m]
+            - ``evolution[3, :]``: third-order dispersion [m]
+            - ``evolution[4, :]``: fourth-order dispersion [m]
+
+        If ``fast=True``, returns ``None``.
+
+    Notes
+    -----
+    - The integration uses a simple symplectic (leapfrog) method for stability.
+    - Derivatives with respect to ``delta`` are computed using a five-point stencil for high accuracy.
+    - The dispersion expansion follows:
+          x(delta) = x_0 + Dx * delta + DDx * delta^2 + DDDx * delta^3 + DDDDx * delta^4 + O(delta^5)
     """
     
     # overwrite fast-calculation toggle if plotting 
