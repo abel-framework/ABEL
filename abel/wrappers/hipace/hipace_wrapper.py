@@ -18,7 +18,7 @@ from abel.utilities.plasma_physics import k_p
 def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, mesh_refinement=False, do_spin_tracking=False):
 
     if output_period is None:
-        output_period = int(num_steps)
+        output_period = int(num_steps/2)
         
     # locate template file
     filename_input_template = os.path.join(os.path.dirname(__file__), 'input_template')
