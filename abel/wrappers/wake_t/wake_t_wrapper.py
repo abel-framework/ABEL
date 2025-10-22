@@ -44,7 +44,7 @@ def wake_t_bunch2beam(bunch):
     return beam
       
     
-# convert from ABEL beam to WakeT particle bunch
+# ==================================================
 def beam2wake_t_bunch(beam, name='beam'):
     """
     Convert an ABEL ``Beam`` to a Wake-T ``ParticleBunch``.
