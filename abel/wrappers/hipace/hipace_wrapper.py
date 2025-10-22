@@ -16,6 +16,106 @@ from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
 def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, mesh_refinement=False, do_spin_tracking=False):
+    """
+    Write a HiPACE++ input script to file based on a provided template and 
+    simulation parameters.
+      
+    It sets the longitudinal grid resolution, adjusts transverse grid resolution 
+    for optimal performance (rounding the number of transfer cells 
+    ``num_cell_xy`` to be 2^n − 1), configures the plasma, and optionally 
+    enables mesh refinement and various physics effects. The main beam and drive 
+    beam used in the simulation are extracted from ABEL ``Beam`` files. 
+    
+    The provided parameters and configurations are substituted into a template 
+    file to produce the final HiPACE++ input file.
+    
+
+    Parameters
+    ----------
+    filename_input : str
+        Output file path for the generated HiPACE++ input file.
+
+    filename_beam : str
+        Path to the HDF5 file containing the main beam (``Beam``).  
+
+    filename_driver : str
+        Path to the HDF5 file containing the drive beam (``Beam``). 
+
+    plasma_density : [m^-3] float
+        Plasma density.
+
+    num_steps : int
+        Maximum number of time steps to simulate.
+
+    time_step : [s] float
+        Time step duration used in the simulation.
+
+    box_range_z : [m] float list
+        Longitudinal simulation domain range ``[box_min_z, box_max_z]``.
+
+    box_size_xy : [m] float
+        Transverse box half-size in x and y that defines grid transverse extents.
+
+    output_period : int, optional
+        Interval (in number of time steps) for output diagnostics. Defaults to 
+        ``num_steps`` if ``None``.
+
+    ion_motion : bool, optional
+        Flag for enabling ion motion in the plasma model. Defaults to ``True``.
+
+    ion_species : str, optional
+        Ion species name (e.g., ``'H'``, ``'He'``). Defaults to ``'H'``.
+
+    radiation_reaction : bool, optional
+        Flag for enabling radiation reaction. Defaults to ``False``.
+
+    beam_ionization : bool, optional
+        Flag for enabling beam ionization. Defaults to ``True``.
+
+    num_cell_xy : int, optional
+        Number of transverse grid cells. Automatically adjusted to 2^n - 1 if 
+        necessary. Defaults to ``511``.
+
+    num_cell_z : int, optional
+        Number of longitudinal grid cells. Defauls to ``512``.
+
+    driver_only : bool, optional
+        If ``True``, only the driver beam is simulated. Defaults to ``False``.
+
+    density_table_file : str, optional
+        Path to a tabulated plasma density profile file. If ``None``, a uniform 
+        plasma is assumed. Defaults to ``None``.
+
+    no_plasma : bool, optional
+        Disable plasma entirely (useful for vacuum beam transport). Defaults to ``False``.
+
+    external_focusing_gradient : [T/m] float, optional
+        Field gradient for an external magnetic field applied traversely across 
+        the plasma. A value > 0 enables external focusing. Defaults to ``0``.
+
+    mesh_refinement : bool, optional
+        Enable mesh refinement (1 refinement level). Defaults to ``False``.
+
+    do_spin_tracking : bool, optional
+        Enable spin tracking for polarized beams. Defaults to ``False``.
+
+    Returns
+    -------
+    None
+        The function writes the completed HiPACE++ input script to ``filename_input`` and
+        does not return any value.
+
+    Notes
+    -----
+    - The plasma components and beam components are automatically determined based on
+      ``ion_motion`` and ``driver_only``.
+    - For example, if ``no_plasma`` is ``True``, all plasma-related inputs are disabled.
+    - See the HiPACE++ documentation [1]_ for supported keywords.
+
+    References
+    ----------
+    .. [1] HiPACE++ User Guide, https://hipace.readthedocs.io/
+    """
 
     if output_period is None:
         output_period = int(num_steps)
@@ -114,6 +214,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         fout.write(results)
 
 
+# ==================================================
 # write the HiPACE++ job script to file
 def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num_tasks_per_node=8):
     
@@ -150,6 +251,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     Path(filename_job_script).chmod(0o0777)
 
 
+# ==================================================
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
 
@@ -175,6 +277,7 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     return beam, driver
 
 
+# ==================================================
 def _hipace_run_local(filename_job_script, runfolder, quiet=False):
     "Helper for running HiPACE++ on the local machine. Returns when job is complete."
 
@@ -221,6 +324,7 @@ def _hipace_run_local(filename_job_script, runfolder, quiet=False):
         raise RuntimeError('Errors during HiPace simulation')
 
 
+# ==================================================
 def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
     "Helper for running HiPACE++ on a batch system using SLURM. Returns when job is complete."
 
@@ -304,6 +408,7 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
         time.sleep(wait_time)
 
 
+# ==================================================
 def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
     """
     Load an ABEL beam from a HiPACE++ HDF5 output file (OpenPMD format).
