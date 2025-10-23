@@ -273,8 +273,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 
     - Memory per GPU is assumed to be 60 GB and is scaled with ``num_tasks_per_node``.
 
-    - The generated script uses placeholders defined in ``job_script_template``, 
-      typically found in the same directory as this function.
+    - The generated script uses placeholders defined in ``job_script_template``, typically found in the same directory as this function.
 
     References
     ----------
