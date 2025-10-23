@@ -58,6 +58,10 @@ def elegant_run(filename, beam0, inputbeamfile, outputbeamfile, verbose=False, t
 
     evolution : list of ``Beam``
         Contains the output beams saved throughout the lattice.
+
+    References
+	----------
+	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
     """
     
     # convert incoming beam object to temporary SDDS file
@@ -85,6 +89,7 @@ def elegant_run(filename, beam0, inputbeamfile, outputbeamfile, verbose=False, t
     return beam, evolution
 
 
+# ==================================================
 def elegant_read_beam(filename, tmpfolder=None, model_beam=None):
     """
     Convert an ELEGANT beam file (SDDS format) into an ABEL ``Beam`` object.
@@ -112,6 +117,10 @@ def elegant_read_beam(filename, tmpfolder=None, model_beam=None):
     ``Beam`` or None
         An ABEL ``Beam`` object containing the phase space and beam charge.
         Returns ``None`` if the charge parameter cannot be extracted.
+
+    References
+	----------
+	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
     """
     
     from abel.utilities.relativity import gamma2energy
@@ -161,6 +170,7 @@ def elegant_read_beam(filename, tmpfolder=None, model_beam=None):
     return beam
 
 
+# ==================================================
 def elegant_write_beam(beam, filename, tmpfolder=None):
     """
     Convert an ABEL ``Beam`` object into an ELEGANT SDDS beam file.
@@ -187,6 +197,10 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
     -------
     str
         The path to the generated ELEGANT SDDS beam file.
+
+    References
+	----------
+	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
     """
     
     from abel.utilities.relativity import energy2gamma
@@ -249,9 +263,49 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
     
     return filename
     
-    
-# Extract the beams and evolution of various beam parameters as a function of s.
-def extract_beams_and_evolution(tmpfolder, evolution_folder, runnable, save_beams=True, model_beam=None):
+
+# ==================================================
+def extract_beams_and_evolution(tmpfolder, evolution_folder, runnable=None, save_beams=True, model_beam=None):
+    """
+    Extract evolution data of various beam parameters and save snapshots of the 
+    beam along the lattice.
+
+    Parameters
+	----------
+	tmpfolder : str
+		Temporary run directory path containing diagnostic output files from the
+		simulation (e.g. ``centroid_vs_s.cen``).
+
+	evolution_folder : str
+		Path to the directory containing beam files to extract beam parameter 
+        evolution from.
+
+	runnable : ``Runnable``, optional
+		ABEL ``Runnable`` object. If provided and ``save_beams`` is ``True``, 
+        the beam files are saved to the shot directory specified by 
+        ``runnable.shot_path()``.
+
+	save_beams : bool, optional
+		If ``True`` and ``runnable`` is not ``None``, saves each extracted beam 
+        snapshot to the shot directory specified by ``runnable.shot_path()``.
+		Defaults to ``True``.
+
+	model_beam : ``Beam``, optional
+        Beam from which metadata and charge is copied.
+
+
+	Returns
+	-------
+	evol : SimpleNamespace
+		Object containing arrays of beam parameters as a function of propagation 
+        distance ``s``. Each field represents one beam parameter, e.g. 
+        ``evol.emit_nx``, ``evol.bunch_length``, etc.
+	
+	
+	References
+	----------
+	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
+	"""
     
     insitu_path = tmpfolder + 'diags/insitu/'
 
@@ -312,12 +366,15 @@ def extract_beams_and_evolution(tmpfolder, evolution_folder, runnable, save_beam
         evol.rel_energy_spread[i] = beam_step.rel_energy_spread()
         
         # save beams if requested
-        if runnable is not None and save_beams:
+        if save_beams:
+            if runnable is None:
+                raise ValueError('runnable not provided.')
             beam_step.save(runnable=runnable)
             
     return evol
     
 
+# ==================================================
 def elegant_apl_fieldmap2D(tau_lens, lensdim_x=2e-3, lensdim_y=2e-3, lens_x_offset=0.0, lens_y_offset=0.0, tmpfolder=None):
     """
     Generates a 2D magnetic field map for an APL (Active Plasma Lens) and export 
