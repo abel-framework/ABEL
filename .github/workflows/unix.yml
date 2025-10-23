@@ -1,0 +1,40 @@
+name: Unix
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-unix
+  cancel-in-progress: true
+
+jobs:
+  unittest:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - uses: actions/setup-python@v6
+      name: Install Python
+      with:
+        python-version-file: "pyproject.toml"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        activate-environment: true
+
+    - name: Install dependencies
+      run: |
+        uv pip install pytest setuptools[core] wheel
+
+    - name: Install
+      run: uv pip install -v .
+
+    - name: Create config file
+      run: python -m pytest -v tests/test_init.py::testCore_init || true
+
+    - name: Run Unit Tests
+      run: python -m pytest tests/
