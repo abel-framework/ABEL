@@ -217,6 +217,73 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
 # ==================================================
 # write the HiPACE++ job script to file
 def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num_tasks_per_node=8):
+    """
+    Write a HiPACE++ job submission script to file based on a template and 
+    system configuration.
+
+    This function generates a batch job script for running HiPACE++ on an HPC 
+    system by substituting values from the ABEL configuration file 
+    `CONFIG.py <https://github.com/abel-framework/ABEL/blob/main/abel/CONFIG.py>`_ 
+    into a template job script (the current job script template follows the 
+    Slurm batch job syntax used on the LUMI supercomputer [1]_). The compute 
+    partition is automatically chosen based on requested resources. 
+    
+    The resulting script is made executable.
+
+    Parameters
+    ----------
+    filename_job_script : str
+        Output path for the generated HiPACE++ job script file. The resulting 
+        file is given executable permissions.
+
+    filename_input : str
+        Path to the HiPACE++ input file (usually created using 
+        ``hipace_write_inputs()``).
+
+    num_nodes : int, optional
+        Number of compute nodes to allocate for the simulation job. Defaults to 
+        1.
+
+    num_tasks_per_node : int, optional
+        Number of MPI tasks per compute node and sets the number of GPUs per 
+        node to the same number. Defaults to 8.
+
+    Returns
+    -------
+    None
+        The function writes the completed job submission script to 
+        ``filename_job_script`` and does not return any value. The script is 
+        made executable (``chmod 0777``).
+
+    Notes
+    -----
+    - The following fields from ``CONFIG.py`` are required:
+      
+      * ``CONFIG.project_name``
+      * ``CONFIG.hipace_binary``
+      * ``CONFIG.partition_name_small``
+      * ``CONFIG.partition_name_devel``
+      * ``CONFIG.partition_name_standard``
+
+    - The job partition [2]_ is selected based on the requested resources:
+      
+      * Partition given by ``CONFIG.partition_name_small`` for ≤2 nodes and ≤8 tasks per node.
+      * Partition given by ``CONFIG.partition_name_devel`` for ≤32 nodes and ≤8 tasks per node.
+      * Partition given by ``CONFIG.partition_name_standard`` otherwise.
+
+    - Memory per GPU is assumed to be 60 GB and is scaled with ``num_tasks_per_node``.
+
+    - The generated script uses placeholders defined in ``job_script_template``, 
+      typically found in the same directory as this function.
+
+    References
+    ----------
+    .. [1] LUMI Supercomputer batch jobs documentation:
+           https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/batch-job/
+
+    .. [2] LUMI Supercomputer Job Scheduling Documentation:
+           https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/partitions/
+    """
     
     # locate template file
     filename_job_script_template = os.path.join(os.path.dirname(__file__), 'job_script_template')
