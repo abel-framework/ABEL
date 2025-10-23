@@ -384,11 +384,11 @@ def _hipace_run_local(filename_job_script, runfolder, quiet=False):
     "Helper for running HiPACE++ on the local machine. Returns when job is complete."
 
     if not quiet:
-        print(f"Running HiPACE locally in folder '{runfolder}'...")
+        print(f"Running HiPACE++ locally in folder '{runfolder}'...")
 
     #Get the input filename out of the job script
     # This could probably be solved in a better way,
-    # but that would requiring reformulating the SLURM logic a bit.
+    # but that would requiring reformulating the Slurm logic a bit.
     filename_input = None
     with open(filename_job_script, 'r') as fin:
         inLines = fin.readlines()
@@ -407,11 +407,11 @@ def _hipace_run_local(filename_job_script, runfolder, quiet=False):
 
                     filename_input = lss[2][1:-1]
     if filename_input == None:
-        raise RuntimeError('Did not find the input filename in the hipace job file')
+        raise RuntimeError('Did not find the input filename in the HiPACE++ job file')
 
     import time
     start_time = time.time()
-    #Run HIPACE
+    #Run HiPACE++
     process = subprocess.Popen([CONFIG.hipace_binary,filename_input], cwd=runfolder,\
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, \
                                close_fds=True, bufsize=1, universal_newlines=True )
@@ -421,14 +421,14 @@ def _hipace_run_local(filename_job_script, runfolder, quiet=False):
     process.stdout.close()
     returncode = process.wait()
 
-    print(f'HiPace complete, returncode = {returncode}, execution time={time.time()-start_time : .1f} [s]')
+    print(f'HiPACE++ complete, returncode = {returncode}, execution time={time.time()-start_time : .1f} [s]')
     if returncode != 0:
-        raise RuntimeError('Errors during HiPace simulation')
+        raise RuntimeError('Errors during HiPACE++ simulation')
 
 
 # ==================================================
 def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
-    "Helper for running HiPACE++ on a batch system using SLURM. Returns when job is complete."
+    "Helper for running HiPACE++ on a batch system using Slurm. Returns when job is complete."
 
     # run system command
     cmd = 'cd ' + runfolder + ' && sbatch ' + os.path.basename(filename_job_script)
@@ -521,15 +521,17 @@ def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
         Path to the directory containing all HiPACE++ HDF5 output files.
 
     hipace_iteration_idx : int
-        Specifies the simulation iteration number to be extracted out of all available output files in ``data_dir``.
+        Specifies the simulation iteration number to be extracted out of all 
+        available output files in ``data_dir``.
 
     species : str, optional
-        Specifies the name of the beam to be extracted.
+        Specifies the name of the beam to be extracted. Defaults to ``'beam'``.
 
 
     Returns
     ----------
     beam : ``Beam`` object
+        The extracted beam.
     """
 
     from openpmd_viewer import OpenPMDTimeSeries
