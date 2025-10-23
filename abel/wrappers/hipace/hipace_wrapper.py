@@ -218,8 +218,8 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
 # write the HiPACE++ job script to file
 def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num_tasks_per_node=8):
     """
-    Write a HiPACE++ job submission script to file based on a template and 
-    system configuration.
+    Write a HiPACE++ batch job script (for a Slurm-based cluster) to file based 
+    on a template and system configuration.
 
     This function generates a batch job script for running HiPACE++ on an HPC 
     system by substituting values from the ABEL configuration file 
@@ -320,6 +320,42 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 # ==================================================
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
+    """
+	Run a HiPACE++ simulation locally or on a Slurm-based cluster using the 
+	provided job script, and load the resulting beam and driver data from the
+	final output file.
+
+	Parameters
+	----------
+	filename_job_script : str
+		Path to the batch job script used to submit the job. Typically generated 
+        by ``hipace_write_jobscript()``.
+
+	num_steps : int
+		Determines which HDF5 file is loaded and used to extract the outputs 
+        ``beam`` and ``driver`` (e.g., ``num_steps=100`` loads the file 
+        ``openpmd_000100.h5``).
+
+	runfolder : str, optional
+		Path to the folder where the HiPACE++ job is executed and where restults
+		are written. If ``None``, derived from ``filename_job_script``. Defaults 
+        to ``None``.
+
+	quiet : bool, optional
+		If ``True``, suppresses terminal output during execution. Defaults to
+		``False``.
+
+	Returns
+	-------
+	beam : ``Beam`` | None
+		The loaded beam from the designated HiPACE++ output file. Set to 
+		``None`` if the beam could not be loaded.
+
+	driver : ``Beam``
+		The loaded driver object from the designated HiPACE++ output file.
+	"""
+
+    # TODO: need to check that num_steps is valid (positive int <= max_step in input_template).
 
     # extract runfolder from job script name
     if runfolder == None:
@@ -327,9 +363,9 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
 
     # run HIPACE++
     if CONFIG.cluster_name == 'LOCAL':
-        _hipace_run_local(filename_job_script, runfolder, quiet=False)
+        _hipace_run_local(filename_job_script, runfolder, quiet=quiet)
     else:
-        _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False)
+        _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=quiet)
     
     # when finished, load the beam and driver
     filename = os.path.join(runfolder, "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps)))
