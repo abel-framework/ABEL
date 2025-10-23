@@ -11,7 +11,76 @@ import scipy.constants as SI
 from types import SimpleNamespace
 
 def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, verbose=False):
-    """Run an ImpactX particle-tracking simulation using a given lattice and input beam."""
+    """
+	Run an ImpactX particle-tracking simulation using a specified lattice and 
+	input beam. 
+    
+    This function 
+
+    1. Sets up an ImpactX simulation specifying allocated resources.
+    
+    2. Configures relevant physics options including space charge effects, CSR (coherent synchrotron radiation) and ISR (incoherent synchrotron radiation). 
+    
+    3. Executes the simulation, converts the results back into an ABEL beam object, and returns the tracked beam and its evolution data.
+	
+
+	Parameters
+	----------
+	lattice : list
+		Contains a sequence consisting of ImpactX beamline elements (e.g., 
+        drifts, bends, lenses, or multipoles). Defines the lattice through which 
+        ``beam0`` is tracked.
+
+	beam0 : ``Beam``
+		Input ABEL beam object representing the particle distribution before 
+        entering the lattice.
+
+	nom_energy : [eV] float, optional
+		Nominal beam energy used to determine the ISR order and scaling. If 
+        ``None``, first order ISR effects are always used. If greater than 
+        1 TeV, third order ISR effects are enabled. Defaults to ``None``.
+
+	runnable : ``Runnable``, optional
+		ABEL ``Runnable`` object. If provided and ``save_beams`` is ``True``, 
+        the beam files are saved to the shot directory specified by 
+        ``runnable.shot_path()``. The pickled file ``runnable.obj`` is also 
+        saved to the same directory.
+
+	keep_data : bool, optional
+		If ``True``, the ImpactX run directory containing simulation outputs and 
+        the pickled file ``runnable.obj`` is preserved after the simulation 
+		completes. If ``False``, it is deleted automatically. Defaults to 
+		``False``.
+
+	save_beams : bool, optional
+		If ``True``, saves beam snapshots for each simulation step via 
+		``extract_beams()``. Defaults to ``False``.
+
+	space_charge : bool, optional
+		Enable space charge effects in the simulation. Defaults to ``False``.
+
+	csr : bool, optional
+		Enable CSR modeling. When enabled, the ImpactX simulation parameter 
+		``sim.csr_bins`` is set to 150. Defaults to ``False``.
+
+	isr : bool, optional
+		Enable ISR modeling. The ISR order is automatically determined based on 
+        ``nom_energy``. Defaults to ``False``.
+
+	verbose : bool, optional
+		If ``True``, prints detailed ImpactX tracking output to the console. 
+		Defaults to ``False``.
+
+
+	Returns
+	-------
+	beam : ``Beam``
+		Output ABEL ``Beam`` object after transport through the given lattice.
+
+	evol : SimpleNamespace
+		Beam parameter evolution data extracted from the ImpactX run (e.g. 
+        emittances, beta functions, centroid offsets).
+    """
     
     # create a new directory
     original_folder = os.getcwd()
@@ -78,12 +147,13 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     if not keep_data:
         shutil.rmtree(runfolder)
     else:
-        new_dir = shutil.move(runfolder, runnable.shot_path())
+        new_dir = shutil.move(runfolder, runnable.shot_path()) # TODO: what if runnable is None?
         os.rename(new_dir, os.path.join(os.path.dirname(new_dir),'impactx_sims'))
 
     return beam, evol
 
 
+# ==================================================
 def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, space_charge="2D", runnable=None, keep_data=False, verbose=False):
     """Run an ImpactX envelope-tracking simulation using a given lattice and beam distribution."""
     
@@ -136,6 +206,7 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     return evol
 
 
+# ==================================================
 def initialize_amrex(verbose=False, verbose_debug=False):
     """Initialize AMReX."""
     
@@ -152,6 +223,7 @@ def initialize_amrex(verbose=False, verbose_debug=False):
             eval('amr.initialize(["amrex.omp_threads=1", "amrex.verbose=0"])')
 
 
+# ==================================================
 def initialize_impactx_sim(verbose=False):
     """Initialize the ImpactX simulation."""
     
@@ -186,6 +258,7 @@ def initialize_impactx_sim(verbose=False):
     return sim
 
 
+# ==================================================
 def extract_beams(path='', runnable=None, beam0=None):
     """Extract the saved beams (from the ImpactX monitors)."""
     
@@ -232,6 +305,7 @@ def extract_beams(path='', runnable=None, beam0=None):
     return beams
         
 
+# ==================================================
 def extract_evolution(path=''):
     """Extract the beam evolution from the reduced beam diagnostics."""
     
@@ -284,7 +358,8 @@ def extract_evolution(path=''):
     
     return evol
 
-    
+
+# ==================================================    
 # convert from ImpactX particle container to ABEL beam
 def particle_container2beam(particle_container):
     """Convert from ImpactX particle container to an ABEL beam object."""
@@ -312,7 +387,8 @@ def particle_container2beam(particle_container):
     
     return beam
 
-    
+
+# ==================================================
 # convert from ABEL beam to ImpactX particle container
 def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
     """Convert from an ABEL beam object to an ImpactX particle container."""
