@@ -72,10 +72,10 @@ class StageHipace(Stage):
         If ``True``, runs the stage without plasma.
 
     external_focusing : bool
-        Flag for whether to include external focusing (APL-like quadrupoles).
+        Flag for whether to include external lineear focusing.
 
     mesh_refinement : bool
-        Enable HiPACE++ mesh refinement.
+        Enable HiPACE++ mesh refinement. See the `HiPACE++ wrapper <https://github.com/abel-framework/ABEL/blob/main/abel/wrappers/hipace/hipace_wrapper.py>`_ for more details.  
 
     do_spin_tracking : bool
         Flag for enabling particle spin tracking.
@@ -672,7 +672,7 @@ class StageHipace(Stage):
             
             
         Returns
-        -------
+        ----------
         waterfalls : list of 2D float ndarrays
             Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
         
