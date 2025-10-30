@@ -12,28 +12,42 @@ import scipy.constants as SI
 
 class InterstageQuads(Interstage, ABC):
     """
-    Abstract subclass of :class:`Interstage` implementing interstage beamline 
-    sections that use magnetic quadrupoles as the main bending dipoles.
+    Abstract subclass of :class:`Interstage` implementing an achromatic 
+    interstage lattice that uses a combination of quadrupoles and sextupoles 
+    as the focusing elements.
 
     This class defines parameters, matching procedures, and lattice composition 
     for its subclasses. It handles the optical and field-level configuration of 
     the lattice components and provides matching functions to ensure proper beam
     transport and chromatic correction.
 
+    The layout of the first half of interstage lattice is: 
+
+    [drift, dipole, drift, quadrupole 1, drift, quadrupole 2, drift, 
+    sextupole 1, drift, quadrupole 3, drift, sextupole 2, drift, 
+    chicane dipole 1, drift, chicane dipol 2, drift, sextupole 3].
+
+    The lattice is then repeated in the opposite order (excluding sextupole 3) 
+    to form a mirror symmetric lattice.
+
     Inherits all attributes from :class:`Interstage`.
 
     Attributes
     ----------
-    polarity_quads : 
+    polarity_quads : int
+        Determines the sign of the quadrupole focusing in the interstage. 
+        Defaults to 1.
 
-    beta_ratio_central : 
-
+    beta_ratio_central : float
+        Sets the target ratio of the horizontal to vertical beta function at the 
+        central quadrupole in the interstage. Used in beta function matching. 
+        Defaults to 2.0
     """
 
     # TODO: shouldn't use_apertures be passed to the constructor of the parent class?
     
     @abstractmethod
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, polarity_quads=1, beta_ratio_central=2, 
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, polarity_quads=1, beta_ratio_central=2.0, 
                  use_apertures=True, cancel_chromaticity=True, cancel_sec_order_dispersion=True,
                  enable_csr=True, enable_isr=True, enable_space_charge=False, charge_sign=-1):
         
@@ -74,7 +88,7 @@ class InterstageQuads(Interstage, ABC):
         -------
         total_length : [m] float
             Total geometric length of the interstage. Returns ``None`` if 
-            ``length_dipole`` is not defined.
+            :attr:`Interstage.length_dipole` is not defined.
         """
         if self.length_dipole is not None:
             ls, *_ = self.matrix_lattice(k1=0, k2=0, k3=0, B_chic1=0, B_chic2=0, m1=0, m2=0, m3=0, half_lattice=False)
@@ -87,21 +101,30 @@ class InterstageQuads(Interstage, ABC):
     
     @property
     def length_gap(self):
+        """
+        The length of a drift section [m].
+        """
         return self.length_dipole * self.length_ratio_gap
 
     @property
     def length_quad_gap_or_sextupole(self):
+        """
+        Length of sextupole 1 and 2 or a gap [m].
+        """
         return self.length_dipole * self.length_ratio_quad_gap_or_sextupole
 
     @property
     def length_central_gap_or_sextupole(self):
         """
-        Length of the central element, either a gap or a sextupole.
+        Length of the central element, either a gap or a sextupole [m].
         """
         return self.length_dipole * self.length_ratio_central_gap_or_sextupole
         
     @property
     def length_quadrupole(self):
+        """
+        Length of a quadrupole [m].
+        """
         return self.length_dipole * self.length_ratio_quadrupole
 
     @property
@@ -118,8 +141,8 @@ class InterstageQuads(Interstage, ABC):
         Returns
         -------
         field_chicane_dipole1 : [T] float
-            Magnetic field strength of the first chicane dipoles, determined via 
-            ``InterstageQuads.match_dispersion_and_R56()``.
+            Magnetic field strength of chicane dipole 1, determined via 
+            :meth:`InterstageQuads.match_dispersion_and_R56`.
         """
         if self._field_ratio_chicane_dipole1 is None:
             self.match_dispersion_and_R56()
@@ -133,8 +156,8 @@ class InterstageQuads(Interstage, ABC):
         Returns
         -------
         field_chicane_dipole2 : [T] float
-            Magnetic field strength of the second chicane dipoles, determined via 
-            ``InterstageQuads.match_dispersion_and_R56()``.
+            Magnetic field strength of chicane dipole 2, determined via 
+            :meth:`InterstageQuads.match_dispersion_and_R56`.
         """
         if self._field_ratio_chicane_dipole2 is None:
             self.match_dispersion_and_R56()
@@ -149,8 +172,8 @@ class InterstageQuads(Interstage, ABC):
         Returns
         -------
         strength_quadrupole1 : [1/m] float
-            Focusing strength k = 1/f of the quadrupole, matched via 
-            ``InterstageQuads.match_beta_function()``.
+            Focusing strength k = 1/f of quadrupole 1, matched via 
+            :meth:`InterstageQuads.match_beta_function`.
         """
         if self._strength_quadrupole1 is None:
             self.match_beta_function()
@@ -158,7 +181,7 @@ class InterstageQuads(Interstage, ABC):
 
     @property
     def field_gradient_quadrupole1(self) -> float:
-        "First quadrupole field gradient [T/m]"
+        "Quadrupole 1 field gradient [T/m]"
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         return self.strength_quadrupole1*p0/(SI.e*self.length_quadrupole)
    
@@ -170,8 +193,8 @@ class InterstageQuads(Interstage, ABC):
         Returns
         -------
         strength_quadrupole2 : [1/m] float
-            Focusing strength k = 1/f of the quadrupole, matched via 
-            ``InterstageQuads.match_beta_function()``.
+            Focusing strength k = 1/f quadrupole 2, matched via 
+            :meth:`InterstageQuads.match_beta_function`.
         """
         if self._strength_quadrupole2 is None:
             self.match_beta_function()
@@ -179,7 +202,7 @@ class InterstageQuads(Interstage, ABC):
 
     @property
     def field_gradient_quadrupole2(self) -> float:
-        "Second quadrupole field gradient [T/m]"
+        "Quadrupole 2 field gradient [T/m]"
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         return self.strength_quadrupole2*p0/(SI.e*self.length_quadrupole)
 
@@ -191,8 +214,8 @@ class InterstageQuads(Interstage, ABC):
         Returns
         -------
         strength_quadrupole3 : [1/m] float
-            Focusing strength k = 1/f of the quadrupole, matched via 
-            ``InterstageQuads.match_beta_function()``.
+            Focusing strength k = 1/f quadrupole 3, matched via 
+            :meth:`InterstageQuads.match_beta_function`.
         """
         if self._strength_quadrupole3 is None:
             self.match_beta_function()
@@ -200,7 +223,7 @@ class InterstageQuads(Interstage, ABC):
 
     @property
     def field_gradient_quadrupole3(self) -> float:
-        "Third quadrupole field gradient [T/m]"
+        "Quadrupole 3 field gradient [T/m]"
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         return self.strength_quadrupole3*p0/(SI.e*self.length_quadrupole)
 
@@ -214,7 +237,7 @@ class InterstageQuads(Interstage, ABC):
         -------
         strength_sextupole1 : [1/m] float
             Sextupole strength matched via 
-            ``InterstageQuads.match_chromatic_amplitude()``.
+            :meth:`InterstageQuads.match_chromatic_amplitude`.
         """
         if self._strength_sextupole1 is None:
             self.match_chromatic_amplitude()
@@ -229,7 +252,7 @@ class InterstageQuads(Interstage, ABC):
         -------
         strength_sextupole2 : [1/m] float
             Sextupole strength matched via 
-            ``InterstageQuads.match_chromatic_amplitude()``.
+            :meth:`InterstageQuads.match_chromatic_amplitude`.
         """
         if self._strength_sextupole2 is None:
             self.match_chromatic_amplitude()
@@ -244,7 +267,7 @@ class InterstageQuads(Interstage, ABC):
         -------
         strength_sextupole3 : [1/m] float
             Sextupole strength matched via 
-            ``InterstageQuads.match_second_order_dispersion()``.
+            :meth:`InterstageQuads.match_second_order_dispersion`.
         """
         if self._strength_sextupole3 is None:
             self.match_second_order_dispersion()
@@ -280,35 +303,35 @@ class InterstageQuads(Interstage, ABC):
         ----------
         k1 : [m^-2] float, optional
             Effective focusing strength of quadrupole 1. Defaults to 
-            ``self.strength_quadrupole1/self.length_quadrupole``.
+            :attr:`InterstageQuads.strength_quadrupole1` / :attr:`InterstageQuads.length_quadrupole`.
 
         k2 : [m^-2] float, optional
             Effective focusing strength of quadrupole 2. Defaults to 
-            ``self.strength_quadrupole2/self.length_quadrupole``.
+            :attr:`InterstageQuads.strength_quadrupole2` / :attr:`InterstageQuads.length_quadrupole`.
 
         k3 : [m^-2] float, optional
             Effective focusing strength of quadrupole 3. Defaults to 
-            ``self.strength_quadrupole3/self.length_quadrupole``.
+            :attr:`InterstageQuads.strength_quadrupole3` / :attr:`InterstageQuads.length_quadrupole`.
 
         B_chic1 : [T] float, optional
             Field strength of the outer chicane dipoles. Defaults to 
-            ``self.field_chicane_dipole1``.
+            :attr:`InterstageQuads.field_chicane_dipole1`.
 
         B_chic2 : [T] float, optional
             Field strength of the inner chicane dipoles. Defaults to 
-            ``self.field_chicane_dipole2``.
+            :attr:`InterstageQuads.field_chicane_dipole2`.
 
         m1 : [m^-2] float, optional
-            Sextupole normalized strength. Defaults to 
-            ``self.strength_sextupole1/self.length_quad_gap_or_sextupole``.
+            Sextupole normalized strength of sextupole 1. Defaults to 
+            :attr:`InterstageQuads.strength_sextupole1` / :attr:`InterstageQuads.length_quad_gap_or_sextupole`.
 
         m2 : [m^-2] float, optional
-            Sextupole normalized strength. Defaults to 
-            ``self.strength_sextupole2/self.length_quad_gap_or_sextupole``.
+            Sextupole normalized strength of sextupole 2. Defaults to 
+            :attr:`InterstageQuads.strength_sextupole2` / :attr:`InterstageQuads.length_quad_gap_or_sextupole`.
 
         m3 : [m^-2] float, optional
-            Sextupole normalized strength. Defaults to 
-            ``self.strength_sextupole3/self.length_central_gap_or_sextupole``.
+            Sextupole normalized strength of sextupole 3. Defaults to 
+            :attr:`InterstageQuads.strength_sextupole3` / :attr:`InterstageQuads.length_central_gap_or_sextupole`.
 
         half_lattice : bool, optional
             If ``True``, returns only half of the symmetric lattice. Defaults to 
@@ -398,8 +421,6 @@ class InterstageQuads(Interstage, ABC):
             Updates ``self._strength_quadrupole1``, ``self._strength_quadrupole2`` 
             and ``self._strength_quadrupole3`` in place.
         """
-
-        "Matching the beta function by adjusting the quadrupole strengths."
         
         # minimizer function for beta matching (central alpha function is zero)
         from abel.utilities.beam_physics import evolve_beta_function
@@ -468,14 +489,15 @@ class InterstageQuads(Interstage, ABC):
     
     def match_chromatic_amplitude(self):
         """
-        Cancell the chromaticity by tuning sextupole 1 and 2.
+        Cancel the chromaticity by tuning sextupole 1 and 2.
 
         Returns
         -------
         None : 
             Updates ``self._strength_sextupole1`` and 
             ``self._strength_sextupole2`` in place. If 
-            ``self.cancel_chromaticity`` is ``False``, both are set to zero.
+            :attr:`Interstage.cancel_chromaticity`  is ``False``, both are set 
+            to zero.
         """
         
         # stop if nonlinearity is turned off
@@ -518,7 +540,7 @@ class InterstageQuads(Interstage, ABC):
         -------
         None : 
             Updates ``self._strength_sextupole3`` in place. If 
-            ``self.cancel_sec_order_dispersion`` is ``False``, sets 
+            :attr:`Interstage.cancel_sec_order_dispersion` is ``False``, sets 
             ``self._strength_sextupole3`` to zero.
         """
         
