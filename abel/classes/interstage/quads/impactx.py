@@ -12,9 +12,8 @@ import scipy.constants as SI
 
 class InterstageQuadsImpactX(InterstageQuads):
     """
-    Interstage model using ImpactX [1]_ for full 3D particle tracking through an 
-    interstage lattice using quadrupole magnets with optional collective 
-    effects.
+    Interstage modul using ImpactX [1]_ for full 3D particle tracking through an 
+    interstage lattice with optional physics effects.
 
     This subclass of :class:`InterstageQuads` enables realistic beam 
     tracking with support for Coherent Synchrotron Radiation (CSR), Incoherent 
@@ -26,7 +25,7 @@ class InterstageQuadsImpactX(InterstageQuads):
     ----------
     num_slices : int
         Number of longitudinal slices per beamline element in the ImpactX 
-        simulation. Controls the integration granularity. Defaults to 50.
+        simulation. Defaults to 50.
 
     use_monitors : bool
         If ``True``, inserts ImpactX ``BeamMonitor`` in the lattice for 
