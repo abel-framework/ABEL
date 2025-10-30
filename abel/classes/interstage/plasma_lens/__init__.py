@@ -136,7 +136,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         -------
         strength_plasma_lens : [1/m] float
             Focusing strength k = 1/f of the plasma lens, matched via 
-            ``InterstagePlasmaLens.match_beta_function()``.
+            :meth:`InterstagePlasmaLens.match_beta_function`.
         """
         if self._strength_plasma_lens is None:
             self.match_beta_function()
@@ -151,7 +151,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         -------
         nonlinearity_plasma_lens : [1/m] float
             Plasma lens nonlinearity focusing term, matched via 
-            ``InterstagePlasmaLens.match_chromatic_amplitude()``.
+            :meth:`InterstagePlasmaLens.match_chromatic_amplitude`.
         """
         if self._nonlinearity_plasma_lens is None:
             self.match_chromatic_amplitude()
@@ -166,7 +166,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         -------
         strength_sextupole : [m^-2] float
             Sextupole strength, matched via 
-            ``InterstagePlasmaLens.match_second_order_dispersion()``.
+            :meth:`InterstagePlasmaLens.match_second_order_dispersion`.
         """
         if self._strength_sextupole is None:
             self.match_second_order_dispersion()
@@ -191,7 +191,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         -------
         field_chicane_dipole1 : [T] float
             Magnetic field strength of the first chicane dipoles, determined via 
-            ``InterstagePlasmaLens.match_dispersion_and_R56()``.
+            :meth:`InterstagePlasmaLens.match_dispersion_and_R56`.
         """
         if self._field_ratio_chicane_dipole1 is None:
             self.match_dispersion_and_R56()
@@ -206,7 +206,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         -------
         field_chicane_dipole2 : [T] float
             Magnetic field strength of the second chicane dipoles, determined via 
-            ``InterstagePlasmaLens.match_dispersion_and_R56()``.
+            :meth:`InterstagePlasmaLens.match_dispersion_and_R56`.
         """
         if self._field_ratio_chicane_dipole2 is None:
             self.match_dispersion_and_R56()
@@ -253,23 +253,23 @@ class InterstagePlasmaLens(Interstage, ABC):
         ----------
         k_lens : [m^-2] float, optional
             Effective focusing strength of the plasma lens. Defaults to 
-            ``self.strength_plasma_lens / self.length_plasma_lens``.
+            :attr:`InterstagePlasmaLens.strength_plasma_lens` / :attr:`InterstagePlasmaLens.length_plasma_lens`.
 
         tau_lens : [m^-1] float, optional
             Transverse taper coefficient representing plasma lens nonlinearity.
-            Defaults to ``self.nonlinearity_plasma_lens``.
+            Defaults to :attr:`InterstagePlasmaLens.nonlinearity_plasma_lens`.
 
         B_chic1 : [T] float, optional
             Field strength of the outer chicane dipoles. Defaults to 
-            ``self.field_chicane_dipole1``.
+            :attr:`InterstagePlasmaLens.field_chicane_dipole1`.
 
         B_chic2 : [T] float, optional
             Field strength of the inner chicane dipoles. Defaults to 
-            ``self.field_chicane_dipole2``.
+            :attr:`InterstagePlasmaLens.field_chicane_dipole2`.
 
         m_sext : [m^-3] float, optional
             Sextupole normalized strength. Defaults to 
-            ``self.strength_sextupole / self.length_central_gap_or_sextupole``.
+            :attr:`InterstagePlasmaLens.strength_sextupole` / :attr:`InterstagePlasmaLens.length_central_gap_or_sextupole`.
 
         half_lattice : bool, optional
             If ``True``, returns only half of the symmetric lattice. Defaults to 
@@ -428,7 +428,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         -------
         None : 
             Updates ``self._nonlinearity_plasma_lens`` in place. If 
-            ``self.cancel_chromaticity`` is ``False``, 
+            :attr:`Interstage.cancel_chromaticity` is ``False``, 
             ``self._nonlinearity_plasma_lens`` is set to zero.
         """
         
@@ -467,7 +467,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         -------
         None : 
             Updates ``self._strength_sextupole`` in place. If 
-            ``self.cancel_sec_order_dispersion`` is ``False``, sets 
+            :attr:`Interstage.cancel_sec_order_dispersion` is ``False``, sets 
             ``self._strength_sextupole`` to zero.
         """
 
