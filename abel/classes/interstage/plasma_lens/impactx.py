@@ -12,7 +12,7 @@ import scipy.constants as SI
 
 class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
     """
-    Interstage model using ImpactX for full 3D particle tracking through an 
+    Interstage model using ImpactX [1]_ for full 3D particle tracking through an 
     interstage lattice using nonlinear plasma lenses with optional collective 
     effects.
 
@@ -26,15 +26,19 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
     ----------
     num_slices : int
         Number of longitudinal slices per beamline element in the ImpactX 
-        simulation. Controls the integration granularity. Defaults to 50.
+        simulation. Defaults to 50.
 
     use_monitors : bool
-        If ``True``, inserts :class:`BeamMonitor` elements in the lattice for 
+        If ``True``, inserts ImpactX ``BeamMonitor`` in the lattice for 
         recording intermediate beam states. Defaults to ``False``.
 
     keep_data : bool
         If ``True``, retains raw data files produced by ImpactX. Defaults to 
         ``False``.
+
+    References
+    ----------
+    .. [1] ImpactX documentation: https://impactx.readthedocs.io/en/latest/
     """
     # TODO: keep_data is not used.
     
