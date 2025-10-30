@@ -12,13 +12,22 @@ import scipy.constants as SI
 
 class InterstagePlasmaLens(Interstage, ABC):
     """
-    Abstract subclass of :class:`Interstage` implementing interstage beamline 
-    sections that use plasma lenses as the main bending dipoles.
+    Abstract subclass of :class:`Interstage` implementing an achromatic 
+    interstage lattice that uses nonlinear plasma lenses as the focusing 
+    elements.
 
     This class defines parameters, matching procedures, and lattice composition 
     for its subclasses. It handles the optical and field-level configuration of 
     the lattice components and provides matching functions to ensure proper beam
     transport and chromatic correction.
+
+    The layout of the first half of interstage lattice is: 
+
+    [drift, dipole, drift, plasma lens, drift, chicane dipole 1, drift, 
+    chicane dipol 2, drift, sextupole 3].
+
+    The lattice is then repeated in the opposite order (excluding sextupole 3) 
+    to form a mirror symmetric lattice.
 
     Inherits all attributes from :class:`Interstage`.
 
@@ -100,27 +109,30 @@ class InterstagePlasmaLens(Interstage, ABC):
     ## RATIO-DEFINED LENGTHS
     
     @property
-    def length_gap(self) -> float:        
+    def length_gap(self) -> float:
+        """
+        The length of a drift section [m].
+        """
         return self.length_dipole * self.length_ratio_gap
         
     @property
     def length_plasma_lens(self) -> float:
         """
-        The length of a plasma lens.
+        The length of a plasma lens [m].
         """
         return self.length_dipole * self.length_ratio_plasma_lens
 
     @property
     def length_chicane_dipole(self) -> float:
         """
-        The length of a chicane dipole.
+        The length of a chicane dipole [m].
         """
         return self.length_dipole * self.length_ratio_chicane_dipole
 
     @property
     def length_central_gap_or_sextupole(self) -> float:
         """
-        Length of the central element, either a gap or a sextupole.
+        Length of the central element, either a gap or a sextupole [m].
         """
         return self.length_dipole * self.length_ratio_central_gap_or_sextupole
 
@@ -190,7 +202,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         Returns
         -------
         field_chicane_dipole1 : [T] float
-            Magnetic field strength of the first chicane dipoles, determined via 
+            Magnetic field strength of chicane dipole 1, determined via 
             :meth:`InterstagePlasmaLens.match_dispersion_and_R56`.
         """
         if self._field_ratio_chicane_dipole1 is None:
@@ -205,7 +217,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         Returns
         -------
         field_chicane_dipole2 : [T] float
-            Magnetic field strength of the second chicane dipoles, determined via 
+            Magnetic field strength of chicane dipole 2, determined via 
             :meth:`InterstagePlasmaLens.match_dispersion_and_R56`.
         """
         if self._field_ratio_chicane_dipole2 is None:
