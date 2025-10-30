@@ -213,8 +213,7 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
     return beta, alpha, evolution
 
 
-def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
-    
+def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False, det=False):
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
         fast = False
@@ -248,12 +247,14 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
             for j in range(len(ss_l)):
                 D_l = Dmat(ss_l[j]-s0, inv_rhos[i], ks[i]) @ Dtot
                 evolution[0,i_last+j] = ss_l[j]
-                evolution[1,i_last+j] = Dx0*D_l[0,0] + Dpx0*D_l[1,2] + D_l[0,2]
+                evolution[1,i_last+j] = Dx0*D_l[0,0] + Dpx0*D_l[0,1] + D_l[0,2]
                 evolution[2,i_last+j] = Dx0*D_l[1,0] + Dpx0*D_l[1,1] + D_l[1,2]
             i_last = i_last + Nres
             
         # final matrix
         Dtot = Dmat(ls[i],inv_rhos[i],ks[i]) @ Dtot
+    if det:
+        print("D-matrix Determinant: ", np.linalg.det(Dtot))
     
     # calculate final dispersion
     Dx = Dx0*Dtot[0,0] + Dpx0*Dtot[0,1] + Dtot[0,2]

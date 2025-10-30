@@ -9,7 +9,8 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
     def __init__(self, E_nom=2, delay_per_stage=1, length_stage=12, num_stages=2, ks=[], B_dipole=1, \
                  keep_data=False, enable_space_charge=False, enable_csr=False, enable_isr=False, layoutnr = 1,\
-                 l_diag = 2, use_monitors=False, x0=10, lattice=[], ns=100, beta0_x=1, beta0_y=1):
+                 l_diag = 2, use_monitors=False, x0=10, lattice=[], ns=100, beta0_x=1, beta0_y=1,\
+                    alpha0_x=0, alpha0_y=0, Dx0=0, Dpx0=0, R560=0, k_bound=10):
         # E_nom in eV, delay in ns
         super().__init__()
         self._E_nom = E_nom #backing variable 
@@ -28,11 +29,17 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         self.ns = ns
         self.beta0_x = beta0_x
         self.beta0_y = beta0_y
+        self.alpha0_x = alpha0_x
+        self.alpha0_y = alpha0_y
+        self.Dx0 = Dx0
+        self.Dpx0 = Dpx0
+        self.R560 = R560
+        self.k_bound = k_bound
 
         # Lattice-elements lengths
         self.l_quads = 0.3
         self.l_kick = 2
-        self.l_gap = 0.25
+        self.l_gap = 1
         self.l_diag = l_diag
         self.l_dipole = self.get_dipole_lengths()
         self.l_sext = 0.1
@@ -79,7 +86,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
     ### Create constraints (delay and length of lattice). The function returns 2 values that should be kept around 0 while optimizing ###
     # If I find the root of this function (I.e where it is 0, as it should be) by 
-    def constraint(self, B_multiplier=1, plot=False):
+    def constraint(self, B_multiplier=1, plot=False, rotate=False):
         from abel.utilities.beam_physics import evolve_orbit
         import matplotlib.pyplot as plt
         import matplotlib.patches as patches
@@ -94,8 +101,11 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         theta, evolution = evolve_orbit(ls=ls, inv_rhos=inv_rs, plot=plot) # evolution[0,:] = xs is the projected length
 
         hypotenuse = np.sqrt(evolution[0,-1]**2 + evolution[1,-1]**2)
-        phi = np.arctan(evolution[1,-1]/evolution[0,-1])
-        print("phi = ", phi)
+        if rotate:
+            phi = np.arctan(evolution[1,-1]/evolution[0,-1])
+        else:
+            phi = 0
+        print("phi0 = ", phi, 'phi_end = ', theta)
         R = np.array([[np.cos(phi), -np.sin(phi)], [np.sin(phi), np.cos(phi)]])
 
         elements_location = self.get_z_elements(theta0=-phi)
@@ -164,7 +174,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
         plt.show()
 
-        print('delay: ', (np.sum(ls)-hypotenuse)/SI.c*1e9)
+        print('delay: ', (np.sum(ls)-evolution[0,-1])/SI.c*1e9)
 
         return evolution[0,-1] - self.length_stage, hypotenuse
     
@@ -214,11 +224,43 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
         return L
     def get_quad_counts(self):
-        N = sum(1 for element in self.lattice if element.name=='quad')
+        N = sum(1 for element in self.lattice if element.name=='quad') - self.get_n_dobble_quads()
         return N
-
     
-    def get_quad_strengths(self, match_full_length=False, ks_matched=False, match_dipole=False, symmetric=False):
+    def get_n_dobble_quads(self):
+        """
+        Check how many quads consists of two halfs that are to be identical
+        """
+        S=0
+        for i in self.indices_quads:
+            if i+1 in self.indices_quads:
+                S+=1
+        return S
+    
+    def get_k0_and_bounds(self):
+        n_quads = self.get_quad_counts()
+
+        k_bound = self.k_bound
+        f0 = (self.length_stage+self.delay_per_stage*SI.c)/2
+        if n_quads%2==0:
+            k0 = [1/f0/self.l_quads, -1/f0/self.l_quads]*(n_quads//2)
+            k_bounds = [(-k_bound,k_bound), (-k_bound,k_bound)]*(n_quads//2)
+            print(len(k_bounds))
+        else:
+            k0 = [-1/f0/self.l_quads, 1/f0/self.l_quads]*(n_quads//2)
+            k0.append(1/f0/self.l_quads)
+            #k_bounds = [(-k_bound,0), (0,k_bound)]*(n_quads//2)
+            k_bounds = [(0,k_bound), (-k_bound,0)]
+            """
+            ,(0,k_bound), (0,k_bound),(-k_bound,0)]
+                      
+            , (0,k_bound), (0,k_bound), (-k_bound,0), (0,k_bound)]
+            """
+            #k_bounds.append((-k_bound,0))
+
+        return k0, k_bounds
+    
+    def match_dogleg(self, ks_matched=False, symmetric=True, mid=False):
         ### Optimize for alpha_x/y to get quad-strengths ###
         # ls_B = [l_dipole1, l_dipole2, l_dipole3, l_diag, B1, B2]
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
@@ -239,120 +281,60 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
         k_bound = 15
         if not ks_matched:
-            f0 = (self.length_stage+self.delay_per_stage*SI.c)/2
-            if n_quads%2==0:
-                k0 = [1/f0/self.l_quads, -1/f0/self.l_quads]*(n_quads//2)
-                k_bounds = [(0,k_bound), (-k_bound,0)]*(n_quads//2)
-                print(len(k_bounds))
-            else:
-                k0 = [1/f0/self.l_quads, -1/f0/self.l_quads]*(n_quads//2)
-                k0.append(1/f0/self.l_quads)
-                k_bounds = [(0,k_bound), (-k_bound,0)]*(n_quads//2)
-                k_bounds.append((0,k_bound))
+            k0, k_bounds = self.get_k0_and_bounds()
         else:
             k0 = [element.k for element in self.lattice if element.name=='quad']
             if n_quads%2==0:
-                k_bounds = [(0,k_bound), (-k_bound,0)]*(n_quads//2)
+                k_bounds = [(-k_bound, k_bound), (-k_bound, k_bound)]*(n_quads//2)
             else:
-                k_bounds = [(0,k_bound), (-k_bound,0)]*(n_quads//2)
-                k_bounds.append((0,k_bound))
-
-        if symmetric and match_full_length:
-            k0 = k0[:n_quads//2]
-            k_bounds = k_bounds[:n_quads//2]
-
-        if match_dipole:
-            B_min = -2
-            B_max = 2
-            inv_r_max = B_max/p
-            inv_r_min = B_min/p
-            k_bounds.append((inv_r_min,inv_r_max))
-            if not ks_matched:
-                inv_r0 = -self.B_dipole/p
-                k0.append(inv_r0)
-            else:
-                k0.append([element.ds for element in self.lattice if element.name=='dipole'][0])
+                k_bounds = [(-k_bound,k_bound), (-k_bound,k_bound)]*(n_quads//2)
+                k_bounds.append((-k_bound,k_bound))
 
         ls, inv_rs_list, ks_list = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True) # returns numpy arrays
 
         
         def optimizer(params):
-            # params = [k1, k2, k3, k4, ..., inv_r1]
-            if match_dipole:
-                ks = params[:-1]
+            #params = [k1, k2, ... k_-1]
+            # Optimize from start (before dipole), but mirror the part from the dipole. The mirroring can be done
+            # post optimizing 
+
+            # Set the params values to the quads
+            j=0
+            for i in self.indices_quads:
+                if i-1 in self.indices_quads: # There are 2 quads in a row
+                    end_mid_mark = i # mark the index for the end of the first half
+                    ks_list[i] = params[j-1] # make sure the next quad is identical
+                else:
+                    ks_list[i] = params[j]
+                    j+=1    
+                    
+
+            # Evolve beam to mid (to element end_mid_mark)
+            ls_1st_half = ls[:i]
+            ks_1st_half = ks_list[:i]
+            inv_rs_list_1st_half = inv_rs_list[:i]
+
+            D_mid, _, _ = evolve_dispersion(ls=ls_1st_half, ks=ks_1st_half, inv_rhos=inv_rs_list_1st_half)
+            _, alphax_mid, _ = evolve_beta_function(ls=ls_1st_half, ks=ks_1st_half, beta0=beta0_x)
+            _, alphay_mid, _ = evolve_beta_function(ls=ls_1st_half, ks=-ks_1st_half, beta0=beta0_y)
+
+            # Evolve beam entire way
+            betax, alphax, _ = evolve_beta_function(ls=ls, ks=ks_list, beta0=beta0_x)
+            betay, alphay, _ = evolve_beta_function(ls=ls, ks=-ks_list, beta0=beta0_y)
+            D, Dp, _ = evolve_dispersion(ls=ls, ks=ks_list, inv_rhos=inv_rs_list)
+            R56, _ = evolve_R56(ls=ls, ks=ks_list, inv_rhos=inv_rs_list)
+
+            if mid:
+                return (D*1e3)**2 #+ alphay_mid**2 + alphax_mid**2
             else:
-                ks = params
-            if symmetric and match_full_length: # match the full lattice, but make it mirror symmetric
-                ks_second_half = ks[::-1]
-                ks = np.append(ks, ks_second_half)
-                
-            # Vary the ks in the lattice without chinging the lattice values
-            # This requires that all quads are named 'quad #' (#=number in which they appear in the lattice)
-            for i, j in enumerate(self.indices_quads):
-                ks_list[j] = ks[i]
-
-            if match_dipole:
-                inv_r = params[-1]
-                inv_rs_list[self.indices_dipoles[0]] = inv_r
-                if symmetric and match_full_length:
-                    inv_rs_list[self.indices_dipoles[-1]] = inv_r
-
-            beta_x, alpha_x, evo_x = evolve_beta_function(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, beta0=beta0_x)
-            beta_y, alpha_y, evo_y = evolve_beta_function(ls=ls, ks=-ks_list, beta0=beta0_y)
-
-            Dx, Dpx, _ = evolve_dispersion(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True)
-            R56, _ = evolve_R56(ls=ls, ks=ks_list, inv_rhos=inv_rs_list, high_res=True)
-
-          
-            if match_full_length:
-                return (beta_x-beta0_x)**2 + (beta_y-beta0_y)**2 + (Dx*1e3)**2 + (R56*1e3)**2 +\
-                    alpha_x**2 + alpha_y**2 + (Dpx*1e3)**2
-            else:
-                return  (Dx*1e2)**2 #+ alpha_x**2 + alpha_y**2
-                    # max(beta_x-50*beta0_x, 0)**2 + max(beta_y-50*beta0_y, 0)**2 #+ max(max(evo_y[1,:])-beta_y*300,0) + max(max(evo_x[1,:])-beta_x*300,0)
-        print(self.indices_quads)
-        opt = minimize(optimizer, x0=k0, bounds=k_bounds)
+                return (D*1e2)**2 + (D_mid*1e2)**2 + alphax**2 + alphay**2 \
+                    + alphay_mid**2 + alphax_mid**2 # minimize dispersion, dispersion 
+        
+        opt = minimize(fun=optimizer, x0=k0, bounds=k_bounds)
         print(opt)
-        yield opt.x[:n_quads]
-        
-        if match_dipole:
-            yield opt.x[-1]
-        
-    def optimize_quads_twice(self, match_dipole=False):
-        from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
+        ks = opt.x
+        return ks
 
-        backup_lattice = self.copy_lattice()
-
-        matching_generator = self.get_quad_strengths(match_dipole=match_dipole) # params0=[k1, k2, k3, k4, ..., inv_r1]
-        k0 = next(matching_generator)
-        self.set_ks(k0)
-
-        if match_dipole:
-            inv_r0 = next(matching_generator)
-            self.lattice[self.indices_dipoles[0]].phi = inv_r0 * self.lattice[self.indices_dipoles[0]].ds
-
-        # Double lattice
-        self.extend_lattice() #Mirror symmetric extension (same sign on dipole fields)
-        self.update_lattice()
-
-        # Cannot change lattice until after the first yield have been collected!
-        optimizer_generator = self.get_quad_strengths(match_dipole=match_dipole, ks_matched=True, match_full_length=True, symmetric=True)
-
-        k1 = next(optimizer_generator)
-        if match_dipole:
-            inv_r1 = next(optimizer_generator)
-
-        # Now that optimizer generator is done (using the "next" function), we can change the lattice
-        self.lattice = backup_lattice
-
-        self.set_ks(k1)
-        if match_dipole:
-            self.lattice[self.indices_dipoles[0]].phi = inv_r1 * self.lattice[self.indices_dipoles[0]].ds
-        self.update_lattice()
-        self.lattice_backup = self.copy_lattice()
-
-        return k1, inv_r1
-    
     def reset_lattice(self):
         try:
             self.lattice = self.lattice_backup
@@ -369,10 +351,11 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         print(j)
         print(self.get_quad_counts())
         if not lattice:
-            for element in self.lattice:
-                if element.name == 'quad':
-                    #print(ks[j])
-                    element.k = ks[j]
+            for i in self.indices_quads:
+                if i-1 in self.indices_quads:
+                    self.lattice[i].k = self.lattice[i-1].k
+                else:
+                    self.lattice[i].k = ks[j]
                     j+=1
         else:
             for element in lattice:
@@ -599,11 +582,14 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         
         plt.show()
     
-    def plot_simplified(self):
+    def plot_simplified(self, return_end_values=False):
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
         ls, inv_rs, ks = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True)
 
-        _, _, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x, inv_rhos=inv_rs, plot=True)
-        _, _, _ = evolve_beta_function(ls=ls, ks=-ks, beta0=self.beta0_y, plot=True)
-        _, _, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True)
-        _, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True)
+        beta_x, alpha_x, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x, alpha0=self.alpha0_x, inv_rhos=inv_rs, plot=True)
+        beta_y, alpha_y, _ = evolve_beta_function(ls=ls, ks=-ks, beta0=self.beta0_y, alpha0=self.alpha0_y, plot=True)
+        print(self.Dx0, self.Dpx0)
+        D, Dp, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, Dx0=self.Dx0, Dpx0=self.Dpx0, plot=True)
+        R56, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True, R560=self.R560)
+        if return_end_values:
+            return beta_x, alpha_x, beta_y, alpha_y, D, Dp, R56
