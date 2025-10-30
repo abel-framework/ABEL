@@ -15,7 +15,7 @@ To remove ABEL, run `pip uninstall abel`.
 
 ## Configuration of ABEL
 To use ABEL, you must configure it. This is done with the file `.abelconfig.toml`, which is automatically created in your home directory the first time you import ABEL.
-Edit this file with your text editor to tell ABEL where to find tools such as ELEGANT, [HIPACE++](https://github.com/Hi-PACE/hipace/), and GUINEAPIG, as well as configure it for your computing cluster, if needed.
+Edit this file with your text editor to tell ABEL where to find tools such as [ELEGANT](https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html), [HIPACE++](https://github.com/Hi-PACE/hipace/), and [GUINEA-PIG](https://gitlab.cern.ch/clic-software/guinea-pig), as well as configure it for your computing cluster, if needed.
 
 Comments in the file explain how to edit it. The configuration file uses the [TOML format](https://en.wikipedia.org/wiki/TOML), which is a simple text file similar to `.ini`, but more well defined.
 
