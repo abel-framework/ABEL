@@ -13,11 +13,11 @@ class InterstageQuadsBasic(InterstageQuads):
     Basic implementation of a quadrupole-based interstage providing analytical 
     phase-space rotation and longitudinal compression.
 
-    The :class:`InterstageQuadsBasic` class extends :class:`InterstageQuads` 
-    to provide a minimal model for studying beam envelope evolution and compression 
-    effects without performing full lattice beam tracking. It applies a phase advance 
-    rotation to both transverse planes and a linear compression in longitudinal phase 
-    space by applying longitudinal dispersion using the specified ``R56`` value.
+    This subclass of :class:`InterstageQuads` provides a minimal model for 
+    studying beam evolution and compression effects without performing full 
+    lattice beam tracking. It applies a phase advance rotation to both 
+    transverse planes and a linear compression in longitudinal phase space by 
+    applying longitudinal dispersion using the specified ``R56`` value.
 
     Inherits all attributes from :class:`InterstageQuads`.
 
@@ -41,10 +41,11 @@ class InterstageQuadsBasic(InterstageQuads):
 
         The beam undergoes:
         
-        1. Longitudinal compression using ``self.R56`` and nominal energy.
+        1. Longitudinal compression using :attr:`Interstage.R56` and nominal 
+           energy.
         2. Transverse phase-space rotation in both x and y planes by a total
-           phase advance ``self.phase_advance`` radians, based on 
-           ``self.beta0``.
+           phase advance :attr:`InterstageQuadsBasic.phase_advance` radians, 
+           based on on :attr:`Interstage.beta0`.
         """
         
         # compress beam
