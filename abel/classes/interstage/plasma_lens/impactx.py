@@ -11,6 +11,35 @@ from types import SimpleNamespace
 import scipy.constants as SI
 
 class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
+    """
+    Interstage modul using ImpactX [1]_ for full 3D particle tracking through an 
+    interstage lattice with optional physics effects.
+
+    This subclass of :class:`InterstagePlasmaLens` enables realistic beam 
+    tracking with support for Coherent Synchrotron Radiation (CSR), Incoherent 
+    Synchrotron Radiation (ISR), and space-charge modeling.
+
+    Inherits all attributes from :class:`InterstagePlasmaLens`.
+
+    Attributes
+    ----------
+    num_slices : int
+        Number of longitudinal slices per beamline element in the ImpactX 
+        simulation. Defaults to 50.
+
+    use_monitors : bool
+        If ``True``, inserts ImpactX ``BeamMonitor`` in the lattice for 
+        recording intermediate beam states. Defaults to ``False``.
+
+    keep_data : bool
+        If ``True``, retains raw data files produced by ImpactX. Defaults to 
+        ``False``.
+
+    References
+    ----------
+    .. [1] ImpactX documentation: https://impactx.readthedocs.io/en/latest/
+    """
+    # TODO: keep_data is not used.
     
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True,
                        enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, keep_data=False):
