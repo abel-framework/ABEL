@@ -28,9 +28,8 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
     ----------
     num_slices : int
         Number of longitudinal slices per beamline element in the ELEGANT 
-        simulation. Sets the varialble `BINS` for all beamline elements in the 
-        `ELEGANT lattice input script [2]_. 
-        Defaults to 50.
+        simulation. Sets the variable ``BINS`` for all beamline elements in the 
+        ELEGANT lattice input script [2]_. Defaults to 50.
 
     use_monitors : bool
         If ``True``, enalbes ELEGANT ``WATCH`` element for recording 
