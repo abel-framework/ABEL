@@ -15,8 +15,7 @@ from abel.wrappers.elegant.elegant_wrapper import elegant_run, elegant_apl_field
 class InterstagePlasmaLensElegant(InterstagePlasmaLens):
     """
     Interstage model using ELEGANT [1]_ for full 3D particle tracking through an 
-    interstage lattice using nonlinear plasma lenses with optional collective 
-    effects.
+    interstage lattice with optional physics effects.
 
     This subclass of :class:`InterstagePlasmaLens` enables realistic beam 
     tracking with support for Coherent Synchrotron Radiation (CSR) and 
