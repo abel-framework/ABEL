@@ -28,7 +28,7 @@ class Interstage(Trackable, CostModeled):
     ----------
     nom_energy : [eV] float
         Nominal beam energy at the entrance of the interstage. Default set to 
-        ``None``, usually set by ``Linac.track()``.
+        ``None``, usually set by :meth:`Linac.track`.
 
     beta0 : [m] float or callable
         Initial beta function at the entrance of the interstage. If callable, it 
@@ -47,7 +47,7 @@ class Interstage(Trackable, CostModeled):
         path length difference. If callable, it is evaluated as 
         ``R56(nom_energy)``. Defaults to 0.
 
-    charge_sign : int (default=-1)
+    charge_sign : int
         Particle charge sign: -1 for electrons, +1 for positrons or protons. 
         Defaults to -1.
 
@@ -55,7 +55,7 @@ class Interstage(Trackable, CostModeled):
         Whether to automatically match and cancel first-order chromatic effects.
         Defaults to ``True``.
 
-    cancel_sec_order_dispersion : bool (default=``False``)
+    cancel_sec_order_dispersion : bool
         Whether to match and cancel second-order dispersion. Defaults to 
         ``False``.
 
@@ -81,10 +81,9 @@ class Interstage(Trackable, CostModeled):
 
     References
     ----------
-    .. [1] Add the interstage manuscript when available.
+    .. [1] TODO: Add the interstage manuscript when available.
 
-    .. [2] C. A. Lindstrøm, "Self-correcting longitudinal phase space in a multistage plasma accelerator", 
-    ArXiv (2021), https://arxiv.org/abs/2104.14460
+    .. [2] C. A. Lindstrøm, "Self-correcting longitudinal phase space in a multistage plasma accelerator", ArXiv (2021), https://arxiv.org/abs/2104.14460
     """
     
     @abstractmethod
@@ -217,8 +216,8 @@ class Interstage(Trackable, CostModeled):
 
         This combines matching of beta functions, first-order dispersion and R56.
         Can also optionally match chromatic amplitude and second order 
-        dispersion depending on ``self.cancel_chromaticity`` and 
-        ``self.cancel_sec_order_dispersion``.
+        dispersion depending on :attr:`Interstage.cancel_chromaticity` and 
+        :attr:`Interstage.cancel_sec_order_dispersion`.
 
         Returns
         -------
