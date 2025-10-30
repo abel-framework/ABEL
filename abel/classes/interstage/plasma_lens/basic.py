@@ -42,10 +42,11 @@ class InterstagePlasmaLensBasic(InterstagePlasmaLens):
 
         The beam undergoes:
         
-        1. Longitudinal compression using ``self.R56`` and nominal energy.
+        1. Longitudinal compression using :attr:`Interstage.R56` and nominal 
+           energy.
         2. Transverse phase-space rotation in both x and y planes by a total
-           phase advance ``self.phase_advance`` radians, based on 
-           ``self.beta0``.
+           phase advance :attr:`InterstagePlasmaLensBasic.phase_advance` 
+           radians, based on :attr:`Interstage.beta0`.
         """
         
         # compress beam
