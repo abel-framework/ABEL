@@ -12,16 +12,19 @@ from types import SimpleNamespace
 
 def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, verbose=False):
     """
-	Run an ImpactX particle-tracking simulation using a specified lattice and 
+	Run an ImpactX [1]_ particle-tracking simulation using a specified lattice and 
 	input beam. 
     
     This function 
 
     1. Sets up an ImpactX simulation specifying allocated resources.
     
-    2. Configures relevant physics options including space charge effects, CSR (coherent synchrotron radiation) and ISR (incoherent synchrotron radiation). 
+    2. Configures relevant physics options including space charge effects, CSR 
+       (coherent synchrotron radiation) and ISR (incoherent synchrotron 
+       radiation). 
     
-    3. Executes the simulation, converts the results back into an ABEL beam object, and returns the tracked beam and its evolution data.
+    3. Executes the simulation, converts the results back into an ABEL beam 
+       object, and returns the tracked beam and its evolution data.
 	
 
 	Parameters
@@ -80,6 +83,10 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
 	evol : SimpleNamespace
 		Beam parameter evolution data extracted from the ImpactX run (e.g. 
         emittances, beta functions, centroid offsets).
+
+    References
+	----------
+	.. [1] ImpactX Documentation: https://impactx.readthedocs.io/en/latest/
     """
     
     # create a new directory
@@ -155,7 +162,54 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
 
 # ==================================================
 def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, space_charge="2D", runnable=None, keep_data=False, verbose=False):
-    """Run an ImpactX envelope-tracking simulation using a given lattice and beam distribution."""
+    """
+    Run an ImpactX envelope-tracking simulation using a given lattice and 
+    initial beam distribution.
+
+    Parameters
+    ----------
+    lattice : list
+		Contains a sequence consisting of ImpactX beamline elements (e.g., 
+        drifts, bends, lenses, or multipoles). Defines the lattice through which 
+        ``beam0`` is tracked.
+
+    distr : ImpctX ``distribution``
+        ImpactX distribution function specifying the initial beam envelope 
+        parameters and correlations.
+
+    nom_energy : [eV] float, optional
+        Nominal kinetic energy of the reference particle. Used to set 
+        relativistic scaling. Defaults to ``None``.
+
+    peak_current : [A] float, optional
+        Peak current of the beam. Defaults to ``None``.
+
+    space_charge : str or bool, optional
+        Space charge model to use. Options include ``'2D'``, ``'3D'``, or 
+        ``False`` to disable. Defaults to ``'2D'``.
+
+    runnable : :class:`abel.core.Runnable`, optional
+        ABEL runnable object to attach simulation results to, if running within 
+        an automated pipeline. Defaults to ``None``.
+
+    runnable : ``Runnable``, optional
+		ABEL ``Runnable`` object. Used to specify the run folder if provided.
+
+    keep_data : bool, optional
+        If ``True``, the temporary ImpactX run directory is preserved after 
+        simulation. Defaults to ``False``.
+
+    verbose : bool, optional
+        If ``True``, prints ImpactX progress and diagnostic information. 
+        Defaults to ``False``.
+
+    Returns
+    -------
+    evol : `SimpleNamespace`
+        Object containing the envelope evolution along the lattice, including 
+        beam size, emittance, and energy as a function of the longitudinal 
+        coordinate.
+    """
     
     # create a new directory
     original_folder = os.getcwd()
@@ -362,7 +416,19 @@ def extract_evolution(path=''):
 # ==================================================    
 # convert from ImpactX particle container to ABEL beam
 def particle_container2beam(particle_container):
-    """Convert from ImpactX particle container to an ABEL beam object."""
+    """
+    Convert from ImpactX particle container to an ABEL beam object.
+
+    Parameters
+    ----------
+    particle_container : ImpactX ``ParticleContainer``
+        ImpactX ``ParticleContainer`` to be converted
+
+    Returns
+    -------
+    beam : ``Beam``
+        ABEL ``Beam`` object.
+    """
     
     from abel.classes.beam import Beam
     
