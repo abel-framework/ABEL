@@ -38,7 +38,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
         # Lattice-elements lengths
         self.l_quads = 0.3
-        self.l_kick = 2
+        self.l_kick = 1.5
         self.l_gap = 1
         self.l_diag = l_diag
         self.l_dipole = self.get_dipole_lengths()
@@ -77,8 +77,19 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
     def update_lattice(self):
         # Get the indices of the quads in the lattice
+
+        ## Find doble quads and replace them with 1
+        print(self.lattice)
+
+        for i, element in enumerate(self.lattice):
+            if element.name == 'quad' and self.lattice[i-1].name=='quad':
+                self.lattice.pop(i-1)
+                element.ds = 2*element.ds
+        print(self.lattice)
+
         self.indices_quads = [i for i, element in enumerate(self.lattice) if element.name=='quad']
         self.indices_dipoles = [i for i, element in enumerate(self.lattice) if element.name=='dipole']
+
 
     def scale_lattice(self, scale=1):
         for element in self.lattice:
@@ -90,10 +101,6 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         from abel.utilities.beam_physics import evolve_orbit
         import matplotlib.pyplot as plt
         import matplotlib.patches as patches
-
-        """
-        params= [k1, k2, k3, k4, B1, B2, B3], the B-fields to be optimized. Same input as in the optimize-function
-        """
 
         ls, inv_rs = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos')) # dipoles = (bool, 'phi' OR 'inv_rhos'))
         inv_rs = [inv_r*B_multiplier for inv_r in inv_rs]
@@ -235,8 +242,8 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                 S+=1
         return S
     
-    def match_lattice(self, ks_matched=False, ks_to_match='all', inv_rs_to_match=[], bounds=None,\
-                      matching_functions='all'):
+    def match_lattice(self, matching_functions, ks_matched=False, ks_to_match='all',\
+                      inv_rs_to_match=[], bounds=None, match_betas=False, symmetric=False):
         ### Optimize for alpha_x/y to get quad-strengths ###
         # ls_B = [l_dipole1, l_dipole2, l_dipole3, l_diag, B1, B2]
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
@@ -257,6 +264,8 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             matching_functions - a dictionary giving the function (D, Dp, D2, D2p beta_x, beta_y, 
                                     alpha_x, alpha_y, R56) as key(s), and the desired values as values.
 
+            symmetric - if symmetric, assume the second half of the lattice is mirror symmetric.
+
         output:
             The optimized values
 
@@ -273,24 +282,49 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
         def optimizer(params):
             # Params has same dimension as len(ks_to_match)+len(inv_rs_to_match)
+            # if match_betas: params = [k0,k1,...,beta_x/y]
 
             # Check if all quads shall be matched
-            if ks_to_match=='all':
-                for i, j in self.indices_quads:
-                    ks[j] = params[i]
+            if symmetric and ks_to_match=='all':
+                for i, k in enumerate(params):
+                    ks[self.indices_quads[i]] = k
+                    if i < len(params)-1:
+                        ks[self.indices_quads[-1-i]] = k
             # If only select quads are to be matched, set the param values 
             # that have same index as integers in ks_to_match
+            elif symmetric and not ks_to_match=='all':
+                raise NotImplementedError('Symmetric lattice matching is not implemented for specific quads,' \
+                'you must match all quads to set symmetric lattice')
             else:
-                for i, j in self.indices_quads:
-                    if i in ks_to_match:
+                if ks_to_match=='all':
+                    for i, j in enumerate(self.indices_quads):
                         ks[j] = params[i]
+            # If only select quads are to be matched, set the param values 
+            # that have same index as integers in ks_to_match
+                else:
+                    k=0
+                    for i, j in enumerate(self.indices_quads):
+                        if i in ks_to_match:
+                            ks[j] = params[k]
+                            k += 1
+            # If we want to match betas as well            
+            if match_betas:
+                beta_x0 = params[-1]
+                beta_y0 = beta_x0
+            else:
+                beta_x0 = self.beta0_x
+                beta_y0 = self.beta0_y
             
-            betax, alphax, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x)
-            betay, alphay, _ = evolve_beta_function(ls=ls, ks=-ks, beta0=self.beta0_y)
+            betax, alphax, evo_x = evolve_beta_function(ls=ls, ks=ks, beta0=beta_x0)
+            betay, alphay, evo_y = evolve_beta_function(ls=ls, ks=-ks, beta0=beta_y0)
             D, Dp, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, high_res=True)
             R56, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, high_res=True)
 
             S=0
+
+            max_betax = max(evo_x[1,:])
+            max_betay = max(evo_y[1,:])
+
             for key, value in matching_functions.items():
                 match key:
                     case 'D':
@@ -298,7 +332,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                     case 'Dp':
                         S += ((Dp-value)*1e2)**2
                     case 'R56':
-                        S += ((R56-value)*1e2)**2
+                        S += ((R56-value)*1e3)**2
                     case 'beta_x':
                         S += (betax-value)**2
                     case 'beta_y':
@@ -307,37 +341,72 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                         S += (alphax-value)**2
                     case 'alpha_y':
                         S += (alphay-value)**2
-                    case _: 
-                        # Runs if there are no other matches
-                        raise ValueError('Invalid string given to matching')
+                    case 'max_betas':
+                        # if beta is "value" times larger than initially, punish the optimizer
+                        S+= max(max_betax-beta_x0*value,0)**2 + max(max_betay-beta_y0*value,0)**2
             return S
         
         ## Prepare the initial guess
         if ks_matched: # set the already optimized value as initial guess (for the quads to match)
             if ks_to_match=='all':
-                x0 = [self.lattice[i].k for i in self.indices_quads]
+                if symmetric:
+                    x0 = [self.lattice[i].k for i in self.indices_quads[:len(self.indices_quads)//2+1]]
+                else:
+                    x0 = [self.lattice[i].k for i in self.indices_quads]
             else:
                 x0 = [self.lattice[j].k for i,j in enumerate(self.indices_quads) if i in ks_to_match]
         else:
-            f0 = (self.get_length + SI.c*self.delay_per_stage)/2
+            f0 = (self.get_length() + SI.c*self.delay_per_stage)
             k0 = 1/f0/self.l_quads
             x0=[]
-            if not bounds:
-                for i in ks_to_match:
-                    if i%2==0:
-                        x0.append(-k0)
+            if ks_to_match=='all':
+                if not bounds:
+                    if symmetric:
+                        loop_range = len(self.indices_quads)//2+1
                     else:
-                        x0.append(k0)
+                        loop_range = len(self.indices_quads)
+
+                    for i in range(loop_range):
+                        if i%2==0:
+                            x0.append(-k0)
+                        else:
+                            x0.append(k0)
+                else:
+                    for tup in bounds:
+                        if tup[0]==0: # k0 positive
+                            x0.append(k0)
+                        else: # k0 is negative
+                            x0.append(-k0)
             else:
-                for i, tup in zip(ks_to_match, bounds):
-                    if tup[0]==0: # k0 positive
-                        x0.append(k0)
-                    else: # k0 is negative
-                        x0.append(-k0)
+                if not bounds:
+                    for i in ks_to_match:
+                        if i%2==0:
+                            x0.append(-k0)
+                        else:
+                            x0.append(k0)
+                else:
+                    for i, tup in zip(ks_to_match, bounds):
+                        if tup[0]==0: # k0 positive
+                            x0.append(k0)
+                        else: # k0 is negative
+                            x0.append(-k0)
+
+        if match_betas:
+            x0.append(self.beta0_x)
         ## Run the optimization                
         opt = minimize(fun=optimizer, x0=x0, bounds=bounds)
         print(opt)
-        return opt.x
+        if ks_to_match=='all' and not match_betas:
+            ks = opt.x
+        elif ks_to_match=='all' and match_betas:
+            ks = opt.x[:-1]
+        else:
+            ks = opt.x[:len(ks_to_match)]
+        if match_betas:
+            betas = opt.x[-1]
+            return ks, betas
+        else:
+            return ks
         
 
     def reset_lattice(self):
@@ -351,23 +420,35 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         
             
     
-    def set_ks(self, ks, lattice=None):
-        j=0
-        print(j)
-        print(self.get_quad_counts())
+    def set_ks(self, ks, lattice=None, ks_to_set='all', symmetric=False):
+        
         if not lattice:
-            for i in self.indices_quads:
-                if i-1 in self.indices_quads:
-                    self.lattice[i].k = self.lattice[i-1].k
+            if ks_to_set =='all':
+                if symmetric: #Set ks for half of the lattice, then mirror
+                    for i, k in enumerate(ks):
+                        self.lattice[self.indices_quads[i]].k = k
+                        if i < len(ks)-1:
+                            self.lattice[self.indices_quads[-1-i]].k = k
                 else:
-                    self.lattice[i].k = ks[j]
-                    j+=1
+                    for i, j in enumerate(self.indices_quads):
+                        self.lattice[j].k = ks[i]
+            else:
+                k=0
+                for i, j in enumerate(self.indices_quads):
+                    if i in ks_to_set:
+                        self.lattice[j].k = ks[k]
+                        k+=1
         else:
-            for element in lattice:
-                if element.name == 'quad':
-                    #print(ks[j])
-                    element.k = ks[j]
-                    j+=1
+            indices_quads = [i for i, element in enumerate(lattice) if element.name=='quad']
+            if ks_to_set =='all':
+                for i, j in enumerate(indices_quads):
+                    lattice[j].k = ks[i]
+            else:
+                k=0
+                for i, j in enumerate(indices_quads):
+                    if i in ks_to_set:
+                        lattice[j].k = ks[k]
+                        k+=1
 
     def get_elements_arrays_from_lattice(self, lengths: bool=True, dipoles: tuple=(False, 'inv_rhos'), quads: bool=False, sext: bool=False):
         # self.lattice = {'dipole/quad': (length, magnetic variable), 'drift': length, ...}
@@ -455,6 +536,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         
 
         self.lattice.extend(deep_copy)
+        self.update_lattice()
     
     def copy_lattice(self):
         """
