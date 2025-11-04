@@ -229,10 +229,10 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     
     # reference particle
     ref = sim.particle_container().ref_particle()
-    ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6)
+    ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6) # TODO: what if nom_energy is None?
 
     # initialize the envelope
-    sim.init_envelope(ref, distr, peak_current)
+    sim.init_envelope(ref, distr, peak_current) # TODO: what if peak_current is None?
 
     # assign the lattice
     sim.lattice.extend(lattice)
@@ -422,7 +422,7 @@ def particle_container2beam(particle_container):
     Parameters
     ----------
     particle_container : ImpactX ``ParticleContainer``
-        ImpactX ``ParticleContainer`` to be converted
+        ImpactX ``ParticleContainer`` to be converted.
 
     Returns
     -------
@@ -457,7 +457,35 @@ def particle_container2beam(particle_container):
 # ==================================================
 # convert from ABEL beam to ImpactX particle container
 def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
-    """Convert from an ABEL beam object to an ImpactX particle container."""
+    """
+    Convert from an ABEL beam object to an ImpactX particle container.
+
+    Parameters
+    ----------
+    beam : ``Beam``
+        ABEL ``Beam`` object.
+
+    nom_energy : [eV] float, optional
+        Nominal kinetic energy of the reference particle. Used to set reference 
+        particle kinetic energy. When ``None``, will use ``beam.energy()``. 
+        Defaults to ``None``.
+
+    sim : ImpactX simulation object, optional
+        If ``None``, one is created via :func:`initialize_impactx_sim`. Defaults 
+        to ``None``.
+
+    verbose : bool, optional
+        If ``True``, prints ImpactX progress and diagnostic information. 
+        Defaults to ``False``.
+
+
+    Returns
+    -------
+    particle_container : ImpactX ``ParticleContainer``
+        ImpactX ``ParticleContainer`` object.
+
+    sim : ImpactX simulation object 
+    """
 
     import amrex.space3d as amr
     from impactx import Config
