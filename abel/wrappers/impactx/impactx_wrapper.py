@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, verbose=False):
     """
-	Run an ImpactX [1]_ particle-tracking simulation using a specified lattice and 
-	input beam. 
+    Run an ImpactX [1]_ particle-tracking simulation using a specified lattice and 
+    input beam. 
     
     This function 
 
@@ -25,68 +25,67 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     
     3. Executes the simulation, converts the results back into an ABEL beam 
        object, and returns the tracked beam and its evolution data.
-	
-
-	Parameters
-	----------
-	lattice : list
-		Contains a sequence consisting of ImpactX beamline elements (e.g., 
+       
+    Parameters
+    ----------
+    lattice : list
+        Contains a sequence consisting of ImpactX beamline elements (e.g., 
         drifts, bends, lenses, or multipoles). Defines the lattice through which 
         ``beam0`` is tracked.
-
-	beam0 : ``Beam``
-		Input ABEL beam object representing the particle distribution before 
+        
+    beam0 : ``Beam``
+        Input ABEL beam object representing the particle distribution before 
         entering the lattice.
-
-	nom_energy : [eV] float, optional
-		Nominal beam energy used to determine the ISR order and scaling. If 
+        
+    nom_energy : [eV] float, optional
+        Nominal beam energy used to determine the ISR order and scaling. If 
         ``None``, first order ISR effects are always used. If greater than 
         1 TeV, third order ISR effects are enabled. Defaults to ``None``.
 
-	runnable : ``Runnable``, optional
-		ABEL ``Runnable`` object. If provided and ``save_beams`` is ``True``, 
+    runnable : ``Runnable``, optional
+        ABEL ``Runnable`` object. If provided and ``save_beams`` is ``True``, 
         the beam files are saved to the shot directory specified by 
-        ``runnable.shot_path()``. The pickled file ``runnable.obj`` is also 
-        saved to the same directory.
+        :func:`runnable.shot_path() <abel.Runnable.shot_path>`. The pickled file 
+        ``runnable.obj`` is also saved to the same directory.
 
-	keep_data : bool, optional
-		If ``True``, the ImpactX run directory containing simulation outputs and 
+    keep_data : bool, optional
+        If ``True``, the ImpactX run directory containing simulation outputs and 
         the pickled file ``runnable.obj`` is preserved after the simulation 
-		completes. If ``False``, it is deleted automatically. Defaults to 
-		``False``.
+        completes. If ``False``, it is deleted automatically. Defaults to 
+        ``False``.
 
-	save_beams : bool, optional
-		If ``True``, saves beam snapshots for each simulation step via 
-		``extract_beams()``. Defaults to ``False``.
+    save_beams : bool, optional
+        If ``True``, saves beam snapshots for each simulation step via 
+        ``extract_beams()``. Defaults to ``False``.
 
-	space_charge : bool, optional
-		Enable space charge effects in the simulation. Defaults to ``False``.
+    space_charge : bool, optional
+        Enable space charge effects in the simulation. Defaults to ``False``.
 
-	csr : bool, optional
-		Enable CSR modeling. When enabled, the ImpactX simulation parameter 
-		``sim.csr_bins`` is set to 150. Defaults to ``False``.
+    csr : bool, optional
+        Enable CSR modeling. When enabled, the ImpactX simulation parameter 
+        ``sim.csr_bins`` is set to 150. Defaults to ``False``.
 
-	isr : bool, optional
-		Enable ISR modeling. The ISR order is automatically determined based on 
+    isr : bool, optional
+        Enable ISR modeling. The ISR order is automatically determined based on 
         ``nom_energy``. Defaults to ``False``.
 
-	verbose : bool, optional
-		If ``True``, prints detailed ImpactX tracking output to the console. 
-		Defaults to ``False``.
+    verbose : bool, optional
+        If ``True``, prints detailed ImpactX tracking output to the console. 
+        Defaults to ``False``.
 
 
-	Returns
-	-------
-	beam : ``Beam``
-		Output ABEL ``Beam`` object after transport through the given lattice.
+    Returns
+    -------
+    beam : ``Beam``
+        Output ABEL ``Beam`` object after transport through the given lattice.
 
-	evol : SimpleNamespace
-		Beam parameter evolution data extracted from the ImpactX run (e.g. 
+    evol : :class:`types.SimpleNamespace`
+        Beam parameter evolution data extracted from the ImpactX run (e.g. 
         emittances, beta functions, centroid offsets).
 
     References
-	----------
-	.. [1] ImpactX Documentation: https://impactx.readthedocs.io/en/latest/
+    ----------
+    .. [1] ImpactX Documentation: https://impactx.readthedocs.io/en/latest/
     """
     
     # create a new directory
@@ -173,7 +172,7 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
         drifts, bends, lenses, or multipoles). Defines the lattice through which 
         ``beam0`` is tracked.
 
-    distr : ImpctX ``distribution``
+    distr : ImpcatX ``distribution``
         ImpactX distribution function specifying the initial beam envelope 
         parameters and correlations.
 
@@ -184,13 +183,9 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     peak_current : [A] float, optional
         Peak current of the beam. Defaults to ``None``.
 
-    space_charge : str or bool, optional
+    space_charge : str | bool, optional
         Space charge model to use. Options include ``'2D'``, ``'3D'``, or 
         ``False`` to disable. Defaults to ``'2D'``.
-
-    runnable : :class:`abel.core.Runnable`, optional
-        ABEL runnable object to attach simulation results to, if running within 
-        an automated pipeline. Defaults to ``None``.
 
     runnable : ``Runnable``, optional
 		ABEL ``Runnable`` object. Used to specify the run folder if provided.
@@ -205,7 +200,7 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
 
     Returns
     -------
-    evol : `SimpleNamespace`
+    evol : :class:`types.SimpleNamespace`
         Object containing the envelope evolution along the lattice, including 
         beam size, emittance, and energy as a function of the longitudinal 
         coordinate.
@@ -318,9 +313,8 @@ def extract_beams(path='', runnable=None, beam0=None):
     Extract the saved beam snapshots from ImpactX monitor OpenPMD files.
 
     This function reads the particle data stored by ImpactX in
-    ``diags/openPMD/monitor.h5`` and reconstructs a list of 
-    :class:`abel.classes.beam.Beam` objects representing the beam at each 
-    diagnostic step.
+    ``diags/openPMD/monitor.h5`` and reconstructs a list of ``Beam`` objects 
+    representing the beam at each diagnostic step.
 
     Parameters
     ----------
@@ -328,20 +322,20 @@ def extract_beams(path='', runnable=None, beam0=None):
         Path to the ImpactX simulation directory containing the OpenPMD output.
         Defaults to `''`.
 
-    runnable : :class:`abel.core.Runnable`, optional
-        ABEL Runnable object used to locate the simulation directory 
+    runnable : ``Runnable``, optional
+        ABEL ``Runnable`` object used to locate the simulation directory 
         (``runnable.shot_path()/impactx_sims``). If provided, ``path`` is 
         ignored.
 
-    beam0 : :class:`abel.classes.beam.Beam`, optional
+    beam0 : ``Beam``, optional
         Reference beam whose metadata (e.g., ``beam0.trackable_number`` and 
         ``beam0.stage_number``) are used to tag the extracted beams.
 
     Returns
     -------
-    beams : list of :class:`abel.classes.beam.Beam`
-        List of reconstructed :class:`abel.classes.beam.Beam` objects, one for 
-        each saved monitor snapshot.
+    beams : list of ``Beam``
+        List of reconstructed ``Beam`` objects, one for each saved monitor 
+        snapshot.
     """
     
     from abel.classes.beam import Beam
