@@ -222,11 +222,11 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     on a template and system configuration.
 
     This function generates a batch job script for running HiPACE++ on an HPC 
-    system by substituting values from the ABEL configuration file 
-    `CONFIG.py <https://github.com/abel-framework/ABEL/blob/main/abel/CONFIG.py>`_ 
-    into a template job script (the current job script template follows the 
-    Slurm batch job syntax used on the LUMI supercomputer [1]_). The compute 
-    partition is automatically chosen based on requested resources. 
+    system by substituting values from the ABEL configuration class  
+    :class:`CONFIG <abel.CONFIG>` into a template job script (the current job 
+    script template follows the Slurm batch job syntax used on the LUMI 
+    supercomputer [1]_). The compute partition is automatically chosen based on 
+    requested resources. 
     
     The resulting script is made executable.
 
@@ -238,7 +238,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 
     filename_input : str
         Path to the HiPACE++ input file (usually created using 
-        ``hipace_write_inputs()``).
+        :func:`hipace_write_inputs() <abel.wrappers.hipace.hipace_wrapper.hipace_write_inputs>`). 
 
     num_nodes : int, optional
         Number of compute nodes to allocate for the simulation job. Defaults to 
@@ -257,7 +257,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 
     Notes
     -----
-    - The following fields from ``CONFIG.py`` are required:
+    - The following fields from :class:`CONFIG <abel.CONFIG>` are required:
       
       * ``CONFIG.project_name``
       * ``CONFIG.hipace_binary``
@@ -280,7 +280,7 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     .. [1] LUMI Supercomputer batch jobs documentation:
            https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/batch-job/
 
-    .. [2] LUMI Supercomputer Job Scheduling Documentation:
+    .. [2] LUMI Supercomputer job scheduling documentation:
            https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/partitions/
     """
     
@@ -321,39 +321,39 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     """
-	Run a HiPACE++ simulation locally or on a Slurm-based cluster using the 
-	provided job script, and load the resulting beam and driver data from the
-	final output file.
+    Run a HiPACE++ simulation locally or on a Slurm-based cluster using the
+    provided job script, and load the resulting beam and driver data from the
+    final output file.
 
-	Parameters
-	----------
-	filename_job_script : str
-		Path to the batch job script used to submit the job. Typically generated 
-        by ``hipace_write_jobscript()``.
+    Parameters
+    ----------
+    filename_job_script : str
+        Path to the batch job script used to submit the job. Typically generated
+        by :func:`hipace_write_jobscript() <abel.wrappers.hipace.hipace_wrapper.hipace_write_jobscript>`.
 
-	num_steps : int
-		Determines which HDF5 file is loaded and used to extract the outputs 
-        ``beam`` and ``driver`` (e.g., ``num_steps=100`` loads the file 
+    num_steps : int
+        Determines which HDF5 file is loaded and used to extract the outputs
+        ``beam`` and ``driver`` (e.g., ``num_steps=100`` loads the file
         ``openpmd_000100.h5``).
 
-	runfolder : str, optional
-		Path to the folder where the HiPACE++ job is executed and where restults
-		are written. If ``None``, derived from ``filename_job_script``. Defaults 
-        to ``None``.
+    runfolder : str, optional
+        Path to the folder where the HiPACE++ job is executed and where results
+        are written. If ``None``, derived from ``filename_job_script``.
+        Defaults to ``None``.
 
-	quiet : bool, optional
-		If ``True``, suppresses terminal output during execution. Defaults to
-		``False``.
+    quiet : bool, optional
+        If ``True``, suppresses terminal output during execution.
+        Defaults to ``False``.
 
-	Returns
-	-------
-	beam : ``Beam`` | None
-		The loaded beam from the designated HiPACE++ output file. Set to 
-		``None`` if the beam could not be loaded.
+    Returns
+    -------
+    beam : ``Beam`` | None
+        The loaded beam from the designated HiPACE++ output file.
+        Set to ``None`` if the beam could not be loaded.
 
-	driver : ``Beam``
-		The loaded driver object from the designated HiPACE++ output file.
-	"""
+    driver : ``Beam``
+        The loaded driver object from the designated HiPACE++ output file.
+    """
 
     # TODO: need to check that num_steps is valid (positive int <= max_step in input_template).
 
@@ -530,7 +530,7 @@ def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
 
     Returns
     ----------
-    beam : ``Beam`` object
+    beam : ``Beam``
         The extracted beam.
     """
 
