@@ -10,16 +10,22 @@ def wake_t_bunch2beam(bunch):
     """
     Convert a Wake-T ``ParticleBunch`` to an ABEL ``Beam``.
 
+    
     Parameters
     ----------
     bunch : Wake-T ``ParticleBunch``
         Wake-T ``ParticleBunch`` to be converted.
 
+        
     Returns
     -------
     beam : ``Beam``
         The converted ABEL ``Beam``.
 
+        
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
 
     from abel.classes.beam import Beam
@@ -49,6 +55,7 @@ def beam2wake_t_bunch(beam, name='beam'):
     """
     Convert an ABEL ``Beam`` to a Wake-T ``ParticleBunch``.
 
+    
     Parameters
     ----------
     beam : ``Beam``
@@ -57,11 +64,16 @@ def beam2wake_t_bunch(beam, name='beam'):
     name : str, optional
         The name for the Wake-T ``ParticleBunch``. Defaults to ``'beam'``.
 
+        
     Returns
     -------
     bunch : Wake-T ``ParticleBunch``
         The converted Wake-T ``ParticleBunch``.
 
+        
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
     
     import wake_t
@@ -86,6 +98,7 @@ def wake_t_hdf5_load(file_path, species='beam'):
     """
     Load an ABEL beam from a Wake-T HDF5 file (OpenPMD format).
 
+    
     Parameters
     ----------
     file_path : str
@@ -94,11 +107,16 @@ def wake_t_hdf5_load(file_path, species='beam'):
     species : str, optional
         Specifies the name of the beam to be extracted.
 
-
+        
     Returns
     ----------
     beam : ``Beam``
         The converted ABEL ``Beam``.
+
+        
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
 
     from abel import Beam
@@ -176,6 +194,7 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     """
     Calculates step size, box sizes etc. to set up a `Wake-T plasma acceleration stage <https://wake-t.readthedocs.io/en/latest/api/beamline_elements/_autosummary/wake_t.beamline_elements.PlasmaStage.html#plasmastage>`_. 
     
+
     Parameters
     ----------
     plasma_density : [m^-3] float
@@ -222,6 +241,11 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     Returns
     ----------
     plasma_stage : Wake-T ``PlasmaStage``
+
+
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
 
     import numpy as np
@@ -300,6 +324,7 @@ def run_single_step_wake_t(plasma_density, drive_beam, beam):
     transversly shifted frame. The coordinates for the results are also given in 
     this shifted frame.
 
+    
     Parameters
     ----------
     drive_beam : ``Beam``
@@ -311,9 +336,14 @@ def run_single_step_wake_t(plasma_density, drive_beam, beam):
         
     Returns
     ----------
-    wake_t_evolution : ``SimpleNamespace``
+    wake_t_evolution : :class:`types.SimpleNamespace`
         Contains the 2D plasma density and wakefields for the initial and 
         final time steps.
+
+
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
 
     import os, uuid, shutil
@@ -369,15 +399,24 @@ def extract_initial_and_final_Ez_rho(tmpfolder):
     """
     Extract the initial and final Ez and plasma charge densities.
 
+    
     Parameters
     ----------
     tmpfolder : str
         The path to the directory containing the Wake-T HDF5 files (OpenPMD 
         format).
 
+        
     Returns
     ----------
-    None
+    wake_t_evolution : :class:`types.SimpleNamespace`
+        Contains the 2D plasma density and wakefields for the initial and 
+        final time steps.
+
+
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
     
     from types import SimpleNamespace
@@ -431,6 +470,7 @@ def wake_t_remove_halo_particles(bunch, nsigma=20):
     """
     Bunch halo cleaning (outliers in x, xp, y and yp).
 
+    
     Parameters
     ----------
     bunch : Wake-T ``ParticleBunch``
@@ -443,10 +483,16 @@ def wake_t_remove_halo_particles(bunch, nsigma=20):
         ``bunch.px/bunch.pz - x_angle > nsigma * divergence_x`` or 
         ``bunch.py/bunch.pz - y_angle > nsigma * divergence_y``. Defaults to 20.
 
+        
     Returns
     ----------
     filtered_bunch : Wake-T ``ParticleBunch``
         Cleaned Wake-T ``ParticleBunch``.
+
+
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
 
     import numpy as np
@@ -501,6 +547,7 @@ def wakeT_r_E_filter(bunch, r_thres, pz_thres):
     ``r_thres`` from axis. Also discards particles that have lower momentum than 
     pz_thres.
 
+    
     Parameters
     ----------
     bunch : Wake-T ``ParticleBunch``
@@ -516,6 +563,11 @@ def wakeT_r_E_filter(bunch, r_thres, pz_thres):
     ----------
     filtered_bunch : Wake-T ``ParticleBunch``
         Cleaned Wake-T ``ParticleBunch``.
+
+
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
 
     import numpy as np
