@@ -115,7 +115,7 @@ class StageWakeT(Stage):
 
         # select the wakefield model (ion motion or not)
         if self.ion_motion:
-            wakefield_model='quasistatic_2d_ion'
+            wakefield_model='quasistatic_2d_ion'  # TODO: This has not yet been implemented with the current Wake-T version (v.0.8.0)
         else:
             wakefield_model='quasistatic_2d'
             
