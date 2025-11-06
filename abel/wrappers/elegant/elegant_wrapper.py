@@ -60,8 +60,8 @@ def elegant_run(filename, beam0, inputbeamfile, outputbeamfile, verbose=False, t
         Contains the output beams saved throughout the lattice.
 
     References
-	----------
-	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
+    ----------
+    .. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
     """
     
     # convert incoming beam object to temporary SDDS file
@@ -119,8 +119,8 @@ def elegant_read_beam(filename, tmpfolder=None, model_beam=None):
         Returns ``None`` if the charge parameter cannot be extracted.
 
     References
-	----------
-	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
+    ----------
+    .. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
     """
     
     from abel.utilities.relativity import gamma2energy
@@ -199,8 +199,8 @@ def elegant_write_beam(beam, filename, tmpfolder=None):
         The path to the generated ELEGANT SDDS beam file.
 
     References
-	----------
-	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
+    ----------
+    .. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
     """
     
     from abel.utilities.relativity import energy2gamma
@@ -271,41 +271,41 @@ def extract_beams_and_evolution(tmpfolder, evolution_folder, runnable=None, save
     beam along the lattice.
 
     Parameters
-	----------
-	tmpfolder : str
-		Temporary run directory path containing diagnostic output files from the
-		simulation (e.g. ``centroid_vs_s.cen``).
+    ----------
+    tmpfolder : str
+        Temporary run directory path containing diagnostic output files from the
+        simulation (e.g. ``centroid_vs_s.cen``).
 
-	evolution_folder : str
-		Path to the directory containing beam files to extract beam parameter 
+    evolution_folder : str
+        Path to the directory containing beam files to extract beam parameter 
         evolution from.
 
-	runnable : ``Runnable``, optional
-		ABEL ``Runnable`` object. If provided and ``save_beams`` is ``True``, 
+    runnable : ``Runnable``, optional
+        ABEL ``Runnable`` object. If provided and ``save_beams`` is ``True``, 
         the beam files are saved to the shot directory specified by 
         ``runnable.shot_path()``.
 
-	save_beams : bool, optional
-		If ``True`` and ``runnable`` is not ``None``, saves each extracted beam 
+    save_beams : bool, optional
+        If ``True`` and ``runnable`` is not ``None``, saves each extracted beam 
         snapshot to the shot directory specified by ``runnable.shot_path()``.
-		Defaults to ``True``.
+        Defaults to ``True``.
 
-	model_beam : ``Beam``, optional
+    model_beam : ``Beam``, optional
         Beam from which metadata and charge is copied.
 
 
-	Returns
-	-------
-	evol : SimpleNamespace
-		Object containing arrays of beam parameters as a function of propagation 
+    Returns
+    -------
+    evol : :class:`types.SimpleNamespace`
+        Object containing arrays of beam parameters as a function of propagation 
         distance ``s``. Each field represents one beam parameter, e.g. 
         ``evol.emit_nx``, ``evol.bunch_length``, etc.
 	
 	
-	References
-	----------
-	.. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
-	"""
+    References
+    ----------
+    .. [1] ELEGANT Documentation: https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
+    """
     
     insitu_path = tmpfolder + 'diags/insitu/'
 
@@ -397,13 +397,13 @@ def elegant_apl_fieldmap2D(tau_lens, lensdim_x=2e-3, lensdim_y=2e-3, lens_x_offs
 
     lensdim_y : [m] float
         Half-width of the transverse field map in the y-direction. Defaults to 
-        2e-3
+        2e-3.
         
     lens_x_offset : [m] float
         Lens transverse offset in x. Defaults to 0.0.
 
     lens_y_offset : [m] float
-        Lens transverse offset in y. Defaults to 0.0
+        Lens transverse offset in y. Defaults to 0.0.
 
     tmpfolder : str, optional
         Temporary folder for intermediate CSV storage. If not provided, a new 
