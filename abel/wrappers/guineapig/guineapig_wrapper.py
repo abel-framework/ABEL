@@ -55,7 +55,7 @@ def guineapig_run(inputfile, beam1, beam2, tmpfolder=None):
         - ``luminosity_full`` : [m^-2 per bunch crossing] Full luminosity.
         - ``luminosity_peak`` : [m^-2 per bunch crossing] Peak luminosity.
         - ``upsilon_max`` : Maximum beamstrahlung parameter.
-        - ``num_pairs`` : Number of coherent pairs (per macroparticle?).
+        - ``num_pairs`` : Number of incoherent e+e- pairs produced via beam–beam interactions.
         - ``num_photon1``, ``num_photon2`` : Number of emitted beamstrahlung photons.
         - ``energy_loss1``, ``energy_loss2`` : [eV] Energy loss per particle.
 
@@ -116,7 +116,7 @@ def guineapig_run(inputfile, beam1, beam2, tmpfolder=None):
 # ==================================================
 def guineapig_write_beam(beam, filename, beta_x=None, beta_y=None):
     """
-    Write an ABEL ``Beam``object to a GUINEA-PIG input beam file.
+    Write an ABEL ``Beam`` object to a GUINEA-PIG input beam file.
 
     Parameters
     ----------
@@ -138,6 +138,11 @@ def guineapig_write_beam(beam, filename, beta_x=None, beta_y=None):
     -------
     None
         The function writes data to disk and does not return a value.
+
+
+    References
+    ----------
+    .. [1] D. Schulte, "Study of Electromagnetic and Hadronic Background in the Interaction Region of the TESLA Collider", University of Hamburg (1997)
     """
 
     # extract beta function (for normalization)
@@ -188,6 +193,11 @@ def guineapig_read_beam(filename, Q, beta_x, beta_y, z_mean=0.0):
     Returns
     -------
     beam : ``Beam``
+
+
+    References
+    ----------
+    .. [1] D. Schulte, "Study of Electromagnetic and Hadronic Background in the Interaction Region of the TESLA Collider", University of Hamburg (1997)
     """
     
     # declare variables
