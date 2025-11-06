@@ -13,14 +13,21 @@ def abel_beam2rft_beam(beam):
     """
     Convert an ABEL ``Beam`` object to a RF-Track ``Bunch6dT`` object.
 
+    
     Parameters
     ----------
     beam : ``Beam``
         The beam to be converted.
 
+        
     Returns
     ----------
     beam_rft : RF-Track ``Bunch6dT``
+
+    
+    References
+    ----------
+    .. [1] RF-Track reference manual: https://gitlab.cern.ch/rf-track/rf-track-reference-manual
     """
 
     from RF_Track import Bunch6dT
@@ -99,6 +106,10 @@ def abel_beam2rft_beam(beam):
 def rft_beam2abel_beam(beam_rft):
     """
     Convert a RF-Track ``Bunch6dT`` object to an ABEL ``Beam`` object.
+
+    References
+    ----------
+    .. [1] RF-Track reference manual: https://gitlab.cern.ch/rf-track/rf-track-reference-manual
     """
     
     import warnings
@@ -162,6 +173,11 @@ def calc_sc_fields_obj(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, nu
     Returns
     ----------
     sc_fields_obj : RF-Track ``SpaceCharge_Field``
+
+    
+    References
+    ----------
+    .. [1] RF-Track reference manual: https://gitlab.cern.ch/rf-track/rf-track-reference-manual
     """
 
     from RF_Track import SpaceCharge_Field
@@ -236,6 +252,11 @@ def rft_beam_fields(abel_beam, num_x_cells, num_y_cells, num_z_cells=None, num_t
     zs_sorted : [m] 1D float array
         The z-coordinates used to evaluate the spacecharge fields. Sorted if 
         ``sort_zs`` is ``True``.
+
+
+    References
+    ----------
+    .. [1] RF-Track reference manual: https://gitlab.cern.ch/rf-track/rf-track-reference-manual
     """
     
     # Set the solver resolution and calculate fields
@@ -272,14 +293,22 @@ def wake_t_bunch2rft_beam(wake_t_bunch):
     """
     Convert a Wake-T ``ParticleBunch`` to a RF-Track ``Bunch6dT`` object.
 
+    
     Parameters
     ----------
     wake_t_bunch : Wake-T ``ParticleBunch``
         The beam to be converted.
 
+        
     Returns
     ----------
     beam_rft : RF-Track ``Bunch6dT``
+
+
+    References
+    ----------
+    .. [1] RF-Track reference manual: https://gitlab.cern.ch/rf-track/rf-track-reference-manual
+    .. [2] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
     """
 
     from RF_Track import Bunch6dT
