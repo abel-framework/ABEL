@@ -66,7 +66,7 @@ API documentation
    api_external/cost_modeled.rst
    api_external/runnable.rst
    api_external/collider.rst
-   api_external/wrapper_apis.rst
+   api_external/wrappers.rst
 
 Development
 -----------

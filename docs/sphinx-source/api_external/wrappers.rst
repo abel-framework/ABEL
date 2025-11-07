@@ -1,20 +1,38 @@
 Wrappers for external codes
 ===============================
 
-``HiPACE++``
+ELEGANT
 ---------------------
+.. automodule:: abel.wrappers.elegant.elegant_wrapper
+   :members:
+   :undoc-members:
 
-``ImpactX``
+GUINEA-PIG
 ---------------------
+.. automodule:: abel.wrappers.guineapig.guineapig_wrapper
+   :members:
+   :undoc-members:
 
-``GUINEAPIG``
+HiPACE++
 ---------------------
+.. automodule:: abel.wrappers.hipace.hipace_wrapper
+   :members:
+   :undoc-members:
 
-``ELEGANT``
+ImpactX
 ---------------------
+.. automodule:: abel.wrappers.impactx.impactx_wrapper
+   :members:
+   :undoc-members:
 
-``RF-Track``
+RF-Track
 ---------------------
+.. automodule:: abel.wrappers.rf_track.rf_track_wrapper
+   :members:
+   :undoc-members:
 
-``Wake-T``
+Wake-T
 ---------------------
+.. automodule:: abel.wrappers.wake_t.wake_t_wrapper
+   :members:
+   :undoc-members:
