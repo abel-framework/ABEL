@@ -64,7 +64,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         
         # run ImpactX
         from abel.wrappers.impactx.impactx_wrapper import run_impactx
-        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
+        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr, isr_on_ref_part=self.isr_on_ref_part)
         
         return super().track(beam, savedepth, runnable, verbose)
     
@@ -101,8 +101,10 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
 
         # add lens offset for ISR mitigation
         if self.enable_isr and self.cancel_isr_kicks:
+            self.isr_on_ref_part = True
             dx_isr = self.lens_offset_isr_kick_mitigation()
         else:
+            self.isr_on_ref_part = False
             dx_isr = 0
             
         # define plasma lens
