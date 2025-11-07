@@ -10,7 +10,7 @@ import uuid, os, shutil
 import scipy.constants as SI
 from types import SimpleNamespace
 
-def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, verbose=False):
+def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, isr_on_ref_part=True, verbose=False):
     """Run an ImpactX particle-tracking simulation using a given lattice and input beam."""
     
     # create a new directory
@@ -33,6 +33,7 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
         sim.csr_bins = 150
     sim.isr = isr
     if isr:
+        sim.isr_on_ref_part = isr_on_ref_part
         if nom_energy is not None and nom_energy > 1e12:
             sim.isr_order = 3
         else:
