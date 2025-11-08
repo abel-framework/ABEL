@@ -24,11 +24,14 @@ def elegant_missing():
     Checks if the elegant executable exists and has executable permissions.
     Returns True if missing.
 
-    Args:
-        file_path (str): The path to the file.
+    Parameters
+    ----------
+    file_path: str
+      The path to the file.
 
-    Returns:
-        bool: False if the file exists and is executable, True otherwise.
+    Returns
+    -------
+    bool: False if the file exists and is executable, True otherwise.
     """
     file_path = CONFIG.elegant_exec
     if os.path.exists(file_path) and os.path.isfile(file_path):
