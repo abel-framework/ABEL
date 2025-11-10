@@ -745,6 +745,7 @@ class StageHipace(Stage):
         '''
 
         from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
+        from abel.classes.beam import Beam
         from matplotlib import pyplot as plt
         
         files = sorted(os.listdir(data_dir))
