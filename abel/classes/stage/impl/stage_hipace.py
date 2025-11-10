@@ -30,135 +30,87 @@ class StageHipace(Stage):
     prepares input files, launches HiPACE++ runs, extracts beam and plasma 
     diagnostics, and post-processes simulation data.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage`.
     
 
     Attributes
     ----------
-    keep_data : bool
-        Flag for whether to keep raw HiPACE++ output after simulation.
+    keep_data : bool, optional
+            Flag for whether to keep raw HiPACE++ output after simulation. 
+            Defaults to ``False``.
 
-    save_drivers : bool
-        Flag for whether to save input and output driver beams to disk.
+    save_drivers : bool, optional
+        Flag for whether to save input and output driver beams to disk. 
+        Defaults to ``False``.
 
-    output : int
+    output : int, optional
         Frequency (in simulation steps) for HiPACE++ field/particle outputs.
+        If ``None``, will output the last time step. Defaults to ``None``. 
 
-    ion_motion : bool
-        Flag to include ion motion in the plasma.
+    ion_motion : bool, optional
+            Flag to include ion motion in the plasma. Defaults to ``True``.
 
-    ion_species : str
-        Ion species used in the plasma (e.g. 'H', 'He', 'Li').
+    ion_species : str, optional
+        Ion species used in the plasma (e.g. 'H', 'He', 'Li'). Defaults to 
+        ``'H'``.
 
-    beam_ionization : bool
-        Flag for enabling beam-induced ionization.
+    beam_ionization : bool, optional
+        Flag for enabling beam-induced ionization. Defaults to ``True``.
 
-    radiation_reaction : bool
-        Flag for enabling radiation reaction effects.
+    radiation_reaction : bool, optional
+        Flag for enabling radiation reaction effects. Defaults to ``False``.
 
-    num_nodes : int
-        Number of compute nodes to request in the job script.
+    num_nodes : int, optional
+        Number of compute nodes to request in the job script. Defaults to 1.
 
-    num_cell_xy : int
-        Number of transverse grid cells in HiPACE++.
+    num_cell_xy : int, optional
+        Number of transverse grid cells in HiPACE++. Defaults to 511.
 
-    driver_only : bool
-        Flag for running simulation with only the driver (no witness beam).
+    driver_only : bool, optional
+        Flag for running simulation with only the driver (no witness beam). 
+        Defaults to ``False``.
 
-    plasma_density_from_file : str
-        Path to plasma density profile file (overrides uniform density).
+    plasma_density_from_file : str, optional
+        Path to plasma density profile file (overrides uniform density). Is 
+        ignored when set to ``None``. Defaults to ``None``.
 
-    no_plasma : bool
-        If ``True``, runs the stage without plasma.
+    no_plasma : bool, optional
+        If ``True``, runs the stage without plasma. Defaults to ``False``.
 
-    external_focusing : bool
-        Flag for whether to include external lineear focusing.
+    external_focusing : bool, optional
+        Flag for enabling drive beam guiding by applying a linear transverse 
+        external magnetic field across the beams. If ``True``, the field 
+        gradient of the external field is set to enforce the drive beam to 
+        undergo an half-interger number of betatron oscillations along the 
+            stage. Defaults to ``False``.
 
-    mesh_refinement : bool
-        Enable HiPACE++ mesh refinement. See the `HiPACE++ wrapper <https://github.com/abel-framework/ABEL/blob/main/abel/wrappers/hipace/hipace_wrapper.py>`_ for more details.  
+    mesh_refinement : bool, optional
+        Enable HiPACE++ mesh refinement. See the 
+        :func:`HiPACE++ wrapper <abel.wrappers.hipace.hipace_wrapper.hipace_write_inputs>`
+        for more details. Defaults to ``True``. 
 
-    do_spin_tracking : bool
-        Flag for enabling particle spin tracking.
+    do_spin_tracking : bool, optional
+        Flag for enabling particle spin tracking. Defaults to ``False``.
 
-    run_path : str
-        Path to store plots and outputs.
+    run_path : str, optional
+        Path to store plots and outputs. Defaults to ``None``.
 
     plasma_profile : SimpleNamespace
         Holds arrays for longitudinal positions (`ss`) and densities (`ns`)
         when ramps are generated internally.
+
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
+
+        
+    References
+    ----------
+    .. [1] HiPACE++ User Guide, https://hipace.readthedocs.io/
     """
     
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing=False, mesh_refinement=True, do_spin_tracking=False, run_path=None):
         """
         The constructor for the ``StageHipace`` class.
-
-        Parameters
-        ----------
-        length : [m] float, optional
-            Total length of the plasma stage.
-
-        nom_energy_gain : [eV] float, optional
-            Nominal beam energy gain.
-
-        plasma_density : [m^-3] float, optional
-            Uniform plasma density. Ignored if ``plasma_density_from_file`` is given.
-
-        driver_source : ``Source`` or ``DriverComplex``, optional (default= ``None``)
-            The source of the drive beam.
-
-        ramp_beta_mag : float, optional
-            Beta function magnitude used in ramp design.
-
-        keep_data : bool, optional (default= ``False``)
-            Flag for whether to keep raw HiPACE++ output after simulation.
-
-        save_drivers : bool, optional (default= ``False``)
-            Flag for whether to save input and output driver beams to disk.
-
-        output : int, optional
-            Frequency (in simulation steps) for HiPACE++ field/particle outputs.
-
-        ion_motion : bool, optional (default= ``True``)
-            Flag to include ion motion in the plasma.
-
-        ion_species : str, optional (default= ``'H'``)
-            Ion species used in the plasma (e.g. 'H', 'He', 'Li').
-
-        beam_ionization : bool, optional (default= ``True``)
-            Flag for enabling beam-induced ionization.
-
-        radiation_reaction : bool, optional (default= ``False``)
-            Flag for enabling radiation reaction effects.
-
-        num_nodes : int, optional (default=1)
-            Number of compute nodes to request in the job script.
-
-        num_cell_xy : int, optional (default=511)
-            Number of transverse grid cells in HiPACE++.
-
-        driver_only : bool, optional (default= ``False``)
-            Flag for running simulation with only the driver (no witness beam).
-
-        plasma_density_from_file : str, optional (default= ``None``)
-            Path to plasma density profile file (overrides uniform density).
-
-        no_plasma : bool, optional (default= ``False``)
-            If ``True``, runs the stage without plasma.
-
-        external_focusing : bool, optional (default= ``False``)
-            Flag for whether to include external focusing (APL-like quadrupoles).
-
-        mesh_refinement : bool, optional (default= ``True``)
-            Enable HiPACE++ mesh refinement.
-
-        do_spin_tracking : bool, optional (default= ``False``)
-            Flag for enabling particle spin tracking.
-
-        run_path : str, optional (default= ``None``)
-            Path to store plots and outputs.
-
-        stage_number : int
-            Keeps track of which stage it is in the beamline.
         """
 
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
@@ -227,7 +179,7 @@ class StageHipace(Stage):
             self._external_focusing_gradient = 0
         if self.external_focusing == True and self._external_focusing_gradient is None:
             num_half_oscillations = 1
-            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2
+            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
         
         beam0 = beam_incoming
         driver0 = driver_incoming
