@@ -25,27 +25,42 @@ class StageWakeT(Stage):
 
     Attributes
     ----------
-    num_cell_xy : int
-        Number of transverse grid cells in Wake-T.
+    num_cell_xy : int, optional
+        Number of transverse grid cells in Wake-T. Defaults to 256.
 
-    keep_data : bool
-        Flag for whether to keep raw Wake-T output after simulation.
+    output_period : int, optional
+        Number of times along the stage in which the Wake-T diagnostics data 
+        is written to file. If ``None``, ``output_period`` is set to 
+        ``round(stage length/step size/8)``. Defaults to ``None``.
 
-    ion_motion : bool
-        Flag to include ion motion in the plasma.
+    keep_data : bool, optional
+        Flag for whether to keep raw Wake-T output after simulation. Defaults to 
+        ``False``.
 
-    run_path : str
-        Path to store plots and outputs.
+    ion_motion : bool, optional
+        Flag to include ion motion in the plasma. Defaults to ``False``.
+
+    run_path : str, optional
+        Path to store plots and outputs. Defaults to ``None``.
 
     stage_number : int
         Keeps track of which stage it is in the beamline.
-    """
+
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False, run_path=None):
+    Notes
+    -----
+    - The box sizes are set based on beam extent and estimated blowout radius.
+    - The step size is set to matched beta function/8
+    """
+
+    # TODO: allow the user to set the box size and step size.
+    
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, output_period=None, keep_data=False, ion_motion=False, run_path=None):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
         self.num_cell_xy = num_cell_xy
+        self.output_period = output_period
         self.keep_data = keep_data
         
         # physics flags
@@ -72,6 +87,11 @@ class StageWakeT(Stage):
         tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + os.sep
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
+
+        # make diagnostics folder
+        diag_dir = os.path.join(tmpfolder, 'hdf5')
+        if not os.path.exists(diag_dir):
+            os.mkdir(diag_dir)
 
         # make driver (and convert to WakeT bunch)
         driver0 = self.driver_source.track()
@@ -118,11 +138,13 @@ class StageWakeT(Stage):
             wakefield_model='quasistatic_2d_ion'
         else:
             wakefield_model='quasistatic_2d'
+        
+        if self.output_period is None:
+            self.output_period = round(self.length/dz/8)
             
-        n_out = round(self.length/dz/8)
         plasma = wake_t.PlasmaStage(length=self.length, density=plasma_profile, wakefield_model=wakefield_model,
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
-                                    n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
+                                    n_out=self.output_period, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
         # do tracking
         bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
@@ -130,13 +152,13 @@ class StageWakeT(Stage):
         
         # save evolution of the beam and driver
         self.__extract_evolution(bunches)
-        self.__extract_initial_and_final_step(tmpfolder)
+        self.__extract_initial_and_final_step(diag_dir)
 
         # delete or move data
-        #if self.keep_data:
-        #    shot_path = runnable.shot_path()  # TODO: this does not work yet
-        #    destination_path = runnable.shot_path() + 'stage_' + str(bunches[1].stage_number) + '/insitu'
-        #    shutil.move(tmpfolder, destination_path)
+        if self.keep_data:
+           destination_path = runnable.shot_path() + 'stage_' + str(self.stage_number)
+           #destination_path = runnable.shot_path() + 'stage_' + str(self.stage_number) + '/insitu'
+           shutil.move(diag_dir, destination_path)
         
         # remove temporary directory
         shutil.rmtree(tmpfolder)
@@ -215,12 +237,11 @@ class StageWakeT(Stage):
 
 
     # ==================================================
-    def __extract_initial_and_final_step(self, tmpfolder):
+    def __extract_initial_and_final_step(self, source_path):
 
         from openpmd_viewer import OpenPMDTimeSeries
         
         # prepare to read simulation data
-        source_path = tmpfolder + 'hdf5/'
         ts = OpenPMDTimeSeries(source_path)
 
         # extract initial on-axis wakefield
