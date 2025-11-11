@@ -719,7 +719,7 @@ class StageHipace(Stage):
 
         
     # ==================================================
-    def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_fig=False):
+    def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_path=None):
         '''
         Create waterfall plots for current profile, relative energy spectrum, 
         horizontal transverse profile and vertical transverse profile.
@@ -740,8 +740,9 @@ class StageHipace(Stage):
             Defines a threshold for identifying and removing "halo" particles 
             based on their deviation from the core of the particle beam.
 
-        save_fig : bool, optional
-            Flag for saving the output figure.
+        save_path : str, optional
+            If not ``None``, saves the output figure to the specified file path. 
+            Defaults to ``None``.
         '''
 
         from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
@@ -802,9 +803,5 @@ class StageHipace(Stage):
         axs[3].set_xlabel('Location along the stage [m]')
         
         plt.show()
-        if save_fig:
-            plot_path = self.run_path + 'plots' + os.sep
-            if not os.path.exists(plot_path):
-                os.makedirs(plot_path)
-            filename = plot_path + 'waterfalls' + '.png'
-            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+        if save_path is not None:
+            fig.savefig(save_path, format='png', dpi=600, bbox_inches='tight', transparent=False)
