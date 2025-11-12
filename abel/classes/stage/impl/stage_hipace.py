@@ -544,18 +544,25 @@ class StageHipace(Stage):
         
         # If there is already a density file open and make the plasma profile
         if self.plasma_density_from_file:
-            ss, ns = [], []
-            with open(self.plasma_density_from_file, 'r') as f:
-                for line in f:
-                    s, n = line.strip().split()
-                    ss.append(float(s))
-                    ns.append(float(n))
-
-                ss = np.array(ss)
-                ns = np.array(ns)
-                self.plasma_profile.ss = ss
-                self.plasma_profile.ns = ns
-            return
+            if isinstance(self.plasma_density_from_file, str):
+                ss, ns = [], []
+                try:
+                    with open(self.plasma_density_from_file, 'r') as f:
+                        for line in f:
+                            s, n = line.strip().split()
+                            ss.append(float(s))
+                            ns.append(float(n))
+        
+                        ss = np.array(ss)
+                        ns = np.array(ns)
+                        self.plasma_profile.ss = ss
+                        self.plasma_profile.ns = ns
+                        
+                        return
+                except FileNotFoundError:
+                    raise FileNotFoundError("File can not be located using given path") from None
+            else:
+                raise TypeError("Expected file path to be a string")
 
         # make the plasma ramp profile
         if self.has_ramp():
@@ -574,7 +581,6 @@ class StageHipace(Stage):
             ss = np.concatenate((ss_upramp, ss_flattop, ss_downramp), axis=0)
             ns = np.concatenate((ns_upramp, ns_flattop, ns_downramp), axis=0)
 
-            # save to file
             self.plasma_profile.ss = ss
             self.plasma_profile.ns = ns
             
