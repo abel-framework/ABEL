@@ -643,44 +643,53 @@ class StageHipace(Stage):
     
     # ==================================================
     # Apply waterfall function to all beam dump files
-    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', remove_halo_nsigma=None, args=None):
         """
-        Applies waterfall function to all beam dump files in ``data_dir``.
+        Applies waterfall function to all HiPACE++ HDF5 output files in 
+        ``data_dir``.
 
          Parameters
         ----------
-        fcns : A list of Beam class methods
-            Beam class profile methods such as ``Beam.current_profile``, ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, ``Beam.transverse_profile_y``.
+        fcns : A list of ``Beam`` class methods
+            Beam class profile methods such as ``Beam.current_profile``, 
+            ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, 
+            ``Beam.transverse_profile_y``.
 
         edges : float list
-            Specifies the bins to be used to create the histogram(s) in the waterfall plot(s).
+            Specifies the bins to be used to create the histogram(s) in the 
+            waterfall plot(s).
 
         data_dir : str
             Path to the directory containing all HiPACE++ HDF5 output files.
 
         species : str, optional
-            Specifies the name of the beam to be extracted.
-
-        clean : bool, optional
-            Determines whether the extracted beams from the HiPACE++ HDF5 output files should be cleaned before further processing.
+            Specifies the name of the beam to be extracted. Defaults to 
+            ``'beam'``.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+            If not ``None``, defines a threshold for identifying and excluding 
+            outlier particles based on their deviation from the core of the 
+            particle beam. Defaults to ``None``.
 
         args : float list, optional
-            Allows passing additional arguments to the functions in fcns.
+            Allows passing additional arguments to the functions in ``fcns``. 
+            Defaults to ``None``.
             
             
         Returns
         ----------
         waterfalls : list of 2D float ndarrays
-            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one 
+            function in ``fcns`` applied across all files (i.e., simulation 
+            outputs). The dimension of element i is determined by the length of 
+            ``edges`` and the number of simulation outputs.
         
         locations : [m] 1D float ndarray
             Stores the location for each slice of ``waterfalls``.
         
         bins : list of 1D float ndarrays
-            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+            Each element contains the bins used for the slices/histograms in 
+            ``waterfalls``.
         """
 
         from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
@@ -702,7 +711,7 @@ class StageHipace(Stage):
             # load phase space
             beam = hipaceHdf5_2_abelBeam(data_dir, index, species=species)
 
-            if clean:
+            if remove_halo_nsigma is not None and remove_halo_nsigma > 0.0:
                 beam.remove_halo_particles(nsigma=remove_halo_nsigma)
             
             # find beam location
@@ -719,7 +728,7 @@ class StageHipace(Stage):
 
         
     # ==================================================
-    def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_path=None):
+    def plot_waterfalls(self, data_dir, species='beam', remove_halo_nsigma=20, save_path=None): # TODO move dependencies and move this to Stage
         '''
         Create waterfall plots for current profile, relative energy spectrum, 
         horizontal transverse profile and vertical transverse profile.
@@ -730,19 +739,22 @@ class StageHipace(Stage):
             Path to the directory containing all HiPACE++ HDF5 output files.
 
         species : str, optional
-            Specifies the name of the beam to be extracted.
-
-        clean : bool, optional
-            Determines whether the extracted beams from the HiPACE++ HDF5 output 
-            files should be cleaned before further processing.
+            Specifies the name of the beam to be extracted. Defaults to 
+            ``'beam'``.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles 
-            based on their deviation from the core of the particle beam.
+            If not ``None``, defines a threshold for identifying and excluding 
+            outlier particles based on their deviation from the core of the 
+            particle beam. Defaults to 20.
 
         save_path : str, optional
             If not ``None``, saves the output figure to the specified file path. 
             Defaults to ``None``.
+
+
+        Returns
+        ----------
+        ``None``
         '''
 
         from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
