@@ -20,7 +20,7 @@ class StageWakeT(Stage):
     simulations using Wake-T. It prepares input files, launches Wake-T runs, 
     extracts beam and plasma diagnostics, and post-processes simulation data.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes
@@ -431,7 +431,7 @@ class StageWakeT(Stage):
             ``waterfalls``.
         """
 
-        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
+        from abel.wrappers.wake_t.wake_t_wrapper import wake_t_hdf5_load
         
         # find number of beam outputs to plot
         files = sorted(os.listdir(data_dir))
@@ -471,7 +471,7 @@ class StageWakeT(Stage):
 
 
     # ==================================================
-    def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, nsig=5, args=None):
+    def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, nsig=5, args=[None, None, None, None]):
         '''
         Extracts data for waterfall plots for current profile, relative energy 
         spectrum, horizontal transverse profile and vertical transverse profile.
@@ -497,7 +497,8 @@ class StageWakeT(Stage):
             defined by the beam x offset +- ``nsig`` * x beam size.
 
         args : float list, optional
-            Allows passing additional arguments to the functions in ``fcns``.
+            Allows passing additional arguments to the functions in ``fcns``. 
+            Defaults to ``[None, None, None, None]``.
 
             
         Returns
@@ -516,7 +517,7 @@ class StageWakeT(Stage):
             ``waterfalls``.
         '''
 
-        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
+        from abel.wrappers.wake_t.wake_t_wrapper import wake_t_hdf5_load
         
         files = sorted(os.listdir(data_dir))
         file_path = data_dir + files[0]
@@ -531,13 +532,13 @@ class StageWakeT(Stage):
         xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
         
-        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
+        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=args)
 
         return waterfalls, locations, bins
 
 
     # ==================================================
-    def plot_waterfalls(self, waterfalls, locations, bins, save_fig=False):
+    def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_fig=False):
         '''
         Makes waterfall plots for current profile, relative energy spectrum, 
         horizontal transverse profile and vertical transverse profile.
@@ -567,6 +568,8 @@ class StageWakeT(Stage):
         '''
 
         from matplotlib import pyplot as plt
+
+        waterfalls, locations, bins = self.extract_waterfalls(data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, nsig=5, args=[None, None, None, None])
 
         # prepare figure
         fig, axs = plt.subplots(4,1)
