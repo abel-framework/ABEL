@@ -11,7 +11,82 @@ import scipy.constants as SI
 from types import SimpleNamespace
 
 def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False, save_beams=False, space_charge=False, csr=False, isr=False, verbose=False):
-    """Run an ImpactX particle-tracking simulation using a given lattice and input beam."""
+    """
+    Run an ImpactX [1]_ particle-tracking simulation using a specified lattice and 
+    input beam. 
+    
+    This function 
+
+    1. Sets up an ImpactX simulation specifying allocated resources.
+    
+    2. Configures relevant physics options including space charge effects, CSR 
+       (coherent synchrotron radiation) and ISR (incoherent synchrotron 
+       radiation). 
+    
+    3. Executes the simulation, converts the results back into an ABEL beam 
+       object, and returns the tracked beam and its evolution data.
+       
+    Parameters
+    ----------
+    lattice : list
+        Contains a sequence consisting of ImpactX beamline elements (e.g., 
+        drifts, bends, lenses, or multipoles). Defines the lattice through which 
+        ``beam0`` is tracked.
+        
+    beam0 : ``Beam``
+        Input ABEL beam object representing the particle distribution before 
+        entering the lattice.
+        
+    nom_energy : [eV] float, optional
+        Nominal beam energy used to determine the ISR order and scaling. If 
+        ``None``, first order ISR effects are always used. If greater than 
+        1 TeV, third order ISR effects are enabled. Defaults to ``None``.
+
+    runnable : ``Runnable``, optional
+        ABEL ``Runnable`` object. If provided and ``save_beams`` is ``True``, 
+        the beam files are saved to the shot directory specified by 
+        :func:`runnable.shot_path() <abel.Runnable.shot_path>`. The pickled file 
+        ``runnable.obj`` is also saved to the same directory.
+
+    keep_data : bool, optional
+        If ``True``, the ImpactX run directory containing simulation outputs and 
+        the pickled file ``runnable.obj`` is preserved after the simulation 
+        completes. If ``False``, it is deleted automatically. Defaults to 
+        ``False``.
+
+    save_beams : bool, optional
+        If ``True``, saves beam snapshots for each simulation step via 
+        ``extract_beams()``. Defaults to ``False``.
+
+    space_charge : bool, optional
+        Enable space charge effects in the simulation. Defaults to ``False``.
+
+    csr : bool, optional
+        Enable CSR modeling. When enabled, the ImpactX simulation parameter 
+        ``sim.csr_bins`` is set to 150. Defaults to ``False``.
+
+    isr : bool, optional
+        Enable ISR modeling. The ISR order is automatically determined based on 
+        ``nom_energy``. Defaults to ``False``.
+
+    verbose : bool, optional
+        If ``True``, prints detailed ImpactX tracking output to the console. 
+        Defaults to ``False``.
+
+
+    Returns
+    -------
+    beam : ``Beam``
+        Output ABEL ``Beam`` object after transport through the given lattice.
+
+    evol : :class:`types.SimpleNamespace`
+        Beam parameter evolution data extracted from the ImpactX run (e.g. 
+        emittances, beta functions, centroid offsets).
+
+    References
+    ----------
+    .. [1] ImpactX Documentation: https://impactx.readthedocs.io/en/latest/
+    """
     
     # create a new directory
     original_folder = os.getcwd()
@@ -78,14 +153,58 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     if not keep_data:
         shutil.rmtree(runfolder)
     else:
-        new_dir = shutil.move(runfolder, runnable.shot_path())
+        new_dir = shutil.move(runfolder, runnable.shot_path()) # TODO: what if runnable is None?
         os.rename(new_dir, os.path.join(os.path.dirname(new_dir),'impactx_sims'))
 
     return beam, evol
 
 
+# ==================================================
 def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, space_charge="2D", runnable=None, keep_data=False, verbose=False):
-    """Run an ImpactX envelope-tracking simulation using a given lattice and beam distribution."""
+    """
+    Run an ImpactX envelope-tracking simulation using a given lattice and 
+    initial beam distribution.
+
+    Parameters
+    ----------
+    lattice : list
+		Contains a sequence consisting of ImpactX beamline elements (e.g., 
+        drifts, bends, lenses, or multipoles). Defines the lattice through which 
+        ``beam0`` is tracked.
+
+    distr : ImpcatX ``distribution``
+        ImpactX distribution function specifying the initial beam envelope 
+        parameters and correlations.
+
+    nom_energy : [eV] float, optional
+        Nominal kinetic energy of the reference particle. Used to set 
+        relativistic scaling. Defaults to ``None``.
+
+    peak_current : [A] float, optional
+        Peak current of the beam. Defaults to ``None``.
+
+    space_charge : str | bool, optional
+        Space charge model to use. Options include ``'2D'``, ``'3D'``, or 
+        ``False`` to disable. Defaults to ``'2D'``.
+
+    runnable : ``Runnable``, optional
+		ABEL ``Runnable`` object. Used to specify the run folder if provided.
+
+    keep_data : bool, optional
+        If ``True``, the temporary ImpactX run directory is preserved after 
+        simulation. Defaults to ``False``.
+
+    verbose : bool, optional
+        If ``True``, prints ImpactX progress and diagnostic information. 
+        Defaults to ``False``.
+
+    Returns
+    -------
+    evol : :class:`types.SimpleNamespace`
+        Object containing the envelope evolution along the lattice, including 
+        beam size, emittance, and energy as a function of the longitudinal 
+        coordinate.
+    """
     
     # create a new directory
     original_folder = os.getcwd()
@@ -105,10 +224,10 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     
     # reference particle
     ref = sim.particle_container().ref_particle()
-    ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6)
+    ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6) # TODO: what if nom_energy is None?
 
     # initialize the envelope
-    sim.init_envelope(ref, distr, peak_current)
+    sim.init_envelope(ref, distr, peak_current) # TODO: what if peak_current is None?
 
     # assign the lattice
     sim.lattice.extend(lattice)
@@ -167,14 +286,42 @@ def initialize_impactx_sim(verbose=False):
     return sim
 
 
+# ==================================================
 def extract_beams(path='', runnable=None, beam0=None):
-    """Extract the saved beams (from the ImpactX monitors)."""
+    """
+    Extract the saved beam snapshots from ImpactX monitor OpenPMD files.
+
+    This function reads the particle data stored by ImpactX in
+    ``diags/openPMD/monitor.h5`` and reconstructs a list of ``Beam`` objects 
+    representing the beam at each diagnostic step.
+
+    Parameters
+    ----------
+    path : str, optional
+        Path to the ImpactX simulation directory containing the OpenPMD output.
+        Defaults to `''`.
+
+    runnable : ``Runnable``, optional
+        ABEL ``Runnable`` object used to locate the simulation directory 
+        (``runnable.shot_path()/impactx_sims``). If provided, ``path`` is 
+        ignored.
+
+    beam0 : ``Beam``, optional
+        Reference beam whose metadata (e.g., ``beam0.trackable_number`` and 
+        ``beam0.stage_number``) are used to tag the extracted beams.
+
+    Returns
+    -------
+    beams : list of ``Beam``
+        List of reconstructed ``Beam`` objects, one for each saved monitor 
+        snapshot.
+    """
     
     from abel.classes.beam import Beam
     import openpmd_api as io
 
     if runnable is not None:
-        path = os.path.join(runnable.shot_path(), 'impactx_sims')
+        path = os.path.join(runnable.shot_path(), 'impactx_sims') # TODO: even if path is provided, this will overwrite it.
         
     # load OpenPMD series
     series = io.Series(os.path.join(path,'diags/openPMD/monitor.h5'), io.Access.read_only)
@@ -213,7 +360,46 @@ def extract_beams(path='', runnable=None, beam0=None):
     return beams
         
 
+# ==================================================
 def extract_evolution(path=''):
+    """
+    Extract the beam evolution from the ImpactX reduced beam diagnostics.
+
+    This function reads the reduced diagnostic files generated by ImpactX,
+    typically stored in ``diags/reduced_beam_characteristics.*`` and 
+    ``diags/ref_particle.*``. It compiles the evolution of beam parameters such as
+    emittance, betatron functions, beam size, bunch length, dispersion, 
+    and energy as a function of longitudinal position ``s``.
+    
+    The function automatically detects the ImpactX version and adapts
+    to the diagnostic format changes introduced in ImpactX 25.10+.
+    
+
+    Parameters
+    ----------
+    path : str, optional
+        Path to the directory containing the ImpactX diagnostic files.
+        Should include the trailing slash, e.g. ``'impactx_sims/'``.
+        Defaults to ``''`` (current working directory).
+
+
+    Returns
+    -------
+    evol : :class:`types.SimpleNamespace`
+        Data structure containing beam evolution parameters, including:
+
+        - ``location`` : [m] numpy.ndarray — Longitudinal position.
+        - ``emit_nx``, ``emit_ny`` : [m rad] numpy.ndarray — Normalized emittances.
+        - ``beta_x``, ``beta_y`` : [m] numpy.ndarray — Beta functions.
+        - ``beam_size_x``, ``beam_size_y`` : [m] numpy.ndarray — RMS beam sizes.
+        - ``bunch_length`` : [m] numpy.ndarray — RMS bunch length.
+        - ``x``, ``y``, ``z`` : [m] numpy.ndarray — Mean centroid positions.
+        - ``energy`` : [eV] numpy.ndarray — Mean beam energy.
+        - ``rel_energy_spread`` : numpy.ndarray — Relative RMS energy spread.
+        - ``dispersion_x``, ``dispersion_y`` : [m] numpy.ndarray — Dispersion functions.
+        - ``charge`` : [C] numpy.ndarray — Total beam charge.
+    """
+
     """Extract the beam evolution from the reduced beam diagnostics."""
     
     from abel.utilities.relativity import gamma2energy
@@ -265,10 +451,23 @@ def extract_evolution(path=''):
     
     return evol
 
-    
+
+# ==================================================    
 # convert from ImpactX particle container to ABEL beam
 def particle_container2beam(particle_container):
-    """Convert from ImpactX particle container to an ABEL beam object."""
+    """
+    Convert from ImpactX particle container to an ABEL beam object.
+
+    Parameters
+    ----------
+    particle_container : ImpactX ``ParticleContainer``
+        ImpactX ``ParticleContainer`` to be converted.
+
+    Returns
+    -------
+    beam : ``Beam``
+        ABEL ``Beam`` object.
+    """
     
     from abel.classes.beam import Beam
     
@@ -293,10 +492,39 @@ def particle_container2beam(particle_container):
     
     return beam
 
-    
+
+# ==================================================
 # convert from ABEL beam to ImpactX particle container
 def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
-    """Convert from an ABEL beam object to an ImpactX particle container."""
+    """
+    Convert from an ABEL beam object to an ImpactX particle container.
+
+    Parameters
+    ----------
+    beam : ``Beam``
+        ABEL ``Beam`` object.
+
+    nom_energy : [eV] float, optional
+        Nominal kinetic energy of the reference particle. Used to set reference 
+        particle kinetic energy. When ``None``, will use ``beam.energy()``. 
+        Defaults to ``None``.
+
+    sim : ImpactX simulation object, optional
+        If ``None``, one is created via :func:`initialize_impactx_sim`. Defaults 
+        to ``None``.
+
+    verbose : bool, optional
+        If ``True``, prints ImpactX progress and diagnostic information. 
+        Defaults to ``False``.
+
+
+    Returns
+    -------
+    particle_container : ImpactX ``ParticleContainer``
+        ImpactX ``ParticleContainer`` object.
+
+    sim : ImpactX simulation object 
+    """
 
     import amrex.space3d as amr
     from impactx import Config
