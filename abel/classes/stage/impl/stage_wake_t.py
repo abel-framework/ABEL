@@ -410,7 +410,8 @@ class StageWakeT(Stage):
             particle beam. Defaults to ``None``.
 
         args : float list, optional
-            Allows passing additional arguments to the functions in ``fcns``. Defaults to ``None``.
+            Allows passing additional arguments to the functions in ``fcns``. 
+            Defaults to ``None``.
             
             
         Returns
@@ -536,7 +537,7 @@ class StageWakeT(Stage):
     # ==================================================
     def plot_waterfalls(self, data_dir, species='beam', remove_halo_nsigma=20, save_path=None): # TODO move this to Stage
         '''
-        Makes waterfall plots for current profile, relative energy spectrum, 
+        Create waterfall plots for current profile, relative energy spectrum, 
         horizontal transverse profile and vertical transverse profile.
 
         Parameters
@@ -551,7 +552,7 @@ class StageWakeT(Stage):
         remove_halo_nsigma : float, optional
             If not ``None``, defines a threshold for identifying and excluding 
             outlier particles based on their deviation from the core of the 
-            particle beam. Defaults to ``None``.
+            particle beam. Defaults to 20.
 
         save_path : str, optional
             If not ``None``, saves the output figure to the specified file path. 
