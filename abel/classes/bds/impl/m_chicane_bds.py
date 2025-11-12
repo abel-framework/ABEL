@@ -243,7 +243,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         return S
     
     def match_lattice(self, matching_functions, ks_matched=False, ks_to_match='all',\
-                      inv_rs_to_match=[], bounds=None, match_betas=False, symmetric=False):
+                      inv_rs_to_match=[], bounds=None, match_betas=False, extend_symmetrically=False):
         ### Optimize for alpha_x/y to get quad-strengths ###
         # ls_B = [l_dipole1, l_dipole2, l_dipole3, l_diag, B1, B2]
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
@@ -285,94 +285,137 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             # if match_betas: params = [k0,k1,...,beta_x/y]
 
             # Check if all quads shall be matched
-            if symmetric and ks_to_match=='all':
+            if ks_to_match=='all' and not match_betas:
                 for i, k in enumerate(params):
                     ks[self.indices_quads[i]] = k
-                    if i < len(params)-1:
-                        ks[self.indices_quads[-1-i]] = k
+            elif ks_to_match=='all' and match_betas:
+                pars = params[:-2]
+                for i, k in enumerate(pars):
+                    ks[self.indices_quads[i]] = k
+
             # If only select quads are to be matched, set the param values 
             # that have same index as integers in ks_to_match
-            elif symmetric and not ks_to_match=='all':
-                raise NotImplementedError('Symmetric lattice matching is not implemented for specific quads,' \
-                'you must match all quads to set symmetric lattice')
+            # If only select quads are to be matched, set the param values 
+            # that have same index as integers in ks_to_match
             else:
-                if ks_to_match=='all':
-                    for i, j in enumerate(self.indices_quads):
-                        ks[j] = params[i]
-            # If only select quads are to be matched, set the param values 
-            # that have same index as integers in ks_to_match
-                else:
-                    k=0
-                    for i, j in enumerate(self.indices_quads):
-                        if i in ks_to_match:
-                            ks[j] = params[k]
-                            k += 1
+                k=0
+                for i, j in enumerate(self.indices_quads):
+                    if i in ks_to_match:
+                        ks[j] = params[k]
+                        k += 1
+
             # If we want to match betas as well            
             if match_betas:
-                beta_x0 = params[-1]
-                beta_y0 = beta_x0
+                beta_x0 = params[-2]
+                beta_y0 = params[-1]
             else:
                 beta_x0 = self.beta0_x
                 beta_y0 = self.beta0_y
             
-            betax, alphax, evo_x = evolve_beta_function(ls=ls, ks=ks, beta0=beta_x0)
-            betay, alphay, evo_y = evolve_beta_function(ls=ls, ks=-ks, beta0=beta_y0)
-            D, Dp, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, high_res=True)
-            R56, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, high_res=True)
+            ls_ = ls
+            ks_ = ks
+            inv_rs_ = inv_rs
+            
+            betax, alphax, evo_x = evolve_beta_function(ls=ls_, ks=ks_, beta0=beta_x0)
+            betay, alphay, evo_y = evolve_beta_function(ls=ls_, ks=-ks_, beta0=beta_y0)
+            D, Dp, _ = evolve_dispersion(ls=ls_, ks=ks_, inv_rhos=inv_rs_, high_res=True)
+            R56, _ = evolve_R56(ls=ls_, ks=ks_, inv_rhos=inv_rs_, high_res=True)
 
-            S=0
 
             max_betax = max(evo_x[1,:])
             max_betay = max(evo_y[1,:])
 
+            min_betax = min(evo_x[1,:])
+            min_betay = min(evo_y[1,:])
+
+            if extend_symmetrically:
+                ls_ = np.append(ls_, ls_[::-1])
+                ks_ = np.append(ks_, ks_[::-1])
+                inv_rs_ = np.append(inv_rs_, inv_rs_[::-1])
+
+                betax_full, alphax_full, evo_x = evolve_beta_function(ls=ls_, ks=ks_, beta0=beta_x0)
+                betay_full, alphay_full, evo_y = evolve_beta_function(ls=ls_, ks=-ks_, beta0=beta_y0)
+                D_full, Dp_full, _ = evolve_dispersion(ls=ls_, ks=ks_, inv_rhos=inv_rs_, high_res=True)
+                R56_full, _ = evolve_R56(ls=ls_, ks=ks_, inv_rhos=inv_rs_, high_res=True)
+                
+                max_betax = max(evo_x[1,:])
+                max_betay = max(evo_y[1,:])
+
+                min_betax = min(evo_x[1,:])
+                min_betay = min(evo_y[1,:])
+
+            S=0
             for key, value in matching_functions.items():
-                match key:
-                    case 'D':
-                        S += ((D-value)*1e2)**2
-                    case 'Dp':
-                        S += ((Dp-value)*1e2)**2
-                    case 'R56':
-                        S += ((R56-value)*1e3)**2
-                    case 'beta_x':
-                        S += (betax-value)**2
-                    case 'beta_y':
-                        S += (betay-value)**2
-                    case 'alpha_x':
-                        S += (alphax-value)**2
-                    case 'alpha_y':
-                        S += (alphay-value)**2
-                    case 'max_betas':
-                        # if beta is "value" times larger than initially, punish the optimizer
-                        S+= max(max_betax-beta_x0*value,0)**2 + max(max_betay-beta_y0*value,0)**2
+                if extend_symmetrically:
+                    match key:
+                        case 'D':
+                            S += ((D_full-value)*1e2)**2
+                        case 'Dp':
+                            S += ((Dp_full-value)*1e2)**2
+                        case 'R56':
+                            S += ((R56_full-value)*1e4)**2 #+ ((R56-value)*1e3)**2
+                        case 'beta_x':
+                            S += ((betax_full-value)*1e1)**2
+                        case 'beta_y':
+                            S += ((betay_full-value)*1e1)**2
+                        case 'alpha_x':
+                            S += ((alphax_full-value)*1e1)**2
+                        case 'alpha_y':
+                            S += ((alphay_full-value)*1e1)**2
+                        case 'max_betas':
+                            # if beta is "value" times larger than initially, punish the optimizer
+                            S += max(max_betax-beta_x0*value,0)**2 + max(max_betay-beta_y0*value,0)**2
+                        case 'min_betas':
+                            S += min(value-min_betax, 0)**2 + min(value-min_betay, 0)**2
+                else:
+                    match key:
+                        case 'D':
+                            S += ((D-value)*1e2)**2
+                        case 'Dp':
+                            S += ((Dp-value)*1e1)**2
+                        case 'R56':
+                            S += ((R56-value)*1e4)**2
+                        case 'beta_x':
+                            S += ((betax-value)*1e1)**2
+                        case 'beta_y':
+                            S += ((betay-value)*1e1)**2
+                        case 'alpha_x':
+                            S += ((alphax-value)*1e1)**2
+                        case 'alpha_y':
+                            S += ((alphay-value)*1e1)**2
+                        case 'max_betas':
+                            # if beta is "value" times larger than initially, punish the optimizer
+                            S += max(max_betax-beta_x0*value,0)**2 + max(max_betay-beta_y0*value,0)**2
+                        case 'min_betas':
+                            S += min(value-min_betax, 0)**2 + min(value-min_betay, 0)**2
             return S
         
-        ## Prepare the initial guess
+        # Set number of params/bounds to include
+        loop_range = len(self.indices_quads)
+
+        ## Prepare the initial guess        
         if ks_matched: # set the already optimized value as initial guess (for the quads to match)
             if ks_to_match=='all':
-                if symmetric:
-                    x0 = [self.lattice[i].k for i in self.indices_quads[:len(self.indices_quads)//2+1]]
-                else:
-                    x0 = [self.lattice[i].k for i in self.indices_quads]
+                x0 = [self.lattice[i].k for i in self.indices_quads]
             else:
                 x0 = [self.lattice[j].k for i,j in enumerate(self.indices_quads) if i in ks_to_match]
+
         else:
             f0 = (self.get_length() + SI.c*self.delay_per_stage)
             k0 = 1/f0/self.l_quads
             x0=[]
             if ks_to_match=='all':
                 if not bounds:
-                    if symmetric:
-                        loop_range = len(self.indices_quads)//2+1
-                    else:
-                        loop_range = len(self.indices_quads)
-
                     for i in range(loop_range):
                         if i%2==0:
                             x0.append(-k0)
                         else:
                             x0.append(k0)
                 else:
-                    for tup in bounds:
+                    bounds_list = bounds
+                    if match_betas:
+                        bounds_list = bounds_list[:-2]
+                    for tup in bounds_list:
                         if tup[0]==0: # k0 positive
                             x0.append(k0)
                         else: # k0 is negative
@@ -385,25 +428,31 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                         else:
                             x0.append(k0)
                 else:
-                    for i, tup in zip(ks_to_match, bounds):
+                    bounds_list = bounds                    
+                    if match_betas:
+                        bounds_list = bounds_list[:-2]
+
+                    assert len(bounds_list)==len(ks_to_match)
+
+                    for tup in bounds_list:
                         if tup[0]==0: # k0 positive
                             x0.append(k0)
                         else: # k0 is negative
                             x0.append(-k0)
 
         if match_betas:
-            x0.append(self.beta0_x)
+            x0.extend([self.beta0_x, self.beta0_y])
         ## Run the optimization                
         opt = minimize(fun=optimizer, x0=x0, bounds=bounds)
         print(opt)
         if ks_to_match=='all' and not match_betas:
             ks = opt.x
         elif ks_to_match=='all' and match_betas:
-            ks = opt.x[:-1]
+            ks = opt.x[:-2]
         else:
             ks = opt.x[:len(ks_to_match)]
         if match_betas:
-            betas = opt.x[-1]
+            betas = opt.x[-2:]
             return ks, betas
         else:
             return ks
@@ -420,18 +469,11 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         
             
     
-    def set_ks(self, ks, lattice=None, ks_to_set='all', symmetric=False):
-        
+    def set_ks(self, ks, lattice=None, ks_to_set='all'):
         if not lattice:
             if ks_to_set =='all':
-                if symmetric: #Set ks for half of the lattice, then mirror
-                    for i, k in enumerate(ks):
-                        self.lattice[self.indices_quads[i]].k = k
-                        if i < len(ks)-1:
-                            self.lattice[self.indices_quads[-1-i]].k = k
-                else:
-                    for i, j in enumerate(self.indices_quads):
-                        self.lattice[j].k = ks[i]
+                for i, j in enumerate(self.indices_quads):
+                    self.lattice[j].k = ks[i]
             else:
                 k=0
                 for i, j in enumerate(self.indices_quads):
@@ -673,10 +715,10 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56
         ls, inv_rs, ks = self.get_elements_arrays_from_lattice(dipoles=(True, 'inv_rhos'), quads=True)
 
-        beta_x, alpha_x, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x, alpha0=self.alpha0_x, inv_rhos=inv_rs, plot=True)
+        beta_x, alpha_x, _ = evolve_beta_function(ls=ls, ks=ks, beta0=self.beta0_x, alpha0=self.alpha0_x, plot=True)
         beta_y, alpha_y, _ = evolve_beta_function(ls=ls, ks=-ks, beta0=self.beta0_y, alpha0=self.alpha0_y, plot=True)
         print(self.Dx0, self.Dpx0)
-        D, Dp, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, Dx0=self.Dx0, Dpx0=self.Dpx0, plot=True)
-        R56, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True, R560=self.R560)
+        D, Dp, _ = evolve_dispersion(ls=ls, ks=ks, inv_rhos=inv_rs, Dx0=self.Dx0, Dpx0=self.Dpx0, plot=True, high_res=True)
+        R56, _ = evolve_R56(ls=ls, ks=ks, inv_rhos=inv_rs, plot=True, R560=self.R560, high_res=True)
         if return_end_values:
             return beta_x, alpha_x, beta_y, alpha_y, D, Dp, R56
