@@ -15,10 +15,7 @@ from tqdm import tqdm
 from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
-<<<<<<< HEAD:abel/apis/hipace/hipace_api.py
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, external_focusing_radial=0, mesh_refinement=False, do_spin_tracking=False, external_focusing_longitudinal=0, filename_test_particle='empty.h5'):
-=======
-def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, mesh_refinement=False, do_spin_tracking=False):
+def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, mesh_refinement=False, do_spin_tracking=False, external_focusing_longitudinal=0, filename_test_particle='empty.h5'):
     """
     Write a HiPACE++ input script to file based on a provided template and 
     simulation parameters.
@@ -119,7 +116,6 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     ----------
     .. [1] HiPACE++ User Guide, https://hipace.readthedocs.io/
     """
->>>>>>> main:abel/wrappers/hipace/hipace_wrapper.py
 
     if output_period is None:
         output_period = int(num_steps)
@@ -211,7 +207,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'plasma_components': plasma_components,
               'ion_species': ion_species,
               'beam_ionization': int(beam_ionization),
-              'external_focusing_radial': abs(external_focusing_radial),
+              'external_focusing_radial': abs(external_focusing_gradient),
               'external_focusing_radial_comment': external_focusing_radial_comment,
               'external_focusing_longitudinal': abs(external_focusing_longitudinal),
               'external_focusing_longitudinal_comment': external_focusing_longitudinal_comment,
