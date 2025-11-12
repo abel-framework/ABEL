@@ -1,27 +1,15 @@
 # -*- coding: utf-8 -*-
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 """
-ABEL : Beam polarization tests
-=======================================
-
-This file is a part of ABEL.
-Copyright 2022– C.A.Lindstrøm, B.Chen, O.G. Finnerud,
-D. Kallvik, E. Hørlyk, K.N. Sjobak, E.Adli, University of Oslo
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
+ABEL : Beam polarization unit tests
 """
 
-import os
+#import os
 import pytest
 
 from abel import *
@@ -43,8 +31,11 @@ def beam():
 
 @pytest.mark.spin
 def test_set_spin_unpolarized(beam):
-    """Test for unpolarized spins to ensure it generates spins that are uniformly distributed on the unit sphere with
-    no preferential polarization along any axis."""
+    """
+    Test for unpolarized spins to ensure it generates spins that are uniformly 
+    distributed on the unit sphere with no preferential polarization along any 
+    axis.
+    """
     beam.set_spin_unpolarized()
 
     s_x, s_y, s_z = beam.spxs(), beam.spys(), beam.spzs()

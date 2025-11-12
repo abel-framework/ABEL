@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abc import abstractmethod
 from abel.classes.beamline.beamline import Beamline
 
@@ -26,12 +32,27 @@ class Linac(Beamline):
         super().assemble_trackables()
     
 
-    def get_nom_energy(self):
-        return self.nom_energy
+    @property
+    def nom_energy(self) -> float | None:
+        "The nominal energy [eV] of the linac."
+        return self._nom_energy
+    @nom_energy.setter
+    def nom_energy(self, energy : float | None):
+        if energy is not None and energy < 0.0:
+            raise ValueError('Nominal energy cannot be negative.')
+        self._nom_energy = energy
+    _nom_energy = None
 
+
+    def get_nom_energy(self):
+        "Alias of linac nominal energy."
+        return self.nom_energy
+    
+    
     def get_nom_beam_power(self):
         return abs(self.nom_energy * self.source.get_charge() * self.get_rep_rate_average())
     
+
     def get_effective_gradient(self):
         return self.get_nom_energy()/self.get_length()
 
@@ -44,6 +65,7 @@ class Linac(Beamline):
             Etot += trackable.energy_usage()
         return Etot
 
+
     def get_cost_breakdown(self):
         "Cost breakdown for the linac [ILC units]"
         
@@ -51,6 +73,6 @@ class Linac(Beamline):
         
         # cost of the civil construction
         for trackable in self.trackables:
-            breakdown.append(trackables.get_cost_breakdown())
+            breakdown.append(trackable.get_cost_breakdown())
 
         return (self.name, breakdown)

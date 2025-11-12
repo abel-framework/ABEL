@@ -1,12 +1,44 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.classes.interstage.plasma_lens import InterstagePlasmaLens
 import uuid, os, shutil, subprocess, csv
 import numpy as np
 import scipy.constants as SI
 from string import Template
 from abel.CONFIG import CONFIG
-from abel.apis.elegant.elegant_api import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
+from abel.wrappers.elegant.elegant_wrapper import elegant_run, elegant_apl_fieldmap2D, elegant_read_beam
 
 class InterstagePlasmaLensElegant(InterstagePlasmaLens):
+    """
+    Interstage model using ELEGANT [1]_ for full 3D particle tracking through an 
+    interstage lattice with optional physics effects.
+
+    This subclass of :class:`InterstagePlasmaLens` enables realistic beam 
+    tracking with support for Coherent Synchrotron Radiation (CSR) and 
+    Incoherent Synchrotron Radiation (ISR).
+
+    Inherits all attributes from :class:`InterstagePlasmaLens`.
+
+    Attributes
+    ----------
+    num_slices : int
+        Number of longitudinal slices per beamline element in the ELEGANT 
+        simulation. Sets the variable ``BINS`` for all beamline elements in the 
+        ELEGANT lattice input script [2]_. Defaults to 50.
+
+    use_monitors : bool
+        If ``True``, enalbes ELEGANT ``WATCH`` element for recording 
+        intermediate beam states [2]_. Defaults to ``False``.
+
+    References
+    ----------
+    .. [1] User's Manual for ELEGANT, https://ops.aps.anl.gov/manuals/elegant_latest/elegant.html
+    .. [2] ELEGANT lattice input script, https://github.com/abel-framework/ABEL/blob/main/abel/wrappers/elegant/templates/lattice_interstage.lte
+    """
     
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False):
         
@@ -18,6 +50,7 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
     
     # track a beam through the lattice using ELEGANT
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
+        "Track plasma-lens-based interstage using ELEGANT."
         
         # make temporary folder and files
         parent_dir = CONFIG.temp_path
@@ -35,7 +68,7 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
         filename_runscript, filename_inputbeam = self.make_run_script(filename_lattice, tmpfolder)
 
         # run ELEGANT
-        from abel.apis.elegant.elegant_api import elegant_run
+        from abel.wrappers.elegant.elegant_wrapper import elegant_run
         beam, self.evolution = elegant_run(filename_runscript, beam0, filename_inputbeam, filename_outputbeam, verbose=verbose, runnable=runnable, tmpfolder=tmpfolder)
         #self.beam0_charge_sign = beam0.charge_sign()  # patch due to ELEGANT not setting correct charge sign
 
@@ -46,15 +79,34 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
 
     
     def make_run_script(self, filename_lattice, tmpfolder):
-        "Make the ELEGANT run script and write it to file."
+        """
+        Make the ELEGANT run script and write it to file.
+
+        Parameters
+        ----------
+        filename_lattice : str
+            Path to the ELEGANT lattice file (``.lte``-file).
+
+        tmpfolder : str
+            Path to a temporary folder for storing temporary simulation outputs.
+
+        Returns
+        -------
+        filename_runscript : str
+            Path to the ELEGANT input file (``runfile.ele``).
+
+        filename_inputbeam : str
+            Path to the temporary SDDS file that will store the input beam for 
+            ELEGANT.
+        """
 
         # make filenames
         filename_runscript = os.path.join(tmpfolder, 'runfile.ele')
         filename_inputbeam = os.path.join(tmpfolder, 'input_beam.bun')
 
         # run file template (to be filled)
-        from abel.apis.elegant.elegant_api import __file__ as elegant_api_file
-        filename_runfile_template = os.path.join(os.path.dirname(elegant_api_file), 'templates', 'runscript_interstage.ele')
+        from abel.wrappers.elegant.elegant_wrapper import __file__ as elegant_wrapper_file
+        filename_runfile_template = os.path.join(os.path.dirname(elegant_wrapper_file), 'templates', 'runscript_interstage.ele')
 
         # template inputs
         inputs = {'nom_energy_MeV': self.nom_energy/1e6,
@@ -72,17 +124,38 @@ class InterstagePlasmaLensElegant(InterstagePlasmaLens):
     
     
     def make_elegant_lattice(self, beam, tmpfolder):
-        "Make the ELEGANT lattice and write it to file."
+        """
+        Make the ELEGANT lattice and write it to file.
+
+        Parameters
+        ----------
+        beam : ``Beam``
+            Incoming main beam.
+
+        tmpfolder : str
+            Path to a temporary folder for storing temporary simulation outputs.
+
+        Returns
+        -------
+        filename_lattice : str
+            Path to the ELEGANT lattice file (``.lte``-file).
+
+        filename_outputbeam : str
+            Path to the SDDS file generated by ELEGANT containing the output 
+            beam.
+        """
 
         # make filenames
         filename_outputbeam = os.path.join(tmpfolder, 'output_beam.bun')
         
         # make lens field
-        filename_lens = elegant_apl_fieldmap2D(self.nonlinearity_plasma_lens, dx=self.lens_offset_x, dy=self.lens_offset_y, tmpfolder=tmpfolder)
+        filename_lens = elegant_apl_fieldmap2D(self.nonlinearity_plasma_lens, lens_x_offset=self.lens1_offset_x, lens_y_offset=self.lens1_offset_y, tmpfolder=tmpfolder) 
+        # TODO: implement two separate lenses with different offsets (the above is only number 1)
+        # TODO: add lens offset jitter
         
         # make lattice file from template
-        from abel.apis.elegant.elegant_api import __file__ as elegant_api_file
-        filename_lattice_template = os.path.join(os.path.dirname(elegant_api_file), 'templates', 'lattice_interstage.lte')
+        from abel.wrappers.elegant.elegant_wrapper import __file__ as elegant_wrapper_file
+        filename_lattice_template = os.path.join(os.path.dirname(elegant_wrapper_file), 'templates', 'lattice_interstage.lte')
 
         # calculate angles
         from abel.utilities.relativity import energy2momentum

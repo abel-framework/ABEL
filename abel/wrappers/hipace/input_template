@@ -1,0 +1,94 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
+amr.n_cell = $num_cell_x $num_cell_y $num_cell_z
+
+hipace.normalized_units = 0
+hipace.bxby_solver = explicit
+
+hipace.dt = $time_step # TODO: set automatic timestep
+amr.blocking_factor = 1
+amr.max_level = $mesh_refinement_maxlevel
+
+hipace.verbose = 1
+max_step = $max_step # TODO: set automatic timestep
+
+hipace.depos_order_xy = 2
+geometry.coord_sys   = 0                  # 0: Cartesian
+geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
+geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z
+
+boundary.field       = Dirichlet
+boundary.particle    = Absorbing
+
+my_constants.ref_ratio_x = $ref_ratio_x
+my_constants.ref_ratio_y = $ref_ratio_y
+my_constants.patch_len_x = $num_cell_x_mr1 * (($grid_high_x / $num_cell_x) / ref_ratio_x)
+my_constants.patch_len_y = $num_cell_y_mr1 * (($grid_high_y / $num_cell_y) / ref_ratio_y)
+
+${mesh_refinement_comment}mr_lev1.n_cell = $num_cell_x_mr1 $num_cell_y_mr1
+${mesh_refinement_comment}mr_lev1.patch_lo = -patch_len_x -patch_len_y $grid_low_z
+${mesh_refinement_comment}mr_lev1.patch_hi =  patch_len_x patch_len_y $grid_high_z
+
+beams.names = $beam_components # 'driver' or 'driver beam'
+beams.insitu_period = 1
+
+beam.injection_type = from_file
+beam.input_file = $filename_beam
+beam.iteration = 0
+beam.do_radiation_reaction = $radiation_reaction
+beam.do_spin_tracking = $do_spin_tracking
+
+driver.injection_type = from_file
+driver.input_file = $filename_driver
+driver.iteration = 0
+
+test_particle.injection_type = from_file
+test_particle.input_file = $filename_test_particle
+test_particle.iteration = 0
+test_particle.do_radiation_reaction = $radiation_reaction
+
+# external focusing
+${external_focusing_radial_comment}beams.external_B(x,y,z,t) = "$external_focusing_radial*y" "-$external_focusing_radial*x" "0.0"
+${external_focusing_longitudinal_comment}beams.external_B(x,y,z,t) = "0" "0" "$external_focusing_longitudinal"
+
+plasmas.names = $plasma_components # 'plasma' or 'electrons ions'
+plasmas.prevent_centered_particle = true
+plasmas.reorder_period = 10
+${mesh_refinement_comment}plasmas.fine_transition_cells = 10
+${mesh_refinement_comment}plasmas.fine_ppc = ref_ratio_x ref_ratio_y
+${mesh_refinement_comment}plasmas.fine_patch(x,y) = "x^2/(1.5*patch_len_x)^2 + y^2/(1.5*patch_len_y)^2 < 1"
+
+
+# if ion motion disabled
+plasma.density(x,y,z) = $plasma_density
+plasma.ppc = 1 1
+plasma.element = electron
+plasma.do_symmetrize = 1
+
+# if ion motion enabled
+electrons.element = electron
+electrons.density(x,y,z) = $plasma_density
+electrons.do_symmetrize = 1
+electrons.ppc = 1 1
+electrons.neutralize_background = 0 
+ions.element = $ion_species
+ions.density(x,y,z) = $plasma_density
+ions.do_symmetrize = 1
+ions.ppc = 1 1
+ions.neutralize_background = 0
+ions.can_ionize = $beam_ionization
+ions.initial_ion_level = 1
+ions.ionization_product = electrons
+
+diagnostic.names = lev0x
+diagnostic.output_period = $output_period
+diagnostic.beam_output_period = $output_period
+lev0x.diag_type = xz
+diagnostic.field_data = Ez ExmBy rho jz_beam
+
+hipace.deposit_rho = true
+hipace.deposit_rho_individual = true

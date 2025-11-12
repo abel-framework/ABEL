@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abc import abstractmethod
 from abel.classes.runnable import Runnable
 from abel.classes.event import Event
@@ -8,8 +14,9 @@ import numpy as np
 
 class InteractionPoint(Runnable, CostModeled):
     
-    def __init__(self, num_ips=1):
+    def __init__(self, num_ips=1, gamma_gamma=False):
         self.num_ips = num_ips
+        self.gamma_gamma = gamma_gamma
         super().__init__()
     
     # run simulation
@@ -77,7 +84,10 @@ class InteractionPoint(Runnable, CostModeled):
                     event.save(self, shot1=shot1, shot2=shot2)
                     
                     if verbose:
-                        print(f">> EVENT {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
+                        if not self.gamma_gamma:
+                            print(f">> EVENT {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
+                        else:
+                            print(f">> EVENT (gamma-gamma) {self.shot1+1}-{self.shot2+1}: Luminosity (full/peak/geom.): {event.full_luminosity()/1e34:.3} / {event.peak_luminosity()/1e34:.3} / {event.geometric_luminosity()/1e34:.2} \u03BCb^-1")
                     
         # return event from last interaction
         return event

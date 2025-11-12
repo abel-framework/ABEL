@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.classes.collider.collider import Collider
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorBasic
@@ -14,6 +20,8 @@ class ILC(Collider):
 
         super().__init__()
         
+        self.com_energy = 500e9
+        self.energy_asymmetry = 1.0
         
         # define positron source
         esource = SourceBasic()
@@ -91,10 +99,9 @@ class ILC(Collider):
         self.linac1 = elinac
         self.linac2 = plinac
         self.ip = ip
-        self.com_energy = 500e9
         self.bunch_separation = 554e-9 # [s]
         self.num_bunches_in_train = 1312
-        self.rep_rate_trains = 5 # [Hz]
+        self.rep_rate_trains = 5.0 # [Hz]
 
         
         # assemble everything

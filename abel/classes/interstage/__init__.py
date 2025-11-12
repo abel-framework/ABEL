@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
@@ -6,6 +12,79 @@ import numpy as np
 import scipy.constants as SI
 
 class Interstage(Trackable, CostModeled):
+    """
+    Abstract base class representing an interstage section between two 
+    accelerator stages. The interstage lattice consists of a bending dipole, a 
+    nonlinear plasma lens (or quadrupoles), two chicane dipoles, a sextupole and 
+    the mentioned elements repeated in the opposite order to form a symmetric 
+    lattice. This is designed to provide achromatic staging [1]_ and to apply 
+    the self-correction effect [2]_ to the beam.
+    
+    Defines common physical parameters and attributes, as well as methods such 
+    as optics matching, beam evolution and optics layout visualization.
+
+
+    Attributes
+    ----------
+    nom_energy : [eV] float
+        Nominal beam energy at the entrance of the interstage. Default set to 
+        ``None``, usually set by :meth:`Linac.track`.
+
+    beta0 : [m] float or callable
+        Initial beta function at the entrance of the interstage. If callable, it 
+        is evaluated as ``beta0(nom_energy)``.
+
+    length_dipole : [m] float or callable
+        Magnetic length of each bending dipole. If callable, it is evaluated as 
+        ``length_dipole(nom_energy)``.
+
+    field_dipole : [T] float or callable
+        Magnetic field of the bending dipoles. If callable, it is evaluated as 
+        ``field_dipole(nom_energy)``.
+
+    R56 : [m] float or callable
+        Longitudinal dispersion term, relating relative momentum deviation to 
+        path length difference. If callable, it is evaluated as 
+        ``R56(nom_energy)``. Defaults to 0.
+
+    charge_sign : int
+        Particle charge sign: -1 for electrons, +1 for positrons or protons. 
+        Defaults to -1.
+
+    cancel_chromaticity : bool
+        Whether to automatically match and cancel first-order chromatic effects.
+        Defaults to ``True``.
+
+    cancel_sec_order_dispersion : bool
+        Whether to match and cancel second-order dispersion. Defaults to 
+        ``False``.
+
+    use_apertures : bool
+        If ``True``, applies aperture clipping to the beam distribution.
+        Defaults to ``True``.
+
+    enable_csr : bool
+        Enables coherent synchrotron adiation (CSR) modeling during tracking.
+        Defaults to ``True``.
+
+    enable_isr : bool
+        Enables incoherent synchrotron radiation (ISR) modeling during tracking.
+        Defaults to ``True``.
+
+    enable_space_charge : bool
+        Enables space charge effects. Defaults to ``False``.
+
+    uses_plasma_lenses : bool
+        Indicates whether the interstage contains plasma lenses instead of magnetic 
+        quadrupoles. Defaults to ``None`` to let the value be set by the subclasses 
+        :class:`InterstagePlasmaLens` and :class:`InterstageQuads`.
+
+    References
+    ----------
+    .. [1] TODO: Add the interstage manuscript when available.
+
+    .. [2] C. A. Lindstrøm, "Self-correcting longitudinal phase space in a multistage plasma accelerator", ArXiv (2021), https://arxiv.org/abs/2104.14460
+    """
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, charge_sign=-1,
@@ -25,8 +104,8 @@ class Interstage(Trackable, CostModeled):
         self._field_dipole = field_dipole
         
         # feature toggles
-        self.cancel_chromaticity = cancel_chromaticity
-        self.cancel_sec_order_dispersion = cancel_sec_order_dispersion
+        self._cancel_chromaticity = cancel_chromaticity
+        self._cancel_sec_order_dispersion = cancel_sec_order_dispersion
         self.use_apertures = use_apertures
 
         # physics flags
@@ -35,13 +114,13 @@ class Interstage(Trackable, CostModeled):
         self.enable_space_charge = enable_space_charge
         
         # lens alignment and jitter
-        self.lens_offset_x = 0
-        self.lens_offset_y = 0
         self.jitter = SimpleNamespace()
         self.jitter.lens_offset_x = 0
         self.jitter.lens_offset_y = 0
         self.jitter.lens_angle_x = 0
         self.jitter.lens_angle_y = 0
+        self.jitter.sextupole_offset_x = 0
+        self.jitter.sextupole_offset_y = 0
         
         # evolution (saved when tracking)
         self.evolution = SimpleNamespace()
@@ -51,6 +130,9 @@ class Interstage(Trackable, CostModeled):
 
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the input beam through the interstage lattice. Abstract method.
+        """
         return super().track(beam, savedepth, runnable, verbose)
     
     
@@ -95,6 +177,27 @@ class Interstage(Trackable, CostModeled):
     @length_dipole.setter
     def length_dipole(self, val):
         self._length_dipole = val
+
+    @property
+    def cancel_chromaticity(self) -> float:
+        if callable(self._cancel_chromaticity):
+            return self._cancel_chromaticity(self.nom_energy)
+        else:
+            return self._cancel_chromaticity
+    @cancel_chromaticity.setter
+    def cancel_chromaticity(self, val):
+        self._cancel_chromaticity = val
+
+    
+    @property
+    def cancel_sec_order_dispersion(self) -> float:
+        if callable(self._cancel_sec_order_dispersion):
+            return self._cancel_sec_order_dispersion(self.nom_energy)
+        else:
+            return self._cancel_sec_order_dispersion
+    @cancel_sec_order_dispersion.setter
+    def cancel_sec_order_dispersion(self, val):
+        self._cancel_sec_order_dispersion = val
     
     
     ## MATRIX LATTICE
@@ -108,6 +211,20 @@ class Interstage(Trackable, CostModeled):
     ## MATCHING
     
     def match(self):
+        """
+        Perform matching of key optical functions within the interstage.
+
+        This combines matching of beta functions, first-order dispersion and R56.
+        Can also optionally match chromatic amplitude and second order 
+        dispersion depending on :attr:`Interstage.cancel_chromaticity` and 
+        :attr:`Interstage.cancel_sec_order_dispersion`.
+
+        Returns
+        -------
+        None
+            Updates the internal lattice configuration in place.
+        """
+
         "Combined matching the beta function, first- and second-order dispersion and the R56"
         self.match_beta_function()
         self.match_dispersion_and_R56()
@@ -136,6 +253,9 @@ class Interstage(Trackable, CostModeled):
     ## PLOTTING
     
     def plot_evolution(self):
+        """
+        Plot the evolution of various beam parameters inside the interstage.
+        """
 
         from matplotlib import pyplot as plt
         
@@ -225,60 +345,94 @@ class Interstage(Trackable, CostModeled):
     
     ## PLOTTING OPTICS
 
-    def plot_optics(self, savefig=None):
+    def plot_optics(self, show_beta_function=True, show_dispersion=True, show_R56=True, show_chromaticity=True, add_no_central_sextupole=False, add_no_chrom_correction=False, savefig=None):
+        """
+        Plot the beta function, dispersion, R56 and chromaticity along the interstage.
+        """
 
         from matplotlib import pyplot as plt
         from matplotlib import patches
-        from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion, evolve_R56
+        from copy import deepcopy
+        from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion, evolve_R56, evolve_chromatic_amplitude
         
         # calculate evolution
         ls, inv_rhos, ks, ms, taus = self.matrix_lattice()
-        if self.uses_plasma_lenses:
-            ks_y = ks
-        else:
-            ks_y = -ks
-        _, _, evol_beta_x = evolve_beta_function(ls, ks, self.beta0, inv_rhos=inv_rhos, fast=False)
-        _, _, evol_beta_y = evolve_beta_function(ls, ks_y, self.beta0, fast=False)
-        _, _, evol_second_order_dispersion = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False);
-        _, evol_R56 = evolve_R56(ls, inv_rhos, ks);
         ssl = np.append([0.0], np.cumsum(ls))
+
+        if show_beta_function:
+            _, _, evol_beta_x = evolve_beta_function(ls, ks, self.beta0, inv_rhos=inv_rhos, fast=False)
+            if self.uses_plasma_lenses:
+                _, _, evol_beta_y = evolve_beta_function(ls, ks, self.beta0, fast=False)
+            else:
+                _, _, evol_beta_y = evolve_beta_function(ls, -ks, self.beta0, fast=False)
+            ss_beta = evol_beta_x[0]
+            beta_xs = evol_beta_x[1]
+            beta_ys = evol_beta_y[1]
+
+        if show_dispersion:
+            _, _, evol_second_order_dispersion = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False);
+            ss_disp = evol_second_order_dispersion[0]
+            dispersion = evol_second_order_dispersion[1]
+            second_order_dispersion = evol_second_order_dispersion[2]
+            
+            if add_no_central_sextupole:
+                ms0 = deepcopy(ms)
+                ms0[int(len(ms)/2)] = 0.0
+                _, _, evol_second_order_dispersion0 = evolve_second_order_dispersion(ls, inv_rhos, ks, ms0, taus, fast=False)
+                second_order_dispersion0 = evol_second_order_dispersion0[2]
         
-        # extract into readable format
-        ss_beta = evol_beta_x[0]
-        beta_xs = evol_beta_x[1]
-        ss_beta_y = evol_beta_y[0]
-        beta_ys = evol_beta_y[1]
-        ss_disp2 = evol_second_order_dispersion[0]
-        ss_disp1 = ss_disp2
-        dispersion = evol_second_order_dispersion[1]
-        second_order_dispersion = evol_second_order_dispersion[2]
-        ss_R56 = evol_R56[0]
-        R56 = evol_R56[1]
-        
+
+        if show_R56:
+            _, evol_R56 = evolve_R56(ls, inv_rhos, ks);
+            ss_R56 = evol_R56[0]
+            R56 = evol_R56[1]
+
+        if show_chromaticity:
+            _, evol_Wx = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, self.beta0, fast=False, plot=False);
+            if self.uses_plasma_lenses:
+                evol_Wy = evol_Wx
+            else:
+                _, evol_Wy = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, self.beta0, fast=False, plot=False, bending_plane=False);
+            ss_W = evol_Wx[0]
+            Wxs = evol_Wx[1]
+            Wys = evol_Wy[1]
+            
+            if add_no_chrom_correction:
+                from copy import deepcopy
+                taus0 = np.zeros_like(taus)
+                _, evol_Wx0 = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus0, self.beta0, fast=False, plot=False);
+                ss_W0 = evol_Wx0[0]
+                Wxs0 = evol_Wx0[1]
+
         # prepare plots
-        fig, axs = plt.subplots(4,1, gridspec_kw={'height_ratios': [0.1, 1, 1, 1]})
+        num_plots = 1 + int(show_beta_function) + int(show_dispersion) + int(show_R56) + int(show_chromaticity)
+        height_ratios = np.ones((num_plots,1))
+        height_ratios[0] = 0.1
+        fig, axs = plt.subplots(num_plots,1, gridspec_kw={'height_ratios': height_ratios})
         fig.set_figwidth(7)
-        fig.set_figheight(11)
+        fig.set_figheight(11/3.1*np.sum(height_ratios))
         col0 = "tab:gray"
         colx1 = "tab:blue"
         coly = "tab:orange"
         colx2 = "#d7e9f5" # lighter version of tab:blue
         colz = "tab:green"
-        long_label = 'Location [m]'
-        long_limits = [min(ss_beta), max(ss_beta)]
+        coloff = "#e69596" # lighter version of tab:red
+        long_label = 'Location (m)'
+        long_limits = [min(ssl), max(ssl)]
 
         # layout
-        axs[0].plot(ss_beta, np.zeros_like(ss_beta), '-', linewidth=0.5, color='k')
-        axs[0].axis('off')
+        n = 0
+        axs[n].plot(ssl, np.zeros_like(ssl), '-', linewidth=0.5, color='k')
+        axs[n].axis('off')
         for i in range(len(ls)):
             if abs(inv_rhos[i]) > 0: # add dipoles
-                axs[0].add_patch(patches.Rectangle((ssl[i],-0.75), ls[i], 1.5, fc='#d9d9d9'))
+                axs[n].add_patch(patches.Rectangle((ssl[i],-0.75), ls[i], 1.5, fc='#d9d9d9'))
             if abs(ks[i]) > 0: # add quad or plasma lenses
-                axs[0].add_patch(patches.Rectangle((ssl[i],0), ls[i], np.sign(ks[i]), fc='#fcb577'))
+                axs[n].add_patch(patches.Rectangle((ssl[i],0), ls[i], np.sign(ks[i]), fc='#fcb577'))
             if abs(ms[i]) > 0: # add sextupole
-                axs[0].add_patch(patches.Rectangle((ssl[i],-0.5), ls[i], 1, fc='#abd4ab'))
-        axs[0].set_xlim(long_limits)
-        axs[0].set_ylim([-1, 1])
+                axs[n].add_patch(patches.Rectangle((ssl[i],-0.5), ls[i], 1, fc='#abd4ab'))
+        axs[n].set_xlim(long_limits)
+        axs[n].set_ylim([-1, 1])
 
         # shift the layout box down
         box = axs[0].get_position()
@@ -288,95 +442,71 @@ class Interstage(Trackable, CostModeled):
         axs[0].set_position(box)
         
         # plot beta function
-        axs[1].plot(ss_beta, self.beta0*np.ones_like(ss_beta), ':', color=col0)
-        axs[1].plot(ss_beta_y, np.sqrt(beta_ys), color=coly)
-        axs[1].plot(ss_beta, np.sqrt(beta_xs), color=colx1)
-        axs[1].set_ylabel(r'$\sqrt{\mathrm{Beta\hspace{0.3}function}}$ (m$^{0.5}$)')
-        axs[1].set_xlim(long_limits)
+        if show_beta_function:
+            n += 1
+            axs[n].plot(ss_beta, np.sqrt(self.beta0*np.ones_like(ss_beta)), ':', color=col0)
+            if self.uses_plasma_lenses:
+                axs[n].plot(ss_beta, np.sqrt(beta_xs), color=colx1)
+            else:
+                axs[n].plot(ss_beta, np.sqrt(beta_ys), color=coly, label=r'$y$')
+                axs[n].plot(ss_beta, np.sqrt(beta_xs), color=colx1, label=r'$x$')
+                axs[n].legend(loc='best', reverse=True, fontsize='small')
+            axs[n].set_ylabel(r'$\sqrt{\mathrm{Beta\hspace{0.3}function}}$ ($\sqrt{\mathrm{m}})$')
+            axs[n].set_xlim(long_limits)
         
         # plot dispersion
-        axs[2].plot(ss_disp1, np.zeros_like(ss_disp1), ':', color=col0)
-        axs[2].plot(ss_disp2, second_order_dispersion / 1e-3, '-', color=colx2, label='2nd order')
-        axs[2].plot(ss_disp1, dispersion / 1e-3, '-', color=colx1, label='1st order')
-        axs[2].set_ylabel('Horizontal dispersion (mm)')
-        axs[2].set_xlim(long_limits)
-        axs[2].legend(loc='best', reverse=True, fontsize='small')
+        if show_dispersion:
+            n += 1
+            axs[n].plot(ss_disp, np.zeros_like(ss_disp), ':', color=col0)
+            if add_no_central_sextupole:
+                axs[n].plot(ss_disp, second_order_dispersion0 / 1e-3, ':', color=coloff, label=r'2$^{\mathrm{nd}}$ order (no central sextupole)')    
+            axs[n].plot(ss_disp, second_order_dispersion / 1e-3, '-', color=colx2, label=r'2$^{\mathrm{nd}}$ order')
+            axs[n].plot(ss_disp, dispersion / 1e-3, '-', color=colx1, label=r'1$^{\mathrm{st}}$ order')
+            axs[n].set_ylabel('Horizontal dispersion (mm)')
+            axs[n].set_xlim(long_limits)
+            axs[n].legend(loc='best', reverse=True, fontsize='small')
         
         # plot R56
-        axs[3].plot(ss_R56, np.zeros_like(ss_R56), ':', color=col0)
-        axs[3].plot(ss_R56, R56/1e-3, color=colz)
-        axs[3].set_ylabel(r'Longitudinal dispersion, $R_{56}$ (mm)')
-        axs[3].set_xlim(long_limits)
-        axs[3].set_xlabel(long_label)
+        if show_R56:
+            n += 1
+            axs[n].plot(ss_R56, np.zeros_like(ss_R56), ':', color=col0)
+            axs[n].plot(ss_R56, R56/1e-3, color=colz)
+            axs[n].set_ylabel(r'Longitudinal dispersion, $R_{56}$ (mm)')
+            axs[n].set_xlim(long_limits)
 
-         # save figure to file
-        if savefig is not None:
-            fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
+        # plot chromaticity
+        if show_chromaticity:
+            n += 1
+            if self.uses_plasma_lenses:
+                if add_no_chrom_correction:
+                    axs[n].plot(ss_W0, Wxs0, ':', color=coloff, label='Linear plasma lenses')
+                    axs[n].plot(ss_W, Wxs, color=colx1, label='Nonlinear plasma lenses')
+                    axs[n].legend(loc='best', reverse=True, fontsize='small')
+                else:
+                    axs[n].plot(ss_W, Wxs, color=colx1)
 
+                # calculate focal lengths and chromaticity
+                f = 1/max(abs(ls*ks))
+                W = 2*(self.beta0+(self.length_dipole+self.length_gap*2+0.5*self.length_plasma_lens)**2/self.beta0)/f
+                axs[n].set_ylim(np.array([-0.01, 1.05])*W)
+            else:
+                axs[n].plot(ss_W, Wys, color=coly, label=r'$y$')
+                axs[n].plot(ss_W, Wxs, color=colx1, label=r'$x$')
+                axs[n].legend(loc='best', reverse=True, fontsize='small')
+                axs[n].set_ylim(np.array([-0.01, 1.05])*max(max(Wys), max(Wxs)))
+            axs[n].set_ylabel(r'Chromatic amplitude, $W$')
+            axs[n].set_xlim(long_limits)
+            
 
-    def plot_chromaticity(self, savefig=None):
-
-        from matplotlib import pyplot as plt
-        from matplotlib import patches
-        from abel.utilities.beam_physics import evolve_chromatic_amplitude
-        
-        # calculate evolution
-        ls, inv_rhos, ks, ms, taus = self.matrix_lattice()
-        ssl = np.append([0.0], np.cumsum(ls))
-        _, evol_Wx = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, self.beta0, fast=False, plot=False);
-        if self.uses_plasma_lenses:
-            evol_Wy = evol_Wx
-        else:
-            _, evol_Wy = evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, self.beta0, fast=False, plot=False, bending_plane=False);
-        ssx = evol_Wx[0]
-        Wxs = evol_Wx[1]
-        ssy = evol_Wy[0]
-        Wys = evol_Wy[1]
-        
-        # prepare plots
-        fig, axs = plt.subplots(2,1, gridspec_kw={'height_ratios': [0.1, 1]})
-        fig.set_figwidth(7)
-        fig.set_figheight(4)
-        col0 = "tab:gray"
-        colx = "tab:blue"
-        coly = "tab:orange"
-        long_label = 'Location [m]'
-        long_limits = [min(ssx), max(ssx)]
-    
-        # layout
-        axs[0].plot(ssx, np.zeros_like(ssx), '-', linewidth=0.5, color='k')
-        axs[0].axis('off')
-        for i in range(len(ls)):
-            if abs(inv_rhos[i]) > 0: # add dipoles
-                axs[0].add_patch(patches.Rectangle((ssl[i],-0.75), ls[i], 1.5, fc='#d9d9d9'))
-            if abs(ks[i]) > 0: # add quads
-                axs[0].add_patch(patches.Rectangle((ssl[i],0), ls[i], np.sign(ks[i]), fc='#fcb577'))
-            if abs(ms[i]) > 0: # add sextupole
-                axs[0].add_patch(patches.Rectangle((ssl[i],-0.5), ls[i], 1, fc='#abd4ab'))
-        axs[0].set_xlim(long_limits)
-        axs[0].set_ylim([-1, 1])
-    
-        # shift the layout box down
-        box = axs[0].get_position()
-        vshift = 0.025
-        box.y0 = box.y0 - vshift
-        box.y1 = box.y1 - vshift
-        axs[0].set_position(box)
-        
-        # plot beta function
-        axs[1].plot(ssy, Wys, color=coly)
-        axs[1].plot(ssx, Wxs, color=colx)
-        axs[1].set_ylabel(r'Chromatic amplitude, $W$')
-        axs[1].set_xlim(long_limits)
-        axs[1].set_yscale('log')
-        axs[1].set_ylim([0.3, 1.3*max(max(Wys), max(Wxs))])
+        # add horizontal axis label
+        axs[n].set_xlabel(long_label)
         
          # save figure to file
         if savefig is not None:
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
     
-    def plot_layout(self, delta=0.25, axes_equal=False, use_second_order_dispersion=False, savefig=None):
+    def plot_layout(self, delta=0.25, axes_equal=False, use_second_order_dispersion=False, savefig=None, figsize=[12,2]):
         "Plot the layout with beam orbit and dispersion."
         
         from matplotlib import pyplot as plt
@@ -392,8 +522,8 @@ class Interstage(Trackable, CostModeled):
         
         # prepare plots
         fig, ax = plt.subplots(1)
-        fig.set_figwidth(12)
-        fig.set_figheight(2)
+        fig.set_figwidth(figsize[0])
+        fig.set_figheight(figsize[1])
 
         # get the orbit
         theta, _ = evolve_orbit(ls, inv_rhos)
@@ -525,6 +655,15 @@ class Interstage(Trackable, CostModeled):
     ## SURVEY PLOTS
     
     def total_bend_angle(self):
+        """
+        Compute the total bending angle of the interstage lattice.
+
+        Returns
+        -------
+        final_angle : [rad] float
+            Net angular deflection of the reference trajectory through the 
+            interstage.
+        """
         ls, inv_rhos, ks, ms, taus = self.matrix_lattice(orbit_only=True)
         from abel.utilities.beam_physics import evolve_orbit
         final_angle, _ = evolve_orbit(ls, inv_rhos, theta0=0)
@@ -547,6 +686,16 @@ class Interstage(Trackable, CostModeled):
     ## COST MODEL
     
     def get_cost_breakdown(self):
+        """
+        Compute the estimated cost of the interstage section based on its length.
+
+        Returns
+        -------
+        Tuple 
+            Containing:
+                - Name of the cost component (``'Interstage'``)
+                - Total estimated cost.
+        """
         return ('Interstage', self.get_length() * CostModeled.cost_per_length_interstage)
 
     

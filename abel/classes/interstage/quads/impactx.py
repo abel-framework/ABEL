@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.classes.interstage.quads import InterstageQuads
 import numpy as np
 import os
@@ -5,6 +11,30 @@ from types import SimpleNamespace
 import scipy.constants as SI
 
 class InterstageQuadsImpactX(InterstageQuads):
+    """
+    Interstage modul using ImpactX [1]_ for full 3D particle tracking through an 
+    interstage lattice with optional physics effects.
+
+    This subclass of :class:`InterstageQuads` enables realistic beam 
+    tracking with support for Coherent Synchrotron Radiation (CSR), Incoherent 
+    Synchrotron Radiation (ISR), and space-charge modeling.
+
+    Inherits all attributes from :class:`InterstageQuads`.
+
+    Attributes
+    ----------
+    num_slices : int
+        Number of longitudinal slices per beamline element in the ImpactX 
+        simulation. Defaults to 50.
+
+    use_monitors : bool
+        If ``True``, inserts ImpactX ``BeamMonitor`` in the lattice for 
+        recording intermediate beam states. Defaults to ``False``.
+
+    References
+    ----------
+    .. [1] ImpactX documentation: https://impactx.readthedocs.io/en/latest/
+    """
     
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False):
         
@@ -27,7 +57,7 @@ class InterstageQuadsImpactX(InterstageQuads):
         lattice = self.get_impactx_lattice()
         
         # run ImpactX
-        from abel.apis.impactx.impactx_api import run_impactx
+        from abel.wrappers.impactx.impactx_wrapper import run_impactx
         beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, 
                                            space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
         
@@ -47,7 +77,7 @@ class InterstageQuadsImpactX(InterstageQuads):
         
         # add monitor (before and after gaps, and in the middle)
         if self.use_monitors:
-            from abel.apis.impactx.impactx_api import initialize_amrex
+            from abel.wrappers.impactx.impactx_wrapper import initialize_amrex
             initialize_amrex()
             monitor = elements.BeamMonitor(name='monitor', backend='h5', encoding='g')
         else:

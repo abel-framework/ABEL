@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 import numpy as np
 import scipy.constants as SI
 
@@ -45,12 +51,11 @@ from .classes.source.impl.source_from_file import SourceFromFile
 from .classes.source.impl.source_flattop import SourceFlatTop
 from .classes.source.impl.source_capsule import SourceCapsule
 from .classes.stage.impl.stage_basic import StageBasic
-from .classes.stage.impl.stage_nonlinear_1d import StageNonlinear1d
 from .classes.stage.impl.stage_hipace import StageHipace
 from .classes.stage.impl.stage_wake_t import StageWakeT
 from .classes.stage.impl.stage_quasistatic_2d import StageQuasistatic2d
-from .classes.stage.impl.stage_slice_transverse_wake_instability import StageSlicesTransWakeInstability
-from .classes.stage.impl.stage_particle_transverse_wake_instability import StagePrtclTransWakeInstability
+from .classes.stage.impl.stage_reduced_models import StageReducedModels
+from .classes.stage.stage import PlasmaRamp
 from .classes.interstage.plasma_lens.basic import InterstagePlasmaLensBasic
 from .classes.interstage.plasma_lens.elegant import InterstagePlasmaLensElegant
 from .classes.interstage.plasma_lens.impactx import InterstagePlasmaLensImpactX
@@ -58,6 +63,7 @@ from .classes.interstage.quads.basic import InterstageQuadsBasic
 from .classes.interstage.quads.impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
+from .classes.plasma_lens.impl.plasma_lens_nonlinear_thick import PlasmaLensNonlinearThick
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
 from .classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorBasic
 from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
@@ -67,7 +73,6 @@ from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
 from .classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from .classes.bds.impl.bds_fbt import BeamDeliverySystemFlatBeamTransformer
-from .classes.spectrometer.impl.spectrometer_facet_ocelot import SpectrometerFacetOcelot
 from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
 from .classes.ip.impl.ip_basic import InteractionPointBasic
 from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig

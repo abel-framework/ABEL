@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.classes.collider.collider import Collider
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
@@ -81,10 +87,10 @@ class HALHFv1(Collider):
         einjector.beta_y = einjector.beta_x
         
         # define interstage
-        interstage = InterstageBasic()
+        interstage = InterstagePlasmaLensBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 1 * np.sqrt(E/10e9) # [m(eV)]
-        interstage.dipole_field = 0.5 # [T]
+        interstage.length_dipole = lambda E: 1 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.field_dipole = 0.5 # [T]
         
         # define electron BDS
         ebds = BeamDeliverySystemBasic()
@@ -101,6 +107,7 @@ class HALHFv1(Collider):
         elinac.interstage = interstage
         elinac.bds = ebds
         elinac.num_stages = 16
+        elinac.alternate_interstage_polarity = True
 
         # define positron source
         psource = SourceBasic()
@@ -166,7 +173,7 @@ class HALHFv1(Collider):
         self.energy_asymmetry = 4
         self.bunch_separation = 80e-9 # [s]
         self.num_bunches_in_train = 100
-        self.rep_rate_trains = 100 # [Hz]
+        self.rep_rate_trains = 100.0 # [Hz]
 
         # assemble everything
         self.assemble_trackables()

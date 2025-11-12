@@ -21,30 +21,28 @@ dependencies = [
    "PyQt6",
    "pyqtgraph",
    "Wake-T",
-   "ocelot@git+https://github.com/ocelot-collab/ocelot.git",
    "ax-platform",
    "CLICopti >= 2.2",
    "RF-Track",
-   "impactx-noacc >= 25.4",
-   "pandas"
+   "impactx-noacc >= 25.6",
+   "toml"
 ]
 requires-python = ">=3,<3.13"
 
 authors = [
   {name = "Carl Andreas Lindstrøm", email = "c.a.lindstrom@fys.uio.no"},
-  {name = "Ben Chen"},
+  {name = "Jian Bin Ben Chen"},
   {name = "Ole Gunnar Finnerud"},
   {name = "Kyrre Sjobak"},
-  {name = "Daniel Kalvik"}
+  {name = "Daniel Kalvik"},
+  {name = "Erik Adli"},
+  {name = "Eir Eline Hørlyk"}
 ]
 readme = "README.md"
-#license = {text="LGPL3+"}
+license = "GPL-3.0-or-later"
 
 #[tool.setuptools]
 #package-dir = {"" = "Python"}
-
-#[tool.setuptools.packages.find]
-#where = ["Python"]
 
 [tool.pytest.ini_options]
 addopts = [
@@ -52,8 +50,21 @@ addopts = [
 ]
 markers = [
   "core: Test core functionality",
+  "rft_wrapper_unit_test: Unit tests for the RF-Track wrapper",
+  "elegant_wrapper_unit_test: Unit tests for the ELEGANT wrapper",
+  "wake_t_wrapper_unit_test : Unit tests for the Wake-T wrapper",
   "stageGeometry: Test stage geometry calculation functionality",
-  "spin: test spin and polarization functionality",
+  "spin: Test spin and polarization functionality",
   "sources: Test the various Source subclasses generate beams with desired properties",
+  "plasma_lens: Test various PlasmaLens subclasses",
   "beam: Tests for the Beam class",
+  "StageReducedModels_linac: Test linacs based on StageReducedModels",
+  "StageReducedModels: Tests on StageReducedModels",
+  "linac_unit_test: Unit tests for the Linac class",
+  "StageBasic: Unit tests for the StageBasic class",
+  "StageBasic_linac: Integration tests for StageBasic linacs",
+  "StageQuasistatic2d: Tests for the StageQuasistatic2d class",
+  "StageWakeT: Tests for the StageWakeT class",
+  "presets: Tests for collider presets",
+  "impactx: Tests for ImpactX",
 ]

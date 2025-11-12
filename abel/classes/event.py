@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 import numpy as np
 import scipy.constants as SI
 from abel.classes.beam import Beam
@@ -5,11 +11,13 @@ from abel.classes.beam import Beam
 class Event():
     
     # empty beam
-    def __init__(self, input_beam1=None, input_beam2=None, shot=0):
+    def __init__(self, input_beam1=None, input_beam2=None, output_beam1=None, output_beam2=None, shot=0):
         
         # save beams
         self.input_beam1 = input_beam1
         self.input_beam2 = input_beam2
+        self.output_beam1 = output_beam1
+        self.output_beam2 = output_beam2
         
         # luminosity spectrum
         self.luminosity_full = None
@@ -80,12 +88,14 @@ class Event():
             if not "_beam" in key:
                 series.iterations[0].set_attribute(key, value)
         
-        # flush
-        series.flush()
-        
         # save beams
         self.input_beam1.save(beam_name="input_beam1", series=series)
         self.input_beam2.save(beam_name="input_beam2", series=series)
+        self.output_beam1.save(beam_name="output_beam1", series=series)
+        self.output_beam2.save(beam_name="output_beam2", series=series)
+        
+        # flush
+        series.flush()
         
         # now the file is closed
         del series
@@ -104,18 +114,31 @@ class Event():
         if load_beams:
             event.input_beam1 = Beam.load(filename, "input_beam1")
             event.input_beam2 = Beam.load(filename, "input_beam2")
+            event.output_beam1 = Beam.load(filename, "output_beam1")
+            event.output_beam2 = Beam.load(filename, "output_beam2")
         
         # load file and add metadata
         series = io.Series(filename, io.Access.read_only)
-        event.luminosity_full = series.iterations[0].get_attribute("luminosity_full")
-        event.luminosity_geom = series.iterations[0].get_attribute("luminosity_geom")
-        event.luminosity_peak = series.iterations[0].get_attribute("luminosity_peak")
-        event.upsilon_max = series.iterations[0].get_attribute("upsilon_max")
-        event.num_pairs = series.iterations[0].get_attribute("num_pairs")
-        event.num_photon1 = series.iterations[0].get_attribute("num_photon1")
-        event.num_photon2 = series.iterations[0].get_attribute("num_photon2")
-        event.energy_loss1 = series.iterations[0].get_attribute("energy_loss1")
-        event.energy_loss2 = series.iterations[0].get_attribute("energy_loss2")
+        
+        luminosity_full = series.iterations[0].get_attribute("luminosity_full")
+        luminosity_geom = series.iterations[0].get_attribute("luminosity_geom")
+        luminosity_peak = series.iterations[0].get_attribute("luminosity_peak")
+        upsilon_max = series.iterations[0].get_attribute("upsilon_max")
+        num_pairs = series.iterations[0].get_attribute("num_pairs")
+        num_photon1 = series.iterations[0].get_attribute("num_photon1")
+        num_photon2 = series.iterations[0].get_attribute("num_photon2")
+        energy_loss1 = series.iterations[0].get_attribute("energy_loss1")
+        energy_loss2 = series.iterations[0].get_attribute("energy_loss2")
+        
+        event.luminosity_full = None if not luminosity_full else luminosity_full
+        event.luminosity_geom = None if not luminosity_geom else luminosity_geom
+        event.luminosity_peak = None if not luminosity_peak else luminosity_peak
+        event.upsilon_max = None if not upsilon_max else upsilon_max
+        event.num_pairs = None if not num_pairs else num_pairs
+        event.num_photon1 = None if not num_photon1 else num_photon1
+        event.num_photon2 = None if not num_photon2 else num_photon2
+        event.energy_loss1 = None if not energy_loss1 else energy_loss1
+        event.energy_loss2 = None if not energy_loss2 else energy_loss2
         
         return event
         

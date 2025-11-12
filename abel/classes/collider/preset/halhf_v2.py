@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.classes.collider.collider import Collider
 from abel.classes.source.impl.source_trapezoid import SourceTrapezoid
 from abel.classes.source.impl.source_basic import SourceBasic
@@ -14,6 +20,7 @@ from abel.classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.beamline.impl.linac.impl.conventional_linac import ConventionalLinac
 from abel.classes.ip.impl.ip_basic import InteractionPointBasic
+from abel.classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
 import scipy.constants as SI
 import numpy as np
 
@@ -63,11 +70,13 @@ class HALHFv2(Collider):
         self.positron_linac_num_structures_per_klystron_warm = 1.0
         self.positron_linac_num_rf_cells_warm = 75
 
-        self.num_particles = 10000
+        self.num_particles = 3000
         self.electron_ip_bunch_length = 150e-6#230e-6
         self.positron_ip_bunch_length = 150e-6#100e-6
         self.enable_waist_shift = True
         self.waist_shift_frac = 0.5
+
+        self.use_guineapig = False
 
         self.num_bds = 2
         
@@ -169,10 +178,10 @@ class HALHFv2(Collider):
         esource.bunch_separation = colliding_bunch_separation
         
         # define interstage
-        interstage = InterstageBasic()
+        interstage = InterstagePlasmaLensBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 0.8 * np.sqrt(E/10e9) # [m(eV)]
-        interstage.dipole_field = 0.5 # [T]
+        interstage.length_dipole = lambda E: 0.8 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.field_dipole = 0.5 # [T]
         
         # define electron BDS
         ebds = BeamDeliverySystemBasic()
@@ -269,11 +278,14 @@ class HALHFv2(Collider):
         elinac.interstage = interstage
         elinac.bds = ebds
         elinac.num_stages = self.pwfa_num_stages
+        elinac.alternate_interstage_polarity = True
         
         
         # define interaction point
-        ip = InteractionPointBasic()
-        #ip = InteractionPointGuineaPig()
+        if self.use_guineapig:
+            ip = InteractionPointGuineaPig()
+        else:
+            ip = InteractionPointBasic()
         ip.num_ips = self.num_bds
         ip.enable_waist_shift = self.enable_waist_shift
         ip.waist_shift_frac = self.waist_shift_frac

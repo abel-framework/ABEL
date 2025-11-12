@@ -1,25 +1,31 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 import numpy as np
 import openpmd_api as io
+import copy, warnings
+import scipy.constants as SI
+import scipy.sparse as sp
+from scipy.spatial.transform import Rotation as Rot
 from datetime import datetime
 from pytz import timezone
-from abel.CONFIG import CONFIG
 from types import SimpleNamespace
-import scipy.constants as SI
+from matplotlib import pyplot as plt
+
+from abel.CONFIG import CONFIG
 from abel.utilities.relativity import energy2proper_velocity, proper_velocity2energy, momentum2proper_velocity, proper_velocity2momentum, proper_velocity2gamma, energy2gamma, gamma2momentum
 from abel.utilities.statistics import weighted_mean, weighted_std, weighted_cov
 from abel.utilities.plasma_physics import k_p, wave_breaking_field, beta_matched
 from abel.physics_models.hills_equation import evolve_hills_equation_analytic
 from abel.physics_models.betatron_motion import evolve_betatron_motion
 
-import scipy.sparse as sp
-from scipy.spatial.transform import Rotation as Rot
-import copy
-
-from matplotlib import pyplot as plt
 
 class Beam():
     
-    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, particle_mass=SI.m_e):
+    def __init__(self, phasespace=None, num_particles=1000, num_bunches_in_train=1, bunch_separation=0.0, allow_low_energy_particles=True, particle_mass=SI.m_e):
 
         # check the inputs
         if num_particles < 1 or not isinstance(num_particles, int):
@@ -38,13 +44,14 @@ class Beam():
         # bunch pattern information
         self.num_bunches_in_train = num_bunches_in_train
         self.bunch_separation = bunch_separation # [s]
-
-        self.particle_mass = particle_mass
         
         self.trackable_number = -1 # will increase to 0 after first tracking element
         self.stage_number = 0
-        self.location = 0        
-        self.particle_mass = SI.m_e
+        self.location = 0
+
+        self.particle_mass = particle_mass
+
+        self.allow_low_energy_particles = allow_low_energy_particles  # Flag for allowing particles to have low energies.
     
     
     # reset phase space
@@ -68,32 +75,38 @@ class Beam():
     # set phase space
     def set_phase_space(self, Q, xs, ys, zs, uxs=None, uys=None, uzs=None, pxs=None, pys=None, pzs=None, xps=None, yps=None, Es=None, spxs=None, spys=None, spzs=None, weightings=None, particle_mass=SI.m_e):
         """
-        Set the phase space of the beam. All input arrays must have the same lengths.
+        Set the phase space of the beam. All input arrays must have the same 
+        lengths.
 
         Parameters
         ----------
-        Q : [C], float
+        Q : [C] float
             Total beam charge.
 
-        xs, ys, zs: [m], 1D ndarray
+        xs, ys, zs : [m] 1D float ndarray
             Coordinates for the macroparticles.
             
-        uxs, uys, uzs: [m/s], 1D ndarray, optional
-            Proper velocities for the macroparticles. All uzs values must be above 10*particle rest energy/c/particle mass. Default set to ``None``.
+        uxs, uys, uzs : [m/s] 1D float ndarray, optional
+            Proper velocities for the macroparticles. All uzs values must be 
+            above 10*particle rest energy/c/particle mass. Default set to 
+            ``None``.
             
-        pxs, pys, pzs: [kg m/s], 1D ndarray, optional
-            Momenta for the macroparticles. All pzs values must be above 10*particle rest energy/c. Default set to ``None``.
+        pxs, pys, pzs : [kg m/s] 1D float ndarray, optional
+            Momenta for the macroparticles. All pzs values must be above 
+            10*particle rest energy/c. Default set to ``None``.
         
-        xps, yps: [rad], 1D ndarray, optional
-            Angles dx/ds and dy/ds for the macroparticles. Default set to ``None``.
+        xps, yps : [rad] 1D float ndarray, optional
+            Angles dx/ds and dy/ds for the macroparticles. Default set to 
+            ``None``.
 
-        Es : [eV], 1D ndarray, optional
-            Energies for the macroparticles. All values must be above 10*particle rest energy. Default set to ``None``.
+        Es : [eV] 1D float ndarray, optional
+            Energies for the macroparticles. All values must be above 
+            10*particle rest energy. Default set to ``None``.
 
-        weightings : 1D ndarray, optional
+        weightings : 1D float ndarray, optional
             Weights for the macroparticles. Default set to ``None``.
 
-        particle_mass : [kg], float, optional
+        particle_mass : [kg] float, optional
             Particle mass for a single real particle. Default set to ``SI.m_e``.
         
             
@@ -205,19 +218,25 @@ class Beam():
             
             if pzs is not None:
                 if np.any(pzs < pz_thres):
-                    print('pzs contains values that are too small.')
-                    #raise ValueError('pzs contains values that are too small.')
+                    if not self.allow_low_energy_particles:
+                        raise ValueError('Beam pzs contains values that are too small.')
+                    else:
+                        warnings.warn('Beam pzs contains values that are too small.\n', UserWarning)
                 uzs = momentum2proper_velocity(pzs)
 
             elif Es is not None:
                 if np.any(Es < energy_thres):
-                    print('Es contains values that are too small.')
-                    #raise ValueError('Es contains values that are too small.')
+                    if not self.allow_low_energy_particles:
+                        raise ValueError('Beam Es contains values that are too small.')
+                    else:
+                        warnings.warn('Beam Es contains values that are too small.\n', UserWarning)
                 uzs = energy2proper_velocity(Es)
         else:
             if np.any(uzs < uz_thres):
-                print('uzs contains values that are too small.')
-                #raise ValueError('uzs contains values that are too small.')
+                if not self.allow_low_energy_particles:
+                    raise ValueError('Beam uzs contains values that are too small.')
+                else:
+                    warnings.warn('Beam uzs contains values that are too small.\n', UserWarning)
         self.__phasespace[5,:] = uzs
         
         if uxs is None:
@@ -239,6 +258,8 @@ class Beam():
         if weightings is None:
             self.__phasespace[6,:] = Q/num_particles
         else:
+            if np.any(weightings < 0):
+                raise ValueError('Beam weightings cannot be negative.')
             self.__phasespace[6,:] = Q*weightings/np.sum(weightings)
         
         # ids
@@ -350,8 +371,10 @@ class Beam():
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         uz_thres = energy2proper_velocity(energy_thres, unit='eV', m=self.particle_mass)
         if np.any(uzs < uz_thres):
-            print('uzs contains values that are too small.')
-            #raise ValueError('uzs contains values that are too small.')
+            if not self.allow_low_energy_particles:
+                raise ValueError('Beam uzs contains values that are too small.')
+            else:
+                warnings.warn('Beam uzs contains values that are too small.\n', UserWarning)
         self.__phasespace[5,:] = uzs
         
     def set_xps(self, xps):
@@ -361,8 +384,10 @@ class Beam():
     def set_Es(self, Es):
         energy_thres = 10*self.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         if np.any(Es < energy_thres):
-            print('Es contains values that are too small.')
-            #raise ValueError('Es contains values that are too small.')
+            if not self.allow_low_energy_particles:
+                raise ValueError('Beam Es contains values that are too small.')
+            else:
+                warnings.warn('Beam Es contains values that are too small.\n', UserWarning)
         self.set_uzs(energy2proper_velocity(Es))
         
     def set_qs(self, qs):
@@ -423,20 +448,25 @@ class Beam():
 
     def comp_beams(beam1, beam2, comp_location=False, rtol=1e-15, atol=0.0):
         """
-        Compare the phase spaces of two beams. Chekcks if all arrays are element-wise equal within given tolerances.
+        Compare the phase spaces of two beams. Chekcks if all arrays are 
+        element-wise equal within given tolerances.
 
         Parameters
         ----------
-        beam1, beam2 : ABEL ``Beam`` object
-            Beams to be compared
+        beam1 : ABEL ``Beam`` object
+            First beam to be compared.
 
-        comp_location: bool, optional
-            Flag for comparing the location of the beams. Default set to ``False``.
+        beam2 : ABEL ``Beam`` object
+            Second beam to be compared.
+
+        comp_location : bool, optional
+            Flag for comparing the location of the beams. Default set to 
+            ``False``.
             
         rtol : float, optional
             The relative tolerance parameter (see [1]_). Default set to 1e-15.
             
-        rb_fit_obj : float, optional
+        atol : float, optional
             The absolute tolerance parameter (see [1]_). Default set to 0.0.
         
             
@@ -452,6 +482,7 @@ class Beam():
 
         if comp_location:
             assert np.allclose(beam1.location, beam2.location, rtol, atol)
+            assert beam1.stage_number == beam2.stage_number
         assert np.allclose(beam1.qs(), beam2.qs(), rtol, atol)
         assert np.allclose(beam1.weightings(), beam2.weightings(), rtol, atol)
         assert np.allclose(beam1.xs(), beam2.xs(), rtol, atol)
@@ -465,15 +496,20 @@ class Beam():
 
     def comp_beam_params(beam1, beam2, comp_location=False):
         """
-        Compare the parameters of two beams to see if they are equal within given tolerances.
+        Compare the parameters of two beams to see if they are equal within 
+        given tolerances.
 
         Parameters
         ----------
-        beam1, beam2 : ABEL ``Beam`` object
-            Beams to be compared
+        beam1 : ABEL ``Beam`` object
+            First beam to be compared.
 
-        comp_location: bool, optional
-            Flag for comparing the location of the beams. Default set to ``False``.
+        beam2 : ABEL ``Beam`` object
+            Second beam to be compared.
+
+        comp_location : bool, optional
+            Flag for comparing the location of the beams. Default set to 
+            ``False``.
         
             
         Returns
@@ -494,18 +530,18 @@ class Beam():
         assert np.allclose(beam1.energy(), beam2.energy(), rtol=0.0, atol=0.6e9)  # Usually rather large discrepancy in energy.
         assert np.allclose(beam1.energy_spread(), beam2.energy_spread(), rtol=0.0, atol=0.6e9)
         assert np.allclose(beam1.rel_energy_spread(), beam2.rel_energy_spread(), rtol=0.0, atol=5e-4)
-        assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.0, atol=1e-6)
-        assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.0, atol=0.5e-6)
-        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.0, atol=0.05e-6)
+        assert np.allclose(beam1.bunch_length(), beam2.bunch_length(), rtol=0.05, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_x(), beam2.beam_size_x(), rtol=0.05, atol=0.5e-6)
+        assert np.allclose(beam1.beam_size_y(), beam2.beam_size_y(), rtol=0.05, atol=0.05e-6)
         assert np.allclose(beam1.geom_emittance_x(), beam2.geom_emittance_x(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.geom_emittance_y(), beam2.geom_emittance_y(), rtol=1e-05, atol=1e-08)
         assert np.allclose(beam1.norm_emittance_x(), beam2.norm_emittance_x(), rtol=0.0, atol=1e-6)
         assert np.allclose(beam1.norm_emittance_y(), beam2.norm_emittance_y(), rtol=0.0, atol=0.5e-6)
         assert np.allclose(beam1.peak_current(), beam2.peak_current(), rtol=0.0, atol=0.7e3)
-        assert np.allclose(beam1.beta_x(), beam2.beta_x(), rtol=0.0, atol=50e-3)
-        assert np.allclose(beam1.beta_y(), beam2.beta_y(), rtol=0.0, atol=50e-3)
-        assert np.allclose(beam1.gamma_x(), beam2.gamma_x(), rtol=0.0, atol=0.1)
-        assert np.allclose(beam1.gamma_y(), beam2.gamma_y(), rtol=0.0, atol=0.1)        
+        assert np.allclose(beam1.beta_x(), beam2.beta_x(), rtol=0.05, atol=5e-3)
+        assert np.allclose(beam1.beta_y(), beam2.beta_y(), rtol=0.05, atol=5e-3)
+        assert np.allclose(beam1.gamma_x(), beam2.gamma_x(), rtol=0.05, atol=0.0)
+        assert np.allclose(beam1.gamma_y(), beam2.gamma_y(), rtol=0.05, atol=0.0)        
         assert np.allclose(beam1.z_offset(), beam2.z_offset(), rtol=0.0, atol=3e-6)
         assert np.allclose(beam1.x_offset(), beam2.x_offset(), rtol=0.0, atol=3e-6)
         assert np.allclose(beam1.y_offset(), beam2.y_offset(), rtol=0.0, atol=3e-6)
@@ -543,22 +579,34 @@ class Beam():
     # ==================================================
     def rotate_coord_sys_3D(self, axis1, angle1, axis2=np.array([0, 1, 0]), angle2=0.0, axis3=np.array([1, 0, 0]), angle3=0.0, invert=False):
         """
-        Rotates the coordinate system (passive transformation) of the beam first with angle1 around axis1, then with angle2 around axis2 and lastly with angle3 around axis3.
+        Rotates the coordinate system (passive transformation) of the beam first 
+        with ``angle1`` around ``axis1``, then with ``angle2`` around ``axis2`` 
+        and lastly with ``angle3`` around ``axis3``.
         
         Parameters
         ----------
-        axis1, axis2, axis3: 1x3 float nd arrays
-            Unit vectors specifying the rotation axes.
+        axis1 : 1x3 float ndarrays
+            Unit vector specifying the rotation axes.
         
-        angle1, angle2, angle3: [rad] float
-            Angles used for rotation of the beam's coordinate system around the respective axes.
+        angle1 : [rad] float
+            Angle used for rotation of the beam's coordinate system around the 
+            respective axes.
 
-        invert: bool
-            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+        axis2, axis3 : 1x3 float ndarrays, optional
+            Additional unit vectors specifying the rotation axes.
+
+        angle2, angle3 : [rad] float, optional
+            Additional angles used for rotation of the beam's coordinate system 
+            around the respective axes.
+
+        invert : bool, optional
+            Performs a standard passive transformation when ``False``. If 
+            ``True``, will perform an active transformation and can thus be used 
+            to invert the passive transformation.
             
         Returns
         ----------
-        Modified beam xs, ys, zs, uxs, uys and uzs.
+        Modified beam ``xs``, ``ys``, ``zs``, ``uxs``, ``uys`` and ``uzs``.
         """
 
         # Check the inputs
@@ -605,7 +653,8 @@ class Beam():
     # ==================================================
     def beam_alignment_angles(self):
         """
-        Calculates the angles for rotation around the y- and x-axis to align the z-axis to the beam proper velocity.
+        Calculates the angles for rotation around the y- and x-axis to align the 
+        z-axis to the beam proper velocity.
         
         Parameters
         ----------
@@ -614,11 +663,14 @@ class Beam():
             
         Returns
         ----------
-        x_angle: [rad] float
+        x_angle : [rad] float
             Used for rotating the beam's frame around the y-axis.
         
-        y_angle: [rad] float
-            Used for rotating the beam's frame around the x-axis. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        y_angle : [rad] float
+            Used for rotating the beam's frame around the x-axis. Note that due 
+            to the right hand rule, a positive rotation angle in the zy-plane 
+            corresponds to rotation from z-axis towards negative y. I.e. the 
+            opposite sign convention of ``beam.yps()``.
         """
 
         # Get the mean proper velocity component offsets
@@ -654,23 +706,31 @@ class Beam():
     # ==================================================
     def xy_rotate_coord_sys(self, x_angle=None, y_angle=None, invert=False):
         """
-        Rotates the coordinate system of the beam first with ``x_angle`` around the y-axis then with ``y_angle`` around the x-axis.
+        Rotates the coordinate system of the beam first with ``x_angle`` around 
+        the y-axis then with ``y_angle`` around the x-axis.
         
         Parameters
         ----------
-        x_angle: [rad] float
-            Angle to rotate the coordinate system with in the zx-plane.
+        x_angle : [rad] float, optional
+            Angle to rotate the coordinate system with in the zx-plane. Calls 
+            ``Beam.beam_alignment_angles()`` by default if no angle is provided.
         
-        y_angle: [rad] float
-            Angle to rotate the coordinate system with in the zy-plane. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of beam.yps().
+        y_angle : [rad] float, optional
+            Angle to rotate the coordinate system with in the zy-plane. Note 
+            that due to the right hand rule, a positive rotation angle in the 
+            zy-plane corresponds to rotation from z-axis towards negative y. 
+            I.e. the opposite sign convention of ``beam.yps()``. Calls 
+            ``Beam.beam_alignment_angles()`` by default if no angle is provided.
 
-        invert: bool
-            Performs a standard passive transformation when False. If True, will perform an active transformation and can thus be used to invert the passive transformation.
+        invert : bool, optional
+            Performs a standard passive transformation when False. If True, will 
+            perform an active transformation and can thus be used to invert the 
+            passive transformation.
         
             
         Returns
         ----------
-        Modified beam xs, ys, zs, uxs, uys and uzs.
+        Modified beam ``xs``, ``ys``, ``zs``, ``uxs``, ``uys`` and ``uzs``.
         """
         
         x_axis = np.array([0, 1, 0])  # Axis as an unit vector. Axis permutaton is zxy.
@@ -692,16 +752,21 @@ class Beam():
         
         Parameters
         ----------
-         align_x_angle: [rad] float, optional
-            Beam coordinates in the zx-plane are rotated with this angle. If ``None``, will align the beam using its angular offset.
+        align_x_angle : [rad] float, optional
+            Beam coordinates in the zx-plane are rotated with this angle. If 
+            ``None``, will align the beam using its angular offset.
         
-        align_y_angle: [rad] float, optional
-            Beam coordinates in the zy-plane are rotated with this angle. Note that due to the right hand rule, a positive rotation angle in the zy-plane corresponds to rotation from z-axis towards negative y. I.e. the opposite sign convention of ``beam.yps()``. If ``None``, will align the beam using its angular offset.
+        align_y_angle : [rad] float, optional
+            Beam coordinates in the zy-plane are rotated with this angle. Note 
+            that due to the right hand rule, a positive rotation angle in the 
+            zy-plane corresponds to rotation from z-axis towards negative y. 
+            I.e. the opposite sign convention of ``beam.yps()``. If ``None``, 
+            will align the beam using its angular offset.
         
             
         Returns
         ----------
-        Modified beam xs, ys and zs.
+        Modified beam ``xs``, ``ys`` and ``zs``.
         """
 
         if align_x_angle is None:
@@ -739,29 +804,33 @@ class Beam():
     # ==================================================
     def slice_centroids(self, beam_quant, bin_number=None, cut_off=None, make_plot=False):
         """
-        Returns the slice centroids of a beam quantity beam_quant.
+        Returns the slice centroids of a beam quantity ``beam_quant``.
 
         Parameters
         ----------
-        beam_quant: 1D float array
-            Beam quantity to be binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+        beam_quant : 1D float array
+            Beam quantity to be binned into bins/slices defined by ``z_centroids``. 
+            The mean is calculated for the quantity for all particles in the 
+            z-bins. Includes e.g. ``beam.xs()``, ``beam.Es()`` etc.
 
-        bin_number: float
+        bin_number : float, optional
             Number of beam slices.
 
-        cut_off: float
-            Determines the longitudinal coordinates inside the region of interest
+        cut_off : float, optional
+            Determines the longitudinal coordinates inside the region of 
+            interest.
 
-        make_plot: bool
+        make_plot : bool, optional
             Flag for making plots.
-
             
         Returns
         ----------
-        beam_quant_slices: 1D float array
-            beam_quant binned into bins/slices defined by z_centroids. The mean is calculated for the quantity for all particles in the z-bins. Includes e.g. beam.xs(), beam.Es() etc.
+        beam_quant_slices : 1D float array
+            ``beam_quant`` binned into bins/slices defined by ``z_centroids``. The mean 
+            is calculated for the quantity for all particles in the z-bins. 
+            Includes e.g. ``beam.xs()``, ``beam.Es()`` etc.
 
-        z_centroids: [m] 1D float array
+        z_centroids : [m] 1D float array
             z-coordinates of the beam slices.
         """
         
@@ -808,10 +877,6 @@ class Beam():
         
     
     # ==================================================
-    # def x_tilt_angle(self, clean=False):
-    #     #return np.arcsin(self.ux_offset(clean=clean)/self.uz_offset(clean=clean))
-    #     return np.arcsin(self.x_offset(clean=clean)/self.z_offset(clean=clean))
-    
     def x_tilt_angle(self, z_cutoff=None):
         "Retrieve the tilt angle of the beam in the zx-plane. WARNING: becomes unreliable around > 1e-4 rad."
         if z_cutoff is None:
@@ -837,15 +902,28 @@ class Beam():
         
         return np.arctan(slope)
 
+
+
     ## BEAM STATISTICS
 
     def total_particles(self):
+        "Total number of physical particles."
         return int(np.nansum(self.weightings()))
     
+    def population(self):
+        "Total number of physical particles."
+        return np.sum(self.weightings())
+    
+    def particle_charge(self):
+        "The charge of a physical particle."
+        return self.charge()/self.total_particles()
+    
     def charge(self):
+        "Total beam charge."
         return np.nansum(self.qs())
     
     def abs_charge(self):
+        "Total absolute beam charge."
         return abs(self.charge())
     
     def charge_sign(self):
@@ -945,14 +1023,6 @@ class Beam():
         covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
         return covy[1,1]/np.sqrt(np.linalg.det(covy))
 
-    def dispersion_x(self, clean=False):
-        px = np.polyfit(self.deltas(), self.xs(), 1)
-        return px[0]
-
-    def dispersion_y(self, clean=False):
-        py = np.polyfit(self.deltas(), self.ys(), 1)
-        return py[0]
-
     def intrinsic_emittance(self):
         covxy = np.cov(self.norm_transverse_vector(), aweights=self.weightings())
         return np.sqrt(np.sqrt(np.linalg.det(covxy)))
@@ -968,10 +1038,10 @@ class Beam():
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
 
-    def norm_amplitude_x(self, beta_x=None, alpha_x=None, clean=False):
-        if beta_x is not None:
-            if alpha_x is None:
-                alpha_x = 0
+    def norm_amplitude_x(self, plasma_density=None, clean=False):
+        if plasma_density is not None:
+            beta_x = beta_matched(plasma_density, self.energy())
+            alpha_x = 0
         else:
             covx = weighted_cov(self.xs(), self.xps(), self.weightings(), clean)
             emgx = np.sqrt(np.linalg.det(covx))
@@ -979,25 +1049,17 @@ class Beam():
             alpha_x = -covx[1,0]/emgx
         return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
         
-    def norm_amplitude_y(self, beta_y=None, alpha_y=None, clean=False):
-        if beta_y is not None:
-            if alpha_y is None:
-                alpha_y = 0
+    def norm_amplitude_y(self, plasma_density=None, clean=False):
+        if plasma_density is not None:
+            beta_y = beta_matched(plasma_density, self.energy())
+            alpha_y = 0
         else:
             covy = weighted_cov(self.ys(), self.yps(), self.weightings(), clean)
             emgy = np.sqrt(np.linalg.det(covy))
             beta_y = covy[0,0]/emgy
             alpha_y = -covy[1,0]/emgy
         return np.sqrt(self.gamma()/beta_y)*np.sqrt(self.y_offset()**2 + (self.y_offset()*alpha_y + self.y_angle()*beta_y)**2)
-
-    def norm_amplitude_emittance_growth_x(self, beta_x=None, alpha_x=None, clean=False):
-        A_x = self.norm_amplitude_x(beta_x=beta_x, alpha_x=alpha_x, clean=clean) # only works of alpha=0
-        return A_x**2/2
-
-    def norm_amplitude_emittance_growth_y(self, beta_y=None, alpha_y=None, clean=False):
-        A_y = self.norm_amplitude_y(beta_y=beta_y, alpha_y=alpha_y, clean=clean)
-        return A_y**2/2
-    
+        
     def peak_density(self):  # TODO: this is only valid for Gaussian beams.
         return (self.charge()/SI.e)/(np.sqrt(2*SI.pi)**3*self.beam_size_x()*self.beam_size_y()*self.bunch_length())
     
@@ -1052,19 +1114,22 @@ class Beam():
 
     def set_arbitrary_spin_polarization(self, polarization, direction='z', seed=None):
         """
-        Generates a random distribution of points on the surface of a sphere of radius 1, with the mean along a defined 'direction' is 
-        'polarization'.
-        For polarization=0, points are uniformly distributed on the surface of the sphere.
+        Generates a random distribution of points on the surface of a sphere of 
+        radius 1, with the mean along a defined ``direction`` is 
+        ``polarization``.
+        For ``polarization=0``, points are uniformly distributed on the surface 
+        of the sphere.
     
         Parameters
         ----------
-        polarization: float
-            Mean value of projection in the defined direction for the generated spins.
+        polarization : float
+            Mean value of projection in the defined direction for the generated 
+            spins.
 
-        direction: string
-            Spin direction (default is z).
+        direction : string
+            Spin direction (default is ``'z'``).
 
-        seed: int, optional
+        seed : int, optional
             Seed to initialize the random number generator (default is 42).
             
 
@@ -1243,34 +1308,29 @@ class Beam():
     
     ## phase spaces
     
-    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None, hlims=None, vlims=None):
+    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
         self.remove_nans()
         if hbins is None:
-            hbins = round(np.sqrt(len(self))/4)
+            hbins = round(np.sqrt(len(self))/2)
         if vbins is None:
-            vbins = round(np.sqrt(len(self))/4)
-        if hlims is not None:
-            hbins = np.linspace(min(hlims), max(hlims), hbins)
-        if vlims is not None:
-            vbins = np.linspace(min(vlims), max(vlims), vbins)
+            vbins = round(np.sqrt(len(self))/2)
         counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
         density = (counts/np.diff(vedges)).T/np.diff(hedges)
 
+        #dx = np.diff(hedges)
+        #dy = np.diff(vedges)
+        #bin_areas = dx[:, None] * dy[None, :]
+        #density = counts/bin_areas
+        #print(np.sum(density*np.diff(vedges)*np.diff(hedges))/self.charge())
         return density, hctrs, vctrs
     
-    def density_lps(self, zbins=None, Ebins=None, zlims=None, Elims=None):
-        return self.phase_space_density(self.zs, self.Es, hbins=zbins, vbins=Ebins, hlims=zlims, vlims=Elims)
+    def density_lps(self, hbins=None, vbins=None):
+        return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
     
-    def density_transverse(self, xbins=None, ybins=None, xlims=None, ylims=None):
-        return self.phase_space_density(self.xs, self.ys, hbins=xbins, vbins=ybins, hlims=xlims, vlims=ylims)
-
-    def density_trace_space_x(self, xbins=None, xpbins=None, xlims=None, xplims=None):
-        return self.phase_space_density(self.xs, self.xps, hbins=xbins, vbins=xpbins, hlims=xlims, vlims=xplims)
-        
-    def density_trace_space_y(self, ybins=None, ypbins=None, ylims=None, yplims=None):
-        return self.phase_space_density(self.ys, self.yps, hbins=ybins, vbins=ypbins, hlims=ylims, vlims=yplims)
+    def density_transverse(self, hbins=None, vbins=None):
+        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)
 
     
     # ==================================================
@@ -1281,16 +1341,18 @@ class Beam():
         
         Parameters
         ----------
-        zbins, xbins, ybins: [m] float or 1D float ndarray
+        zbins, xbins, ybins : [m] float or 1D float ndarray, optional
             The bins along z(x,y).
+
+        ...
             
         Returns
         ----------
-        dQ_dxdydz: [C/m^3] 3D float ndarray 
+        dQ_dxdydz : [C/m^3] 3D float ndarray 
             Charge density of the beam.
         
-        zctrs, xctrs, yctrs: [m] 1D float ndarray 
-            The centre positions of the bins of dQ_dxdydz.
+        zctrs, xctrs, yctrs : [m] 1D float ndarray 
+            The centre positions of the bins of ``dQ_dxdydz``.
         """
         
         zs = self.zs()
@@ -1335,44 +1397,54 @@ class Beam():
     # ==================================================
     def Dirichlet_BC_system_matrix(self, main_diag, upper_inner_off_diag, lower_inner_off_diag, upper_outer_off_diag, lower_outer_off_diag, num_x_cells, num_unknowns, rhs, boundary_val):
         """
-        Applies Dirichlet boundary conditions and assemble the system matrix and the right hand side (source term) of the Poisson equation.
+        Applies Dirichlet boundary conditions and assemble the system matrix and 
+        the right hand side (source term) of the Poisson equation.
         
         Parameters
         ----------
-        main_diag: [m^-2] 1D float ndarray
-            The main diagonal of the system matrix to be modified according to the boundary conditions.
+        main_diag : [m^-2] 1D float ndarray
+            The main diagonal of the system matrix to be modified according to 
+            the boundary conditions.
 
-        upper_inner_off_diag: [m^-2] 1D float ndarray
-            The upper inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        upper_inner_off_diag : [m^-2] 1D float ndarray
+            The upper inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
-        lower_inner_off_diag: [m^-2] 1D float ndarray
-            The lower inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        lower_inner_off_diag : [m^-2] 1D float ndarray
+            The lower inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
-        outer_inner_off_diag: [m^-2] 1D float ndarray
-            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        outer_inner_off_diag : [m^-2] 1D float ndarray
+            The outer inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
 
-        outer_inner_off_diag: [m^-2] 1D float ndarray
-            The outer inne off-diagonal of the system matrix to be modified according to the boundary conditions.
+        outer_inner_off_diag : [m^-2] 1D float ndarray
+            The outer inne off-diagonal of the system matrix to be modified 
+            according to the boundary conditions.
             
-        num_x_cells: float
-            The number of cells in the x-direction. Determines the number of columns of the system matrix A.
+        num_x_cells : float
+            The number of cells in the x-direction. Determines the number of 
+            columns of the system matrix ``A``.
 
-        num_x_cells: float
-            The number of unknowns in the system, which is determined by The number of cells in the x and y-direction.
+        num_unknowns : float
+            The number of unknowns in the system, which is determined by The 
+            number of cells in the x and y-direction.
 
-        rhs: [V/m^3] 1D float ndarray
-            The right hand side of the Poisson equation to be modified according to the boundary conditions.
+        rhs : [V/m^3] 1D float ndarray
+            The right hand side of the Poisson equation to be modified according 
+            to the boundary conditions.
 
-        boundary_val: [V/m] float
-            The value of the electric fields Ex and Ey at the simulation box boundary.
-
+        boundary_val : [V/m] float
+            The value of the electric fields Ex and Ey at the simulation box 
+            boundary.
             
+
         Returns
         ----------
-        A: [m^-2] 2D float sparse matrix
+        A : [m^-2] 2D float sparse matrix
             System matrix.
 
-        rhs: [V/m^3] 1D float ndarray
+        rhs : [V/m^3] 1D float ndarray
             The modified right hand side of the Poisson equation.
         """
         
@@ -1417,7 +1489,10 @@ class Beam():
     # ==================================================
     def Ex_Ey_2D(self, num_x_cells, num_y_cells, charge_density_xy_slice, dx, dy, boundary_val=0.0):
         """
-        2D Poisson solver for the transverse electric fields Ex and Ey of a beam slice in the xy-plane. The equations solved are a combination of Gauss' law and Faraday's law assuming no time-varying z-component of magnetic field Bz. I.e.
+        2D Poisson solver for the transverse electric fields Ex and Ey of a beam 
+        slice in the xy-plane. The equations solved are a combination of Gauss' 
+        law and Faraday's law assuming no time-varying z-component of magnetic 
+        field Bz. I.e.
 
         dEx/dx + dEy/dy = 1/epsilon_0 * dQ/dzdxdy
         dEy/dx - dEx/dy = 0.
@@ -1425,24 +1500,25 @@ class Beam():
         
         Parameters
         ----------
-        num_x_cells, num_y_cells: float
+        num_x_cells, num_y_cells : float
             The number of cells in the x and y-direction.
 
-        charge_density_xy_slice: [C/m^3] 2D ndarray
+        charge_density_xy_slice : [C/m^3] 2D float ndarray
             A xy-slice of the beam charge density.
 
-        dx, dy: [m] float
+        dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
 
-        boundary_val: [V/m] 
-
+        boundary_val : [V/m] float, optional
+            The value of the electric fields Ex and Ey at the simulation box 
+            boundary. Default set to ``0.0``.
             
         Returns
         ----------
-        Ex: [V/m] 2D float array 
+        Ex : [V/m] 2D float array 
             x-conponent of electric field generated by the chosen beam slice.
 
-        Ey: [V/m] 2D float array 
+        Ey : [V/m] 2D float array 
             y-conponent of electric field generated by the chosen beam slice.
         """
         
@@ -1483,36 +1559,45 @@ class Beam():
     # ==================================================
     def Ex_Ey(self, x_box_min, x_box_max, y_box_min, y_box_max, dx, dy, num_z_cells=None, boundary_val=0.0, tolerance=5.0):
         """
-        Calculate slice Ex and Ey for the entire beam by solving the Poisson equations for Ex and Ey slice by slice.
+        Calculate slice Ex and Ey for the entire beam by solving the Poisson 
+        equations for Ex and Ey slice by slice.
 
         Parameters
         ----------
-        x_box_min, y_box_min: [m] float
-            The lower x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+        x_box_min, y_box_min : [m] float
+            The lower x(y) boundary of the simulation domain. Should be much 
+            larger than the plasma bubble radius.
 
-        x_box_max, y_box_max: [m] float
-            The upper x(y) boundary of the simulation domain. Should be much larger than the plasma bubble radius.
+        x_box_max, y_box_max : [m] float
+            The upper x(y) boundary of the simulation domain. Should be much 
+            larger than the plasma bubble radius.
         
-        dx, dy: [m] float
+        dx, dy : [m] float
             Bin widths in x and y of the bins of dQ_dzdxdy.
 
-        num_z_cells: float
+        num_z_cells : float, optional
             The number of cells in the z-direction.
 
-        boundary_val: [V/m]
-            The values of the electric fields Ex and Ey at the simulation domain boundary.
+        boundary_val : [V/m] float, optional
+            The values of the electric fields Ex and Ey at the simulation domain 
+            boundary. Default set to ``0.0``.
 
+        tolerance : float, optional
+            Value used to determine the tolerance of the simulation box size as 
+            ``np.abs(x_box_min/xs.min()) < tolerance`` for all four sides. 
+            Default set to ``5.0``.
             
         Returns
         ----------
-        Ex: [V/m] 2D float array 
+        Ex : [V/m] 2D float array 
             x-conponent of electric field generated by the chosen beam slice.
 
-        Ey: [V/m] 2D float array 
+        Ey : [V/m] 2D float array 
             y-conponent of electric field generated by the chosen beam slice.
 
-        zctrs, xctrs, yctrs: [m] 1D float ndarray
-            Coordinates in z, x and y for the centres of the bins of Ex and Ey.
+        zctrs, xctrs, yctrs : [m] 1D float ndarray
+            Coordinates in z, x and y for the centres of the bins of ``Ex`` and 
+            ``Ey``.
         """
 
         # Check if the selected simulation boundaries are significantly larger than the beam extent
@@ -1562,151 +1647,82 @@ class Beam():
         fig.set_figwidth(6)
         fig.set_figheight(4)        
         ax.plot(ts*SI.c*1e6, np.abs(dQdt)/1e3)
-        ax.set_xlabel('z (μm)')
+        ax.set_xlabel('z (um)')
         ax.set_ylabel('Beam current (kA)')
     
-    def plot_lps(self, zlims=None, Elims=None, chromatic=False, num_samples=10000, dQdEdzlim=None, figsize=None, savefig=None):
-        fig, ax = plt.subplots()
-        if figsize is None:
-            fig.set_figwidth(8)
-            fig.set_figheight(5)  
-        else:
-            fig.set_figwidth(figsize[0])
-            fig.set_figheight(figsize[1])
-        if not chromatic:
-            dQdzdE, zs, Es = self.density_lps(zlims=zlims, Elims=Elims)
-            p = ax.pcolor(zs*1e6, Es/1e9, -dQdzdE*1e15, cmap=CONFIG.default_cmap, shading='auto')
-        else:
-            from abel.utilities.colors import FLASHForward_nowhite as cmap
-            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
-            deltalim = round(4*self.rel_energy_spread(), 2)
-            p = ax.scatter(self.zs()[inds]*1e6, self.Es()[inds]/1e9, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
-        if zlims is not None:
-            ax.set_xlim(np.array(zlims)*1e6)
-        if Elims is not None:
-            ax.set_ylim(np.array(Elims)/1e9)
-        ax.set_xlabel('ξ (μm)')
-        ax.set_ylabel('E (GeV)')
-        ax.set_title(f'Longitudinal phase space (s = {self.location:.2f} m) \n σE = {self.rel_energy_spread()*1e2:.1f}%, σz = {self.bunch_length()*1e6:.1f} μm')
-        cb = fig.colorbar(p)
-        if not chromatic:
-            cb.ax.set_ylabel('Charge density (pC/μm/GeV)')
-            if dQdEdzlim is not None:
-                p.set_clim([0, dQdEdzlim*1e15])
-        else:
-            cb.ax.set_ylabel('Rel. energy offset (%)')
-           
-        # save figure to file
-        if savefig is not None:
-            p.set_rasterized(True)
-            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
-        
-        
-    def plot_trace_space_x(self, xlims=None, xplims=None, chromatic=False, num_samples=10000, dQdxdxplim=None, figsize=None, savefig=None):
-        fig, ax = plt.subplots()
-        if figsize is None:
-            fig.set_figwidth(8)
-            fig.set_figheight(5)  
-        else:
-            fig.set_figwidth(figsize[0])
-            fig.set_figheight(figsize[1])
-        if not chromatic:
-            dQdxdxp, xs, xps = self.density_trace_space_x(xlims=xlims, xplims=xplims)
-            p = ax.pcolor(xs*1e6, xps*1e3, -dQdxdxp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        else:
-            from abel.utilities.colors import FLASHForward_nowhite as cmap
-            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
-            deltalim = round(4*self.rel_energy_spread(), 2)
-            p = ax.scatter(self.xs()[inds]*1e6, self.xps()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
-        if xlims is not None:
-            ax.set_xlim(np.array(xlims)*1e6)
-        if xplims is not None:
-            ax.set_ylim(np.array(xplims)*1e3)
-        ax.set_xlabel('x (μm)')
-        ax.set_ylabel("x' (mrad)")
-        ax.set_title(f'Horizontal trace space (s = {self.location:.2f} m) \n β = {self.beta_x()*1e3:.0f} mm, α = {self.alpha_x():.1f}, εn = {self.norm_emittance_x()*1e6:.2f} mm mrad')
-        cb = fig.colorbar(p)
-        if not chromatic:
-            if dQdxdxplim is not None:
-                p.set_clim([0, dQdxdxplim*1e3])
-            cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
-        else:
-            cb.ax.set_ylabel('Rel. energy offset (%)')
-            
-        # save figure to file
-        if savefig is not None:
-            p.set_rasterized(True)
-            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
-        
-    def plot_trace_space_y(self, ylims=None, yplims=None, chromatic=False, num_samples=10000, figsize=None, savefig=None):
-        fig, ax = plt.subplots()
-        if figsize is None:
-            fig.set_figwidth(8)
-            fig.set_figheight(5)  
-        else:
-            fig.set_figwidth(figsize[0])
-            fig.set_figheight(figsize[1])
-        if not chromatic:
-            dQdydyp, ys, yps = self.density_trace_space_y(ylims=ylims, yplims=yplims)
-            p = ax.pcolor(ys*1e6, yps*1e3, -dQdydyp*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        else:
-            from abel.utilities.colors import FLASHForward_nowhite as cmap
-            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
-            deltalim = round(4*self.rel_energy_spread(), 2)
-            p = ax.scatter(self.ys()[inds]*1e6, self.yps()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2)
-        if ylims is not None:
-            ax.set_xlim(np.array(ylims)*1e6)
-        if yplims is not None:
-            ax.set_ylim(np.array(yplims)*1e3)
-        ax.set_xlabel('y (μm)')
-        ax.set_ylabel("y' (mrad)")
-        ax.set_title(f'Vertical trace space (s = {self.location:.2f} m) \n β = {self.beta_y()*1e3:.0f} mm, α = {self.alpha_y():.1f}, εn = {self.norm_emittance_y()*1e6:.2f} mm mrad')
-        cb = fig.colorbar(p)
-        if not chromatic:
-            cb.ax.set_ylabel('Charge density (pC/μm/mrad)')
-        else:
-            cb.ax.set_ylabel('Rel. energy offset (%)')
-            
-        # save figure to file
-        if savefig is not None:
-            p.set_rasterized(True)
-            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
+    def plot_lps(self):
+        dQdzdE, zs, Es = self.density_lps()
 
-    def plot_transverse_profile(self, xlims=None, ylims=None, chromatic=False, num_samples=10000, figsize=None, savefig=None):
         fig, ax = plt.subplots()
-        if figsize is None:
-            fig.set_figwidth(8)
-            fig.set_figheight(5) 
-        else:
-            fig.set_figwidth(figsize[0])
-            fig.set_figheight(figsize[1])
-        if not chromatic:
-            dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys, hlims=xlims, vlims=ylims)
-            p = ax.pcolor(xs*1e3, ys*1e3, -dQdxdy*1e3, cmap=CONFIG.default_cmap, shading='auto')
-        else:
-            #from abel.utilities.colors import FLASHForward_nowhite as cmap
-            from abel.utilities.colors import RGB as cmap
-            inds = np.random.choice(np.array(range(len(self))), size=num_samples) if len(self) > num_samples else range(len(self))
-            deltalim = round(3*self.rel_energy_spread(), 2)
-            p = ax.scatter(self.xs()[inds]*1e3, self.ys()[inds]*1e3, c=self.deltas()[inds]*1e2, s=3, cmap=cmap, vmin=-deltalim*1e2, vmax=deltalim*1e2, alpha=0.8)
-        if xlims is not None:
-            ax.set_xlim(np.array(xlims)*1e3)
-        if ylims is not None:
-            ax.set_ylim(np.array(ylims)*1e3)
-        ax.set_xlabel('x (mm)')
-        ax.set_ylabel('y (mm)')
-        ax.set_title('Transverse profile')
-        ax.set_title(f"Transverse profile (s = {self.location:.2f} m) \n σx = {self.beam_size_x()*1e6:.1f} μm, σy = {self.beam_size_y()*1e6:.1f} μm")
-        cb = fig.colorbar(p)
-        if not chromatic:
-            cb.ax.set_ylabel('Charge density (nC/mm^2)')
-        else:
-            cb.ax.set_ylabel('Rel. energy offset (%)')
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
             
-        # save figure to file
-        if savefig is not None:
-            p.set_rasterized(True)
-            fig.savefig(str(savefig), format="pdf", bbox_inches="tight", dpi=200)
+        p = ax.pcolor(zs*1e6, Es/1e9, dQdzdE*1e15, cmap=cmap, shading='auto')
+        ax.set_xlabel('z (um)')
+        ax.set_ylabel('E (GeV)')
+        ax.set_title('Longitudinal phase space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/GeV)')
+        
+    def plot_trace_space_x(self):
+        dQdxdxp, xs, xps = self.phase_space_density(self.xs, self.xps)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)
+        
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(xs*1e6, xps*1e3, dQdxdxp*1e3, cmap=cmap, shading='auto')
+        ax.set_xlabel('x (um)')
+        ax.set_ylabel('x'' (mrad)')
+        ax.set_title('Horizontal trace space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
+        
+    def plot_trace_space_y(self):
+        dQdydyp, ys, yps = self.phase_space_density(self.ys, self.yps)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)  
+        
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(ys*1e6, yps*1e3, dQdydyp*1e3, cmap=cmap, shading='auto')
+        ax.set_xlabel('y (um)')
+        ax.set_ylabel('y'' (mrad)')
+        ax.set_title('Vertical trace space')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um/mrad)')
+
+    def plot_transverse_profile(self):
+        dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(8)
+        fig.set_figheight(5)
+
+        cmap = CONFIG.default_cmap
+        if self.charge() < 0:
+            cmap = cmap.reversed()
+            
+        p = ax.pcolor(xs*1e6, ys*1e6, dQdxdy, cmap=cmap, shading='auto')
+        #p = ax.imshow(-dQdxdy, extent=[xs.min()*1e6, xs.max()*1e6, ys.min()*1e6, ys.max()*1e6], 
+        #   origin='lower', cmap=CONFIG.default_cmap, aspect='auto')
+        ax.set_xlabel('x (um)')
+        ax.set_ylabel('y (um)')
+        ax.set_title('Transverse profile')
+        cb = fig.colorbar(p)
+        cb.ax.set_ylabel('Charge density (pC/um^2)')
 
     
     # TODO: unfinished!
@@ -1734,6 +1750,26 @@ class Beam():
         del self[Es < 0]
         
     def compress(self, R_56, nom_energy):
+        """
+        Compress the beam longitudinally by applying longitudinal dispersion.
+        The compression is applied by changing the z-coordinates by
+
+        z = z0 + (1-E/nom_energy) * R_56.
+
+
+        Parameters
+        ----------
+        R_56 : float
+            R_56 used to determine the beam compression.
+
+        nom_energy : [eV] float
+            Nominal energy used to determine the beam compression.
+
+
+        Returns
+        ----------
+        ``None``
+        """
         zs = self.zs() + (1-self.Es()/nom_energy) * R_56
         self.set_zs(zs)
         
@@ -1801,9 +1837,10 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, calc_evolution=False):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=False):
         """
-        Evolve the beam by solving Hill's equation.
+        Evolve the beam by solving Hill's equation in the x- and y direction 
+        separately.
 
         Parameters
         ----------
@@ -1822,7 +1859,7 @@ class Beam():
         radiation_reaction : bool
             Flag for enabling ating radiation reaction.
         
-        calc_evolution : bool
+        probe_evolution : bool
             Flag for recording the beam parameter evolution. 
 
 
@@ -1832,7 +1869,8 @@ class Beam():
             The final energies for all macroparticles.
         
         evol : SimpleNamespace object
-            only returns when ``calc_evolution=True``. Contains beam parameter evolution data.
+            only returns when ``probe_evolution=True``. Contains beam parameter 
+            evolution data.
         """
         
         # remove particles with subzero and Nan energy
@@ -1852,7 +1890,7 @@ class Beam():
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
-        if calc_evolution:  # TODO: This seems to be very clumsy. Consider re-writing.
+        if probe_evolution:  # TODO: This seems to be very clumsy. Consider re-writing.
                 
             # calculate evolution
             num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
@@ -1920,7 +1958,7 @@ class Beam():
                 print('Save_evolution has not yet been implemented without radiation reaction, set save_evolution to False')
 
 
-        if calc_evolution:
+        if probe_evolution:
             return Es_final, evol
         else:
             return Es_final
@@ -2060,7 +2098,10 @@ class Beam():
         mass = particles["mass"][io.Record_Component.SCALAR].get_attribute("value")
         
         # extract phase space
-        ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
+        if "id" in particles:
+            ids = particles["id"][io.Record_Component.SCALAR].load_chunk()
+        else:
+            ids = None
         weightings = particles["weighting"][io.Record_Component.SCALAR].load_chunk()
         xs = particles['position']['x'].load_chunk()
         ys = particles['position']['y'].load_chunk()
@@ -2086,6 +2127,7 @@ class Beam():
         # make beam
         beam = Beam()
         beam.set_phase_space(Q=np.sum(weightings*charge), xs=xs, ys=ys, zs=zs, pxs=pxs, pys=pys, pzs=pzs, spxs=spxs, spys=spys, spzs=spzs, weightings=weightings)
+        beam.particle_mass = mass
         
         # add metadata to beam
         try:
@@ -2105,33 +2147,38 @@ class Beam():
 
 
     # ==================================================
-    def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap='seismic', xlab=None, ylab=None, clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, reduce_cax_pad=False):
-        
-        if axes is None:
-            fig = plt.figure()  # an empty figure with an axes
-            ax = fig.add_axes([.15, .15, .75, .75])
-            cbar_ax = fig.add_axes([.85, .15, .03, .75])
-        else:
-            #ax = axes[0]  # TODO: adjust colourbar axes
-            #cbar_ax = axes[1]
-            
-            ax = axes
-            cbar_ax = None
+    def imshow_plot(self, data, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab=None, ylab=None, clab='', gridOn=False, origin='lower', interpolation=None, aspect='auto', log_cax=False, cax_pad=0.03):
 
-        if reduce_cax_pad is True:
-            # Create an axis on the right side of ax. The width of cax will be 5%
-            # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+        if axes is None:
+            from matplotlib.gridspec import GridSpec
+
+            # Create a figure with GridSpec
+            fig = plt.figure(figsize=(5, 4))
+            gs = GridSpec(1, 2, width_ratios=[1, 0.03], wspace=cax_pad)  # Adjust cax_pad for padding
+            
+            ax = fig.add_subplot(gs[0, 0])  # Main plot axes
+            cbar_ax = fig.add_subplot(gs[0, 1])  # Colour bar axes
+        else:
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+            ax = axes
             divider = make_axes_locatable(ax)
-            cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
+            cbar_ax = divider.append_axes("right", size="3%", pad=cax_pad)
 
         if vmin is None:
             vmin = data.min()
         if vmax is None:
             vmax = data.max()
 
+        # Modify tick parameters
+        ax.tick_params(axis='both', direction='out', length=4)
+        #ax.xaxis.set_ticks_position('both')  # Ticks on both top and bottom
+        ax.minorticks_on()  # Enable minor ticks
+        ax.tick_params(axis='both', which='minor', direction='out', length=2.5)  # Configure minor ticks
+
         # Make a 2D plot
         if log_cax is True:
-            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=colors.LogNorm(vmin+1, vmax))
+            from matplotlib.colors import LogNorm
+            p = ax.imshow(data, extent=extent, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation, norm=LogNorm(vmin+1, vmax))
         else:
             p = ax.imshow(data, extent=extent, vmin=vmin, vmax=vmax, cmap=plt.get_cmap(colmap), origin=origin, aspect=aspect, interpolation=interpolation)
 
@@ -2140,30 +2187,15 @@ class Beam():
             ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
 
         # Add a colourbar
-        cbar = plt.colorbar(p, ax=ax, cax=cbar_ax)
+        cbar = plt.colorbar(p, ax=ax, cax=cbar_ax, pad=cax_pad)
         cbar.set_label(clab)
-
-        # Set the tick formatter to use power notation
-        #import matplotlib.ticker as ticker
-        #cbar.ax.yaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
-        #cbar.ax.tick_params(axis='y', which='major', pad=10)
-
-        #import matplotlib.ticker as ticker
-        #fmt = ticker.ScalarFormatter(useMathText=True)
-        #fmt.set_powerlimits((-3, 19))
-        #cbar.ax.yaxis.set_major_formatter(fmt)
-
-        # Customize the colorbar tick locator and formatter
-        #from matplotlib.ticker import ScalarFormatter
-        #cbar.ax.yaxis.set_major_locator(plt.MaxNLocator(nbins=6))  # Set the number of tick intervals
-        #cbar.ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=True))  # Use scientific notation
 
         ax.set_ylabel(ylab)
         ax.set_xlabel(xlab)
 
     
     # ==================================================
-    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', reduce_cax_pad=False):
+    def distribution_plot_2D(self, arr1, arr2, weights=None, hist_bins=None, hist_range=None, axes=None, extent=None, vmin=None, vmax=None, scale=None, colmap=CONFIG.default_cmap, xlab='', ylab='', clab='', origin='lower', interpolation='nearest', log_cax=False, cax_pad=0.03):
 
         if weights is None:
             weights = self.weightings()
@@ -2178,17 +2210,17 @@ class Beam():
             extent = hist_range[0] + hist_range[1]
         
         binned_data, zedges, xedges = np.histogram2d(arr1, arr2, hist_bins, hist_range, weights=weights)
-        beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
-        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, reduce_cax_pad=reduce_cax_pad)
+        
+        if scale is None:
+            beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)
+        else:
+            beam_hist2d = binned_data.T/np.diff(zedges)/np.diff(xedges)/scale
+        
+        self.imshow_plot(beam_hist2d, axes=axes, extent=extent, vmin=vmin, vmax=vmax, colmap=colmap, xlab=xlab, ylab=ylab, clab=clab, gridOn=False, origin=origin, interpolation=interpolation, log_cax=log_cax, cax_pad=cax_pad)
 
     
     # ==================================================
     def density_map_diags(self):
-        
-        #colors = ['white', 'aquamarine', 'lightgreen', 'green']
-        #colors = ['white', 'forestgreen', 'limegreen', 'lawngreen', 'aquamarine', 'deepskyblue']
-        #bounds = [0, 0.2, 0.4, 0.8, 1]
-        #cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
         
         cmap = CONFIG.default_cmap
 
@@ -2211,7 +2243,7 @@ class Beam():
         energ_lab = r'$\mathcal{E}$ [GeV]'
         
         # Set up a figure with axes
-        fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained', figsize=(5*3, 4*3))
+        fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(5*3, 4*3))
         fig.suptitle(r'$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
 
         nbins = int(np.sqrt(len(weights)/2))
@@ -2322,8 +2354,134 @@ class Beam():
         extent_energ[3] = extent_energ[3]/1e9  # [GeV]
         self.distribution_plot_2D(arr1=zs, arr2=Es, weights=weights, hist_bins=hist_bins, hist_range=hist_range_energ, axes=axs[2][2], extent=extent_energ, vmin=None, vmax=None, colmap=cmap, xlab=xilab, ylab=energ_lab, clab=r'$\partial^2 N/\partial \xi \partial\mathcal{E}$ [$\mathrm{m}^{-1}$ $\mathrm{eV}^{-1}$]', origin='lower', interpolation='nearest')
 
+        # Adjust layout to prevent overlaps
+        plt.tight_layout()  # Avoid overlap globally
 
-        # ==================================================
+
+    # ==================================================
+    def energy_scatter_profiles(self, n_th_particle=1):
+        '''
+        Creates scatter plots of various beam profiles with particles coloured 
+        according to energy.
+
+        Parameters
+        ----------
+        n_th_particle : int, optional
+            Specifies the amount of plotted particles by only plotting every 
+            ``n_th_particle`` particle. Default set to 1, i.e.
+
+            
+        Returns
+        ----------
+        ``None``
+        '''
+
+        if not isinstance(n_th_particle, int) or n_th_particle < 1:
+            raise ValueError("n_th_particle must be an integer <= 1.")
+        
+        from matplotlib.colors import LinearSegmentedColormap  # For customising colour maps
+        
+        # Define the color map and boundaries
+        colors = ['black', 'red', 'orange', 'yellow']
+        bounds = [0, 0.2, 0.4, 0.8, 1]
+        cmap = LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
+
+        # Macroparticles data
+        zs = self.zs()
+        xs = self.xs()
+        xps = self.xps()
+        ys = self.ys()
+        yps = self.yps()
+        Es = self.Es()
+        weights = self.weightings()
+
+        # Labels for plots
+        zlab = r'$z$ [$\mathrm{\mu}$m]'
+        xilab = r'$\xi$ [$\mathrm{\mu}$m]'
+        xlab = r'$x$ [$\mathrm{\mu}$m]'
+        ylab = r'$y$ [$\mathrm{\mu}$m]'
+        xps_lab = r"$x'$ [mrad]"
+        yps_lab = r"$y'$ [mrad]"
+        energ_lab = r'$\mathcal{E}$ [GeV]'
+        
+        # Set up a figure with axes
+        fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(5*3, 4*3))
+        plt.tight_layout(pad=6.0)  # Sets padding between the figure edge and the edges of subplots, as a fraction of the font size.
+        fig.subplots_adjust(top=0.85)  # By setting top=..., you are specifying that the top boundary of the subplots should be at ...% of the figure’s height.
+        
+        # 2D z-x distribution
+        ax = axs[0][0]
+        p = ax.scatter(zs[::n_th_particle]*1e6, xs[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(xlab)
+            
+        # 2D z-x' distribution
+        ax = axs[0][1]
+        ax.scatter(zs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(xps_lab)
+            
+        # 2D x-x' distribution
+        ax = axs[0][2]
+        ax.scatter(xs[::n_th_particle]*1e6, xps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xlab)
+        ax.set_ylabel(xps_lab)
+            
+        # 2D z-y distribution
+        ax = axs[1][0]
+        ax.scatter(zs[::n_th_particle]*1e6, ys[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(ylab)
+            
+        # 2D z-y' distribution
+        ax = axs[1][1]
+        ax.scatter(zs[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(yps_lab)
+            
+        # 2D y-y' distribution
+        ax = axs[1][2]
+        ax.scatter(ys[::n_th_particle]*1e6, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(ylab)
+        ax.set_ylabel(yps_lab)
+            
+        # 2D x-y distribution
+        ax = axs[2][0]
+        ax.scatter(xs[::n_th_particle]*1e6, ys[::n_th_particle]*1e6, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xlab)
+        ax.set_ylabel(ylab)
+        
+        # 2D x'-y' distribution
+        ax = axs[2][1]
+        ax.scatter(xps[::n_th_particle]*1e3, yps[::n_th_particle]*1e3, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xps_lab)
+        ax.set_ylabel(yps_lab)
+
+        # Energy distribution
+        #ax = axs[2][1]
+        #dN_dE, rel_energ = self.rel_energy_spectrum()
+        #dN_dE = dN_dE/-e
+        #ax.fill_between(rel_energ*100, y1=dN_dE, y2=0, color='b', alpha=0.3)
+        #ax.plot(rel_energ*100, dN_dE, color='b', alpha=0.3, label='Relative energy density')
+        #ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+        #ax.set_xlabel(r'$\mathcal{E}/\langle\mathcal{E}\rangle-1$ [%]')
+        #ax.set_ylabel('Relative energy density')
+        ## Add text to the plot
+        #ax.text(0.05, 0.95, r'$\sigma_\mathcal{E}/\langle\mathcal{E}\rangle=$' f'{format(self.rel_energy_spread()*100, ".2f")}' '%', fontsize=12, color='black', ha='left', va='top', transform=ax.transAxes)
+        
+        # 2D z-energy distribution
+        ax = axs[2][2]
+        ax.scatter(zs[::n_th_particle]*1e6, Es[::n_th_particle]/1e9, c=Es[::n_th_particle]/1e9, cmap=cmap)
+        ax.set_xlabel(xilab)
+        ax.set_ylabel(energ_lab)
+            
+        # Set label and other properties for the colorbar
+        fig.suptitle(r'$\Delta s=$' f'{format(self.location, ".2f")}' ' m')
+        cbar_ax = fig.add_axes([0.15, 0.91, 0.7, 0.02])   # The four values in the list correspond to the left, bottom, width, and height of the new axes, respectively.
+        fig.colorbar(p, cax=cbar_ax, orientation='horizontal', label=energ_lab)
+
+
+    # ==================================================
     def print_summary(self):
 
         print('---------------------------------------------------')

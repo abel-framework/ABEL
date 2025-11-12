@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.classes.interstage.plasma_lens import InterstagePlasmaLens
 import numpy as np
 import os
@@ -5,6 +11,35 @@ from types import SimpleNamespace
 import scipy.constants as SI
 
 class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
+    """
+    Interstage modul using ImpactX [1]_ for full 3D particle tracking through an 
+    interstage lattice with optional physics effects.
+
+    This subclass of :class:`InterstagePlasmaLens` enables realistic beam 
+    tracking with support for Coherent Synchrotron Radiation (CSR), Incoherent 
+    Synchrotron Radiation (ISR), and space-charge modeling.
+
+    Inherits all attributes from :class:`InterstagePlasmaLens`.
+
+    Attributes
+    ----------
+    num_slices : int
+        Number of longitudinal slices per beamline element in the ImpactX 
+        simulation. Defaults to 50.
+
+    use_monitors : bool
+        If ``True``, inserts ImpactX ``BeamMonitor`` in the lattice for 
+        recording intermediate beam states. Defaults to ``False``.
+
+    keep_data : bool
+        If ``True``, retains raw data files produced by ImpactX. Defaults to 
+        ``False``.
+
+    References
+    ----------
+    .. [1] ImpactX documentation: https://impactx.readthedocs.io/en/latest/
+    """
+    # TODO: keep_data is not used.
     
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True,
                        enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, keep_data=False):
@@ -28,7 +63,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         lattice = self.get_impactx_lattice()
         
         # run ImpactX
-        from abel.apis.impactx.impactx_api import run_impactx
+        from abel.wrappers.impactx.impactx_wrapper import run_impactx
         beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
         
         return super().track(beam, savedepth, runnable, verbose)
@@ -45,7 +80,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         
         # add monitor (before and after gaps, and in the middle)
         if self.use_monitors:
-            from abel.apis.impactx.impactx_api import initialize_amrex
+            from abel.wrappers.impactx.impactx_wrapper import initialize_amrex
             initialize_amrex()
             monitor = elements.BeamMonitor(name='monitor', backend='h5', encoding='g')
         else:
@@ -64,6 +99,12 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         phi_dip = self.length_dipole*B_dip*SI.e/energy2momentum(self.nom_energy)
         dipole = elements.ExactSbend(ds=self.length_dipole, phi=np.rad2deg(phi_dip), B=B_dip, nslice=self.num_slices)
 
+        # add lens offset for ISR mitigation
+        if self.enable_isr and self.cancel_isr_kicks:
+            dx_isr = self.lens_offset_isr_kick_mitigation()
+        else:
+            dx_isr = 0
+            
         # define plasma lens
         ds_pl = self.length_plasma_lens/(self.num_slices+1)
         drift_slice_pl = elements.ExactDrift(ds=ds_pl, nslice=1)
@@ -71,9 +112,9 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         plasma_lens2 = [drift_slice_pl]
         kl_lens = self.strength_plasma_lens
         tau_lens = self.nonlinearity_plasma_lens
-        dxs = np.random.normal(loc=self.lens_offset_x, scale=self.jitter.lens_offset_x, size=2)
+        dxs = dx_isr*np.array([1, -1]) + np.array([self.lens1_offset_x, self.lens2_offset_x]) + np.random.normal(scale=self.jitter.lens_offset_x, size=2)
         dxps = np.random.normal(scale=self.jitter.lens_angle_x, size=2)
-        dys = np.random.normal(loc=self.lens_offset_y, scale=self.jitter.lens_offset_y, size=2)
+        dys = np.array([self.lens1_offset_y, self.lens2_offset_y]) + np.random.normal(scale=self.jitter.lens_offset_y, size=2)
         dyps = np.random.normal(scale=self.jitter.lens_angle_y, size=2)
         for i in range(self.num_slices):
             dl = ds_pl*(i+1) - self.length_plasma_lens/2
@@ -85,10 +126,16 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         # add another one at the end of the lens
         if self.use_apertures:
             aperture = elements.Aperture(aperture_x=self.lens_radius, aperture_y=self.lens_radius, shape="elliptical")
-            pl = [aperture]
-            pl.extend(plasma_lens)
-            pl.append(aperture)
-            plasma_lens = pl
+            
+            pl1 = [aperture]
+            pl1.extend(plasma_lens1)
+            pl1.append(aperture)
+            plasma_lens1 = pl1
+            
+            pl2 = [aperture]
+            pl2.extend(plasma_lens2)
+            pl2.append(aperture)
+            plasma_lens1 = pl2
 
         # define first chicane dipole
         B_chic1 = self.field_chicane_dipole1
@@ -108,7 +155,9 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
 
         # define sextupole (or gap)
         if self.cancel_sec_order_dispersion:
-            half_sextupole_or_gap = elements.ExactMultipole(ds=self.length_central_gap_or_sextupole/2, k_normal=[0.,0.,self.strength_sextupole/self.length_central_gap_or_sextupole], k_skew=[0.,0.,0.], nslice=self.num_slices)
+            dx_sext = np.random.normal(scale=self.jitter.sextupole_offset_x)
+            dy_sext = np.random.normal(scale=self.jitter.sextupole_offset_y)
+            half_sextupole_or_gap = elements.ExactMultipole(ds=self.length_central_gap_or_sextupole/2, k_normal=[0.,0.,self.strength_sextupole/self.length_central_gap_or_sextupole], k_skew=[0.,0.,0.], nslice=self.num_slices, dx=dx_sext, dy=dy_sext)
         else:
             half_sextupole_or_gap = elements.ExactDrift(ds=self.length_central_gap_or_sextupole/2, nslice=1)
         

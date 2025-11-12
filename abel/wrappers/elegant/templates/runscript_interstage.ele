@@ -1,0 +1,38 @@
+! This file is part of ABEL
+! Copyright 2025, The ABEL Authors
+! Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+! Affiliations: 1) University of Oslo, 2) LBNL
+! License: GPL-3.0-or-later
+
+! RUN SCRIPT for STAGING OF PLASMA ACCELERATORS
+! by Carl A. Lindstrom (University of Oslo), 13.08.2022
+
+&run_setup
+    lattice = "$filename_lattice",
+    use_beamline = "ACHROMAT",
+    p_central_mev = "$nom_energy_MeV",
+    random_number_seed = 0,
+    centroid = "$filename_centroid",
+&end
+
+&run_control
+&end
+
+&sdds_beam
+    input  = "$filename_inputbeam",
+&end
+
+&track
+&end
+
+&twiss_output
+    filename = "$filename_twiss";
+    beta_x = 1;
+    alpha_x = 1;
+    eta_x = 1;
+    etap_x = 1;
+    beta_y = 1;
+    alpha_y = 1;
+    eta_y = 1;
+    etap_y = 1;
+&end

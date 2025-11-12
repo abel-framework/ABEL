@@ -1,10 +1,16 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 import scipy.constants as SI
 import numpy as np
 from abel.classes.turnaround.turnaround import Turnaround
 
 class TurnaroundBasic(Turnaround):
     
-    def __init__(self, nom_energy=None, bend_radius=None, use_semi_circle=False, fill_factor=0.9, max_dipole_field=1.4, max_rel_energy_loss=0.005):
+    def __init__(self, nom_energy=None, bend_radius=None, use_semi_circle=False, fill_factor=0.9, max_dipole_field=1.4, max_rel_energy_loss=0.003):
 
         super().__init__(nom_energy=nom_energy, use_semi_circle=use_semi_circle)
 

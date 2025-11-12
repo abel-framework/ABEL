@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.classes.collider.collider import Collider
 from abel.classes.source.impl.source_basic import SourceBasic
 from abel.classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
@@ -13,6 +19,7 @@ from abel.classes.beamline.impl.linac.impl.plasma_linac import PlasmaLinac
 from abel.classes.ip.impl.ip_basic import InteractionPointBasic
 import scipy.constants as SI
 import numpy as np
+import copy
 
 class HALHFgg(Collider):
 
@@ -114,10 +121,10 @@ class HALHFgg(Collider):
         esource.beta_y = esource.beta_x
         
         # define interstage
-        interstage = InterstageBasic()
+        interstage = InterstagePlasmaLensBasic()
         interstage.beta0 = lambda E: stage.matched_beta_function(E)
-        interstage.dipole_length = lambda E: 1.2 * np.sqrt(E/10e9) # [m(eV)]
-        interstage.dipole_field = 0.5 # [T]
+        interstage.length_dipole = lambda E: 1.2 * np.sqrt(E/10e9) # [m(eV)]
+        interstage.field_dipole = 0.5 # [T]
         
         # define electron BDS
         ebds = BeamDeliverySystemBasic()
@@ -142,6 +149,7 @@ class HALHFgg(Collider):
         elinac.num_stages = self.pwfa_num_stages
         elinac.interstage = interstage
         elinac.bds = ebds
+        elinac.alternate_interstage_polarity = True
         
         # define interaction point
         ip = InteractionPointBasic()

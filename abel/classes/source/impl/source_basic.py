@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 import numpy as np
 import scipy.constants as SI
 from abel.classes.beam import Beam
@@ -6,6 +12,58 @@ from abel.utilities.beam_physics import generate_trace_space_xy, generate_symm_t
 from abel.utilities.relativity import energy2gamma
 
 class SourceBasic(Source):
+    """
+    Beam particle source implementation that generates a Gaussian particle 
+    distribution.
+
+    Inherits all attributes from ``Source``.
+
+    Attributes
+    ----------
+    num_particles : int
+        Number of macro-particles to sample.
+        
+    rel_energy_spread : float
+        Relative energy spread, defined as the ratio of the standard deviation 
+        of the energy distribution to the mean energy. If provided, 
+        ``energy_spread`` will be set to ``energy * rel_energy_spread`` during 
+        ``track()`` (overriding any previously-set absolute ``energy_spread``).
+        
+    energy_spread : [eV] float
+        Absolute energy spread (standard deviation). If ``rel_energy_spread`` is 
+        supplied, this value is overwritten to ``energy * rel_energy_spread`` 
+        when ``track()`` is called.
+
+    bunch_length : [m] float
+        Longitudinal bunch length used as the standard deviation for
+        Gaussian sampling of z-positions.
+
+    z_offset : [m] float
+        Mean longitudinal offset for the sampled z-positions.
+
+    emit_nx, emit_ny : [m rad] float
+        Normalized transverse emittances.
+
+    beta_x, beta_y : [m] float
+        Twiss beta functions.
+
+    alpha_x, alpha_y : float
+        Twiss alpha functions.
+
+    angular_momentum : [m rad] float
+        Normalized angular momentum.
+
+    symmetrize : bool
+        If ``True`` and ``symmetrize_6d`` is ``False``, the generated particle 
+        distribution is transversely symmetrised in x, y, x' and y'.
+
+    symmetrize_6d : bool
+        Flag for generating a fully symmetric 6D distribution for
+        (x,x',y,y',z,E).
+
+    z_cutoff : float
+        If set, particles with ``z <= z_cutoff`` are removed by ``z_filter``.
+    """
     
     def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, symmetrize_6d=False, z_cutoff=None):
         
@@ -31,6 +89,9 @@ class SourceBasic(Source):
         
     
     def track(self, _=None, savedepth=0, runnable=None, verbose=False):
+        """
+        Generate a ``Beam`` object.
+        """
         
         # make empty beam
         beam = Beam()
@@ -84,12 +145,34 @@ class SourceBasic(Source):
     # ==================================================
     # Filter out particles whose z < z_cutoff for testing instability etc.
     def z_filter(self, beam):
+        """
+        Return a new ``Beam`` with particles filtered by longitudinal position.
+
+        The filter keeps particles for which ``z > self.z_cutoff``. All phase
+        space components, spin components and weights are filtered consistently. 
+        The returned ``Beam`` is a new initialised ``Beam`` with the filtered 
+        phase space.
+
+        Parameters
+        ----------
+        beam : Beam
+            Input beam whose internal phase space arrays will be read.
+
+        Returns
+        -------
+        Beam
+            New ``Beam`` instance containing only the particles with 
+            ``z > z_cutoff``.
+        """
         xs = beam.xs()
         ys = beam.ys()
         zs = beam.zs()
         pxs = beam.pxs()
         pys = beam.pys()
         pzs = beam.pzs()
+        spxs = beam.spxs()
+        spys = beam.spys()
+        spzs = beam.spzs()
         weights = beam.weightings()
 
         # Apply the filter
@@ -100,19 +183,60 @@ class SourceBasic(Source):
         pxs_filtered = pxs[bool_indices]
         pys_filtered = pys[bool_indices]
         pzs_filtered = pzs[bool_indices]
+        spxs_filtered = spxs[bool_indices]
+        spys_filtered = spys[bool_indices]
+        spzs_filtered = spzs[bool_indices]
         weights_filtered = weights[bool_indices]
 
         # Initialise ABEL Beam object
         beam_out = Beam()
         
         # Set the phase space of the ABEL beam
-        beam_out.set_phase_space(Q=np.sum(weights_filtered)*-SI.e,
+        beam_out.set_phase_space(Q=np.sum(weights_filtered)*np.sign(self.charge)*SI.e,
                              xs=xs_filtered,
                              ys=ys_filtered,
                              zs=zs_filtered, 
                              pxs=pxs_filtered,  # Always use single particle momenta?
                              pys=pys_filtered,
-                             pzs=pzs_filtered)
+                             pzs=pzs_filtered,
+                             spxs=spxs_filtered,
+                             spys=spys_filtered,
+                             spzs=spzs_filtered,
+                             particle_mass=beam.particle_mass
+                             )
 
         return beam_out
     
+
+    # ==================================================
+    def print_summary(self):
+        """
+        Print a summary for the source.
+        """
+        print('Type: ', type(self))
+        print('Number of macro particles: ', self.num_particles)
+        print('Charge [nC]: ', self.charge*1e9)
+        print('Energy [GeV]: ', self.energy/1e9)
+        print('Normalised x emittance [mm mrad]: ', self.emit_nx*1e6)
+        print('Normalised y emittance [mm mrad]: ', self.emit_ny*1e6)
+        print('x beta function [mm]: ', self.beta_x*1e3)
+        print('y beta function [mm]: ', self.beta_y*1e3)
+        print('Relative energy spread [%]: ', self.rel_energy_spread*100)
+        print('Bunch length [um]: ', self.bunch_length*1e6)
+        print('x-offset [um]: ', self.x_offset*1e6)
+        print('y-offset [um]: ', self.y_offset*1e6)
+        print('z-offset [um]: ', self.z_offset*1e6)
+        print('x-jitter [nm]: ', self.jitter.x*1e9)
+        print('y-jitter [nm]: ', self.jitter.y*1e9)
+        print('t-jitter [ns]: ', self.jitter.t*1e9)
+        print('Normalised x emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_x * 1e6 if self.norm_jitter_emittance_x is not None else "None")
+        print('Normalised y emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_y * 1e6 if self.norm_jitter_emittance_y is not None else "None")
+        if self.symmetrize:
+            print('Symmetrisation: ', self.symmetrize)
+        else:
+            if self.symmetrize_6d:
+                print('6D Symmetrisation: ', self.symmetrize_6d)
+            else:
+                print('Symmetrisation: ', self.symmetrize)

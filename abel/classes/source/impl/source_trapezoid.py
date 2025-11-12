@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 import numpy as np
 import scipy.constants as SI
 from abel import Source, Beam
@@ -5,6 +11,68 @@ from abel.utilities.beam_physics import generate_trace_space_xy
 from abel.utilities.relativity import energy2gamma
 
 class SourceTrapezoid(Source):
+    """
+    Beam particle source implementation that generates a longitudinally 
+    trapezoidal, transversely Gaussian particle distribution.
+
+    This class extends ``Source`` and models bunches with an adjustable ratio 
+    of trapezoidal-to-uniform charge regions. The resulting longitudinal 
+    distribution can also be smoothed with a Gaussian blur and optionally made 
+    front-heavy (i.e. denser at the bunch head).
+
+    Inherits all attributes from ``Source``.
+
+    Attributes
+    ----------
+    num_particles : int
+        Number of macro-particles to sample.
+        
+    rel_energy_spread : float
+        Relative energy spread, defined as the ratio of the standard deviation 
+        of the energy distribution to the mean energy. If provided, 
+        ``energy_spread`` will be set to ``energy * rel_energy_spread`` during 
+        ``track()`` (overriding any previously-set absolute ``energy_spread``).
+        
+    energy_spread : [eV] float
+        Absolute energy spread (standard deviation). If ``rel_energy_spread`` is 
+        supplied, this value is overwritten to ``energy * rel_energy_spread`` 
+        when ``track()`` is called.
+
+    bunch_length : [m] float
+        Longitudinal bunch length used as the standard deviation for
+        Gaussian sampling of z-positions.
+
+    gaussian_blur : [m] float
+        Gaussian blur applied to the front and back of the z-distribution to 
+        smooth the transition to zero.
+
+    current_head : [A] float
+        Current at the head of the bunch. Used to define the trapezoidal 
+        shape by controlling the uniform-to-triangular charge ratio.
+
+    z_offset : [m] float
+        Mean longitudinal offset for the sampled z-positions.
+
+    emit_nx, emit_ny : [m rad] float
+        Normalized transverse emittances.
+
+    beta_x, beta_y : [m] float
+        Twiss beta functions.
+
+    alpha_x, alpha_y : float
+        Twiss alpha functions.
+
+    angular_momentum : [m rad] float
+        Normalized angular momentum.
+
+    symmetrize : bool
+        If ``True`` and ``symmetrize_6d`` is ``False``, the generated particle 
+        distribution is transversely symmetrised in x, y, x' and y'.
+
+    front_heavy_distribution : bool
+        If ``True``, redistributes the z-distribution to favour the bunch head
+        (lower z).
+    """
     
     def __init__(self, length=0, num_particles=1000, energy=None, charge=0, rel_energy_spread=None, energy_spread=None, bunch_length=None, gaussian_blur=0, current_head=0, z_offset=0, x_offset=0, y_offset=0, x_angle=0, y_angle=0, emit_nx=0, emit_ny=0, beta_x=None, beta_y=None, alpha_x=0, alpha_y=0, angular_momentum=0, wallplug_efficiency=1, accel_gradient=None, symmetrize=False, front_heavy_distribution=False):
         
@@ -29,6 +97,9 @@ class SourceTrapezoid(Source):
         
     
     def track(self, _ = None, savedepth=0, runnable=None, verbose=False):
+        """
+        Generate a ``Beam`` object.
+        """
         
         # make empty beam
         beam = Beam()
@@ -90,14 +161,14 @@ class SourceTrapezoid(Source):
             zs = zmax - (zmax-zmin)*zs_norm_redist
 
             # recalculate weightings (lower where there are more particles)
-            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+            weightings = np.ones(zs.shape)*np.abs(self.charge)/( SI.e * self.num_particles )
             weightings[mask_uniform] = (1+front_heaviness*zs_norm_redist[mask_uniform])**2
-            weightings[mask_uniform] = weightings[mask_uniform]/(np.sum(weightings[mask_uniform])/(self.charge/SI.e))*np.sum(mask_uniform)/len(zs)
+            weightings[mask_uniform] = weightings[mask_uniform]/(np.sum(weightings[mask_uniform])/(np.abs(self.charge)/SI.e) )*np.sum(mask_uniform)/len(zs)
             weightings[mask_triangle] = (1+front_heaviness*zs_norm_redist[mask_triangle])**3
-            weightings[mask_triangle] = weightings[mask_triangle]/(np.sum(weightings[mask_triangle])/(self.charge/SI.e))*np.sum(mask_triangle)/len(zs)
+            weightings[mask_triangle] = weightings[mask_triangle]/(np.sum(weightings[mask_triangle])/(np.abs(self.charge)/SI.e) )*np.sum(mask_triangle)/len(zs)
             
         else:
-            weightings = np.ones(zs.shape)*self.charge/(SI.e*self.num_particles)
+            weightings = np.ones(zs.shape)*np.abs(self.charge)/(SI.e * self.num_particles)
         
         # energies
         Es = np.random.normal(loc=self.energy, scale=self.energy_spread, size=num_particles_actual)
@@ -114,19 +185,31 @@ class SourceTrapezoid(Source):
         # add jitters and offsets in super function
         return super().track(beam, savedepth, runnable, verbose)
     
-    
-    def get_length(self):
-        if self.accel_gradient is not None:
-            return self.energy/self.accel_gradient
-        else:
-            return self.length
-    
-    def get_charge(self):
-        return self.charge
-    
-    def get_energy(self):
-        return self.energy
-    
-    def energy_efficiency(self):
-        return self.wallplug_efficiency
-    
+
+    def print_summary(self):
+        """
+        Print a summary for the source.
+        """
+        print('Type: ', type(self))
+        print('Number of macro particles: ', self.num_particles)
+        print('Charge [nC]: ', self.charge*1e9)
+        print('Energy [GeV]: ', self.energy/1e9)
+        print('Normalised x emittance [mm mrad]: ', self.emit_nx*1e6)
+        print('Normalised y emittance [mm mrad]: ', self.emit_ny*1e6)
+        print('x beta function [mm]: ', self.beta_x*1e3)
+        print('y beta function [mm]: ', self.beta_y*1e3)
+        print('Relative energy spread [%]: ', self.rel_energy_spread*100)
+        print('Bunch length [um]: ', self.bunch_length*1e6)
+        print('Gaussian blur [um]: ', self.gaussian_blur*1e6)
+        print('Current head [A]: ', self.current_head)
+        print('x-offset [um]: ', self.x_offset*1e6)
+        print('y-offset [um]: ', self.y_offset*1e6)
+        print('z-offset [um]: ', self.z_offset*1e6)
+        print('x-jitter [nm]: ', self.jitter.x*1e9)
+        print('y-jitter [nm]: ', self.jitter.y*1e9)
+        print('t-jitter [ns]: ', self.jitter.t*1e9)
+        print('Normalised x emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_x * 1e6 if self.norm_jitter_emittance_x is not None else "None")
+        print('Normalised y emittance jitter [mm mrad]: ', 
+            self.norm_jitter_emittance_y * 1e6 if self.norm_jitter_emittance_y is not None else "None")
+        print('Symmetrisation: ', self.symmetrize)

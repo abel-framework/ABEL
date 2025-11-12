@@ -1,3 +1,9 @@
+# This file is part of ABEL
+# Copyright 2025, The ABEL Authors
+# Authors: C.A.Lindstrøm(1), J.B.B.Chen(1), O.G.Finnerud(1), D.Kalvik(1), E.Hørlyk(1), A.Huebl(2), K.N.Sjobak(1), E.Adli(1)
+# Affiliations: 1) University of Oslo, 2) LBNL
+# License: GPL-3.0-or-later
+
 from abel.CONFIG import CONFIG
 from abel.classes.beam import Beam
 from abel.classes.source.source import Source
@@ -17,7 +23,7 @@ from matplotlib import pyplot as plt
 
 class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=False, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=True, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -312,7 +318,7 @@ class PlasmaLinac(Linac):
 
 
     def trim_attr_reduce_pickle_size(self):
-        "Delete attributes to reduce space in the pickled file."
+        "Clear attributes to reduce space in the pickled file."
         self._first_stage = None
         self._last_stage = None
         self._last_interstage = None
@@ -1453,3 +1459,33 @@ class PlasmaLinac(Linac):
         plt.close()
 
         return filename
+
+
+    def print_summary(self):
+        # TODO: Make print_summary() for each class below and call on these instead.
+        print('== Plasma-linac parameters ==========')
+        print('Number of plasma stages: ', self.num_stages)
+        print('Nominal energy [GeV]: ', self.nom_energy/1e9 if self.nom_energy is not None else "None")
+
+        print('\n== Driver source ==========')
+        self.stage.driver_source.print_summary()
+
+        print('\n== Source ==========')
+        self.source.print_summary()
+
+        print('\n== Stage ==========')
+        self.stage.print_summary()
+
+        if self.stage.upramp is not None:
+            print('\n== Upramp ==========')
+            self.stage.upramp.print_summary(print_params=False)
+
+        if self.stage.downramp is not None:
+            print('\n== Downramp ==========')
+            self.stage.downramp.print_summary(print_params=False)
+
+        print('\n== Interstage ==========')
+        if self.interstage is None:
+            print('Type: ', 'None')
+        else:
+            self.interstage.print_summary()
