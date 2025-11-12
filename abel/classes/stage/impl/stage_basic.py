@@ -20,7 +20,7 @@ class StageBasic(Stage):
     and decreases the energy of all drive beam macro particles with the same 
     energy gain.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes

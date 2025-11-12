@@ -53,7 +53,7 @@ class StageReducedModels(Stage):
     The drive beam, longitudinal electric field and blow-out bubble radius are 
     assumed unchanged throughout the tracking process through the stage.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
 
     
     Attributes

@@ -30,7 +30,7 @@ class StageHipace(Stage):
     prepares input files, launches HiPACE++ runs, extracts beam and plasma 
     diagnostics, and post-processes simulation data.
 
-    Inherits all attributes from :class:`Stage`.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes

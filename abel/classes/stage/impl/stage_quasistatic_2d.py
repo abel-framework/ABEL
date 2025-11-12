@@ -18,7 +18,7 @@ class StageQuasistatic2d(Stage):
     drive beam macro particles using a longitudinal field calculated using a 
     short Wake-T simulation.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes
