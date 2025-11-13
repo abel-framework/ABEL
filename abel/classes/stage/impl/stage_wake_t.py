@@ -115,6 +115,26 @@ class StageWakeT(Stage):
 
         # select the wakefield model (ion motion or not)
         if self.ion_motion:
+
+            # Check the version number of Wake-T in order to see if it supports the ion motion wakefield model
+            from importlib.metadata import version, PackageNotFoundError
+            from packaging import version as pkg_version
+
+            package_name = "wake_t"
+
+            try:
+                installed_version = version(package_name)
+                
+                # Compare version numbers ensuring the installed version is newer than 0.8.0.
+                if pkg_version.parse(installed_version) <= pkg_version.parse("0.8.0"):
+                    raise RuntimeError(
+                        f"The installed {package_name} version is {installed_version}. It must be newer than 0.8.0 to support the ion motion wakefield model."
+                    )
+                    
+            except PackageNotFoundError:
+                print(f"The package '{package_name}' is not installed.")
+
+
             wakefield_model='quasistatic_2d_ion'  # TODO: This has not yet been implemented with the current Wake-T version (v.0.8.0)
         else:
             wakefield_model='quasistatic_2d'
