@@ -51,8 +51,10 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         # simulation options
         self.num_slices = num_slices
         self.use_monitors = use_monitors
+        self._isr_on_ref_part = None
 
-        
+
+    # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         "Track plasma-lens-based interstage using ImpactX."
         
@@ -68,7 +70,23 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         
         return super().track(beam, savedepth, runnable, verbose)
     
+
+    # ==================================================
+    @property
+    def isr_on_ref_part(self) -> bool | None:
+        """
+        Whether `ISR will be applied to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`_.
+        
+        Read only. ``True`` if 
+        :attr:`self.enable_isr <abel.Interstage.enable_isr>` and 
+        :attr:`self.cancel_isr_kicks <abel.InterstagePlasmaLens.cancel_isr_kicks>` 
+        are ``True``. Set by 
+        :func:`InterstagePlasmaLensImpactX.get_impactx_lattice() <abel.InterstagePlasmaLensImpactX.get_impactx_lattice>`.
+        """
+        return self._isr_on_ref_part
     
+
+    # ==================================================
     def get_impactx_lattice(self):
         "Set up the ImpactX plasma-lens-based interstage lattice."
         
@@ -101,10 +119,10 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
 
         # add lens offset for ISR mitigation
         if self.enable_isr and self.cancel_isr_kicks:
-            self.isr_on_ref_part = True
+            self._isr_on_ref_part = True
             dx_isr = self.lens_offset_isr_kick_mitigation()
         else:
-            self.isr_on_ref_part = False
+            self._isr_on_ref_part = False
             dx_isr = 0
             
         # define plasma lens
