@@ -168,7 +168,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         external_focusing_longitudinal_comment = ''
     else:
         external_focusing_longitudinal_comment = '#' 
-    ""
+    """
     # mesh refinement (level 1)
     res_mr0 = box_size_xy/num_cell_xy
     box_size_xy_mr1 = 0.9/k_p(plasma_density)
