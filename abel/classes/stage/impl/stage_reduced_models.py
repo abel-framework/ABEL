@@ -96,18 +96,18 @@ class StageReducedModels(Stage):
 
     num_z_cells_main : int
         Determines the binning of the z-coordinates used to probe main beam 
-        electric fields using ``RF-Track``. Used in calculating wakefield 
+        electric fields using RF-Track. Used in calculating wakefield 
         perturbation due to ion motion.
 
     num_x_cells_rft, num_y_cells_rft : int
-        Number of grid cells along x and y used in ``RF-Track`` for calculating 
-        beam electric fields used in calculating wakefield perturbation due to 
-        ion motion.
+        Number of grid cells along x and y used in RF-Track for calculating beam
+        electric fields used in calculating wakefield perturbation due to ion 
+        motion.
 
     num_xy_cells_probe : int
         Number of grid cells along x and y used to probe beam electric fields 
-        calculated by ``RF-Track``. Used in calculating wakefield perturbation 
-        due to ion motion.
+        calculated by RF-Track. Used in calculating wakefield perturbation due
+        to ion motion.
 
     uniform_z_grid : bool
         Flag to determine whether the grid along z is uniform (``True``) or finely 
@@ -144,6 +144,12 @@ class StageReducedModels(Stage):
 
     show_prog_bar : bool
         Flag for displaying the progress bar for beam tracking.
+
+        
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
+    .. [2] RF-Track reference manual: https://gitlab.cern.ch/rf-track/rf-track-reference-manual
     """
 
     # ==================================================
@@ -190,23 +196,23 @@ class StageReducedModels(Stage):
 
         num_z_cells_main : int, optional
             Determines the binning of the z-coordinates used to probe main beam 
-            electric fields using ``RF-Track``. Used in calculating wakefield 
+            electric fields using RF-Track. Used in calculating wakefield 
             perturbation due to ion motion. Default set by the ion motion 
             physics model.
 
         num_x_cells_rft : int, optional (default=50)
-            Number of grid cells along x used in ``RF-Track`` for calculating 
-            beam electric fields used in calculating wakefield perturbation due to 
+            Number of grid cells along x used in RF-Track for calculating beam
+            electric fields used in calculating wakefield perturbation due to 
             ion motion.
         
         num_y_cells_rft : int, optional (default=50)
-            Number of grid cells along y used in ``RF-Track`` for calculating 
+            Number of grid cells along y used in RF-Track for calculating 
             beam electric fields used in calculating wakefield perturbation due to 
             ion motion.
 
         num_xy_cells_probe : int, optional (default=41)
             Number of grid cells along x and y used to probe beam electric fields 
-            calculated by ``RF-Track``. Used in calculating wakefield perturbation 
+            calculated by RF-Track. Used in calculating wakefield perturbation 
             due to ion motion.
 
         uniform_z_grid : bool, optional (default= ``False``)
