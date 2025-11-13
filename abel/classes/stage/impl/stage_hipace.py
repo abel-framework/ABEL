@@ -36,8 +36,8 @@ class StageHipace(Stage):
     Attributes
     ----------
     keep_data : bool, optional
-            Flag for whether to keep raw HiPACE++ output after simulation. 
-            Defaults to ``False``.
+        Flag for whether to keep raw HiPACE++ output after simulation. 
+        Defaults to ``False``.
 
     save_drivers : bool, optional
         Flag for whether to save input and output driver beams to disk. 
@@ -116,6 +116,89 @@ class StageHipace(Stage):
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing=False, mesh_refinement=True, do_spin_tracking=False, run_path=None):
         """
         The constructor for the ``StageHipace`` class.
+
+        Parameters
+        ----------
+        length : [m] float
+            Total length of the plasma stage and its ramps if any.
+        
+        nom_energy_gain : [eV] float
+            Nominal/target energy gain of the acceleration stage.
+        
+        plasma_density : [m^-3] float
+            Plasma density.
+
+        driver_source : ``Source`` or ``DriverComplex``, optional
+            The source of the drive beam. Default set to ``None``.
+
+        ramp_beta_mag : float, optional
+            Used for demagnifying and magnifying beams passing through entrance 
+            and exit plasma ramps. Defaults to ``None``
+
+        keep_data : bool, optional
+            Flag for whether to keep raw HiPACE++ output after simulation. 
+            Defaults to ``False``.
+
+        save_drivers : bool, optional
+            Flag for whether to save input and output driver beams to disk. 
+            Defaults to ``False``.
+
+        output : int, optional
+            Frequency (in simulation steps) for HiPACE++ field/particle outputs.
+            If ``None``, will output the last time step. Defaults to ``None``. 
+
+        ion_motion : bool, optional
+                Flag to include ion motion in the plasma. Defaults to ``True``.
+
+        ion_species : str, optional
+            Ion species used in the plasma (e.g. 'H', 'He', 'Li'). Defaults to 
+            ``'H'``.
+
+        beam_ionization : bool, optional
+            Flag for enabling beam-induced ionization. Defaults to ``True``.
+
+        radiation_reaction : bool, optional
+            Flag for enabling radiation reaction effects. Defaults to ``False``.
+
+        num_nodes : int, optional
+            Number of compute nodes to request in the job script. Defaults to 1.
+
+        num_cell_xy : int, optional
+            Number of transverse grid cells in HiPACE++. Defaults to 511.
+
+        driver_only : bool, optional
+            Flag for running simulation with only the driver (no witness beam). 
+            Defaults to ``False``.
+
+        plasma_density_from_file : str, optional
+            Path to plasma density profile file (overrides uniform density). Is 
+            ignored when set to ``None``. Defaults to ``None``. Expected format 
+            for the file:
+
+                - Must be a plain text file.
+                - Each line must contain exactly two whitespace-separated numeric values (SI units):
+                <longitudinal position> <plasma density>
+
+        no_plasma : bool, optional
+            If ``True``, runs the stage without plasma. Defaults to ``False``.
+
+        external_focusing : bool, optional
+            Flag for enabling drive beam guiding by applying a linear transverse 
+            external magnetic field across the beams. If ``True``, the field 
+            gradient of the external field is set to enforce the drive beam to 
+            undergo an half-interger number of betatron oscillations along the 
+            stage. Defaults to ``False``.
+
+        mesh_refinement : bool, optional
+            Enable HiPACE++ mesh refinement. See the 
+            :func:`HiPACE++ wrapper <abel.wrappers.hipace.hipace_wrapper.hipace_write_inputs>`
+            for more details. Defaults to ``True``. 
+
+        do_spin_tracking : bool, optional
+            Flag for enabling particle spin tracking. Defaults to ``False``.
+
+        run_path : str, optional
+            Path to store plots and outputs. Defaults to ``None``.
         """
 
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
