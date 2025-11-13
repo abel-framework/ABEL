@@ -9,7 +9,61 @@ import numpy as np
 from abel.CONFIG import CONFIG
 from abel.classes.event import Event
 
+
 def guineapig_run(inputfile, beam1, beam2, tmpfolder=None):
+    """
+    Run a GUINEA-PIG beam–beam interaction simulation between two beams.
+
+    This function executes a GUINEA-PIG simulation using the provided GUINEA-PIG 
+    input file and two colliding ``Beam`` objects. It prepares the temporary 
+    beam input files, runs the external GUINEA-PIG binary, parses the resulting 
+    output file (``.ref``-file), and returns an ``Event`` object containing the 
+    incoming and outgoing beams, as well as luminosity values and other 
+    interaction results.
+    
+
+    Parameters
+    ----------
+    inputfile : str
+        Path to the GUINEA-PIG accelerator file. This file defines the beam–beam 
+        interaction parameters such as crossing angle, magnetic fields, and 
+        bunch spacing.
+
+    beam1 : ``Beam``
+        First input beam. Used to generate the GUINEA-PIG input file 
+        ``inputbeam1.ini``.
+
+    beam2 : ``Beam``
+        Second input beam. Analogous to ``beam1``, it is used to generate 
+        ``inputbeam2.ini`` for use by GUINEA-PIG.
+
+    tmpfolder : str, optional
+        Path to a temporary working directory to store intermediate files (e.g. 
+        GUINEA-PIG outputs). If ``None``, a unique folder is created in 
+        ``CONFIG.temp_path``. Defaults to ``None``.
+
+
+    Returns
+    -------
+    event : ``Event``
+        Object representing the simulated beam–beam interaction, 
+        containing:
+
+        - ``beam_in_1``, ``beam_in_2`` : Input beams.
+        - ``beam_out_1``, ``beam_out_2`` : Outgoing beams after collision.
+        - ``luminosity_geom`` : [m^-2 per bunch crossing] Geometric luminosity.
+        - ``luminosity_full`` : [m^-2 per bunch crossing] Full luminosity.
+        - ``luminosity_peak`` : [m^-2 per bunch crossing] Peak luminosity.
+        - ``upsilon_max`` : Maximum beamstrahlung parameter.
+        - ``num_pairs`` : Number of incoherent e+e- pairs produced via beam–beam interactions.
+        - ``num_photon1``, ``num_photon2`` : Number of emitted beamstrahlung photons.
+        - ``energy_loss1``, ``energy_loss2`` : [eV] Energy loss per particle.
+
+
+    References
+    ----------
+    .. [1] D. Schulte, "Study of Electromagnetic and Hadronic Background in the Interaction Region of the TESLA Collider", University of Hamburg (1997)
+    """
     
     # make temporary output file
     if tmpfolder is None:
@@ -59,7 +113,37 @@ def guineapig_run(inputfile, beam1, beam2, tmpfolder=None):
     return event
     
 
+# ==================================================
 def guineapig_write_beam(beam, filename, beta_x=None, beta_y=None):
+    """
+    Write an ABEL ``Beam`` object to a GUINEA-PIG input beam file.
+
+    Parameters
+    ----------
+    beam : ``Beam``
+        ABEL ``Beam``object to be written to file
+
+    filename : str
+        Path to the GUINEA-PIG input beam file (a ``.ini``-file). 
+
+    beta_x : [m] float, optional
+        The beta function in x of the beam. If ``None``, it is calculated 
+        directly from ``beam``.  Defaults to ``None``.
+
+    beta_y : [m] float, optional
+        The beta function in y of the beam. If ``None``, it is calculated 
+        directly from ``beam``.  Defaults to ``None``.
+
+    Returns
+    -------
+    None
+        The function writes data to disk and does not return a value.
+
+
+    References
+    ----------
+    .. [1] D. Schulte, "Study of Electromagnetic and Hadronic Background in the Interaction Region of the TESLA Collider", University of Hamburg (1997)
+    """
 
     # extract beta function (for normalization)
     if beta_x is None:
@@ -80,7 +164,41 @@ def guineapig_write_beam(beam, filename, beta_x=None, beta_y=None):
             csvwriter.writerow([Es[i]/1e9, xps_norm[i]*1e6, yps_norm[i]*1e6, zs[i]*1e6, xs_ipslice_norm[i]*1e6, ys_ipslice_norm[i]*1e6])
 
 
-def guineapig_read_beam(filename, Q, beta_x, beta_y, z_mean=0):
+# ==================================================
+def guineapig_read_beam(filename, Q, beta_x, beta_y, z_mean=0.0):
+    """
+    Extract data from a GUINEA-PIG output beam file and convert it into a 
+    ``Beam`` object.
+
+    
+    Parameters
+    ----------
+    filename : str
+        Path to the GUINEA-PIG output beam file (usually ``beam1.dat`` and 
+        ``beam2.dat``). Containing the particles of an output beam.
+
+    Q : [C] float
+        Total beam charge.
+
+    beta_x : [m] float
+        The beta function in x of the beam.
+
+    beta_y : [m] float
+        The beta function in y of the beam.
+
+    z_mean : [m] float, optional
+        The mean z-position of the beam. Defaults to 0.0.
+
+
+    Returns
+    -------
+    beam : ``Beam``
+
+
+    References
+    ----------
+    .. [1] D. Schulte, "Study of Electromagnetic and Hadronic Background in the Interaction Region of the TESLA Collider", University of Hamburg (1997)
+    """
     
     # declare variables
     Es = []
@@ -93,7 +211,7 @@ def guineapig_read_beam(filename, Q, beta_x, beta_y, z_mean=0):
     # perform CSV extraction
     with open(filename, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=' ')
-        for row in reader:
+        for row in reader: # TODO: re-write this to extract data more efficiently. 
             
             E = float(row[0].strip())*1e9
             Es.append(E)
@@ -121,7 +239,68 @@ def guineapig_read_beam(filename, Q, beta_x, beta_y, z_mean=0):
     return beam
     
 
+# ==================================================
 def guineapig_read_output(outputfile, verbose=False):
+    """
+    Parse and extract beam–beam interaction results from a GUINEA-PIG output 
+    file.
+
+    This function reads the output file produced by GUINEA-PIG (typically named
+    ``output.ref``) and extracts key diagnostic quantities such as luminosities,
+    beamstrahlung parameters, and particle production counts.
+    
+
+    Parameters
+    ----------
+    outputfile : str
+        Path to the GUINEA-PIG output file (usually ``output.ref``). The file is
+        assumed to be generated by a standard GUINEA-PIG run and contain the
+        diagnostic summary of the beam–beam interaction.
+
+    verbose : bool, optional
+        If ``True``, print each line of the file to the console while parsing. 
+        Defaults to ``False``.
+
+
+    Returns
+    -------
+    lumi_ee_full : [m^-2 per bunch crossing] float
+        Full luminosity per bunch crossing, including all beam–beam effects.
+
+    lumi_ee_peak : [m^-2 per bunch crossing] float
+        Peak luminosity per bunch crossing, typically corresponding to the
+        high-energy core of the beam distribution.
+
+    lumi_ee_geom : [m^-2 per bunch crossing] float
+        Geometric luminosity, computed assuming ideal (non-disrupted) beams.
+
+    upsilon_max : float
+        Maximum beamstrahlung parameter (Υ) that occured duting the interaction, 
+        describing the strength of the electromagnetic fields during the 
+        collision.
+
+    num_pairs : float
+        Number of incoherent e+e- pairs produced via beam–beam interactions.
+
+    num_photon1 : float
+        Number of beamstrahlung photons emitted per macroparticle in beam 1.
+
+    num_photon2 : float
+        Number of beamstrahlung photons emitted per macroparticle in beam 2.
+
+    energy_loss1 : [eV] float
+        Mean energy loss of beam particles in beam 1 due to beam–beam 
+        interactions.
+
+    energy_loss2 : [eV] float
+        Mean energy loss of beam particles in beam 1 due to beam–beam 
+        interactions.
+
+
+    References
+    ----------
+    .. [1] D. Schulte, "Study of Electromagnetic and Hadronic Background in the Interaction Region of the TESLA Collider", University of Hamburg (1997)
+    """
 
     lumi_ee_full = None
     lumi_ee_peak = None
@@ -152,7 +331,7 @@ def guineapig_read_output(outputfile, verbose=False):
             if row.find('upsmax= ') != -1:
                 upsilon_max = float(row.split(" ")[1])
             if row.find('n_pairs =') != -1:
-                num_pairs = float(row.split(" : ")[1].split(" ")[2])
+                num_pairs = float(row.split(" : ")[1].split(" ")[2]) # TODO: this is used to return the number of coherent pairs in Event.num_coherent_pairs(), but this is actually the number of incoherent pairs.
             if row.find('final number of phot. per tracked macropart.1') != -1:
                 num_photon1 = float(row.split(" : ")[1].strip(' '))
             if row.find('final number of phot. per tracked macropart.2') != -1:

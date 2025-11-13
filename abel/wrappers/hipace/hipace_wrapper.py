@@ -16,6 +16,106 @@ from abel.utilities.plasma_physics import k_p
 
 # write the HiPACE++ input script to file
 def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_density, num_steps, time_step, box_range_z, box_size_xy, output_period=None, ion_motion=True, ion_species='H', radiation_reaction=False, beam_ionization=True, num_cell_xy=511, num_cell_z=512, driver_only=False, density_table_file=None, no_plasma=False, external_focusing_gradient=0, mesh_refinement=False, do_spin_tracking=False):
+    """
+    Write a HiPACE++ input script to file based on a provided template and 
+    simulation parameters.
+      
+    It sets the longitudinal grid resolution, adjusts transverse grid resolution 
+    for optimal performance (rounding the number of transfer cells 
+    ``num_cell_xy`` to be 2^n − 1), configures the plasma, and optionally 
+    enables mesh refinement and various physics effects. The main beam and drive 
+    beam used in the simulation are extracted from ABEL ``Beam`` files. 
+    
+    The provided parameters and configurations are substituted into a template 
+    file to produce the final HiPACE++ input file.
+    
+
+    Parameters
+    ----------
+    filename_input : str
+        Output file path for the generated HiPACE++ input file.
+
+    filename_beam : str
+        Path to the HDF5 file containing the main beam (``Beam``).  
+
+    filename_driver : str
+        Path to the HDF5 file containing the drive beam (``Beam``). 
+
+    plasma_density : [m^-3] float
+        Plasma density.
+
+    num_steps : int
+        Maximum number of time steps to simulate.
+
+    time_step : [s] float
+        Time step duration used in the simulation.
+
+    box_range_z : [m] float list
+        Longitudinal simulation domain range ``[box_min_z, box_max_z]``.
+
+    box_size_xy : [m] float
+        Transverse box half-size in x and y that defines grid transverse extents.
+
+    output_period : int, optional
+        Interval (in number of time steps) for output diagnostics. Defaults to 
+        ``num_steps`` if ``None``.
+
+    ion_motion : bool, optional
+        Flag for enabling ion motion in the plasma model. Defaults to ``True``.
+
+    ion_species : str, optional
+        Ion species name (e.g., ``'H'``, ``'He'``). Defaults to ``'H'``.
+
+    radiation_reaction : bool, optional
+        Flag for enabling radiation reaction. Defaults to ``False``.
+
+    beam_ionization : bool, optional
+        Flag for enabling beam ionization. Defaults to ``True``.
+
+    num_cell_xy : int, optional
+        Number of transverse grid cells. Automatically adjusted to 2^n - 1 if 
+        necessary. Defaults to ``511``.
+
+    num_cell_z : int, optional
+        Number of longitudinal grid cells. Defauls to ``512``.
+
+    driver_only : bool, optional
+        If ``True``, only the driver beam is simulated. Defaults to ``False``.
+
+    density_table_file : str, optional
+        Path to a tabulated plasma density profile file. If ``None``, a uniform 
+        plasma is assumed. Defaults to ``None``.
+
+    no_plasma : bool, optional
+        Disable plasma entirely (useful for vacuum beam transport). Defaults to ``False``.
+
+    external_focusing_gradient : [T/m] float, optional
+        Field gradient for an external magnetic field applied traversely across 
+        the plasma. A value > 0 enables external focusing. Defaults to ``0``.
+
+    mesh_refinement : bool, optional
+        Enable mesh refinement (1 refinement level). Defaults to ``False``.
+
+    do_spin_tracking : bool, optional
+        Enable spin tracking for polarized beams. Defaults to ``False``.
+
+    Returns
+    -------
+    None
+        The function writes the completed HiPACE++ input script to ``filename_input`` and
+        does not return any value.
+
+    Notes
+    -----
+    - The plasma components and beam components are automatically determined based on
+      ``ion_motion`` and ``driver_only``.
+    - For example, if ``no_plasma`` is ``True``, all plasma-related inputs are disabled.
+    - See the HiPACE++ documentation [1]_ for supported keywords.
+
+    References
+    ----------
+    .. [1] HiPACE++ User Guide, https://hipace.readthedocs.io/
+    """
 
     if output_period is None:
         output_period = int(num_steps)
@@ -114,8 +214,75 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         fout.write(results)
 
 
+# ==================================================
 # write the HiPACE++ job script to file
 def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num_tasks_per_node=8):
+    """
+    Write a HiPACE++ batch job script (for a Slurm-based cluster) to file based 
+    on a template and system configuration.
+
+    This function generates a batch job script for running HiPACE++ on an HPC 
+    system by substituting values from the ABEL configuration class  
+    :class:`CONFIG <abel.CONFIG>` into a template job script (the current job 
+    script template follows the Slurm batch job syntax used on the LUMI 
+    supercomputer [1]_). The compute partition is automatically chosen based on 
+    requested resources. 
+    
+    The resulting script is made executable.
+
+    Parameters
+    ----------
+    filename_job_script : str
+        Output path for the generated HiPACE++ job script file. The resulting 
+        file is given executable permissions.
+
+    filename_input : str
+        Path to the HiPACE++ input file (usually created using 
+        :func:`hipace_write_inputs() <abel.wrappers.hipace.hipace_wrapper.hipace_write_inputs>`). 
+
+    num_nodes : int, optional
+        Number of compute nodes to allocate for the simulation job. Defaults to 
+        1.
+
+    num_tasks_per_node : int, optional
+        Number of MPI tasks per compute node and sets the number of GPUs per 
+        node to the same number. Defaults to 8.
+
+    Returns
+    -------
+    None
+        The function writes the completed job submission script to 
+        ``filename_job_script`` and does not return any value. The script is 
+        made executable (``chmod 0777``).
+
+    Notes
+    -----
+    - The following fields from :class:`CONFIG <abel.CONFIG>` are required:
+      
+      * ``CONFIG.project_name``
+      * ``CONFIG.hipace_binary``
+      * ``CONFIG.partition_name_small``
+      * ``CONFIG.partition_name_devel``
+      * ``CONFIG.partition_name_standard``
+
+    - The job partition [2]_ is selected based on the requested resources:
+      
+      * Partition given by ``CONFIG.partition_name_small`` for ≤2 nodes and ≤8 tasks per node.
+      * Partition given by ``CONFIG.partition_name_devel`` for ≤32 nodes and ≤8 tasks per node.
+      * Partition given by ``CONFIG.partition_name_standard`` otherwise.
+
+    - Memory per GPU is assumed to be 60 GB and is scaled with ``num_tasks_per_node``.
+
+    - The generated script uses placeholders defined in ``job_script_template``, typically found in the same directory as this function.
+
+    References
+    ----------
+    .. [1] LUMI Supercomputer batch jobs documentation:
+           https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/batch-job/
+
+    .. [2] LUMI Supercomputer job scheduling documentation:
+           https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/partitions/
+    """
     
     # locate template file
     filename_job_script_template = os.path.join(os.path.dirname(__file__), 'job_script_template')
@@ -150,8 +317,45 @@ def hipace_write_jobscript(filename_job_script, filename_input, num_nodes=1, num
     Path(filename_job_script).chmod(0o0777)
 
 
+# ==================================================
 # run HiPACE++
 def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
+    """
+    Run a HiPACE++ simulation locally or on a Slurm-based cluster using the
+    provided job script, and load the resulting beam and driver data from the
+    final output file.
+
+    Parameters
+    ----------
+    filename_job_script : str
+        Path to the batch job script used to submit the job. Typically generated
+        by :func:`hipace_write_jobscript() <abel.wrappers.hipace.hipace_wrapper.hipace_write_jobscript>`.
+
+    num_steps : int
+        Determines which HDF5 file is loaded and used to extract the outputs
+        ``beam`` and ``driver`` (e.g., ``num_steps=100`` loads the file
+        ``openpmd_000100.h5``).
+
+    runfolder : str, optional
+        Path to the folder where the HiPACE++ job is executed and where results
+        are written. If ``None``, derived from ``filename_job_script``.
+        Defaults to ``None``.
+
+    quiet : bool, optional
+        If ``True``, suppresses terminal output during execution.
+        Defaults to ``False``.
+
+    Returns
+    -------
+    beam : ``Beam`` | None
+        The loaded beam from the designated HiPACE++ output file.
+        Set to ``None`` if the beam could not be loaded.
+
+    driver : ``Beam``
+        The loaded driver object from the designated HiPACE++ output file.
+    """
+
+    # TODO: need to check that num_steps is valid (positive int <= max_step in input_template).
 
     # extract runfolder from job script name
     if runfolder == None:
@@ -159,9 +363,9 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
 
     # run HIPACE++
     if CONFIG.cluster_name == 'LOCAL':
-        _hipace_run_local(filename_job_script, runfolder, quiet=False)
+        _hipace_run_local(filename_job_script, runfolder, quiet=quiet)
     else:
-        _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False)
+        _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=quiet)
     
     # when finished, load the beam and driver
     filename = os.path.join(runfolder, "diags/hdf5/openpmd_{:06}.h5".format(int(num_steps)))
@@ -175,15 +379,16 @@ def hipace_run(filename_job_script, num_steps, runfolder=None, quiet=False):
     return beam, driver
 
 
+# ==================================================
 def _hipace_run_local(filename_job_script, runfolder, quiet=False):
     "Helper for running HiPACE++ on the local machine. Returns when job is complete."
 
     if not quiet:
-        print(f"Running HiPACE locally in folder '{runfolder}'...")
+        print(f"Running HiPACE++ locally in folder '{runfolder}'...")
 
     #Get the input filename out of the job script
     # This could probably be solved in a better way,
-    # but that would requiring reformulating the SLURM logic a bit.
+    # but that would requiring reformulating the Slurm logic a bit.
     filename_input = None
     with open(filename_job_script, 'r') as fin:
         inLines = fin.readlines()
@@ -202,11 +407,11 @@ def _hipace_run_local(filename_job_script, runfolder, quiet=False):
 
                     filename_input = lss[2][1:-1]
     if filename_input == None:
-        raise RuntimeError('Did not find the input filename in the hipace job file')
+        raise RuntimeError('Did not find the input filename in the HiPACE++ job file')
 
     import time
     start_time = time.time()
-    #Run HIPACE
+    #Run HiPACE++
     process = subprocess.Popen([CONFIG.hipace_binary,filename_input], cwd=runfolder,\
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, \
                                close_fds=True, bufsize=1, universal_newlines=True )
@@ -216,13 +421,14 @@ def _hipace_run_local(filename_job_script, runfolder, quiet=False):
     process.stdout.close()
     returncode = process.wait()
 
-    print(f'HiPace complete, returncode = {returncode}, execution time={time.time()-start_time : .1f} [s]')
+    print(f'HiPACE++ complete, returncode = {returncode}, execution time={time.time()-start_time : .1f} [s]')
     if returncode != 0:
-        raise RuntimeError('Errors during HiPace simulation')
+        raise RuntimeError('Errors during HiPACE++ simulation')
 
 
+# ==================================================
 def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
-    "Helper for running HiPACE++ on a batch system using SLURM. Returns when job is complete."
+    "Helper for running HiPACE++ on a batch system using Slurm. Returns when job is complete."
 
     # run system command
     cmd = 'cd ' + runfolder + ' && sbatch ' + os.path.basename(filename_job_script)
@@ -304,6 +510,7 @@ def _hipace_run_slurm(filename_job_script, num_steps, runfolder, quiet=False):
         time.sleep(wait_time)
 
 
+# ==================================================
 def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
     """
     Load an ABEL beam from a HiPACE++ HDF5 output file (OpenPMD format).
@@ -314,15 +521,17 @@ def hipaceHdf5_2_abelBeam(data_dir, hipace_iteration_idx, species='beam'):
         Path to the directory containing all HiPACE++ HDF5 output files.
 
     hipace_iteration_idx : int
-        Specifies the simulation iteration number to be extracted out of all available output files in ``data_dir``.
+        Specifies the simulation iteration number to be extracted out of all 
+        available output files in ``data_dir``.
 
     species : str, optional
-        Specifies the name of the beam to be extracted.
+        Specifies the name of the beam to be extracted. Defaults to ``'beam'``.
 
 
     Returns
     ----------
-    beam : ``Beam`` object
+    beam : ``Beam``
+        The extracted beam.
     """
 
     from openpmd_viewer import OpenPMDTimeSeries
