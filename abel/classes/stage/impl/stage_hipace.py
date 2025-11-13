@@ -100,7 +100,7 @@ class StageHipace(Stage):
     run_path : str, optional
         Path to store plots and outputs. Defaults to ``None``.
 
-    plasma_profile : SimpleNamespace
+    plasma_profile : :class:`types.SimpleNamespace`
         Holds arrays for longitudinal positions (`ss`) and densities (`ns`)
         when ramps are generated internally.
 

@@ -69,26 +69,26 @@ class Stage(Trackable, CostModeled):
     nom_energy_flattop : [eV] float
         Nominal energy at the start of the plasma stage, excluding any ramps.
 
-    efficiency : ``SimpleNamespace``
+    efficiency : :class:`types.SimpleNamespace`
         Contains efficiency metrics:
-        - driver_to_wake : fraction of driver energy transferred to the wakefield.
-        - wake_to_beam : fraction of wakefield energy transferred to beam.
-        - driver_to_beam : overall energy transfer efficiency.
-        - dumped_power : remaining driver power.
+            - driver_to_wake : fraction of driver energy transferred to the wakefield.
+            - wake_to_beam : fraction of wakefield energy transferred to beam.
+            - driver_to_beam : overall energy transfer efficiency.
+            - dumped_power : remaining driver power.
 
-    evolution : ``SimpleNamespace``
+    evolution : :class:`types.SimpleNamespace`
         Contains the beam parameter evolution across the stage.
 
-    initial : ``SimpleNamespace``
+    initial : :class:`types.SimpleNamespace`
         Initial state of the stage including beam, driver, and plasma 
         quantities.
 
-    final : ``SimpleNamespace``
+    final : :class:`types.SimpleNamespace`
         Final state of the stage after tracking. Includes beam, driver, and 
         plasma quantities.
 
     name : str
-        Name of the stage, default is 'Plasma stage'.
+        Name of the stage, default is ``'Plasma stage'``.
     """
 
     
