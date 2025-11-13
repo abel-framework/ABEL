@@ -163,11 +163,12 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         external_focusing_radial_comment = ''
     else:
         external_focusing_radial_comment = '#'
-
+    """
     if abs(external_focusing_longitudinal) > 0:
         external_focusing_longitudinal_comment = ''
     else:
         external_focusing_longitudinal_comment = '#' 
+    ""
     # mesh refinement (level 1)
     res_mr0 = box_size_xy/num_cell_xy
     box_size_xy_mr1 = 0.9/k_p(plasma_density)
@@ -210,7 +211,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'external_focusing_radial': abs(external_focusing_gradient),
               'external_focusing_radial_comment': external_focusing_radial_comment,
               'external_focusing_longitudinal': abs(external_focusing_longitudinal),
-              'external_focusing_longitudinal_comment': external_focusing_longitudinal_comment,
+              #'external_focusing_longitudinal_comment': external_focusing_longitudinal_comment,
               'filename_beam': filename_beam,
               'filename_driver': filename_driver,
               'filename_test_particle': filename_test_particle}

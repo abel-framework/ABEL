@@ -226,9 +226,9 @@ class StageHipace(Stage):
         self._make_ramp_profile(tmpfolder)
         
         # set external focusing
-        if self.external_focusing == False:
+        if self.external_focusing_radial == False:
             self._external_focusing_gradient = 0
-        if self.external_focusing == True and self._external_focusing_gradient is None:
+        if self.external_focusing_radial == True and self._external_focusing_gradient is None:
             num_half_oscillations = 1
             self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2
         
