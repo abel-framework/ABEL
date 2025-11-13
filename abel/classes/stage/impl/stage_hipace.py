@@ -683,7 +683,7 @@ class StageHipace(Stage):
             Each element contains the bins used for the slices/histograms in ``waterfalls``.
         """
 
-        from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
+        from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
         
         # find number of beam outputs to plot
         files = sorted(os.listdir(data_dir))
@@ -744,7 +744,8 @@ class StageHipace(Stage):
             Flag for saving the output figure.
         '''
 
-        from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
+        from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
+        from abel.classes.beam import Beam
         from matplotlib import pyplot as plt
         
         files = sorted(os.listdir(data_dir))
