@@ -33,7 +33,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
 
     enable_isr_on_ref_part : bool, optional
         Flag for applying `ISR to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`_.
-        Note that this does not have an effect if 
+        Note that this does not have any effect if 
         :attr:`self.enable_isr <abel.Interstage.enable_isr>` is ``False``. 
         Defaults to ``True``.
 
