@@ -178,6 +178,7 @@ class StageHipace(Stage):
 
         # external focusing (APL-like) [T/m]
         self.external_focusing_radial = external_focusing_radial
+        self._external_focusing_gradient = None
         self.external_focusing_longitudinal = external_focusing_longitudinal
 
         # plasma profile
@@ -316,7 +317,7 @@ class StageHipace(Stage):
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
 
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_radial=self.external_focusing_radial, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking, external_focusing_longitudinal=self.external_focusing_longitudinal, filename_test_particle=filename_test_particle)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_r, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking, external_focusing_longitudinal=self.external_focusing_longitudinal, filename_test_particle=filename_test_particle)
         
         
         ## RUN SIMULATION
