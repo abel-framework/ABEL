@@ -1368,7 +1368,7 @@ class Stage(Trackable, CostModeled):
         Returns
         -------
         None
-            Results are stored in ``self.efficiency``.
+            Results are stored in :attr:`Stage.efficiency <abel.Stage.efficiency>`.
         """
 
         Etot0_beam = beam0.total_energy()
