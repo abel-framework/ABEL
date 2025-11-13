@@ -72,7 +72,12 @@ class StageHipace(Stage):
 
     plasma_density_from_file : str, optional
         Path to plasma density profile file (overrides uniform density). Is 
-        ignored when set to ``None``. Defaults to ``None``.
+        ignored when set to ``None``. Defaults to ``None``. Expected format for 
+        the file:
+
+            - Must be a plain text file.
+            - Each line must contain exactly two whitespace-separated numeric values (SI units):
+              <longitudinal position> <plasma density>
 
     no_plasma : bool, optional
         If ``True``, runs the stage without plasma. Defaults to ``False``.
