@@ -20,32 +20,47 @@ class StageWakeT(Stage):
     simulations using Wake-T. It prepares input files, launches Wake-T runs, 
     extracts beam and plasma diagnostics, and post-processes simulation data.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes
     ----------
-    num_cell_xy : int
-        Number of transverse grid cells in Wake-T.
+    num_cell_xy : int, optional
+        Number of transverse grid cells in Wake-T. Defaults to 256.
 
-    keep_data : bool
-        Flag for whether to keep raw Wake-T output after simulation.
+    output_period : int, optional
+        Number of times along the stage in which the Wake-T diagnostics data 
+        is written to file. If ``None``, ``output_period`` is set to 
+        ``round(stage length/step size/8)``. Defaults to ``None``.
 
-    ion_motion : bool
-        Flag to include ion motion in the plasma.
+    keep_data : bool, optional
+        Flag for whether to keep raw Wake-T output after simulation. Defaults to 
+        ``False``.
 
-    run_path : str
-        Path to store plots and outputs.
+    ion_motion : bool, optional
+        Flag to include ion motion in the plasma. Defaults to ``False``.
+
+    run_path : str, optional
+        Path to store plots and outputs. Defaults to ``None``.
 
     stage_number : int
         Keeps track of which stage it is in the beamline.
-    """
+
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False, run_path=None):
+    Notes
+    -----
+    - The box sizes are set based on beam extent and estimated blowout radius.
+    - The step size is set to matched beta function/8
+    """
+
+    # TODO: allow the user to set the box size and step size.
+    
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, output_period=None, keep_data=False, ion_motion=False, run_path=None):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
         self.num_cell_xy = num_cell_xy
+        self.output_period = output_period
         self.keep_data = keep_data
         
         # physics flags
@@ -72,6 +87,11 @@ class StageWakeT(Stage):
         tmpfolder = CONFIG.temp_path + str(uuid.uuid4()) + os.sep
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
+
+        # make diagnostics folder
+        diag_dir = os.path.join(tmpfolder, 'hdf5')
+        if not os.path.exists(diag_dir):
+            os.mkdir(diag_dir)
 
         # make driver (and convert to WakeT bunch)
         driver0 = self.driver_source.track()
@@ -138,11 +158,13 @@ class StageWakeT(Stage):
 
         else: # Exclude ion motion effects
             wakefield_model='quasistatic_2d'
+        
+        if self.output_period is None:
+            self.output_period = round(self.length/dz/8)
             
-        n_out = round(self.length/dz/8)
         plasma = wake_t.PlasmaStage(length=self.length, density=plasma_profile, wakefield_model=wakefield_model,
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
-                                    n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
+                                    n_out=self.output_period, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
         # do tracking
         bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
@@ -150,13 +172,13 @@ class StageWakeT(Stage):
         
         # save evolution of the beam and driver
         self.__extract_evolution(bunches)
-        self.__extract_initial_and_final_step(tmpfolder)
+        self.__extract_initial_and_final_step(diag_dir)
 
         # delete or move data
-        #if self.keep_data:
-        #    shot_path = runnable.shot_path()  # TODO: this does not work yet
-        #    destination_path = runnable.shot_path() + 'stage_' + str(bunches[1].stage_number) + '/insitu'
-        #    shutil.move(tmpfolder, destination_path)
+        if self.keep_data:
+           destination_path = runnable.shot_path() + 'stage_' + str(self.stage_number)
+           #destination_path = runnable.shot_path() + 'stage_' + str(self.stage_number) + '/insitu'
+           shutil.move(diag_dir, destination_path)
         
         # remove temporary directory
         shutil.rmtree(tmpfolder)
@@ -235,12 +257,11 @@ class StageWakeT(Stage):
 
 
     # ==================================================
-    def __extract_initial_and_final_step(self, tmpfolder):
+    def __extract_initial_and_final_step(self, source_path):
 
         from openpmd_viewer import OpenPMDTimeSeries
         
         # prepare to read simulation data
-        source_path = tmpfolder + 'hdf5/'
         ts = OpenPMDTimeSeries(source_path)
 
         # extract initial on-axis wakefield
@@ -374,7 +395,7 @@ class StageWakeT(Stage):
     
     # ==================================================
     # Apply waterfall function to all beam dump files
-    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', remove_halo_nsigma=None, args=None):
         """
         Applies waterfall function to all Wake-T HDF5 output files in 
         ``data_dir``.
@@ -394,18 +415,17 @@ class StageWakeT(Stage):
             Path to the directory containing all Wake-T HDF5 output files.
 
         species : str, optional
-            Specifies the name of the beam to be extracted.
-
-        clean : bool, optional
-            Determines whether the extracted beams from the Wake-T HDF5 output 
-            files should be cleaned before further processing.
+            Specifies the name of the beam to be extracted. Defaults to 
+            ``'beam'``.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles 
-            based on their deviation from the core of the particle beam.
+            If not ``None``, defines a threshold for identifying and excluding 
+            outlier particles based on their deviation from the core of the 
+            particle beam. Defaults to ``None``.
 
         args : float list, optional
-            Allows passing additional arguments to the functions in ``fcns``.
+            Allows passing additional arguments to the functions in ``fcns``. 
+            Defaults to ``None``.
             
             
         Returns
@@ -424,7 +444,7 @@ class StageWakeT(Stage):
             ``waterfalls``.
         """
 
-        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
+        from abel.wrappers.wake_t.wake_t_wrapper import wake_t_hdf5_load
         
         # find number of beam outputs to plot
         files = sorted(os.listdir(data_dir))
@@ -447,7 +467,7 @@ class StageWakeT(Stage):
             file_path = data_dir + files[index]
             beam = wake_t_hdf5_load(file_path=file_path, species=species)
 
-            if clean:
+            if remove_halo_nsigma is not None and remove_halo_nsigma > 0.0:
                 beam.remove_halo_particles(nsigma=remove_halo_nsigma)
             
             # find beam location
@@ -464,7 +484,7 @@ class StageWakeT(Stage):
 
 
     # ==================================================
-    def extract_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, nsig=5, args=None):
+    def extract_waterfalls(self, data_dir, species='beam', remove_halo_nsigma=None, nsig=5, args=[None, None, None, None]):
         '''
         Extracts data for waterfall plots for current profile, relative energy 
         spectrum, horizontal transverse profile and vertical transverse profile.
@@ -475,22 +495,21 @@ class StageWakeT(Stage):
             Path to the directory containing all Wake-T HDF5 output files.
 
         species : str, optional
-            Specifies the name of the beam to be extracted.
-
-        clean : bool, optional
-            Determines whether the extracted beams from the Wake-T HDF5 output 
-            files should be cleaned before further processing.
+            Specifies the name of the beam to be extracted. Defaults to 
+            ``'beam'``.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles 
-            based on their deviation from the core of the particle beam.
+            If not ``None``, defines a threshold for identifying and excluding 
+            outlier particles based on their deviation from the core of the 
+            particle beam. Defaults to ``None``.
 
         nsig : float, optional
             Helps define the range of the histograms. E.g. the range in x is 
             defined by the beam x offset +- ``nsig`` * x beam size.
 
         args : float list, optional
-            Allows passing additional arguments to the functions in ``fcns``.
+            Allows passing additional arguments to the functions in ``fcns``. 
+            Defaults to ``[None, None, None, None]``.
 
             
         Returns
@@ -509,7 +528,7 @@ class StageWakeT(Stage):
             ``waterfalls``.
         '''
 
-        from abel.apis.wake_t.wake_t_api import wake_t_hdf5_load
+        from abel.wrappers.wake_t.wake_t_wrapper import wake_t_hdf5_load
         
         files = sorted(os.listdir(data_dir))
         file_path = data_dir + files[0]
@@ -524,34 +543,34 @@ class StageWakeT(Stage):
         xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
         
-        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
+        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, remove_halo_nsigma=remove_halo_nsigma, args=args)
 
         return waterfalls, locations, bins
 
 
     # ==================================================
-    def plot_waterfalls(self, waterfalls, locations, bins, save_fig=False):
+    def plot_waterfalls(self, data_dir, species='beam', remove_halo_nsigma=20, save_path=None): # TODO move this to Stage
         '''
-        Makes waterfall plots for current profile, relative energy spectrum, 
+        Create waterfall plots for current profile, relative energy spectrum, 
         horizontal transverse profile and vertical transverse profile.
 
         Parameters
         ----------
-        waterfalls : list of 2D float ndarrays
-            Each element in ``waterfalls`` corresponds to the output of one 
-            function in ``fcns`` applied across all files (i.e., simulation 
-            outputs). The dimension of element i is determined by the length of 
-            edges and the number of simulation outputs.
-        
-        locations : [m] 1D float ndarray
-            Stores the location for each slice of the ``waterfalls``.
-        
-        bins : list of 1D float ndarrays
-            Each element contains the bins used for the slices/histograms in 
-            ``waterfalls``.
+        data_dir : str
+            Path to the directory containing all Wake-T HDF5 output files.
 
-        save_fig : bool, optional
-            Flag for saving the output figure.
+        species : str, optional
+            Specifies the name of the beam to be extracted. Defaults to 
+            ``'beam'``.
+
+        remove_halo_nsigma : float, optional
+            If not ``None``, defines a threshold for identifying and excluding 
+            outlier particles based on their deviation from the core of the 
+            particle beam. Defaults to 20.
+
+        save_path : str, optional
+            If not ``None``, saves the output figure to the specified file path. 
+            Defaults to ``None``.
 
 
         Returns
@@ -560,6 +579,8 @@ class StageWakeT(Stage):
         '''
 
         from matplotlib import pyplot as plt
+
+        waterfalls, locations, bins = self.extract_waterfalls(data_dir, species=species, remove_halo_nsigma=remove_halo_nsigma, nsig=5, args=[None, None, None, None])
 
         # prepare figure
         fig, axs = plt.subplots(4,1)
@@ -599,11 +620,7 @@ class StageWakeT(Stage):
         axs[3].set_xlabel('Location along the stage [m]')
         
         plt.show()
-        if save_fig:
-            plot_path = self.run_path + 'plots' + os.sep
-            if not os.path.exists(plot_path):
-                os.makedirs(plot_path)
-            filename = plot_path + 'waterfalls' + '.png'
-            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
 
+        if save_path is not None:
+            fig.savefig(save_path, format='png', dpi=600, bbox_inches='tight', transparent=False)
             
