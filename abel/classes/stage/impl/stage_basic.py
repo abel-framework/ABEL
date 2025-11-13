@@ -441,7 +441,7 @@ class StageBasic(Stage):
             
         Returns
         -------
-        stage_copy : ``Stage``
+        stage_copy : ``StageBasic``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
