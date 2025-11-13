@@ -130,13 +130,13 @@ class StageWakeT(Stage):
                     raise RuntimeError(
                         f"The installed {package_name} version is {installed_version}. It must be newer than 0.8.0 to support the ion motion wakefield model."
                     )
+                else:
+                    wakefield_model='quasistatic_2d_ion' # Use the Quasistatic2DWakefieldIon wakefield model (https://github.com/Wake-T/Wake-T/blob/dev/wake_t/physics_models/plasma_wakefields/qs_rz_baxevanis_ion/wakefield.py).
                     
             except PackageNotFoundError:
                 print(f"The package '{package_name}' is not installed.")
 
-
-            wakefield_model='quasistatic_2d_ion'  # TODO: This has not yet been implemented with the current Wake-T version (v.0.8.0)
-        else:
+        else: # Exclude ion motion effects
             wakefield_model='quasistatic_2d'
             
         n_out = round(self.length/dz/8)
