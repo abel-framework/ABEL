@@ -45,13 +45,13 @@ class Source(Trackable, CostModeled):
     x_angle, y_angle : [rad] float
         Transverse angular offsets applied to the beam.
 
-    x_pointing_angle, y_pointing_angle : [rad] float, optional
-        The pointing angles of the generated beam. If ``None``, the values for 
-        x_angle and y_angle are used such that the beam axis is aligned to its 
-        propagation direction. Defaults to ``None``.
+    align_beam_axis : bool, optional
+        Flag for aligning the generated beam's axis to its propagation direction 
+        defined by ``x_angle`` and ``y_angle`` (plus angular jitters). Defaults 
+        to ``False``.
 
     norm_jitter_emittance_x, norm_jitter_emittance_y : [m rad] float
-        Used to generate jitter in position and angle by samling from a jitter 
+        Used to generate jitter in position and angle by sampling from a jitter 
         phase space defined by Twiss functions and the given emittance jitter.
 
     waist_shift_x, waist_shift_y : [m] float
@@ -79,7 +79,7 @@ class Source(Trackable, CostModeled):
     #TODO: Why is accel_gradient needed??
     
     @abstractmethod
-    def __init__(self, length=0.0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, x_pointing_angle=None, y_pointing_angle=None, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0.0, waist_shift_y=0.0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
+    def __init__(self, length=0.0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, align_beam_axis=False, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0.0, waist_shift_y=0.0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
 
         super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -93,8 +93,7 @@ class Source(Trackable, CostModeled):
         self.y_offset = y_offset
         self.x_angle = x_angle
         self.y_angle = y_angle
-        self.x_pointing_angle = x_pointing_angle
-        self.y_pointing_angle = y_pointing_angle
+        self.align_beam_axis = align_beam_axis
 
         self.norm_jitter_emittance_x = norm_jitter_emittance_x
         self.norm_jitter_emittance_y = norm_jitter_emittance_y
@@ -165,19 +164,12 @@ class Source(Trackable, CostModeled):
         do_beam_rotation = False
         rotation_angle_x = 0.0
         rotation_angle_y = 0.0
-        if self.x_pointing_angle is None and np.abs(self.x_angle) > 1e-15:
-            self.x_pointing_angle = self.x_angle
-            rotation_angle_x = beam.x_angle()
+
+        if self.align_beam_axis and np.abs(beam.x_angle()) > 1e-15:
+            rotation_angle_x = beam.x_angle()  # Use the generated beam's angle (insterad of the source's angle) to also take account of angular jitter.
             do_beam_rotation = True
-        if self.y_pointing_angle is None and np.abs(self.y_angle) > 1e-15:
-            self.y_pointing_angle = self.y_angle
+        if self.align_beam_axis and np.abs(beam.y_angle()) > 1e-15:
             rotation_angle_y = -beam.y_angle()  # Minus due to right hand rule.
-            do_beam_rotation = True
-        if self.x_pointing_angle is not None:
-            rotation_angle_x = self.x_pointing_angle
-            do_beam_rotation = True
-        if self.y_pointing_angle is not None:
-            rotation_angle_y = -self.y_pointing_angle  # Minus due to right hand rule.
             do_beam_rotation = True
 
         if do_beam_rotation:
@@ -239,7 +231,9 @@ class Source(Trackable, CostModeled):
     def wallplug_power(self):
         if self.rep_rate is not None:
             return self.energy_usage() * self.rep_rate
-    
+
+
+    # ==================================================
     def survey_object(self):
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
@@ -248,8 +242,9 @@ class Source(Trackable, CostModeled):
         label = 'Source'
         color = 'black'
         return x_points, y_points, final_angle, label, color
-        
     
+        
+    # ==================================================
     def print_summary(self):
         """
         Print a summary for the source.
