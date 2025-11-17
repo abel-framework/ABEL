@@ -1468,15 +1468,28 @@ class Stage(Trackable, CostModeled):
         import sys
         machine_zero = sys.float_info.epsilon
 
-        drive_beam_rotated = driver_incoming
-        beam_rotated = beam_incoming
+        # Check if the driver source generates a drive beam alignmed to its propagation direction, which is required by many Stage subclasses
+        driver_source = self.get_driver_source()
+
+        if not driver_source.align_beam_axis:
+            raise ValueError("Currently does not support drive beam axis not aligned with its propagation direction. I.e. driver_source.align_beam_axis must be set to True.")
+        
+
+        print('driver.x_angle(): ', driver_incoming.x_angle(), 'driver.y_angle(): ', driver_incoming.y_angle()) # TODO: delete
+        print('driver.x_tilt_angle(): ', driver_incoming.x_tilt_angle(), 'driver.y_tilt_angle(): ', driver_incoming.y_tilt_angle()) # TODO: delete
+
+        if not np.isclose(driver_incoming.x_angle(), driver_incoming.x_tilt_angle(), rtol=1e-2, atol=0.0) or not np.isclose(driver_incoming.x_angle(), driver_incoming.x_tilt_angle(), rtol=1e-2, atol=0.0):
+            pointing_error_string = 'Drive beam may not have been accurately aligned to its propagation direction.\n' + 'driver_incoming x_angle: ' + str(driver_incoming.x_angle()) + '\ndrive_beam_rotated x_tilt_angle: ' + str(driver_incoming.x_tilt_angle()) + 'driver_incoming y_angle: ' + str(driver_incoming.y_angle()) + '\ndrive_beam_rotated y_tilt_angle: ' + str(driver_incoming.y_tilt_angle())
+            warnings.warn(pointing_error_string)
 
         # Check if the driver source of the stage has angular offset
-        driver_source = self.get_driver_source()
         has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
 
         # Perform rotation if there is angular offset
         if has_angular_offset:
+
+            drive_beam_rotated = driver_incoming
+            beam_rotated = beam_incoming
 
             driver_x_angle = driver_incoming.x_angle()
             driver_y_angle = driver_incoming.y_angle()
@@ -1487,9 +1500,6 @@ class Stage(Trackable, CostModeled):
             # Calculate the angles that will be used to rotate the beams' frame
             rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
             rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
-
-            # The model currently does not support drive beam tilt not aligned with beam propagation, so need to first ensure that the drive beam is aligned to its own propagation direction. This is done using active transformation to rotate the beam around x- and y-axis
-            drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
 
             # Use passive transformation to rotate the frame of the beams
             drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
