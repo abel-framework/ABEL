@@ -1473,14 +1473,6 @@ class Stage(Trackable, CostModeled):
 
         if not driver_source.align_beam_axis:
             raise ValueError("Currently does not support drive beam axis not aligned with its propagation direction. I.e. driver_source.align_beam_axis must be set to True.")
-        
-
-        print('driver.x_angle(): ', driver_incoming.x_angle(), 'driver.y_angle(): ', driver_incoming.y_angle()) # TODO: delete
-        print('driver.x_tilt_angle(): ', driver_incoming.x_tilt_angle(), 'driver.y_tilt_angle(): ', driver_incoming.y_tilt_angle()) # TODO: delete
-
-        if not np.isclose(driver_incoming.x_angle(), driver_incoming.x_tilt_angle(), rtol=1e-2, atol=0.0) or not np.isclose(driver_incoming.x_angle(), driver_incoming.x_tilt_angle(), rtol=1e-2, atol=0.0):
-            pointing_error_string = 'Drive beam may not have been accurately aligned to its propagation direction.\n' + 'driver_incoming x_angle: ' + str(driver_incoming.x_angle()) + '\ndrive_beam_rotated x_tilt_angle: ' + str(driver_incoming.x_tilt_angle()) + 'driver_incoming y_angle: ' + str(driver_incoming.y_angle()) + '\ndrive_beam_rotated y_tilt_angle: ' + str(driver_incoming.y_tilt_angle())
-            warnings.warn(pointing_error_string)
 
         # Check if the driver source of the stage has angular offset
         has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
