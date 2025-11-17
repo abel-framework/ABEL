@@ -521,7 +521,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
     
     def track(self, beam0, savedepth=0, runnable=None, verbose=False, plot=False):
 
-        from abel.apis.impactx.impactx_api import run_impactx
+        from abel.wrappers.impactx.impactx_wrapper import run_impactx
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_R56, evolve_second_order_dispersion
 
         # Get lattice
