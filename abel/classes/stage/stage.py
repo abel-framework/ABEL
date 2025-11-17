@@ -1478,10 +1478,10 @@ class Stage(Trackable, CostModeled):
         has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
 
         # Perform rotation if there is angular offset
+        drive_beam_rotated = driver_incoming
+        beam_rotated = beam_incoming
+        
         if has_angular_offset:
-
-            drive_beam_rotated = driver_incoming
-            beam_rotated = beam_incoming
 
             driver_x_angle = driver_incoming.x_angle()
             driver_y_angle = driver_incoming.y_angle()
