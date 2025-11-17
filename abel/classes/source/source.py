@@ -12,6 +12,7 @@ import numpy as np
 import scipy.constants as SI
 from abel.utilities.beam_physics import generate_trace_space
 from abel.utilities.relativity import energy2gamma
+import warnings
 
 class Source(Trackable, CostModeled):
     """
@@ -174,6 +175,10 @@ class Source(Trackable, CostModeled):
 
         if do_beam_rotation:
             beam.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+
+            if not np.isclose(beam.x_angle(), beam.x_tilt_angle(), rtol=1e-2, atol=0.0) or not np.isclose(beam.y_angle(), beam.y_tilt_angle(), rtol=1e-2, atol=0.0):
+                pointing_error_string = 'The beam may not have been accurately aligned to its propagation direction.\n' + 'beam x_angle: ' + str(beam.x_angle()) + '\nbeam x_tilt_angle: ' + str(beam.x_tilt_angle()) + 'beam y_angle: ' + str(beam.y_angle()) + '\nbeam y_tilt_angle: ' + str(beam.y_tilt_angle())
+                warnings.warn(pointing_error_string)
 
         # set metadata
         beam.location = 0
