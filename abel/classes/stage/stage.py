@@ -8,7 +8,7 @@ from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
-from abel.classes.source.impl.source_capsule import Source
+from abel.classes.source.source import Source
 from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import copy, warnings
