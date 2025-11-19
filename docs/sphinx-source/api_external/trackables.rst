@@ -49,6 +49,28 @@ Trackable elements
 ``Interstage``
 ---------------------
 .. autoclass:: abel.Interstage
+ :members:
+
+.. autoclass:: abel.InterstagePlasmaLens
+ :members:
+
+.. autoclass:: abel.InterstagePlasmaLensBasic
+ :members:
+
+.. autoclass:: abel.InterstagePlasmaLensElegant
+ :members:
+
+.. autoclass:: abel.InterstagePlasmaLensImpactX
+ :members:
+
+.. autoclass:: abel.InterstageQuads
+ :members:
+
+.. autoclass:: abel.InterstageQuadsBasic
+ :members:
+
+.. autoclass:: abel.InterstageQuadsImpactX
+ :members:
 
 ``RFAccelerator``
 ---------------------

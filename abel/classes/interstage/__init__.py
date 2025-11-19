@@ -12,6 +12,79 @@ import numpy as np
 import scipy.constants as SI
 
 class Interstage(Trackable, CostModeled):
+    """
+    Abstract base class representing an interstage section between two 
+    accelerator stages. The interstage lattice consists of a bending dipole, a 
+    nonlinear plasma lens (or quadrupoles), two chicane dipoles, a sextupole and 
+    the mentioned elements repeated in the opposite order to form a symmetric 
+    lattice. This is designed to provide achromatic staging [1]_ and to apply 
+    the self-correction effect [2]_ to the beam.
+    
+    Defines common physical parameters and attributes, as well as methods such 
+    as optics matching, beam evolution and optics layout visualization.
+
+
+    Attributes
+    ----------
+    nom_energy : [eV] float
+        Nominal beam energy at the entrance of the interstage. Default set to 
+        ``None``, usually set by :meth:`Linac.track`.
+
+    beta0 : [m] float or callable
+        Initial beta function at the entrance of the interstage. If callable, it 
+        is evaluated as ``beta0(nom_energy)``.
+
+    length_dipole : [m] float or callable
+        Magnetic length of each bending dipole. If callable, it is evaluated as 
+        ``length_dipole(nom_energy)``.
+
+    field_dipole : [T] float or callable
+        Magnetic field of the bending dipoles. If callable, it is evaluated as 
+        ``field_dipole(nom_energy)``.
+
+    R56 : [m] float or callable
+        Longitudinal dispersion term, relating relative momentum deviation to 
+        path length difference. If callable, it is evaluated as 
+        ``R56(nom_energy)``. Defaults to 0.
+
+    charge_sign : int
+        Particle charge sign: -1 for electrons, +1 for positrons or protons. 
+        Defaults to -1.
+
+    cancel_chromaticity : bool
+        Whether to automatically match and cancel first-order chromatic effects.
+        Defaults to ``True``.
+
+    cancel_sec_order_dispersion : bool
+        Whether to match and cancel second-order dispersion. Defaults to 
+        ``False``.
+
+    use_apertures : bool
+        If ``True``, applies aperture clipping to the beam distribution.
+        Defaults to ``True``.
+
+    enable_csr : bool
+        Enables coherent synchrotron adiation (CSR) modeling during tracking.
+        Defaults to ``True``.
+
+    enable_isr : bool
+        Enables incoherent synchrotron radiation (ISR) modeling during tracking.
+        Defaults to ``True``.
+
+    enable_space_charge : bool
+        Enables space charge effects. Defaults to ``False``.
+
+    uses_plasma_lenses : bool
+        Indicates whether the interstage contains plasma lenses instead of magnetic 
+        quadrupoles. Defaults to ``None`` to let the value be set by the subclasses 
+        :class:`InterstagePlasmaLens` and :class:`InterstageQuads`.
+
+    References
+    ----------
+    .. [1] TODO: Add the interstage manuscript when available.
+
+    .. [2] C. A. Lindstrøm, "Self-correcting longitudinal phase space in a multistage plasma accelerator", ArXiv (2021), https://arxiv.org/abs/2104.14460
+    """
     
     @abstractmethod
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, charge_sign=-1,
@@ -57,6 +130,9 @@ class Interstage(Trackable, CostModeled):
 
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
+        """
+        Track the input beam through the interstage lattice. Abstract method.
+        """
         return super().track(beam, savedepth, runnable, verbose)
     
     
@@ -135,6 +211,20 @@ class Interstage(Trackable, CostModeled):
     ## MATCHING
     
     def match(self):
+        """
+        Perform matching of key optical functions within the interstage.
+
+        This combines matching of beta functions, first-order dispersion and R56.
+        Can also optionally match chromatic amplitude and second order 
+        dispersion depending on :attr:`Interstage.cancel_chromaticity` and 
+        :attr:`Interstage.cancel_sec_order_dispersion`.
+
+        Returns
+        -------
+        None
+            Updates the internal lattice configuration in place.
+        """
+
         "Combined matching the beta function, first- and second-order dispersion and the R56"
         self.match_beta_function()
         self.match_dispersion_and_R56()
@@ -163,6 +253,9 @@ class Interstage(Trackable, CostModeled):
     ## PLOTTING
     
     def plot_evolution(self):
+        """
+        Plot the evolution of various beam parameters inside the interstage.
+        """
 
         from matplotlib import pyplot as plt
         
@@ -253,6 +346,9 @@ class Interstage(Trackable, CostModeled):
     ## PLOTTING OPTICS
 
     def plot_optics(self, show_beta_function=True, show_dispersion=True, show_R56=True, show_chromaticity=True, add_no_central_sextupole=False, add_no_chrom_correction=False, savefig=None):
+        """
+        Plot the beta function, dispersion, R56 and chromaticity along the interstage.
+        """
 
         from matplotlib import pyplot as plt
         from matplotlib import patches
@@ -559,6 +655,15 @@ class Interstage(Trackable, CostModeled):
     ## SURVEY PLOTS
     
     def total_bend_angle(self):
+        """
+        Compute the total bending angle of the interstage lattice.
+
+        Returns
+        -------
+        final_angle : [rad] float
+            Net angular deflection of the reference trajectory through the 
+            interstage.
+        """
         ls, inv_rhos, ks, ms, taus = self.matrix_lattice(orbit_only=True)
         from abel.utilities.beam_physics import evolve_orbit
         final_angle, _ = evolve_orbit(ls, inv_rhos, theta0=0)
@@ -581,6 +686,16 @@ class Interstage(Trackable, CostModeled):
     ## COST MODEL
     
     def get_cost_breakdown(self):
+        """
+        Compute the estimated cost of the interstage section based on its length.
+
+        Returns
+        -------
+        Tuple 
+            Containing:
+                - Name of the cost component (``'Interstage'``)
+                - Total estimated cost.
+        """
         return ('Interstage', self.get_length() * CostModeled.cost_per_length_interstage)
 
     
