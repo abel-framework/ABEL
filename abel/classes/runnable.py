@@ -166,6 +166,7 @@ class Runnable(ABC):
     
     # generate track path
     def shot_path(self, shot=None):
+        "Generate a path for a directory to store the data of a shot."
         if shot is None:
             shot = self.shot
         if self.is_scan(): # if a scan
