@@ -165,6 +165,29 @@ class Trackable(ABC):
     #=========================================#
     
     def track(self, beam : Beam, savedepth : int = 0, runnable : Runnable | None = None, verbose : bool = False):
+        """
+        Track the beam...
+
+        Parameters
+        ----------
+        beam : ``Beam``
+            ``Beam`` object to be tracked through the interstage.
+        
+        savedepth : int, optional
+            Level of detail for saving intermediate beam evolution data. 
+            Higher values store more data but increase memory usage. Defaults to 0.
+        
+        runnable : ``Runnable``, optional
+            ...
+        
+        verbose : bool, optional
+            If `True`, prints detailed tracking information to console. Defaults to ``False``.
+
+        Returns
+        -------
+        beam : ``Beam``
+            ``Beam`` object after being propagated through the interstage.
+        """
         
         # remove nan particles
         beam.remove_nans()
