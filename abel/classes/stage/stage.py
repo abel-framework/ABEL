@@ -1348,8 +1348,7 @@ class Stage(Trackable, CostModeled):
         - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
         - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
         - ``driver_to_beam``: Overall efficiency from driver to beam (product of the above).  
-        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over 
-        the repetition rate if available.
+        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over the repetition rate if available.
 
         Parameters
         ----------
@@ -2089,11 +2088,11 @@ class Stage(Trackable, CostModeled):
         
         # make figures
         has_final_step = self.final is not None \
-            and hasattr(self.final, 'plasma.density.extent') \
-            and hasattr(self.final, 'plasma.wakefield.onaxis.zs') \
-            and hasattr(self.final, 'plasma.wakefield.onaxis.Ezs') \
-            and hasattr(self.final, 'plasma.density.rho') \
-            and hasattr(self.final, 'beam.density.rho')
+            and hasattr(self.final.plasma.density, 'extent') \
+            and hasattr(self.final.plasma.wakefield.onaxis, 'zs') \
+            and hasattr(self.final.plasma.wakefield.onaxis, 'Ezs') \
+            and hasattr(self.final.plasma.density, 'rho') \
+            and hasattr(self.final.beam.density, 'rho')
 
         num_plots = 1 + int(has_final_step)
         fig, ax = plt.subplots(num_plots,1)
