@@ -34,12 +34,16 @@ class IonMotionConfig():
         
         Parameters
         ----------
-        drive_beam : ABEL ``Beam`` object
-            Drive beam.
+        drive_beam : ``Beam``
+            Drive beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the drive beam in ion motion 
+            wakefield perturbation calculations.
 
-        main_beam : ABEL ``Beam`` object
-            Main beam.
-        
+        main_beam : ``Beam``
+            Main beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the main beam in ion motion 
+            wakefield perturbation calculations.
+            
         plasma_ion_density : [m^-3] float
             Plasma ion density.
         
@@ -168,11 +172,15 @@ class IonMotionConfig():
 
         Parameters
         ----------
-        drive_beam : ABEL ``Beam`` object
-            Drive beam.
+        drive_beam : ``Beam``
+            Drive beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the drive beam in ion motion 
+            wakefield perturbation calculations.
 
-        main_beam : ABEL ``Beam`` object
-            Main beam.
+        main_beam : ``Beam``
+            Main beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the main beam in ion motion 
+            wakefield perturbation calculations.
 
         set_driver_sc_coords : bool, optional
             Sets the xy limits used by 
