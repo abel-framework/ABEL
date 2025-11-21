@@ -9,8 +9,8 @@ import numpy as np
 
 defaultUnitE = 'eV'
 
+
 # =============================================
-# convert Lorentz beta to Lorentz gamma
 def beta2gamma(beta):
     """
     Convert Lorentz beta to Lorentz factor.
@@ -19,7 +19,6 @@ def beta2gamma(beta):
 
 
 # =============================================
-# convert Lorentz beta to velocity
 def beta2velocity(beta):
     """
     Convert Lorentz beta to velocity [m/s].
@@ -28,7 +27,6 @@ def beta2velocity(beta):
 
 
 # =============================================
-# convert Lorentz beta to kinetic energy [eV]
 def beta2energy(beta, unitE=defaultUnitE):
     """
     Convert Lorentz beta to kinetic energy.
@@ -52,44 +50,39 @@ def beta2energy(beta, unitE=defaultUnitE):
 
 
 # =============================================
-# convert Lorentz gamma to Lorentz beta
 def gamma2beta(gamma):
     """
-    Convert Lorentz gamma to Lorentz beta.
+    Convert Lorentz factor to Lorentz beta.
     """
     return np.sign(gamma) * np.sqrt(1-1/gamma**2)
 
 
 # =============================================
-# convert Lorentz gamma to velocity
 def gamma2velocity(gamma):
     """
-    Convert Lorentz gamma to velocity [m/s].
+    Convert Lorentz factor to velocity [m/s].
     """
     return beta2velocity(gamma2beta(gamma))
 
 
 # =============================================
-# convert Lorentz gamma to proper velocity
 def gamma2proper_velocity(gamma):
     """
-    Convert Lorentz gamma to proper velocity [m/s].
+    Convert Lorentz factor to proper velocity [m/s].
     """
     return abs(gamma) * gamma2velocity(gamma)
 
 
 # =============================================
-# convert Lorentz gamma to momentum [kg m/s]
 def gamma2momentum(gamma, m=SI.m_e):
     """
-    Convert Lorentz gamma to momentum [kg m/s].
+    Convert Lorentz factor to momentum [kg m/s].
     """
     p = m * gamma2proper_velocity(gamma)
     return p
 
 
 # =============================================
-# convert Lorentz gamma to kinetic energy
 def gamma2energy(gamma, unit=defaultUnitE, m=SI.m_e):
     """
     Convert Lorentz factor to kinetic energy.
@@ -118,7 +111,6 @@ def gamma2energy(gamma, unit=defaultUnitE, m=SI.m_e):
 
 
 # =============================================
-# convert velocity to Lorentz beta
 def velocity2beta(v):
     """
     Convert velocity [m/s] to Lorentz beta.
@@ -127,7 +119,6 @@ def velocity2beta(v):
 
 
 # =============================================
-# convert velocity [m/s] to Lorentz gamma
 def velocity2gamma(v):
     """
     Convert velocity [m/s] to Lorentz factor.
@@ -136,7 +127,6 @@ def velocity2gamma(v):
 
 
 # =============================================
-# convert proper velocity to Lorentz gamma
 def proper_velocity2gamma(u):
     """
     Convert proper velocity [m/s] to Lorentz factor.
@@ -145,7 +135,6 @@ def proper_velocity2gamma(u):
 
 
 # =============================================
-# convert proper velocity to momentum [kg m/s]
 # def proper_velocity2momentum(u):
 #     return gamma2momentum(proper_velocity2gamma(u))
 def proper_velocity2momentum(u, m=SI.m_e):
@@ -169,7 +158,6 @@ def proper_velocity2momentum(u, m=SI.m_e):
 
 
 # =============================================
-# convert proper velocity to energy
 def proper_velocity2energy(u, unit=defaultUnitE, m=SI.m_e):
     """
     Convert proper velocity to energy.
@@ -195,7 +183,6 @@ def proper_velocity2energy(u, unit=defaultUnitE, m=SI.m_e):
 
 
 # =============================================
-# convert momentum [kg m/s] to Lorentz gamma
 def momentum2gamma(p, m=SI.m_e):
     """
     Convert momentum to Lorentz factor.
@@ -217,7 +204,6 @@ def momentum2gamma(p, m=SI.m_e):
 
 
 # =============================================
-# convert momentum [kg m/s] to proper velocity
 def momentum2proper_velocity(p, m=SI.m_e):
     """
     Convert momentum to proper velocity.
@@ -239,7 +225,6 @@ def momentum2proper_velocity(p, m=SI.m_e):
 
 
 # =============================================
-# convert momentum [kg m/s] to energy [eV]
 def momentum2energy(p):
     """
     Convert momentum [kg m/s] to energy [eV].
@@ -248,7 +233,6 @@ def momentum2energy(p):
 
 
 # =============================================
-# convert kinetic energy [eV] to Lorentz beta
 def energy2beta(E, unit=defaultUnitE):
     """
     Convert particle energy to Lorentz beta.
@@ -271,7 +255,6 @@ def energy2beta(E, unit=defaultUnitE):
 
 
 # =============================================
-# convert kinetic energy [eV] to Lorentz gamma
 def energy2gamma(E, unit=defaultUnitE, m=SI.m_e):
     """
     Convert particle energy to Lorentz factor.
@@ -299,7 +282,6 @@ def energy2gamma(E, unit=defaultUnitE, m=SI.m_e):
 
 
 # =============================================
-# convert energy to proper velocity
 def energy2proper_velocity(E, unit=defaultUnitE, m=SI.m_e):
     """
     Convert energy to proper velocity.
