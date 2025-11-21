@@ -6,7 +6,8 @@
 
 import numpy as np
 
-# generate trace space from geometric emittance and twiss parameters
+
+# =============================================
 def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
     """
     Generate a 2D transverse trace space defined by geometric emittance 
@@ -31,7 +32,7 @@ def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
 
     symmetrize : bool, optional
         If ``True``, generate only ``N/2`` unique samples and then mirror them
-        symmetrically in phase space. Defaults to ``False``.
+        symmetrically in phase space (zero mean). Defaults to ``False``.
 
 
     Returns
@@ -67,7 +68,7 @@ def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
     return xs, xps
 
 
-# generate trace space from geometric emittance and twiss parameters (2 planes)
+# =============================================
 def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, L=0, symmetrize=False):
     """
     Generate transverse trace-space samples in both x- and y-planes.
@@ -165,13 +166,13 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
     return xs, xps, ys, yps
 
 
-# generate trace space from geometric emittance and twiss parameters for a beam symmetrised in 6D
+# =============================================
 def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, bunch_length, energy_spread, L=0):
     """
     Generate a fully symmetrized 6D trace-space particle distribution.
 
-    This function constructs a Gaussian beam distribution with zero first
-    moments in all six phase-space dimensions (x, x', y, y', z, E). The
+    This function constructs a Gaussian beam distribution symmetrised around 
+    zero in all six phase-space dimensions (x, x', y, y', z, E). The 
     distribution is defined by the geometric emittances, Twiss parameters,
     bunch length, and relative energy spread. Optional canonical angular
     momentum ``L`` introduces correlated x–y coupling.
@@ -274,9 +275,12 @@ def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y,
     
     return xs, xps, ys, yps, zs, Es
 
-    
-# general focusing transfer matrix (quadrupole and drift)
+
+# =============================================
 def Rmat(l, k=0, plasmalens=True):
+    """
+    General focusing transfer matrix (quadrupole and drift)
+    """
     import warnings
     warnings.filterwarnings("ignore")
     
@@ -309,8 +313,11 @@ def Rmat(l, k=0, plasmalens=True):
                           [0,0,-np.sin(np.sqrt(-k)*l)*np.sqrt(-k),np.cos(np.sqrt(-k)*l)]])
 
 
-# general dispersion transfer matrix (dipole, quadrupole and drift)
+# =============================================
 def Dmat(l, inv_rho=0, k=0):
+    """
+    General dispersion transfer matrix (dipole, quadrupole and drift)
+    """
     R = Rmat(l,k)
     if inv_rho == 0:
         return np.matrix([[R[0,0], R[0,1], 0],
@@ -322,7 +329,7 @@ def Dmat(l, inv_rho=0, k=0):
                           [0, 0, 1]])
     
     
-
+# =============================================
 def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False):
     """
     Evolution of the beta function.
@@ -377,6 +384,7 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
     return beta, alpha, evolution
 
 
+# =============================================
 def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
     """
     Numerically compute the evolution of the first-order transverse dispersion 
@@ -466,6 +474,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
     return Dx, Dpx, evolution
 
 
+# =============================================
 def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=False):
     """
     Numerically compute the evolution of second- and higher-order horizontal 
@@ -632,6 +641,7 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
     return DDx, DDpx, evolution
 
 
+# =============================================
 def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False, evolution_disp=None):
     """
     Evolution of longitudinal dispersion, R56.
@@ -694,8 +704,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res
     return R56, evolution
 
 
-
-
+# =============================================
 def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
     """
     Evolution of the beam orbit (i.e., the top view).
@@ -748,6 +757,7 @@ def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
     return theta, evolution
 
 
+# =============================================
 def evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, plot=False):
     """
     Evolution of the curly H function (i.e., single-particle emittance of the dispersion).
@@ -784,6 +794,7 @@ def evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, plot=False):
     return curlyH, evolution
 
 
+# =============================================
 def evolve_I2(ls, inv_rhos, fast=False, plot=False):
     """
     Evolution of the second synchrotron radiation integral I_2.
@@ -822,6 +833,7 @@ def evolve_I2(ls, inv_rhos, fast=False, plot=False):
     return I2, evolution
 
 
+# =============================================
 def evolve_I3(ls, inv_rhos, fast=False, plot=False):
     """
     Evolution of the third synchrotron radiation integral I_3.
@@ -860,6 +872,7 @@ def evolve_I3(ls, inv_rhos, fast=False, plot=False):
     return I3, evolution
 
 
+# =============================================
 def evolve_I4(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False):
     """
     Evolution of the fourth synchrotron radiation integral I_4.
@@ -920,6 +933,7 @@ def evolve_I4(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False):
     return I4, evolution
 
 
+# =============================================
 def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False):
     """
     Evolution of the fifth synchrotron radiation integral I_5.
@@ -977,6 +991,7 @@ def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot
     return I5, evolution
 
 
+# =============================================
 def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False, bending_plane=True):
     """
     Evolution of the first-order chromatic amplitude W.
