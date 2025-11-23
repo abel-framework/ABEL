@@ -1324,6 +1324,40 @@ class Stage(Trackable, CostModeled):
     
 
     # ==================================================
+    def length_num_beta_osc(self, num_beta_osc, initial_energy):
+        """
+        Calculate the stage length required for the main beam to undergo 
+        ``num_beta_osc`` betatron oscillations.
+
+        Parameters
+        ----------
+        num_beta_osc : int
+            ...
+
+        initial_energy : [eV] float
+            ...
+
+            
+        Returns
+        -------
+        length : [m] float
+            ...
+        """
+
+        from abel.utilities.plasma_physics import k_p
+
+        if not isinstance(num_beta_osc, int) or num_beta_osc < 0:
+            raise ValueError('Number of input betatron oscillations must be a positive integer.')
+
+        phase_advance = num_beta_osc * 2*np.pi
+        phase_advance_factor = phase_advance / k_p(self.plasma_density) * np.sqrt(2/(SI.m_e*SI.c**2))
+
+        length = (phase_advance_factor/2)**2 * SI.e*self.nom_accel_gradient_flattop + np.sqrt(initial_energy*SI.e) * phase_advance_factor
+
+        return length
+    
+
+    # ==================================================
     def energy_usage(self):
         return self.driver_source.energy_usage()
     
