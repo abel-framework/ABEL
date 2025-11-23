@@ -1324,17 +1324,20 @@ class Stage(Trackable, CostModeled):
     
 
     # ==================================================
-    def length_num_beta_osc(self, num_beta_osc, initial_energy):
+    def length_num_beta_osc(self, num_beta_osc, initial_energy, nom_accel_gradient, q=SI.e, m=SI.m_e):
         """
-        Calculate the stage length required for the main beam to undergo 
-        ``num_beta_osc`` betatron oscillations.
+        Calculate the stage length that gives ``num_beta_osc`` betatron 
+        oscillations for a particle with given energy.
 
         Parameters
         ----------
-        num_beta_osc : int
+        num_beta_osc : float
             ...
 
         initial_energy : [eV] float
+            ...
+
+        nom_accel_gradient : [V/m] float
             ...
 
             
@@ -1346,15 +1349,48 @@ class Stage(Trackable, CostModeled):
 
         from abel.utilities.plasma_physics import k_p
 
-        if not isinstance(num_beta_osc, int) or num_beta_osc < 0:
-            raise ValueError('Number of input betatron oscillations must be a positive integer.')
+        if num_beta_osc < 0:
+            raise ValueError('Number of input betatron oscillations must be positive.')
 
         phase_advance = num_beta_osc * 2*np.pi
-        phase_advance_factor = phase_advance / k_p(self.plasma_density) * np.sqrt(2/(SI.m_e*SI.c**2))
+        phase_advance_factor = phase_advance / k_p(self.plasma_density) * np.sqrt(2/(m*SI.c**2))
 
-        length = (phase_advance_factor/2)**2 * SI.e*self.nom_accel_gradient_flattop + np.sqrt(initial_energy*SI.e) * phase_advance_factor
+        length = (phase_advance_factor/2)**2 * q*nom_accel_gradient + np.sqrt(initial_energy*q) * phase_advance_factor
 
         return length
+    
+
+    # ==================================================
+    def length2num_beta_osc(self, length, initial_energy, nom_accel_gradient, q=SI.e, m=SI.m_e):
+        """
+        Calculate the number of betatron oscillations a particle can undergo in 
+        the stage.
+
+        Parameters
+        ----------
+        length : [m] float
+            ...
+
+        initial_energy : [eV] float
+            ...
+
+        nom_accel_gradient : [V/m] float
+            ...
+
+            
+        Returns
+        -------
+        length : [m] float
+            ...
+        """
+
+        from abel.utilities.plasma_physics import k_p
+
+        integral = 2*np.sqrt(initial_energy*q + q*nom_accel_gradient*length)/(q*nom_accel_gradient) - 2*np.sqrt(initial_energy*q)/(q*nom_accel_gradient)
+
+        num_beta_osc = k_p(self.plasma_density)*np.sqrt(m*SI.c**2/2) * integral/(2*np.pi)
+
+        return num_beta_osc
     
 
     # ==================================================
