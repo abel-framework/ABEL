@@ -1324,7 +1324,16 @@ class Stage(Trackable, CostModeled):
     
 
     # ==================================================
-    def length_num_beta_osc(self, num_beta_osc, initial_energy, nom_accel_gradient, q=SI.e, m=SI.m_e):
+    # def set_flattop_length(self, num_beta_osc, initial_energy):
+    #     """
+        
+    #     """
+        
+    #     flattop_num_beta_osc = self.calc_flattop_num_beta_osc(num_beta_osc, initial_energy)
+
+
+    # ==================================================
+    def match_length2num_beta_osc(self, num_beta_osc, initial_energy, nom_accel_gradient, q=SI.e, m=SI.m_e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given energy.
@@ -1360,6 +1369,94 @@ class Stage(Trackable, CostModeled):
         return length
     
 
+    # ==================================================
+    def calc_flattop_num_beta_osc(self, num_beta_osc):
+        """
+        If the stage has uniform ramps, calculates the number of betatron 
+        oscillations that the are performed in the main flattop by subtracting 
+        the contributions from the ramps.
+
+        The contributions from the ramps are calculated from the phase advances 
+        in the ramps as L_ramp/beta_matched_ramp.
+
+        - If the stage does have ramps that have not been fully set up, a 
+        deepcopy of the stage is created to set up its ramps using 
+        :func:`Stage._prepare_ramps() <abel.Stage._prepare_ramps>`. Subse
+
+        - If the stage does not have ramps, will simply return the input total 
+        number of betatron oscillations ``num_beta_osc``.
+
+        
+        Parameters
+        ----------
+        num_beta_osc : float
+            Total number of desired betatron oscillations that the main beam 
+            should perform through the whole plasma stage including ramps.
+
+            
+        Returns
+        -------
+        float
+            The number of betatron oscillations the main beam should undergo in 
+            the flattop stage after the contributions from the ramps (if 
+            applicable) have been subtracted from ``num_beta_osc``.
+        """
+
+        if num_beta_osc < 0:
+            raise ValueError('Number of input betatron oscillations must be positive.')
+
+        if not self.has_ramp():
+            return num_beta_osc
+        
+        # Make a copy of the stage and set up its ramps if they are not set yp
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+
+        # Calculate the upramp length and matched beta function
+        if stage_copy.upramp is not None:
+            # if self.upramp.length is None:
+            #     upramp_length = beta_matched(self.plasma_density, initial_energy)*np.pi/(2*np.sqrt(1/self.upramp.ramp_beta_mag))
+            # else:
+            #     upramp_length = self.upramp.length
+            
+            upramp_length = stage_copy.upramp.length
+            upramp_beta = beta_matched(stage_copy.plasma_density, self.nom_energy)*stage_copy.upramp.ramp_beta_mag
+            upramp_phase_advance = upramp_length/upramp_beta
+        else:
+            upramp_phase_advance = 0.0
+        
+        # Calculate the downramp length and matched beta function
+        if stage_copy.nom_energy_gain_flattop is None:
+            raise ValueError('Stage.nom_energy_gain_flattop not set.')
+        else:
+            downramp_input_energy = self.nom_energy+stage_copy.nom_energy_gain_flattop
+
+        if stage_copy.downramp is not None:
+            # if self.downramp.length is None:
+            #     downramp_length = beta_matched(self.plasma_density, downramp_input_energy)*np.pi/(2*np.sqrt(1/self.downramp.ramp_beta_mag))
+            # else:
+            #     downramp_length = self.downramp.length
+
+            downramp_length = stage_copy.downramp.length
+            downramp_beta = beta_matched(stage_copy.plasma_density, downramp_input_energy)*stage_copy.downramp.ramp_beta_mag
+            downramp_phase_advance = downramp_length/downramp_beta
+        else:
+            downramp_phase_advance = 0.0
+
+        # Calculate the phase advance in the flattop stage
+        tot_phase_advance = num_beta_osc * 2*np.pi
+        flattop_phase_advance = tot_phase_advance - upramp_phase_advance - downramp_phase_advance
+
+        return flattop_phase_advance/(2*np.pi)
+        
+    
     # ==================================================
     def length2num_beta_osc(self, length, initial_energy, nom_accel_gradient, q=SI.e, m=SI.m_e):
         """
