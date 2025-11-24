@@ -1333,36 +1333,61 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def match_length2num_beta_osc(self, num_beta_osc, initial_energy, nom_accel_gradient, q=SI.e, m=SI.m_e):
+    def match_length2num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e, m=SI.m_e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
-        oscillations for a particle with given energy.
+        oscillations for a particle with given initial energy ``initial_energy`` 
+        in a uniform plasma stage (excluding ramps) with nominal acceleration 
+        gradient ``nom_accel_gradient`` and plasma density ``plasma_density``.
 
         Parameters
         ----------
         num_beta_osc : float
-            ...
+            Total number of design betatron oscillations that the electron 
+            should perform through the plasma stage excluding ramps. 
 
-        initial_energy : [eV] float
-            ...
+        initial_energy : [eV] float, optional
+            The initial energy of the particle at the start of the plasma stage. 
+            Defaults to ``self.nom_energy``.
 
-        nom_accel_gradient : [V/m] float
-            ...
+        nom_accel_gradient : [V/m] float, optional
+            Nominal accelerating gradient of the plasma stage exclusing ramps. 
+            Defaults to ``self.nom_accel_gradient_flattop``.
+
+        plasma_density : [m^-3] float, optional
+            The plasma density of the plasma stage. Defaults to 
+            ``self.plasma_density``.
+
+        q : [C] float, optional
+            Particle charge. Defaults to elementary charge.
+
+        m : [kg] float, optional
+            Particle mass. Defaults to electron mass.
 
             
         Returns
         -------
         length : [m] float
-            ...
+            Length of the plasma stage excluding ramps matched to the given 
+            number of betatron oscillations.
         """
 
         from abel.utilities.plasma_physics import k_p
+
+        if initial_energy is None:
+            initial_energy = self.nom_energy
+
+        if nom_accel_gradient is None:
+            nom_accel_gradient = self.nom_accel_gradient_flattop
+
+        if plasma_density is None:
+            plasma_density = self.plasma_density
 
         if num_beta_osc < 0:
             raise ValueError('Number of input betatron oscillations must be positive.')
 
         phase_advance = num_beta_osc * 2*np.pi
-        phase_advance_factor = phase_advance / k_p(self.plasma_density) * np.sqrt(2/(m*SI.c**2))
+        phase_advance_factor = phase_advance / k_p(plasma_density) * np.sqrt(2/(m*SI.c**2))
 
         length = (phase_advance_factor/2)**2 * q*nom_accel_gradient + np.sqrt(initial_energy*q) * phase_advance_factor
 
@@ -1459,18 +1484,16 @@ class Stage(Trackable, CostModeled):
         ----------
         length_flattop : [m] float, optional
             Length of a plasma stage excluding ramps that the particle can 
-            perform betatron 
-            oscillations in. Defaults to 
+            perform betatron scillations in. Defaults to 
             ``self.length_flattop``.
 
         initial_energy : [eV] float, optional
             The initial energy of the particle at the start of the plasma stage. 
-            Defaults to 
-            ``self.plasma_density``.
+            Defaults to ``self.nom_energy``.
 
         nom_accel_gradient_flattop : [V/m] float, optional
-            Nominal accelerating gradient of the plasma stage exclusing ramps. Defaults to 
-            ``self.plasma_density``.
+            Nominal accelerating gradient of the plasma stage exclusing ramps. 
+            Defaults to ``self.nom_accel_gradient_flattop``.
 
         plasma_density : [m^-3] float, optional
             The plasma density of the plasma stage. Defaults to 
