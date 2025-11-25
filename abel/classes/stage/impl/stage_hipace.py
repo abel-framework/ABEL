@@ -543,16 +543,17 @@ class StageHipace(Stage):
         """Prepare the ramps (local to HiPACE)."""
         
         # If there is already a density file open and make the plasma profile
-        try:
-            data = np.loadtxt(self.plasma_density_from_file, comments='#')
-            ss, ns = data[:, 0], data[:, 1]
-            self.plasma_profile.ss = ss
-            self.plasma_profile.ns = ns
-            return
-        except OSError:
-            raise FileNotFoundError(f"Plasma profile file '{self.plasma_density_from_file}' cannot be located or opened using given path.") from None # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
-        except ValueError:
-            raise ValueError(f"Plasma profile file '{self.plasma_density_from_file}' must contain two numeric values (SI units) in the order <longitudinal position> <plasma density> per line.") # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
+        if self.plasma_density_from_file is not None:
+            try:
+                data = np.loadtxt(self.plasma_density_from_file, comments='#')
+                ss, ns = data[:, 0], data[:, 1]
+                self.plasma_profile.ss = ss
+                self.plasma_profile.ns = ns
+                return
+            except OSError:
+                raise FileNotFoundError(f"Plasma profile file '{self.plasma_density_from_file}' cannot be located or opened using given path.") from None # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
+            except ValueError:
+                raise ValueError(f"Plasma profile file '{self.plasma_density_from_file}' must contain two numeric values (SI units) in the order <longitudinal position> <plasma density> per line.") from None # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
 
         # make the plasma ramp profile
         if self.has_ramp():
