@@ -1516,12 +1516,18 @@ class Stage(Trackable, CostModeled):
         from abel.utilities.plasma_physics import k_p
 
         if length_flattop is None:
+            if self.length_flattop is None:
+                raise ValueError('Stage.length_flattop not set.')
             length_flattop = self.length_flattop
 
         if initial_energy is None:
+            if self.nom_energy is None:
+                raise ValueError('Stage.nom_energy not set.')
             initial_energy = self.nom_energy
 
         if nom_accel_gradient_flattop is None:
+            if self.nom_accel_gradient_flattop is None:
+                raise ValueError('Stage.nom_accel_gradient_flattop not set.')
             nom_accel_gradient_flattop = self.nom_accel_gradient_flattop
 
         if plasma_density is None:
