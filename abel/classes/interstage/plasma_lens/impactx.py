@@ -135,10 +135,8 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
 
         # add lens offset for ISR mitigation
         if self.enable_isr and self.cancel_isr_kicks:
-            #self._isr_on_ref_part = True
             dx_isr = self.lens_offset_isr_kick_mitigation()
         else:
-            #self._isr_on_ref_part = False
             dx_isr = 0
             
         # define plasma lens
