@@ -584,7 +584,7 @@ class StageWakeT(Stage):
 
 
         Returns
-        ----------
+        -------
         ``None``
         '''
 

@@ -8,7 +8,7 @@ from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
-from abel.classes.source.impl.source_capsule import Source
+from abel.classes.source.source import Source
 from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import copy, warnings
@@ -69,26 +69,26 @@ class Stage(Trackable, CostModeled):
     nom_energy_flattop : [eV] float
         Nominal energy at the start of the plasma stage, excluding any ramps.
 
-    efficiency : ``SimpleNamespace``
+    efficiency : :class:`types.SimpleNamespace`
         Contains efficiency metrics:
-        - driver_to_wake : fraction of driver energy transferred to the wakefield.
-        - wake_to_beam : fraction of wakefield energy transferred to beam.
-        - driver_to_beam : overall energy transfer efficiency.
-        - dumped_power : remaining driver power.
+            - driver_to_wake : fraction of driver energy transferred to the wakefield.
+            - wake_to_beam : fraction of wakefield energy transferred to beam.
+            - driver_to_beam : overall energy transfer efficiency.
+            - dumped_power : remaining driver power.
 
-    evolution : ``SimpleNamespace``
+    evolution : :class:`types.SimpleNamespace`
         Contains the beam parameter evolution across the stage.
 
-    initial : ``SimpleNamespace``
+    initial : :class:`types.SimpleNamespace`
         Initial state of the stage including beam, driver, and plasma 
         quantities.
 
-    final : ``SimpleNamespace``
+    final : :class:`types.SimpleNamespace`
         Final state of the stage after tracking. Includes beam, driver, and 
         plasma quantities.
 
     name : str
-        Name of the stage, default is 'Plasma stage'.
+        Name of the stage, default is ``'Plasma stage'``.
     """
 
     
@@ -187,7 +187,7 @@ class Stage(Trackable, CostModeled):
         associated driver complex of the stage.
 
         Returns
-        ----------
+        -------
         driver_source : ``Source``
         """
     
@@ -277,7 +277,7 @@ class Stage(Trackable, CostModeled):
         preset parameters.
             
         Returns
-        ----------
+        -------
         stage_copy : ``Stage``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
@@ -365,7 +365,7 @@ class Stage(Trackable, CostModeled):
 
 
         Returns
-        ----------
+        -------
         trackable_ramp : ``Stage``
             A uniform ramp that can be used for tracking.
         """
@@ -573,6 +573,7 @@ class Stage(Trackable, CostModeled):
             Print tracking information.
 
         Returns
+        -------
             Beam (modified)
         """
         beam.stage_number += 1
@@ -1285,7 +1286,7 @@ class Stage(Trackable, CostModeled):
             Default set to ``True``.
             
         Returns
-        ----------
+        -------
         beta_function : [m], float
             The matched beta function.
         '''
@@ -1314,7 +1315,7 @@ class Stage(Trackable, CostModeled):
             The energy used for matching.
             
         Returns
-        ----------
+        -------
         beta_function : [m], float
             The matched beta function.
         '''
@@ -1366,8 +1367,8 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
-            Results are stored in ``self.efficiency``.
+        None
+            Results are stored in :attr:`Stage.efficiency <abel.Stage.efficiency>`.
         """
 
         Etot0_beam = beam0.total_energy()
@@ -1410,7 +1411,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
+        None
             Results are stored in ``self.initial.beam.current`` and, if provided, 
             ``self.final.beam.current`` with attributes:
             - ``zs`` : longitudinal positions [m]  
@@ -1454,7 +1455,7 @@ class Stage(Trackable, CostModeled):
 
 
         Returns
-        ----------
+        -------
         drive_beam_rotated : ``Beam``
             Rotated drive beam. Returns the input ``driver_incoming`` if the 
             driver source of the stage does not have neither angular jitter nor 
@@ -1534,7 +1535,7 @@ class Stage(Trackable, CostModeled):
 
 
         Returns
-        ----------
+        -------
         driver_outgoing : ``Beam``
             Drive beam rotated back to its original coordinate system before the 
             stage. Returns the input ``driver_outgoing`` if the driver source of 
@@ -1681,7 +1682,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
+        None
         """
 
         from matplotlib import pyplot as plt
@@ -1834,7 +1835,7 @@ class Stage(Trackable, CostModeled):
 
         Returns
         -------
-        ``None``
+        None
         """
 
         from matplotlib import pyplot as plt
@@ -2053,8 +2054,8 @@ class Stage(Trackable, CostModeled):
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
 
-        Other parameters
-        ----------------
+        Parameters
+        ----------
         aspect : str
             The aspect ratio of the plots.
             Defaults to 'equal' which is also the matplotlib default; can also 
@@ -2068,8 +2069,8 @@ class Stage(Trackable, CostModeled):
             Defaults to None
 
 
-        Returns:
-        --------
+        Returns
+        -------
         None
         """
 
