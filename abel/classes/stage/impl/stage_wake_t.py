@@ -115,8 +115,28 @@ class StageWakeT(Stage):
 
         # select the wakefield model (ion motion or not)
         if self.ion_motion:
-            wakefield_model='quasistatic_2d_ion'
-        else:
+
+            # Check the version number of Wake-T in order to see if it supports the ion motion wakefield model
+            from importlib.metadata import version, PackageNotFoundError
+            from packaging import version as pkg_version
+
+            package_name = "wake_t"
+
+            try:
+                installed_version = version(package_name)
+                
+                # Compare version numbers ensuring the installed version is newer than 0.8.0.
+                if pkg_version.parse(installed_version) <= pkg_version.parse("0.8.0"):
+                    raise RuntimeError(
+                        f"The installed {package_name} version is {installed_version}. It must be newer than 0.8.0 to support the ion motion wakefield model."
+                    )
+                else:
+                    wakefield_model='quasistatic_2d_ion' # Use the Quasistatic2DWakefieldIon wakefield model (https://github.com/Wake-T/Wake-T/blob/dev/wake_t/physics_models/plasma_wakefields/qs_rz_baxevanis_ion/wakefield.py).
+                    
+            except PackageNotFoundError:
+                print(f"The package '{package_name}' is not installed.")
+
+        else: # Exclude ion motion effects
             wakefield_model='quasistatic_2d'
             
         n_out = round(self.length/dz/8)
@@ -351,12 +371,6 @@ class StageWakeT(Stage):
     def energy_usage(self):
         return None # TODO
 
-
-    # ================================================== TODO: remove this in a separate PR in order to always use the parent's matched_beta_function().
-    def matched_beta_function(self, energy):
-        from abel.utilities.plasma_physics import beta_matched
-        return beta_matched(self.plasma_density, energy) * self.ramp_beta_mag
-
     
     # ==================================================
     # Apply waterfall function to all beam dump files
@@ -541,7 +555,7 @@ class StageWakeT(Stage):
 
 
         Returns
-        ----------
+        -------
         ``None``
         '''
 

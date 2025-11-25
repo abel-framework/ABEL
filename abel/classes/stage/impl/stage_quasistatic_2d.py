@@ -18,19 +18,21 @@ class StageQuasistatic2d(Stage):
     drive beam macro particles using a longitudinal field calculated using a 
     short Wake-T simulation.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes
     ----------
-    enable_radiation_reaction : bool
-        Flag for enabling radiation reaction effects.
+    enable_radiation_reaction : bool, optional
+        Flag for enabling radiation reaction effects. Defaults to ``False``.
 
-    probe_evolution : bool
-        Flag for storing the beam parameter evolution data.
+    probe_evolution : bool, optional
+        Flag for storing the beam parameter evolution data. Defaults to 
+        ``False``.
 
-    store_beams_for_tests : bool
-        Flag for storing intermediate beam states for testing.
+    store_beams_for_tests : bool, optional
+        Flag for storing intermediate beam states for testing. Defaults to 
+        ``False``.
 
     stage_number : int
         Keeps track of which stage it is in the beamline.
