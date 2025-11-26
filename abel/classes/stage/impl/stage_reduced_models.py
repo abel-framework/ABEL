@@ -672,6 +672,11 @@ class StageReducedModels(Stage):
             upramp = self.convert_PlasmaRamp(self.upramp)
             if type(upramp) is not StageReducedModels:
                 raise TypeError('upramp is not a StageReducedModels.')
+            
+            # Set a new time step for the ramp
+            n_steps = 25  # Do n_steps time steps in the tracking of the ramp
+            lambda_beta = upramp.matched_beta_function_flattop(beam0_energy) * 2*np.pi  # [m], betatron wavelength
+            upramp.time_step_mod = min(upramp.length_flattop / (lambda_beta*n_steps), 0.02)  # Step size in in units of betatron wavelength, equivalent to time step size in units of betatron wavelength/c.
 
         elif type(self.upramp) is Stage:
             upramp = self.upramp  # Allow for other types of ramps
@@ -764,8 +769,14 @@ class StageReducedModels(Stage):
         if type(self.downramp) is PlasmaRamp:
 
             downramp = self.convert_PlasmaRamp(self.downramp)
+
             if type(downramp) is not StageReducedModels:
                 raise TypeError('downramp is not a StageReducedModels.')
+            
+            # Set a new time step for the ramp
+            n_steps = 25  # Do n_steps time steps in the tracking of the ramp
+            lambda_beta = downramp.matched_beta_function_flattop(beam0_energy) * 2*np.pi  # [m], betatron wavelength
+            downramp.time_step_mod = min(downramp.length_flattop / (lambda_beta*n_steps), 0.02)  # Step size in in units of betatron wavelength, equivalent to time step size in units of betatron wavelength/c.
             
         elif type(self.downramp) is Stage:
             downramp = self.downramp  # Allow for other types of ramps
@@ -840,7 +851,7 @@ class StageReducedModels(Stage):
 
         stage_copy = super().copy_config2blank_stage()
 
-        # Additional configurations 
+        # Additional configurations
         stage_copy.probe_evol_period = probe_evol_period
         stage_copy.driver_source = None
         stage_copy.make_animations = False  # Currently does not support animations in ramps, as they get overwritten.
