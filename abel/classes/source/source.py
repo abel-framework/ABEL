@@ -74,7 +74,7 @@ class Source(Trackable, CostModeled):
     #TODO: Why is accel_gradient needed??
     
     @abstractmethod
-    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
+    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None, spin_polarization=0.0, spin_polarization_direction='z'):
 
         super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -83,6 +83,9 @@ class Source(Trackable, CostModeled):
         self.charge = charge
         self.accel_gradient = accel_gradient
         self.wallplug_efficiency = wallplug_efficiency
+
+        self.spin_polarization = spin_polarization
+        self.spin_polarization_direction = spin_polarization_direction
         
         self.x_offset = x_offset
         self.y_offset = y_offset
@@ -104,10 +107,7 @@ class Source(Trackable, CostModeled):
         self.jitter.yp = 0
         self.jitter.E = 0
 
-        self.spin_polarization = 0
-        self.spin_polarization_direction = 'z'
-
-        self.is_polarized = False #TODO shouldn't this rather be a function that checks whether spin_polarization > 0?
+        self.is_polarized = False # TODO write a function instead to check this.
     
     
     @abstractmethod
