@@ -1435,6 +1435,9 @@ class Stage(Trackable, CostModeled):
         if not self.has_ramp():
             return num_beta_osc
         
+        if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
+            raise ValueError('This method assumes uniform ramps.')
+
         # Make a copy of the stage and set up its ramps if they are not set yp
         ramps_not_set_up = (
             (self.upramp is not None and self.upramp.length is None) or
