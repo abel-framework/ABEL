@@ -1,22 +1,27 @@
-#Generated using `pip freeze` in a new python 3.13.9 / Linux x86_64 venv,
-# installing sphix and sphinx_rtd_theme with pip,
-# and testing the build by running
-# `sphinx-build -M html "sphinx-source" "sphinx-build"`
-# in the docs folder (equivalent to `make html`)
-
 alabaster==1.0.0
 babel==2.17.0
 certifi==2025.11.12
 charset-normalizer==3.4.4
+contourpy==1.3.3
+cycler==0.12.1
 docutils==0.21.2
+fonttools==4.60.1
 idna==3.11
 imagesize==1.4.1
 Jinja2==3.1.6
+kiwisolver==1.4.9
 MarkupSafe==3.0.3
+matplotlib==3.10.7
+numpy==2.3.5
 packaging==25.0
+pillow==12.0.0
 Pygments==2.19.2
+pyparsing==3.2.5
+python-dateutil==2.9.0.post0
 requests==2.32.5
 roman-numerals-py==3.1.0
+scipy==1.16.3
+six==1.17.0
 snowballstemmer==3.0.1
 Sphinx==8.2.3
 sphinx-rtd-theme==3.0.2
