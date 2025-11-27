@@ -118,7 +118,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     """
 
     if output_period is None:
-        output_period = int(num_steps)
+        output_period = int(num_steps/2)
         
     # locate template file
     filename_input_template = os.path.join(os.path.dirname(__file__), 'input_template')
