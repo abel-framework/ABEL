@@ -1321,19 +1321,10 @@ class Stage(Trackable, CostModeled):
         '''
 
         return beta_matched(self.plasma_density, energy)
-    
-
-    # ==================================================
-    # def set_flattop_length(self, num_beta_osc, initial_energy):
-    #     """
-        
-    #     """
-        
-    #     flattop_num_beta_osc = self.calc_flattop_num_beta_osc(num_beta_osc, initial_energy)
 
 
     # ==================================================
-    def match_length2num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e, m=SI.m_e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e, m=SI.m_e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
@@ -1437,9 +1428,6 @@ class Stage(Trackable, CostModeled):
         
         if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
             raise ValueError('This method assumes uniform ramps.')
-        
-        from abel.utilities.beam_physics import evolve_beta_function
-        from abel.utilities.beam_physics import phase_advance
 
         # Make a copy of the stage and set up its ramps if they are not set yp
         ramps_not_set_up = (
@@ -1461,8 +1449,6 @@ class Stage(Trackable, CostModeled):
         # Calculate the downramp length and matched beta function
         if stage_copy.nom_energy_gain_flattop is None:
             raise ValueError('Stage.nom_energy_gain_flattop not set.')
-        # else:
-        #     downramp_input_energy = self.nom_energy+stage_copy.nom_energy_gain_flattop
 
         # Calculate the downramp length and phase advance
         if stage_copy.downramp is not None:
