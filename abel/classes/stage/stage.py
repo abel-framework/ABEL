@@ -1389,7 +1389,7 @@ class Stage(Trackable, CostModeled):
         phase_advance = num_beta_osc * 2*np.pi
         phase_advance_factor = phase_advance / k_p(plasma_density) * np.sqrt(2/(m*SI.c**2))
 
-        length = (phase_advance_factor/2)**2 * q*nom_accel_gradient + np.sqrt(initial_energy*q) * phase_advance_factor
+        length = (phase_advance_factor/2)**2 * q*nom_accel_gradient + np.sqrt(initial_energy*SI.e) * phase_advance_factor
 
         return length
     
