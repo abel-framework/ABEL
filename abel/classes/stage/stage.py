@@ -1321,19 +1321,10 @@ class Stage(Trackable, CostModeled):
         '''
 
         return beta_matched(self.plasma_density, energy)
-    
-
-    # ==================================================
-    # def set_flattop_length(self, num_beta_osc, initial_energy):
-    #     """
-        
-    #     """
-        
-    #     flattop_num_beta_osc = self.calc_flattop_num_beta_osc(num_beta_osc, initial_energy)
 
 
     # ==================================================
-    def match_length2num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e, m=SI.m_e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e, m=SI.m_e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
@@ -1389,7 +1380,7 @@ class Stage(Trackable, CostModeled):
         phase_advance = num_beta_osc * 2*np.pi
         phase_advance_factor = phase_advance / k_p(plasma_density) * np.sqrt(2/(m*SI.c**2))
 
-        length = (phase_advance_factor/2)**2 * q*nom_accel_gradient + np.sqrt(initial_energy*q) * phase_advance_factor
+        length = (phase_advance_factor/2)**2 * q*nom_accel_gradient + np.sqrt(initial_energy*SI.e) * phase_advance_factor
 
         return length
     
@@ -1435,6 +1426,9 @@ class Stage(Trackable, CostModeled):
         if not self.has_ramp():
             return num_beta_osc
         
+        if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
+            raise ValueError('This method assumes uniform ramps.')
+
         # Make a copy of the stage and set up its ramps if they are not set yp
         ramps_not_set_up = (
             (self.upramp is not None and self.upramp.length is None) or
@@ -1446,24 +1440,19 @@ class Stage(Trackable, CostModeled):
         else: 
             stage_copy = self
 
-        # Calculate the upramp length and matched beta function
+        # Calculate the upramp length and phase advance
         if stage_copy.upramp is not None:
-            upramp_length = stage_copy.upramp.length
-            upramp_beta = beta_matched(stage_copy.plasma_density, self.nom_energy)*stage_copy.upramp.ramp_beta_mag
-            upramp_phase_advance = upramp_length/upramp_beta
+            upramp_phase_advance = stage_copy.upramp.phase_advance_beta_evolution()
         else:
             upramp_phase_advance = 0.0
         
         # Calculate the downramp length and matched beta function
         if stage_copy.nom_energy_gain_flattop is None:
             raise ValueError('Stage.nom_energy_gain_flattop not set.')
-        else:
-            downramp_input_energy = self.nom_energy+stage_copy.nom_energy_gain_flattop
 
+        # Calculate the downramp length and phase advance
         if stage_copy.downramp is not None:
-            downramp_length = stage_copy.downramp.length
-            downramp_beta = beta_matched(stage_copy.plasma_density, downramp_input_energy)*stage_copy.downramp.ramp_beta_mag
-            downramp_phase_advance = downramp_length/downramp_beta
+            downramp_phase_advance = stage_copy.downramp.phase_advance_beta_evolution()
         else:
             downramp_phase_advance = 0.0
 
@@ -1475,7 +1464,7 @@ class Stage(Trackable, CostModeled):
         
     
     # ==================================================
-    def flattop_length2num_beta_osc(self, length_flattop=None, initial_energy=None, nom_accel_gradient_flattop=None, plasma_density=None, q=SI.e, m=SI.m_e):
+    def length_flattop2num_beta_osc(self, length_flattop=None, initial_energy=None, nom_accel_gradient_flattop=None, plasma_density=None, q=SI.e, m=SI.m_e):
         """
         Calculate the number of betatron oscillations a particle can undergo in 
         the stage (excluding ramps).
@@ -1534,11 +1523,7 @@ class Stage(Trackable, CostModeled):
             plasma_density = self.plasma_density
 
         if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
-            if self.parent is not None:
-                beta = beta_matched(self.parent.plasma_density, initial_energy)*self.ramp_beta_mag
-            else:
-                beta = self.matched_beta_function(initial_energy)
-            num_beta_osc = length_flattop/beta/(2*np.pi)
+            return self.phase_advance_beta_evolution()/(2*np.pi)
         else:
             integral = 2*np.sqrt(initial_energy*q + q*nom_accel_gradient_flattop*length_flattop)/(q*nom_accel_gradient_flattop) - 2*np.sqrt(initial_energy*q)/(q*nom_accel_gradient_flattop)
 
@@ -1546,6 +1531,49 @@ class Stage(Trackable, CostModeled):
 
         return num_beta_osc
     
+    
+    # ==================================================
+    def phase_advance_beta_evolution(self, beta0=None):
+        """
+        Calculate the phase advance in a stage by evolving the beta function 
+        through a single element lattice set up using the stage's focusing 
+        strength and length. The evolved beta function is then integrated along 
+        the stage.
+
+        Parameters
+        ----------
+        beta0 : [m] float
+            The initial beta function at the start of the stage. If ``None``, 
+            will calculate the matched beta function for the flattop stage and 
+            scale it according the the ramp's ramp_beta_mag if ``self`` is a 
+            ramp.
+
+            
+        Returns
+        -------
+        float
+            The phase advance calculated by integrating the beta function 
+            evolution through the stage.
+        """
+
+        from abel.utilities.beam_physics import evolve_beta_function
+        from abel.utilities.beam_physics import phase_advance
+        
+        g_ion = SI.e*self.plasma_density/(2*SI.epsilon_0)
+        p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
+        if beta0 is None:
+            if self.is_upramp():
+                beta0 = self.matched_beta_function(self.nom_energy, match_entrance=True)
+            elif self.is_downramp():
+                beta0 = beta_matched(self.parent.plasma_density, self.nom_energy)
+            else:
+                beta0 = beta_matched(self.plasma_density, self.nom_energy)
+
+        ls = np.array([self.length_flattop])
+        ks = np.array([g_ion*SI.e/SI.c/p0])
+        _, _, beta_evolution = evolve_beta_function(ls=ls, ks=ks, beta0=beta0, fast=False, plot=False)
+        return phase_advance(beta_evolution[0,:], beta_evolution[1,:])
+
 
     # ==================================================
     def energy_usage(self):
