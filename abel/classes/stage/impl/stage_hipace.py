@@ -582,8 +582,18 @@ class StageHipace(Stage):
     def _make_ramp_profile(self, tmpfolder):
         """Prepare the ramps (local to HiPACE)."""
         
-        # check that there is not already a plasma density profile set
-        assert self.plasma_density_from_file is None
+        # If there is already a density file open and make the plasma profile
+        if self.plasma_density_from_file is not None:
+            try:
+                data = np.loadtxt(self.plasma_density_from_file, comments='#')
+                ss, ns = data[:, 0], data[:, 1]
+                self.plasma_profile.ss = ss
+                self.plasma_profile.ns = ns
+                return
+            except OSError:
+                raise FileNotFoundError(f"Plasma profile file '{self.plasma_density_from_file}' cannot be located or opened using given path.") from None # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
+            except ValueError:
+                raise ValueError(f"Plasma profile file '{self.plasma_density_from_file}' must contain two numeric values (SI units) in the order <longitudinal position> <plasma density> per line.") from None # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
 
         # make the plasma ramp profile
         if self.has_ramp():
@@ -602,7 +612,6 @@ class StageHipace(Stage):
             ss = np.concatenate((ss_upramp, ss_flattop, ss_downramp), axis=0)
             ns = np.concatenate((ns_upramp, ns_flattop, ns_downramp), axis=0)
 
-            # save to file
             self.plasma_profile.ss = ss
             self.plasma_profile.ns = ns
             
