@@ -1,6 +1,9 @@
 name: Unix
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-unix
