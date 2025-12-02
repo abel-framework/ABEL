@@ -3,7 +3,7 @@ name: Unix
 on: [push, pull_request]
 
 concurrency:
-  group: unix-${{ github.workflow }}-${{ github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,8 +19,7 @@ jobs:
     - uses: actions/setup-python@v6
       name: Install Python
       with:
-        python-version: "3.12.11"
-        #python-version-file: "pyproject.toml"
+        python-version-file: "pyproject.toml"
 
     - name: Install uv
       uses: astral-sh/setup-uv@v6
