@@ -38,4 +38,4 @@ jobs:
       run: python -m pytest -v tests/test_init.py::testCore_init || true
 
     - name: Run Unit Tests
-      run: python -m pytest tests/
+      run: python -m pytest -v tests/
