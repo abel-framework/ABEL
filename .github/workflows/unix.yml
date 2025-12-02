@@ -6,7 +6,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.ref }}-${{ github.head_ref }}-unix
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,4 +40,4 @@ jobs:
       run: python -m pytest -v tests/test_init.py::testCore_init || true
 
     - name: Run Unit Tests
-      run: python -m pytest tests/
+      run: python -m pytest -v tests/
