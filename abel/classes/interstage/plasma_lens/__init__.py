@@ -142,12 +142,16 @@ class InterstagePlasmaLens(Interstage, ABC):
     @property
     def strength_plasma_lens(self) -> float:
         """
-        Effective focusing strength of the plasma lens.
+        Effective integrated focusing strength of the plasma lens (equivalent to 
+        gql/(cp), where g [V/m^2] is the gradient of the focusing fields, q is 
+        the particle charge, l is th length of the lens, c is the speed of 
+        light in vacuum and p [kg m/s] is the nominal particle momentum).
+
 
         Returns
         -------
         strength_plasma_lens : [1/m] float
-            Focusing strength k = 1/f of the plasma lens, matched via 
+            Effective integrated focusing strength of the plasma lens, matched via 
             :meth:`InterstagePlasmaLens.match_beta_function`.
         """
         if self._strength_plasma_lens is None:
@@ -264,7 +268,10 @@ class InterstagePlasmaLens(Interstage, ABC):
         Parameters
         ----------
         k_lens : [m^-2] float, optional
-            Effective focusing strength of the plasma lens. Defaults to 
+            Effective focusing strength of the plasma lens (equivalent to 
+            gq/(cp), where g [V/m^2] is the gradient of the focusing fields, q 
+            is the particle charge, c is the speed of light in vacuum and 
+            p [kg m/s] is the nominal particle momentum). Defaults to 
             :attr:`InterstagePlasmaLens.strength_plasma_lens` / :attr:`InterstagePlasmaLens.length_plasma_lens`.
 
         tau_lens : [m^-1] float, optional
@@ -301,7 +308,10 @@ class InterstagePlasmaLens(Interstage, ABC):
             Inverse bending radii.
 
         ks : [m^-2] 1D float ndarray
-            Plasma lens focusing strengths.
+            Plasma lens focusing strengths equivalent to gq/(cp), where 
+            g [V/m^2] is the gradient of the focusing fields, q is the 
+            particle charge, c is the speed of light in vacuum and p [kg m/s] 
+            is the nominal particle momentum.
 
         ms : [m^-3] 1D float ndarray
             Sextupole strengths.
