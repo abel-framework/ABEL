@@ -31,12 +31,18 @@ class InterstageQuadsImpactX(InterstageQuads):
         If ``True``, inserts ImpactX ``BeamMonitor`` in the lattice for 
         recording intermediate beam states. Defaults to ``False``.
 
+    enable_isr_on_ref_part : bool, optional
+        Flag for applying `ISR to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`__.
+        Note that this does not have any effect if 
+        :attr:`self.enable_isr <abel.Interstage.enable_isr>` is ``False``. 
+        Defaults to ``True``.
+
     References
     ----------
     .. [1] ImpactX documentation: https://impactx.readthedocs.io/en/latest/
     """
     
-    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False):
+    def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True, enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, enable_isr_on_ref_part=True):
         
         super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56,
                          cancel_chromaticity=cancel_chromaticity, cancel_sec_order_dispersion=cancel_sec_order_dispersion,
@@ -45,8 +51,10 @@ class InterstageQuadsImpactX(InterstageQuads):
         # simulation options
         self.num_slices = num_slices
         self.use_monitors = use_monitors
+        self.isr_on_ref_part = enable_isr_on_ref_part
 
     
+    # ==================================================
     def track(self, beam0, savedepth=0, runnable=None, verbose=False):
         "Track quad-based interstage using ImpactX."
         
@@ -59,11 +67,37 @@ class InterstageQuadsImpactX(InterstageQuads):
         # run ImpactX
         from abel.wrappers.impactx.impactx_wrapper import run_impactx
         beam, self.evolution = run_impactx(lattice, beam0, nom_energy=self.nom_energy, verbose=False, runnable=runnable, save_beams=self.use_monitors, 
-                                           space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr)
+                                           space_charge=self.enable_space_charge, csr=self.enable_csr, isr=self.enable_isr, isr_on_ref_part=self.isr_on_ref_part)
         
         return super().track(beam, savedepth, runnable, verbose)
+    
 
-        
+    # ==================================================
+    @property
+    def isr_on_ref_part(self) -> bool | None:
+        """
+        Whether `ISR will be applied to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`__.
+        to cause the reference particle to lose energy due to radiation. This 
+        should be activated when the lattice optics, magnet settings, etc. 
+        are chosen to account for radiative energy loss. This can prevent beam 
+        centroid kicks.
+
+        Only ``True`` if 
+        :attr:`self.enable_isr <abel.Interstage.enable_isr>` and 
+        :attr:`self.enable_isr_on_ref_part <abel.InterstageQuadsImpactX.enable_isr_on_ref_part>` 
+        are ``True``. 
+        """
+        return self._isr_on_ref_part
+    @isr_on_ref_part.setter
+    def isr_on_ref_part(self, enable_isr_on_ref_part : bool | None):
+        if self.enable_isr and enable_isr_on_ref_part:
+            self._isr_on_ref_part = True
+        else:
+            self._isr_on_ref_part = False
+    _isr_on_ref_part = None
+
+    
+    # ==================================================
     def get_impactx_lattice(self):
         "Set up the ImpactX  quad-based interstage lattice."
 
