@@ -704,7 +704,7 @@ class StageHipace(Stage):
                 stage_copy._prepare_ramps()
             else: 
                 stage_copy = self
-                
+
             self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=1)  # [T/m]
     _external_focusing = False
 
@@ -729,10 +729,10 @@ class StageHipace(Stage):
     # =============================================
     def driver_guiding_orbit(self, driver, dacc_gradient=0.0, num_steps_per_half_osc=100):
         """
-        Estimate the orbit in one dimension that the drive beam will follow 
-        when driver guiding with an external linear azimuthal magnetic field is 
-        applied to a drive beam with an initial angular offset. The calculations 
-        are done by integrating simplified equations of motion.
+        Estimate the orbit that the drive beam will follow when driver guiding 
+        with an external linear azimuthal magnetic field is applied to a drive 
+        beam with an initial angular offset. The calculations  are done by 
+        integrating simplified equations of motion.
         """
 
         from abel.utilities.relativity import energy2momentum
@@ -764,10 +764,13 @@ class StageHipace(Stage):
 
         prop_length = 0
         s_orbit = np.array([0.0])
-        #x = driver.x_offset()
+        x0 = driver.x_offset()
+        x_orbit = np.array([x0])  # [m], records the orbit
+        x = x0
         y0 = driver.y_offset()
         y_orbit = np.array([y0])  # [m], records the orbit
         y = y0
+        px = weighted_mean(driver.pxs(), driver.weightings(), clean=False)
         py = weighted_mean(driver.pys(), driver.weightings(), clean=False)
         pz = pz0 # Can add option for deceleration using a gradient
 
@@ -775,22 +778,27 @@ class StageHipace(Stage):
 
             # Drift
             prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
             y = y + py/pz*1/2*ds
 
             # Kick
+            dpx = q*g*x*ds
+            px = px + dpx
             dpy = q*g*y*ds
             py = py + dpy
             pz = pz0 + q * dacc_gradient * prop_length/SI.c # dacc_gradient>0
 
             # Drift
             prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
             y = y + py/pz*1/2*ds
             s_orbit = np.append(s_orbit, prop_length)
+            x_orbit = np.append(x_orbit, x)
             y_orbit = np.append(y_orbit, y)
 
         s_orbit = s_orbit + driver.z_offset()
 
-        return s_orbit, y_orbit
+        return s_orbit, x_orbit, y_orbit
 
 
 
