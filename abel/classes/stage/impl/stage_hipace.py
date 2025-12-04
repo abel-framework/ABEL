@@ -679,33 +679,6 @@ class StageHipace(Stage):
             #ss = density_table[:,0]
             return ss.max()-ss.min()
         return super().get_length()
-    
-
-    # # =============================================
-    # @property
-    # def external_focusing_gradient(self):
-    #     return self._external_focusing_gradient
-    # @external_focusing_gradient.setter
-    # def external_focusing_gradient(self, gradient : float | None, num_half_oscillations=1):
-    #     if self.external_focusing and gradient is None:
-    #         #if self.get_length() is None:
-
-    #         # Make a copy of the stage and set up its ramps if they are not set yp
-    #         ramps_not_set_up = (
-    #             (self.upramp is not None and self.upramp.length is None) or
-    #             (self.downramp is not None and self.downramp.length is None)
-    #         )
-    #         if ramps_not_set_up:
-    #             stage_copy = copy.deepcopy(self)
-    #             stage_copy._prepare_ramps()
-    #         else: 
-    #             stage_copy = self
-
-    #         self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=num_half_oscillations)  # [T/m]
-
-    #     elif self.external_focusing and gradient is not None:
-    #         self._external_focusing_gradient = gradient
-    # _external_focusing_gradient = None
 
 
     # =============================================
@@ -731,9 +704,8 @@ class StageHipace(Stage):
                 stage_copy._prepare_ramps()
             else: 
                 stage_copy = self
-
+                
             self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=1)  # [T/m]
-
     _external_focusing = False
 
 
