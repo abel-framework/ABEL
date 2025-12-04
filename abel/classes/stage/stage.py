@@ -2130,9 +2130,12 @@ class Stage(Trackable, CostModeled):
             if i==0:
                 data_struct = self.initial
                 title = 'Initial step'
-            elif i==1:
+            elif i==1 & has_middle_step == True:
                 data_struct = self.middle
                 title = 'Middle step'
+            elif i==1 & has_final_step == True:
+                data_struct = self.final
+                title = 'Final step'
             elif i==2:
                 data_struct = self.final
                 title = 'Final step'

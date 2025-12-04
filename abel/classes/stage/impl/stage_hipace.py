@@ -515,35 +515,37 @@ class StageHipace(Stage):
         self.final.plasma.wakefield.onaxis.zs = metadata.z
         self.final.plasma.wakefield.onaxis.Ezs = Ez
 
-        # extract middle on-axis wakefield
-        Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=int(max(ts.iterations)/2))
-        self.middle.plasma.wakefield.onaxis.zs = metadata.z
-        self.middle.plasma.wakefield.onaxis.Ezs = Ez
+        # extract middle field information if middle step exists
+        if int(max(ts.iterations)) % 2 == 0:
+            # extract middle on-axis wakefield
+            Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=int(max(ts.iterations)/2))
+            self.middle.plasma.wakefield.onaxis.zs = metadata.z
+            self.middle.plasma.wakefield.onaxis.Ezs = Ez
+    
+            # extract middle beam density
+            jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=int(max(ts.iterations)/2))
+            self.middle.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
+            self.middle.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
+    
+            # extract middle plasma density
+            rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=int(max(ts.iterations)/2))
+            self.middle.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
+            self.middle.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)
         
         # extract initial plasma density
         rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
         self.initial.plasma.density.extent = metadata0_plasma.imshow_extent[[2,3,0,1]]
         self.initial.plasma.density.rho = -(rho0_plasma.T/SI.e-self.plasma_density)
  
-        # extract final beam density
+        # extract initial beam density
         jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=min(ts.iterations))
         self.initial.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
         self.initial.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
 
-        # extract middle beam density
-        jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=int(max(ts.iterations)/2))
-        self.middle.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
-        self.middle.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
-
-        # extract initial plasma density
+        # extract final plasma density
         rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=max(ts.iterations))
         self.final.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
         self.final.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)
-
-        # extract initial plasma density
-        rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=int(max(ts.iterations)/2))
-        self.middle.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
-        self.middle.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)
 
         # extract final beam density
         jz_beam, metadata_beam = ts.get_field(field='jz_beam', iteration=max(ts.iterations))
