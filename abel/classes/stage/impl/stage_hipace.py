@@ -87,7 +87,7 @@ class StageHipace(Stage):
         external magnetic field across the beams. If ``True``, the field 
         gradient of the external field is set to enforce the drive beam to 
         undergo an half-interger number of betatron oscillations along the 
-            stage. Defaults to ``False``.
+        stage. Defaults to ``False``.
 
     mesh_refinement : bool, optional
         Enable HiPACE++ mesh refinement. See the 
@@ -679,6 +679,155 @@ class StageHipace(Stage):
             #ss = density_table[:,0]
             return ss.max()-ss.min()
         return super().get_length()
+    
+
+    # # =============================================
+    # @property
+    # def external_focusing_gradient(self):
+    #     return self._external_focusing_gradient
+    # @external_focusing_gradient.setter
+    # def external_focusing_gradient(self, gradient : float | None, num_half_oscillations=1):
+    #     if self.external_focusing and gradient is None:
+    #         #if self.get_length() is None:
+
+    #         # Make a copy of the stage and set up its ramps if they are not set yp
+    #         ramps_not_set_up = (
+    #             (self.upramp is not None and self.upramp.length is None) or
+    #             (self.downramp is not None and self.downramp.length is None)
+    #         )
+    #         if ramps_not_set_up:
+    #             stage_copy = copy.deepcopy(self)
+    #             stage_copy._prepare_ramps()
+    #         else: 
+    #             stage_copy = self
+
+    #         self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=num_half_oscillations)  # [T/m]
+
+    #     elif self.external_focusing and gradient is not None:
+    #         self._external_focusing_gradient = gradient
+    # _external_focusing_gradient = None
+
+
+    # =============================================
+    @property
+    def external_focusing(self) -> bool:
+        return self._external_focusing
+    @external_focusing.setter
+    def external_focusing(self, enable_external_focusing=False):
+        self._external_focusing = enable_external_focusing
+
+        if enable_external_focusing is False:
+            self._external_focusing_gradient = 0.0
+        elif enable_external_focusing and self._external_focusing_gradient is None:
+            #if self.get_length() is None:
+
+            # Make a copy of the stage and set up its ramps if they are not set yp
+            ramps_not_set_up = (
+                (self.upramp is not None and self.upramp.length is None) or
+                (self.downramp is not None and self.downramp.length is None)
+            )
+            if ramps_not_set_up:
+                stage_copy = copy.deepcopy(self)
+                stage_copy._prepare_ramps()
+            else: 
+                stage_copy = self
+
+            self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=1)  # [T/m]
+
+    _external_focusing = False
+
+
+    def calc_external_focusing_gradient(self, num_half_oscillations=1):
+        """
+        Calculate the external focusing gradient g for an azimuthal magnetic 
+        field B=[gy,-gx,0] that gives ``num_half_oscillations`` half 
+        oscillations for the drive beam over the length of the stage.
+        """
+        driver_source = self.get_driver_source()
+        if driver_source is None:
+            raise ValueError('The driver of the stage is not set.')
+        elif driver_source.energy is None:
+            raise ValueError('The energy of the driver source of the stage is not set.')
+        if self.get_length() is None:
+            raise ValueError('Stage length is not set.')
+        #return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
+        return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.length_flattop)**2 
+
+
+    # =============================================
+    def driver_guiding_orbit(self, driver, dacc_gradient=0.0, num_steps_per_half_osc=100):
+        """
+        Estimate the orbit in one dimension that the drive beam will follow 
+        when driver guiding with an external linear azimuthal magnetic field is 
+        applied to a drive beam with an initial angular offset. The calculations 
+        are done by integrating simplified equations of motion.
+        """
+
+        from abel.utilities.relativity import energy2momentum
+        from abel.utilities.statistics import weighted_mean
+
+        energy_thres = 10*driver.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
+        pz_thres = energy2momentum(energy_thres, unit='eV', m=driver.particle_mass)
+        pz0 = energy2momentum(driver.energy(), unit='eV', m=driver.particle_mass)
+
+        if pz0 < pz_thres:
+            raise ValueError('This estimate is only valid for a relativistic beam.')
+        
+        # Make a copy of the stage and set up its ramps if they are not set yp
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+        
+        q = driver.particle_charge()  # [C], particle charge including charge sign.
+        g = self._external_focusing_gradient  # [T/m]
+        #num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.get_length()
+        num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.length_flattop
+        ds = self.length_flattop/num_half_oscillations/num_steps_per_half_osc  # [m], step size
+
+        prop_length = 0
+        s_orbit = np.array([0.0])
+        #x = driver.x_offset()
+        y0 = driver.y_offset()
+        y_orbit = np.array([y0])  # [m], records the orbit
+        y = y0
+        py = weighted_mean(driver.pys(), driver.weightings(), clean=False)
+        pz = pz0 # Can add option for deceleration using a gradient
+
+        while prop_length < self.length_flattop:
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            y = y + py/pz*1/2*ds
+
+            # Kick
+            dpy = q*g*y*ds
+            py = py + dpy
+            pz = pz0 + q * dacc_gradient * prop_length/SI.c # dacc_gradient>0
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            y = y + py/pz*1/2*ds
+            s_orbit = np.append(s_orbit, prop_length)
+            y_orbit = np.append(y_orbit, y)
+
+        s_orbit = s_orbit + driver.z_offset()
+
+        return s_orbit, y_orbit
+
+
+
+
+        
+
+
+
+
 
     
     # ==================================================
