@@ -746,7 +746,7 @@ class StageHipace(Stage):
         num_steps_per_half_osc : int, optional
             Number of calcualtion steps per half-oscillation of the drive beam. 
             The number of half-oscillations is set in 
-            :func:`StageHipace.calc_external_focusing_gradient() <abel.classes.stage.impl.stage_hipace.calc_external_focusing_gradient>`. 
+            :meth:`StageHipace.calc_external_focusing_gradient() <abel.StageHipace.calc_external_focusing_gradient>`. 
             Defaults to 100.
         
 
