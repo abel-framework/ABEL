@@ -1164,3 +1164,22 @@ def phase_advance(ss, betas):
     from scipy import integrate
     inv_betas = 1/betas
     return integrate.simpson(y=inv_betas, x=ss)
+
+
+# =============================================
+def arc_lengths(s_trajectory, x_trajectory):
+    """
+    Docstring for arc_length
+    
+    :param s_trajectory: Description
+    :param x_trajectory: Description
+    """
+
+    ds = np.diff(s_trajectory)
+    dx = np.diff(x_trajectory)
+
+    length = np.cumsum(np.sqrt(ds**2 + dx**2))
+
+    length = np.insert(length, 0, 0.0)
+
+    return length
