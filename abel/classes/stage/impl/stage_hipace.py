@@ -727,12 +727,40 @@ class StageHipace(Stage):
 
 
     # =============================================
-    def driver_guiding_orbit(self, driver, dacc_gradient=0.0, num_steps_per_half_osc=100):
+    def driver_guiding_trajectory(self, driver, dacc_gradient=0.0, num_steps_per_half_osc=100):
         """
-        Estimate the orbit that the drive beam will follow when driver guiding 
-        with an external linear azimuthal magnetic field is applied to a drive 
-        beam with an initial angular offset. The calculations  are done by 
+        Estimate the trajectory that the drive beam will follow when driver 
+        guiding with an external linear azimuthal magnetic field is applied to a 
+        drive beam with an initial angular offset. The calculations  are done by 
         integrating simplified equations of motion.
+
+        Parameters
+        ----------
+        driver : ``Beam``
+            The drive beam.
+        
+        dacc_gradient : [V/m] float, optional
+            The decceleration gradient. Drive beam charge * decceleration 
+            gradient must be negative. Defaults to 0.0.
+
+        num_steps_per_half_osc : int, optional
+            Number of calcualtion steps per half-oscillation of the drive beam. 
+            The number of half-oscillations is set in 
+            :func:`StageHipace.calc_external_focusing_gradient() <abel.classes.stage.impl.stage_hipace.calc_external_focusing_gradient>`. 
+            Defaults to 100.
+        
+
+        Returns
+        -------
+        s_trajectory : [m] float
+            Longitudinal coordinate of the drive beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] float
+            x-coordinate of the drive beam trajectory.
+        
+        y_trajectory : [m] float
+            y-coordinate of the drive beam trajectory.
         """
 
         from abel.utilities.relativity import energy2momentum
@@ -745,6 +773,10 @@ class StageHipace(Stage):
         if pz0 < pz_thres:
             raise ValueError('This estimate is only valid for a relativistic beam.')
         
+        q = driver.particle_charge()  # [C], particle charge including charge sign.
+        if q * dacc_gradient > 0.0:
+            raise ValueError('Drive beam charge * decceleration gradient must be negative.')
+        
         # Make a copy of the stage and set up its ramps if they are not set yp
         ramps_not_set_up = (
             (self.upramp is not None and self.upramp.length is None) or
@@ -756,19 +788,18 @@ class StageHipace(Stage):
         else: 
             stage_copy = self
         
-        q = driver.particle_charge()  # [C], particle charge including charge sign.
         g = self._external_focusing_gradient  # [T/m]
         #num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.get_length()
         num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.length_flattop
         ds = self.length_flattop/num_half_oscillations/num_steps_per_half_osc  # [m], step size
 
         prop_length = 0
-        s_orbit = np.array([0.0])
+        s_trajectory = np.array([0.0])
         x0 = driver.x_offset()
-        x_orbit = np.array([x0])  # [m], records the orbit
+        x_trajectory = np.array([x0])  # [m], records the trajectory
         x = x0
         y0 = driver.y_offset()
-        y_orbit = np.array([y0])  # [m], records the orbit
+        y_trajectory = np.array([y0])  # [m], records the trajectory
         y = y0
         px = weighted_mean(driver.pxs(), driver.weightings(), clean=False)
         py = weighted_mean(driver.pys(), driver.weightings(), clean=False)
@@ -792,22 +823,13 @@ class StageHipace(Stage):
             prop_length = prop_length + 1/2*ds
             x = x + px/pz*1/2*ds
             y = y + py/pz*1/2*ds
-            s_orbit = np.append(s_orbit, prop_length)
-            x_orbit = np.append(x_orbit, x)
-            y_orbit = np.append(y_orbit, y)
+            s_trajectory = np.append(s_trajectory, prop_length)
+            x_trajectory = np.append(x_trajectory, x)
+            y_trajectory = np.append(y_trajectory, y)
 
-        s_orbit = s_orbit + driver.z_offset()
+        s_trajectory = s_trajectory + driver.z_offset()
 
-        return s_orbit, x_orbit, y_orbit
-
-
-
-
-        
-
-
-
-
+        return s_trajectory, x_trajectory, y_trajectory
 
     
     # ==================================================
@@ -817,7 +839,7 @@ class StageHipace(Stage):
         Applies waterfall function to all HiPACE++ HDF5 output files in 
         ``data_dir``.
 
-         Parameters
+        Parameters
         ----------
         fcns : A list of ``Beam`` class methods
             Beam class profile methods such as ``Beam.current_profile``, 
@@ -846,7 +868,7 @@ class StageHipace(Stage):
             
             
         Returns
-        ----------
+        -------
         waterfalls : list of 2D float ndarrays
             Each element in ``waterfalls`` corresponds to the output of one 
             function in ``fcns`` applied across all files (i.e., simulation 
@@ -922,7 +944,7 @@ class StageHipace(Stage):
 
 
         Returns
-        ----------
+        -------
         ``None``
         '''
 
