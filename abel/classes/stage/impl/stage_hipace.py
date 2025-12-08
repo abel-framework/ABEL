@@ -689,9 +689,9 @@ class StageHipace(Stage):
     def external_focusing(self, enable_external_focusing=False):
         self._external_focusing = enable_external_focusing
 
-        if enable_external_focusing is False:
+        if self._external_focusing is False or self._external_focusing is None:
             self._external_focusing_gradient = 0.0
-        elif enable_external_focusing and self._external_focusing_gradient is None:
+        elif self._external_focusing and self._external_focusing_gradient is None:
             #if self.get_length() is None:
 
             # Make a copy of the stage and set up its ramps if they are not set yp
