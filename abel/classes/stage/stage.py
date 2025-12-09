@@ -92,7 +92,6 @@ class Stage(Trackable, CostModeled):
     """
 
     
-    # ==================================================
     @abstractmethod
     def __init__(self, nom_accel_gradient, nom_energy_gain, plasma_density, driver_source=None, ramp_beta_mag=None):
         """
@@ -181,7 +180,6 @@ class Stage(Trackable, CostModeled):
         self.name = 'Plasma stage'
         
 
-    # ==================================================
     @property
     def driver_source(self) -> Source | DriverComplex | None:
         "Get or set the the driver source or the driver complex of the stage."
@@ -204,17 +202,12 @@ class Stage(Trackable, CostModeled):
         """
     
         if isinstance(self.driver_source, DriverComplex):
-            driver_source = self.driver_source.source
-        elif isinstance(self.driver_source, Source):
-            driver_source = self.driver_source
-        
-        return driver_source
-    
+            return self.driver_source.source
+        else:
+            return self.driver_source
 
     
     ## Define upramp and downramp, if present
-
-    # ==================================================
     @property
     def upramp(self) -> Self | None:
         "Get or set the upramp."
@@ -234,7 +227,6 @@ class Stage(Trackable, CostModeled):
     _upramp = None
 
 
-    # ==================================================
     @property
     def downramp(self) -> Self:
         "Get or set the downramp."
@@ -254,7 +246,6 @@ class Stage(Trackable, CostModeled):
     _downramp = None
 
 
-    # ==================================================
     @property
     def ramp_beta_mag(self) -> Self:
         """
@@ -279,7 +270,6 @@ class Stage(Trackable, CostModeled):
     _ramp_beta_mag = None
 
 
-    # ==================================================
     def copy_config2blank_stage(self):
         """
         Return a deep copy of the stage with most physics parameters reset to 
@@ -358,7 +348,6 @@ class Stage(Trackable, CostModeled):
         return stage_copy
     
 
-    # ==================================================
     def convert_PlasmaRamp(self, ramp):
         """
         Convert a ``PlasmaRamp`` object to a ``Stage`` subclass object of the 
@@ -413,7 +402,6 @@ class Stage(Trackable, CostModeled):
         return trackable_ramp
     
 
-    # ==================================================
     def _prepare_ramps(self):
         """
         Prepare upramp and downramp parameters before tracking.
@@ -465,7 +453,6 @@ class Stage(Trackable, CostModeled):
                 self.downramp.length_flattop = self._calc_ramp_length(self.downramp)
     
     
-    # ==================================================
     def is_upramp(self):
         "Check if this stage is the upramp of its parent."
 
@@ -478,7 +465,6 @@ class Stage(Trackable, CostModeled):
             return False
         
 
-    # ==================================================
     def is_downramp(self):
         "Check if this stage is the downramp of its parent"
 
@@ -491,7 +477,6 @@ class Stage(Trackable, CostModeled):
             return False
         
 
-    # ==================================================
     def has_ramp(self):
         "Check if there are any ramps attached to this stage."
 
@@ -501,7 +486,6 @@ class Stage(Trackable, CostModeled):
             return False
 
 
-    # ==================================================
     def _calc_ramp_length(self, ramp : Self) -> float:
         "Calculate and set the up/down ramp (uniform step ramp) length [m] based on stage nominal energy."
         if ramp.nom_energy is None:
@@ -520,7 +504,6 @@ class Stage(Trackable, CostModeled):
         return ramp_length
     
 
-    # ==================================================
     @property
     def parent(self) -> Self | None:
         "Get or set the parent stage of a ramp."
@@ -535,7 +518,6 @@ class Stage(Trackable, CostModeled):
     _parent = None
 
 
-    # ==================================================
     def _getOtherRamp(self, aRamp : Self) -> Self:
         "Return the opposite ramp in the same pair."
         if aRamp == self.upramp:
@@ -546,7 +528,6 @@ class Stage(Trackable, CostModeled):
             raise StageError("Could not find calling ramp?")
 
 
-    # ==================================================
     def _getOverallestStage(self) -> Self:
         "Find the top-level parent stage in the hierarchy."
         bottom_Stage = self
@@ -563,7 +544,6 @@ class Stage(Trackable, CostModeled):
     
     ## Tracking methods
 
-    # ==================================================
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         """
@@ -647,7 +627,6 @@ class Stage(Trackable, CostModeled):
 
     # Methods for setting and getting the variables
 
-    # ==================================================
     @property
     def length(self) -> float:
         "Total length of the trackable stage element [m], or None if not set/calculateable"
@@ -688,7 +667,6 @@ class Stage(Trackable, CostModeled):
         return self.length
 
 
-    # ==================================================
     @property
     def nom_energy_gain(self) -> float:
         "Total nominal energy gain of the stage [eV], or None if not set/calculateable"
@@ -717,7 +695,6 @@ class Stage(Trackable, CostModeled):
         return self.nom_energy_gain
 
 
-    # ==================================================
     @property
     def nom_accel_gradient(self) -> float:
         "Total nominal accelerating gradient of the stage [eV/m], or None if not set/calculateable"
@@ -741,7 +718,6 @@ class Stage(Trackable, CostModeled):
     _nom_accel_gradient_calc = None
 
 
-    # ==================================================
     @property
     def length_flattop(self) -> float:
         "Length of the plasma flattop [m], or None if not set/calculateable"
@@ -767,7 +743,6 @@ class Stage(Trackable, CostModeled):
     _length_flattop      = None
     _length_flattop_calc = None
 
-
     # ==================================================
     @property
     def nom_energy_gain_flattop(self) -> float:
@@ -790,7 +765,6 @@ class Stage(Trackable, CostModeled):
             raise
     _nom_energy_gain_flattop      = None
     _nom_energy_gain_flattop_calc = None
-
 
     # ==================================================
     @property
@@ -816,7 +790,6 @@ class Stage(Trackable, CostModeled):
     _nom_accel_gradient_flattop_calc = None
 
 
-    # ==================================================
     @property
     def nom_energy(self) -> float:
         "Nominal energy for the tracking [eV], or ``None`` if not set/calculateable"
@@ -843,7 +816,6 @@ class Stage(Trackable, CostModeled):
     _nom_energy_calc = None
 
 
-    # ==================================================
     @property
     def nom_energy_flattop(self) -> float:
         "Nominal energy in the flattop for the tracking [eV], or ``None`` if not set/calculateable"
@@ -870,15 +842,12 @@ class Stage(Trackable, CostModeled):
     _nom_energy_flattop_calc = None
 
 
-    # ==================================================
     ## Recalculation methods
-    # ==================================================
     def _resetLengthEnergyGradient(self):
         "Reset all the calculated values in the current Stage hierarchy"
         self._getOverallestStage()._resetLengthEnergyGradient_helper()
 
 
-    # ==================================================
     def _resetLengthEnergyGradient_helper(self):
         #Climb back up from the bottom and set what we can
         # directly / to None, from the stored user input
@@ -910,7 +879,6 @@ class Stage(Trackable, CostModeled):
             self.downramp._resetLengthEnergyGradient_helper()
 
 
-    # ==================================================
     def _recalcLengthEnergyGradient(self):
         #Iteratively calculate everything until stability is reached
         #Note: Before starting calculation, call _resetLengthEnergyGradient() to reset the hierachy
@@ -918,7 +886,6 @@ class Stage(Trackable, CostModeled):
         self._printVerb()
 
 
-    # ==================================================
     def _recalcLengthEnergyGradient_helper(self):
         itrCtr = 0
         updateCounter_total = 0
@@ -1244,7 +1211,6 @@ class Stage(Trackable, CostModeled):
         return updateCounter_total
 
 
-    # ==================================================
     doVerbosePrint_debug = False
     def _printVerb(self, *args, **kwargs):
         "Print() if doVerbosePrint_debug == True, else NOP."
@@ -1252,7 +1218,6 @@ class Stage(Trackable, CostModeled):
             print(*args, **kwargs)
 
 
-    # ==================================================
     def _printLengthEnergyGradient_internal(stage):
         "For debugging"
         print("parent/upramp/downramp:    ", stage.parent, stage.upramp, stage.downramp)
@@ -1268,7 +1233,6 @@ class Stage(Trackable, CostModeled):
 
     ## Various calculations / plots / etc
 
-    # ==================================================
     def get_cost_breakdown(self):
         """
         Get the cost breakdown of the plasma stage.
@@ -1279,7 +1243,6 @@ class Stage(Trackable, CostModeled):
         return (self.name, breakdown)
 
 
-    # ==================================================
     def matched_beta_function(self, energy_incoming, match_entrance=True):
         '''
         Calculates the matched beta function of the stage. If there is an 
@@ -1314,7 +1277,6 @@ class Stage(Trackable, CostModeled):
                 raise ValueError('Downramp ramp_beta_mag not defined.')
 
     
-    # ==================================================
     def matched_beta_function_flattop(self, energy):
         '''
         Calculates the matched beta function of the flattop stage.
@@ -1334,17 +1296,14 @@ class Stage(Trackable, CostModeled):
         return beta_matched(self.plasma_density, energy)
     
 
-    # ==================================================
     def energy_usage(self):
         return self.driver_source.energy_usage()
     
 
-    # ==================================================
     def energy_efficiency(self):
         return self.efficiency
 
 
-    # ==================================================
     #@abstractmethod   # TODO: calculate the dumped power and use it for the dump cost model.
     def dumped_power(self):
         return self.efficiency.dumped_power
@@ -1352,37 +1311,17 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_efficiency(self, beam0, driver0, beam, driver):
-        """
-        Calculate the efficiency of energy transfer in the stage.
+        # abort if no driver or beam
+        if driver0 is None or beam0 is None:
+            return
 
-        This method computes the following efficiency metrics:
-        
-        - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
-        - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
-        - ``driver_to_beam``: Overall efficiency from driver to beam (product of the above).  
-        - ``dumped_power``: Remaining driver power dumped after interaction, averaged over 
-        the repetition rate if available.
-
-        Parameters
-        ----------
-        beam0 : ``Beam``
-            Input beam before the stage.
-
-        driver0 : ``Beam``
-            Input drive beam before the stage.
-
-        beam : ``Beam``
-            Output beam after the stage.
-
-        driver : ``Beam``
-            Output drive beam after the stage.
-
-        Returns
-        -------
-        ``None``
-            Results are stored in ``self.efficiency``.
-        """
-
+        # Added average which assumes no charge loss
+        driver0_avg = driver0.energy()
+        driver_avg = driver.energy()
+        beam0_avg = beam0.energy()
+        beama_avg = beam.energy()
+        self.efficiency.wake_to_beam_avg = (beam.charge()*(beama_avg-beam0_avg))/(driver.charge()*(driver0_avg - driver_avg))
+            
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
         Etot0_driver = driver0.total_energy()
@@ -1398,38 +1337,10 @@ class Stage(Trackable, CostModeled):
 
     # ==================================================
     def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
-        """
-        Calculate and store the beam current profile.
 
-        This method computes the current profile of the initial (input) and 
-        optionally final (output) beams using a temporal binning scheme based on 
-        the RMS bunch lengths of the driver and beam. The results are stored in 
-        ``self.initial.beam.current`` and, if output beams are provided, in 
-        ``self.final.beam.current``.
-
-        Parameters
-        ----------
-        beam0 : ``Beam``
-            Input beam before the stage.
-
-        driver0 : ``Beam``
-            Input drive beam before the stage.
-
-        beam : ``Beam``, optional
-            Output beam after the stage.
-
-        driver : ``Beam``, optional
-            Output drive beam after the stage.
-
-        Returns
-        -------
-        ``None``
-            Results are stored in ``self.initial.beam.current`` and, if provided, 
-            ``self.final.beam.current`` with attributes:
-            - ``zs`` : longitudinal positions [m]  
-            - ``Is`` : beam current profile [A]
-        """
-        
+        if driver0 is None:
+            driver0 = copy.deepcopy(beam0)
+            driver0.scale_charge(beam0.charge()*1e-15)
         dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
         num_sigmas = 6
         z_min = beam0.z_offset() - num_sigmas * beam0.bunch_length()
@@ -1605,7 +1516,7 @@ class Stage(Trackable, CostModeled):
     
     # ==================================================
     def save_driver_to_file(self, driver, runnable):
-        driver.save(runnable, beam_name='driver_stage' + str(driver.stage_number+1))
+        driver.save(runnable, beam_name = 'driver')
 
     
     # ==================================================
@@ -2059,7 +1970,7 @@ class Stage(Trackable, CostModeled):
         
     # ==================================================
     # plot wake
-    def plot_wake(self, aspect='equal', show_beam=True, savefig=None):
+    def plot_wake(self, aspect='auto', show_beam=True, savefig=None):
         """
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
@@ -2126,14 +2037,16 @@ class Stage(Trackable, CostModeled):
             else:
                 ax1 = ax[i]
 
-            # extract initial or final
+            # extract initial, final and middle
             if i==0:
                 data_struct = self.initial
                 title = 'Initial step'
-            elif i==1 & has_middle_step == True:
+            # If middle step exists, extract it
+            elif i==1 and has_middle_step == True:
                 data_struct = self.middle
-                title = 'Middle step'
-            elif i==1 & has_final_step == True:
+                title = f"s = {self.evolution.beam.location[self.middle.n_step]:.2f} m"
+            # If middle step does not exist, simply plot final step
+            elif i==1 and has_middle_step == False:
                 data_struct = self.final
                 title = 'Final step'
             elif i==2:
@@ -2161,7 +2074,7 @@ class Stage(Trackable, CostModeled):
             ax2 = ax1.twinx()
             ax2.plot(zs0*1e6, Ezs0/1e9, color = 'black')
             ax2.set_ylabel(r'$E_{z}$' ' [GV/m]')
-            ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
+            #ax2.set_ylim(bottom=-Ezmax/1e9, top=Ezmax/1e9)
             axpos = ax1.get_position()
             pad_fraction = 0.13  # Fraction of the figure width to use as padding between the ax and colorbar
             cbar_width_fraction = 0.015  # Fraction of the figure width for the colorbar width
@@ -2205,6 +2118,7 @@ class Stage(Trackable, CostModeled):
             ax1.set_title(title)
             ax1.grid(False)
             ax2.grid(False)
+            #ax1.set_ylim(0, 300)
             
         # save the figure
         if savefig is not None:

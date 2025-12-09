@@ -514,24 +514,30 @@ class StageHipace(Stage):
         Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=max(ts.iterations))
         self.final.plasma.wakefield.onaxis.zs = metadata.z
         self.final.plasma.wakefield.onaxis.Ezs = Ez
-
-        # extract middle field information if middle step exists
-        if int(max(ts.iterations)) % 2 == 0:
+        print(ts.iterations)
+        # extract middle field information if there are more than two steps
+        if len(ts.iterations) > 2:
+            # Get step closest to middle
+            middle_step = ts.iterations[np.argmin(abs(ts.iterations - int(max(ts.iterations)/2)))]
+            
             # extract middle on-axis wakefield
-            Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=int(max(ts.iterations)/2))
+            Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=middle_step)
             self.middle.plasma.wakefield.onaxis.zs = metadata.z
             self.middle.plasma.wakefield.onaxis.Ezs = Ez
     
             # extract middle beam density
-            jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=int(max(ts.iterations)/2))
+            jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=middle_step)
             self.middle.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
             self.middle.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
     
             # extract middle plasma density
-            rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=int(max(ts.iterations)/2))
+            rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=middle_step)
             self.middle.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
             self.middle.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)
-        
+
+            # Extract step 
+            self.middle.n_step = middle_step
+            print(self.middle.n_step)
         # extract initial plasma density
         rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
         self.initial.plasma.density.extent = metadata0_plasma.imshow_extent[[2,3,0,1]]
