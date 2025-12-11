@@ -958,14 +958,24 @@ class StageHipace(Stage):
         num_bins = int(np.sqrt(len(beam0)*2))
         nsig = 5
         
+        # Set up the bins for energy and time
         if species == 'driver':
             deltaedges = np.linspace(-0.5, 0.5, num_bins)
         else:
             deltaedges = np.linspace(-0.05, 0.05, num_bins)
         tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
-        xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
-        yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
+
+        # Set up the bins for x and y based on drive beam trajectory
+        driver_source = self.get_driver_source()
+        _, x_trajectory, y_trajectory = self.driver_guiding_trajectory(driver_source.track(), dacc_gradient=0.0e9, num_steps_per_half_osc=100)
+        xedge_min = np.min(x_trajectory) - nsig*beam0.beam_size_x()
+        xedge_max = nsig*beam0.beam_size_x() + np.max(x_trajectory)
+        xedges = np.linspace(xedge_min, xedge_max, num_bins)
+        yedge_min = np.min(y_trajectory) - nsig*beam0.beam_size_y()
+        yedge_max = nsig*beam0.beam_size_y() + np.max(y_trajectory)
+        yedges = np.linspace(yedge_min, yedge_max, num_bins)
         
+        # Caculate the waterfalls
         waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
 
         # prepare figure
