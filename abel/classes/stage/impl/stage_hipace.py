@@ -787,16 +787,23 @@ class StageHipace(Stage):
             stage_copy._prepare_ramps()
         else: 
             stage_copy = self
-
+        
         #L = stage_copy.get_length()  # [m]
         L = stage_copy.length_flattop  # [m]
+        
         if pz0 + q * dacc_gradient * L/SI.c < pz_thres:
             raise ValueError('The energy depletion will be too severe. This estimate is only valid for a relativistic beam.')
         
         g = self._external_focusing_gradient  # [T/m]
-        #num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*L
-        num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*L
-        ds = L/num_half_oscillations/num_steps_per_half_osc  # [m], step size
+        if g is None:
+            g = 0.0
+            num_half_oscillations = 1
+        elif g < 1e-15:
+            num_half_oscillations = 1
+        else:
+            #num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.get_length()
+            num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.length_flattop
+        ds = self.length_flattop/num_half_oscillations/num_steps_per_half_osc  # [m], step size
 
         prop_length = 0
         s_trajectory = np.array([0.0])
