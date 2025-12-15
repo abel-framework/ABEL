@@ -214,8 +214,8 @@ class StageHipace(Stage):
         self.no_plasma = no_plasma
 
         # external focusing (APL-like) [T/m]
-        self.external_focusing = external_focusing
         self._external_focusing_gradient = None
+        self.external_focusing = external_focusing
 
         # plasma profile
         self.plasma_profile = SimpleNamespace()
@@ -261,13 +261,6 @@ class StageHipace(Stage):
         # and flattop nominal energy if not already done
         self._prepare_ramps()
         self._make_ramp_profile(tmpfolder)
-        
-        # set external focusing
-        if self.external_focusing == False:
-            self._external_focusing_gradient = 0
-        if self.external_focusing == True and self._external_focusing_gradient is None:
-            num_half_oscillations = 1
-            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
         
         beam0 = beam_incoming
         driver0 = driver_incoming
@@ -686,12 +679,12 @@ class StageHipace(Stage):
     def external_focusing(self) -> bool:
         return self._external_focusing
     @external_focusing.setter
-    def external_focusing(self, enable_external_focusing=False):
-        self._external_focusing = enable_external_focusing
+    def external_focusing(self, enable_external_focusing : bool | None):
+        self._external_focusing = bool(enable_external_focusing)
 
-        if self._external_focusing is False or self._external_focusing is None:
+        if self._external_focusing is False:
             self._external_focusing_gradient = 0.0
-        elif self._external_focusing and self._external_focusing_gradient is None:
+        elif self._external_focusing_gradient is None or self._external_focusing_gradient < 1e-15:
             #if self.get_length() is None:
 
             # Make a copy of the stage and set up its ramps if they are not set yp
@@ -704,7 +697,7 @@ class StageHipace(Stage):
                 stage_copy._prepare_ramps()
             else: 
                 stage_copy = self
-
+                
             self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=1)  # [T/m]
     _external_focusing = False
 
@@ -716,14 +709,12 @@ class StageHipace(Stage):
         oscillations for the drive beam over the length of the stage.
         """
         driver_source = self.get_driver_source()
-        if driver_source is None:
-            raise ValueError('The driver of the stage is not set.')
-        elif driver_source.energy is None:
-            raise ValueError('The energy of the driver source of the stage is not set.')
+        #if driver_source.energy is None:
+        #    raise ValueError('The energy of the driver source of the stage is not set.')
         if self.get_length() is None:
             raise ValueError('Stage length is not set.')
         #return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
-        return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.length_flattop)**2 
+        return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.length_flattop)**2  # [T/m]
 
 
     # =============================================
