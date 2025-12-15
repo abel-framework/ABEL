@@ -190,11 +190,17 @@ class Stage(Trackable, CostModeled):
         -------
         driver_source : ``Source``
         """
-    
-        if isinstance(self.driver_source, DriverComplex):
+        if self.driver_source is None:
+            raise ValueError('The driver source of the stage is not set.')
+        elif isinstance(self.driver_source, DriverComplex):
             driver_source = self.driver_source.source
         elif isinstance(self.driver_source, Source):
             driver_source = self.driver_source
+        else:
+            raise ValueError('The driver source is of incompatible type.')
+
+        if driver_source.energy is None:
+            raise ValueError('The energy of the driver source of the stage is not set.')
         
         return driver_source
     
