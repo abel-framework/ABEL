@@ -345,7 +345,8 @@ class StageReducedModels(Stage):
         """
         Track the particles through the stage.
         """
-
+        print("In StageReducedModels.track()",flush=True)
+            
         # Set the diagnostics directory
         if runnable is not None:
             self.run_path = runnable.run_path()
@@ -373,11 +374,12 @@ class StageReducedModels(Stage):
 
         
         # ========== Get the drive beam ==========
+        print("Do driver_source.track()...",flush=True)
         driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
-        
+        print("Done driver_source.track().",flush=True)
         original_driver = copy.deepcopy(driver_incoming)
         original_beam = copy.deepcopy(beam_incoming)
-
+        print("Copied drivers.",flush=True)
 
         # ========== Rotate the coordinate system of the beams ==========
         # Perform coordinate rotations before calling on upramp tracking.
@@ -385,7 +387,6 @@ class StageReducedModels(Stage):
 
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             drive_beam_rotated, beam_rotated = self.rotate_beam_coordinate_systems(driver_incoming, beam_incoming)
-
 
         # ========== Prepare ramps ==========
         # If ramps exist, set ramp lengths, nominal energies, nominal energy gains
@@ -419,8 +420,9 @@ class StageReducedModels(Stage):
 
         
         # ========== Main tracking sequence ==========
+        print("Do main_tracking_procedure()...",flush=True)
         beam, driver = self.main_tracking_procedure(beam_ramped, drive_beam_ramped, shot_path, tmpfolder)
-
+        print("Done main_tracking_procedure().",flush=True)
 
         # ==========  Apply plasma density downramp (magnify beta function) ==========
         if self.downramp is not None:
@@ -465,6 +467,7 @@ class StageReducedModels(Stage):
         
 
         # ========== Bookkeeping ==========
+        print("Do bookeeping...",flush=True)
         self.driver_to_beam_efficiency = (beam_outgoing.energy()-original_beam.energy())/driver_outgoing.energy() * beam_outgoing.abs_charge()/driver_outgoing.abs_charge()
 
         # Store beams for tests
@@ -479,6 +482,7 @@ class StageReducedModels(Stage):
 
         # Clear some of the attributes to reduce file size of pickled files
         self.trim_attr_reduce_pickle_size()  # Remove this line to save wake snapshots in ramps
+        print("Done bookeeping.",flush=True)
 
         # Return the beam (and optionally the driver)
         if self._return_tracked_driver:
