@@ -306,10 +306,20 @@ def plasma_stage_setup(plasma_density, abel_drive_beam, abel_main_beam=None, sta
     num_cell_z = round((box_max_z-box_min_z)/dr)
 
     # Construct a Wake-T plasma stage
+    print("Constructing - parameters are:", flush=True)
+    print("stage_length=", stage_length, flush=True)
+    print("plasma_density=", plasma_density, flush=True)
+    print("box_size_r=", box_size_r, flush=True)
+    print("box_min_z=", box_min_z, flush=True)
+    print("box_max_z=", box_max_z, flush=True)
+    print("n_out=", n_out, flush=True)
+    print("num_cell_xy=", num_cell_xy, flush=True)
+    print("num_cell_z=", num_cell_z, int(num_cell_z), flush=True)
+    print("dz_fields=", dz_fields, flush=True)
     plasma_stage = wake_t.beamline_elements.PlasmaStage(length=stage_length, density=plasma_density, wakefield_model='quasistatic_2d',
                                                 r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                                 n_out=n_out, n_r=num_cell_xy, n_xi=int(num_cell_z), dz_fields=dz_fields, ppc=1)
-    
+    print("Complete.",flush=True)
     return plasma_stage
 
     
