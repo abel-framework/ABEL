@@ -380,6 +380,13 @@ def run_single_step_wake_t(plasma_density, drive_beam, beam):
     wakeT_xy_res = 0.1*beam.bunch_length()
     wakeT_max_box_r = 4/k_p(plasma_density)
     wakeT_num_cell_xy = int(wakeT_max_box_r/wakeT_xy_res)
+    print("beam.bunch_length() : ", beam.bunch_length())
+    print("wakeT_xy_res = ", wakeT_xy_res)
+    print("plasma_density = ", plasma_density)
+    print("k_p : ", k_p(plasma_density))
+    print("wakeT_max_box_r = ", wakeT_max_box_r)
+    print("wakeT_num_cell_xy = ", wakeT_num_cell_xy)
+    
     print("PLASMA_STAGE_SETUP...", flush=True)
     plasma_stage = plasma_stage_setup(plasma_density, drive_beam, beam, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy)
 
