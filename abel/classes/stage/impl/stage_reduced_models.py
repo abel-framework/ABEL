@@ -426,7 +426,7 @@ class StageReducedModels(Stage):
 
         # ==========  Apply plasma density downramp (magnify beta function) ==========
         if self.downramp is not None:
-
+            print("Doing Downramp...", flush=True)
             if type(self.downramp) is PlasmaRamp and self.downramp.ramp_shape != 'uniform':
                 raise TypeError('Only uniform ramps have been implemented.')
             
@@ -437,12 +437,15 @@ class StageReducedModels(Stage):
             elif self.ramp_beta_mag is not None:
                 ramp_beta_mag = self.ramp_beta_mag
 
+            print("Doing driver.magnify_beta_function()...",flush=True)
             driver.magnify_beta_function(ramp_beta_mag, axis_defining_beam=driver)
             
             # Track the beams through the downramp
+            print("Doing track_downramp...", flush=True)
             beam_outgoing, driver_outgoing = self.track_downramp(beam, driver)
-
-        else:  # Do the following if there are no downramp. 
+            print("Done Downramp.", flush=True)
+        else:  # Do the following if there are no downramp.
+            print("No downramp", flush=True)
             beam_outgoing = beam
             driver_outgoing = driver
 
@@ -450,13 +453,14 @@ class StageReducedModels(Stage):
         # ========== Rotate the coordinate system of the beams back to original ==========
         # Perform un-rotation after track_downramp(). Also adds drift to the drive beam.
         if self.parent is None:  # Ensures that the un-rotation is only performed by the main stage and not by its ramps.
-            
+            print("Doing undo_beam_coordinate_systems...", flush=True)
             # Will only rotate the beam coordinate system if the driver source of the stage has angular jitter or angular offset
             driver_outgoing, beam_outgoing = self.undo_beam_coordinate_systems_rotation(original_driver, driver_outgoing, beam_outgoing)
         
         
         # ==========  Make animations ==========
         if self.probe_evol_period > 0 and self.make_animations:
+            print("Doing make animations...", flush=True)
             self.animate_sideview_x(tmpfolder)
             self.animate_sideview_y(tmpfolder)
             self.animate_phasespace_x(tmpfolder)
