@@ -408,7 +408,6 @@ class StageReducedModels(Stage):
             beam_ramped = beam_rotated
             drive_beam_ramped = drive_beam_rotated
 
-
         # ========== Record longitudinal number profile ==========
         # Number profile N(z). Dimensionless, same as dN/dz with each bin multiplied with the widths of the bins.
         main_num_profile, z_slices = self.longitudinal_number_distribution(beam=beam_ramped)
@@ -723,6 +722,7 @@ class StageReducedModels(Stage):
         # Set driver
         upramp.driver_source = SourceCapsule(beam=driver0)
 
+        upramp.print_summary()
         
         # ========== Main tracking sequence ==========
         beam, driver = upramp.main_tracking_procedure(beam0, driver0, shot_path, tmpfolder=None)
@@ -822,6 +822,7 @@ class StageReducedModels(Stage):
         # set driver
         downramp.driver_source = SourceCapsule(beam=driver0)
 
+        downramp.print_summary()
         
         # ========== Main tracking sequence ==========
         print("Calling downramp.main_tracking_procedure()...",flush=True)
