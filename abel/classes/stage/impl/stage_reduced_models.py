@@ -810,6 +810,7 @@ class StageReducedModels(Stage):
         
         # ========== Main tracking sequence ==========
         print("Calling downramp.main_tracking_procedure()...",flush=True)
+        print("Downramp = ", downramp, flush=True)
         beam, driver = downramp.main_tracking_procedure(beam0, driver0, shot_path, tmpfolder=None)
         print("Done with downramp.main_tracking_procedure()...",flush=True)
 
