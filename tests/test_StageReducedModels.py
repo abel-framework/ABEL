@@ -113,7 +113,7 @@ def setup_StageReducedModels(driver_source, main_source, plasma_density=6.0e20, 
 
 
 @pytest.mark.StageReducedModels
-def test_stage_length_gradient_energyGain():
+def test_stage_length_gradient_energyGain1():
     """
     Tests ensuring that the flattop length and total length of the stage as well 
     as nominal gradient and nominal energy gain are set correctly.
@@ -149,6 +149,32 @@ def test_stage_length_gradient_energyGain():
     assert np.allclose(stage.length_flattop, 7.8, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
+
+    # Remove output directory
+    shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.StageReducedModels
+def test_stage_length_gradient_energyGain2():
+    """
+    Tests ensuring that the flattop length and total length of the stage as well 
+    as nominal gradient and nominal energy gain are set correctly.
+    """
+
+    np.random.seed(42)
+
+    plasma_density = 6.0e+20                                                      # [m^-3]
+    ramp_beta_mag = 5.0
+    enable_xy_jitter = False
+    enable_xpyp_jitter = False
+    enable_tr_instability = False
+    enable_radiation_reaction = False
+    enable_ion_motion = False
+    use_ramps = True
+    drive_beam_update_period = 0
+
+    driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
 
 
     # ========== Set nominal energy gain and flattop nominal acceleration gradient ==========
