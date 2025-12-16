@@ -38,9 +38,11 @@ class Runnable(ABC):
                 print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
 
             # if overwrite_from is None: # TODO
+            print("TRACK!", flush=True)
             self.track(beam=None, savedepth=self.savedepth, runnable=self, verbose=self.verbose)
 
             # save object to file
+            print("SAVE!", flush=True)
             self.save()
 
     ## SCAN FUNCTIONALITY

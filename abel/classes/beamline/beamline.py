@@ -46,11 +46,15 @@ class Beamline(Trackable, Runnable, CostModeled):
         
         # assemble the trackables
         if self.trackables is None:
+            print("ASSEMBLE!", flush=True)
             self.assemble_trackables()
-        
+            print("ASSEMBLED.", flush=True)
+            
         # perform element-wise tracking
         for trackable in self.trackables:
+            print("trackable = ", trackable, flush=True)
             beam = trackable.track(beam, savedepth-1, runnable, verbose)
+        print("Done with trackables.", flush=True)
         
         return beam
 
