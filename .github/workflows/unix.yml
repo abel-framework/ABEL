@@ -40,4 +40,4 @@ jobs:
       run: python -m pytest -v tests/test_init.py::testCore_init || true
 
     - name: Run Unit Tests
-      run: python -m pytest -v tests/test_StageReducedModels.py::test_stage_length_gradient_energyGain
+      run: python -m pytest -s -v tests/test_StageReducedModels.py::test_stage_length_gradient_energyGain
