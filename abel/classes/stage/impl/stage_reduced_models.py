@@ -768,18 +768,22 @@ class StageReducedModels(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
+        print("Saved beams.", flush=True)
+            
         # Convert PlasmaRamp to a StageReducedModels
         if type(self.downramp) is PlasmaRamp:
-
+            print("Convert PlasmaRamp", flush=True)
             downramp = self.convert_PlasmaRamp(self.downramp)
             if type(downramp) is not StageReducedModels:
                 raise TypeError('downramp is not a StageReducedModels.')
             
         elif type(self.downramp) is Stage:
+            print("Set Stage",flush=True)
             downramp = self.downramp  # Allow for other types of ramps
         else:
             raise StageError('Ramp is not an instance of Stage class.')
-        
+
+        print("Sanity checking",flush=True)
         if downramp.plasma_density is None:
             raise ValueError('Downramp plasma density is invalid.')
         if downramp.nom_energy is None:
@@ -798,14 +802,16 @@ class StageReducedModels(Stage):
             raise ValueError('Downramp nominal acceleration gradient is invalid.')
         if downramp.nom_accel_gradient_flattop is None:
             raise ValueError('Downramp flattop nominal acceleration gradient is invalid.')
+        print("Is sane.",flush=True)
 
         # set driver
         downramp.driver_source = SourceCapsule(beam=driver0)
 
         
         # ========== Main tracking sequence ==========
+        print("Calling downramp.main_tracking_procedure()...",flush=True)
         beam, driver = downramp.main_tracking_procedure(beam0, driver0, shot_path, tmpfolder=None)
-
+        print("Done with downramp.main_tracking_procedure()...",flush=True)
 
         # ========== Bookkeeping ==========
         self.downramp.driver_to_beam_efficiency = (beam.energy()-beam0_energy)/driver.energy() * beam.abs_charge()/driver.abs_charge()
