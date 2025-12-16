@@ -393,6 +393,7 @@ class StageReducedModels(Stage):
         # and flattop nominal energy if not already done.
         self._prepare_ramps()
 
+        self.print_summary()
         
         # ========== Apply plasma density up ramp (demagnify beta function) ==========
         if self.upramp is not None:  # if self has an upramp

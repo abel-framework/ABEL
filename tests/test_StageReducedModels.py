@@ -152,6 +152,7 @@ def test_stage_length_gradient_energyGain():
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
+    print("\n\n\n")
 
     # ========== Set nominal energy gain and flattop nominal acceleration gradient ==========
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False, length_flattop=None)
