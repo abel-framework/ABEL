@@ -141,6 +141,8 @@ def test_stage_length_gradient_energyGain():
     stage.length_flattop = 7.8                                                    # [m]
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
 
+    stage.print_summary()
+
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=True)
 
@@ -157,6 +159,8 @@ def test_stage_length_gradient_energyGain():
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
     stage.nom_energy_gain_flattop = 7.8e9                                         # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
+
+    stage.print_summary()
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=True)
