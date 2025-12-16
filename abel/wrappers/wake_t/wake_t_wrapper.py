@@ -350,6 +350,7 @@ def run_single_step_wake_t(plasma_density, drive_beam, beam):
     from abel.utilities.plasma_physics import k_p
     from abel.CONFIG import CONFIG
 
+    print("IN SINGLE_STEP_WAKE_T", flush=True)
 
     # The drive beam must be centred around r=0 before being used in Wake-T
     driver_x_offset = drive_beam.x_offset()
@@ -369,8 +370,10 @@ def run_single_step_wake_t(plasma_density, drive_beam, beam):
     wakeT_xy_res = 0.1*beam.bunch_length()
     wakeT_max_box_r = 4/k_p(plasma_density)
     wakeT_num_cell_xy = int(wakeT_max_box_r/wakeT_xy_res)
+    print("PLASMA_STAGE_SETUP...", flush=True)
     plasma_stage = plasma_stage_setup(plasma_density, drive_beam, beam, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy)
 
+    print("MAKE TEMP FOLDER...", flush=True)
     # Make temp folder
     if not os.path.exists(CONFIG.temp_path):
         os.mkdir(CONFIG.temp_path)
@@ -378,15 +381,20 @@ def run_single_step_wake_t(plasma_density, drive_beam, beam):
     if not os.path.exists(tmpfolder):
         os.mkdir(tmpfolder)
 
+    print("CONVERT BEMAS TO WAKE T BUNCHES...", flush=True)
     # Convert beams to Wake-T bunches
     driver0_wake_t = beam2wake_t_bunch(drive_beam, name='driver')
     beam0_wake_t = beam2wake_t_bunch(beam, name='beam')
 
     # Perform the Wake-T simulation
+    print("PLASMA_STAGE.TRACK()...", flush=True)
     plasma_stage.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=False)
+    print("DONE PLASMA_STAGE.TRACK()...", flush=True)
     
     # Extract the fields
     wake_t_evolution = extract_initial_and_final_Ez_rho(tmpfolder)
+
+    print("EXTRACED FIELDS...", flush=True)
     
     # Remove temporary directory
     shutil.rmtree(tmpfolder)
