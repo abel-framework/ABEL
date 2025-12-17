@@ -2900,7 +2900,10 @@ class StageReducedModels(Stage):
         super().print_summary()
 
         print(f"Time step [betatron wavelength/c]:\t\t\t {self.time_step_mod :.3f}")
-        print(f"Ramp beta magnification:\t\t\t\t {self.ramp_beta_mag :.3f}")
+        if self.ramp_beta_mag is None:
+            print(f"Ramp beta magnification:\t\t\t\t None")
+        else:
+            print(f"Ramp beta magnification:\t\t\t\t {self.ramp_beta_mag :.3f}")
         
         print(f"Transverse wake instability enabled:\t\t\t {str(self.enable_tr_instability) :s}")
         print(f"Radiation reaction enabled:\t\t\t\t {str(self.enable_radiation_reaction) :s}")

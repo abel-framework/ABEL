@@ -2233,7 +2233,7 @@ class Stage(Trackable, CostModeled):
         if nom_energy_gain is None:
             print(f"Nominal energy gain [GeV]:\t\t\t\t Not set")
         else:
-            print(f"Nominal energy gain [GeV]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")
+            print(f"Nominal energy gain [GeV]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")            
 
         if self.nom_energy_gain_flattop is None:
             print(f"Nominal energy gain flattop [GeV]:\t\t\t Not set")
@@ -2256,7 +2256,12 @@ class Stage(Trackable, CostModeled):
             print(f"Driver source type: {type(self.driver_source)}")
 
         if self.has_ramp():
-            print(f"Has ramp(s):\t\t\t\t\t\t Yes")
+            #print(f"Has ramp(s):\t\t\t\t\t\t Yes")
+            print('')
+            if self.upramp is not None:
+                self.upramp.print_summary(print_params=True)
+            if self.downramp is not None:
+                self.downramp.print_summary(print_params=True)
         else:
             print(f"Has ramp(s):\t\t\t\t\t\t No")
 
@@ -2377,10 +2382,26 @@ class PlasmaRamp(Stage):
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
             print('Ramp type: \t\t\t\t\t\t downramp')
-        print('Ramp shape: \t\t\t\t\t\t', self.ramp_shape)
+        print('\tRamp shape: \t\t\t\t\t', self.ramp_shape)
 
         if print_params:
-            super().print_summary()
+            #super().print_summary()
+            if self.plasma_density is None:
+                print(f"\tPlasma density [m^-3]:\t\t\t\t Not set")
+            else:
+                print(f"\tPlasma density [m^-3]:\t\t\t\t {self.plasma_density :.3e}")
+            if self.length is None:
+                print(f"\tLength [m]:\t\t\t\t\t Not set")
+            else:
+                print(f"\tLength [m]:\t\t\t\t\t {self.length :.3f}")
+            if self.nom_energy_gain is None:
+                print(f"\tNominal energy gain [GeV]:\t\t\t Not set")
+            else:
+                print(f"\tNominal energy gain [GeV]:\t\t\t {self.nom_energy_gain /1e9 :.3f}") 
+            if self.nom_accel_gradient is None:
+                print(f"\tNominal acceleration gradient [GV/m]:\t\t Not set")
+            else:
+                print(f"\tNominal acceleration gradient [GV/m]:\t\t {self.nom_accel_gradient/1e9 :.3f}")
 
 
 ###################################################

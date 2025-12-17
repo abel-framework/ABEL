@@ -1465,15 +1465,7 @@ class PlasmaLinac(Linac):
 
         print('\n== Stage ==========')
         self.stage.print_summary()
-
-        if self.stage.upramp is not None:
-            print('\n== Upramp ==========')
-            self.stage.upramp.print_summary(print_params=False)
-
-        if self.stage.downramp is not None:
-            print('\n== Downramp ==========')
-            self.stage.downramp.print_summary(print_params=False)
-
+        
         print('\n== Interstage ==========')
         if self.interstage is None:
             print('Type: ', 'None')
