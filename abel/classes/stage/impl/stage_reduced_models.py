@@ -545,7 +545,7 @@ class StageReducedModels(Stage):
             Drive beam after tracking.
         """
 
-        print("main_tracking_procedure() START",flush=True)
+        #print("main_tracking_procedure() START",flush=True) #TODO: delete
         
         # ========== Wake-T simulation and extraction ==========
         # Extract driver xy-offsets for later use
@@ -553,22 +553,22 @@ class StageReducedModels(Stage):
         driver_y_offset = driver0.y_offset()
 
         # Perform a single time step Wake-T simulation
-        print("main_tracking_procedure() single_step_wake_t...",flush=True)
+        #print("main_tracking_procedure() single_step_wake_t...",flush=True) #TODO: delete
         wake_t_evolution = run_single_step_wake_t(self.plasma_density, copy.deepcopy(driver0), copy.deepcopy(beam0))  # Must send deepcopies of the beams, as this function changes the input beams. 
 
         # Read the Wake-T simulation data
-        print("main_tracking_procedure() store_rb_Ez...",flush=True)
+        #print("main_tracking_procedure() store_rb_Ez...",flush=True) #TODO: delete
         self.store_rb_Ez_2stage(wake_t_evolution, driver0, beam0)
 
 
         # ========== Set up and track the beams using the physics models ==========
         # Filter out beam particles outside of the plasma bubble
-        print("main_tracking_procedure() bubble_filter...",flush=True)
+        #print("main_tracking_procedure() bubble_filter...",flush=True) #TODO: delete
         beam_filtered = self.bubble_filter(beam0, sort_zs=True)
         beam_filtered.location = beam0.location
         beam_filtered.stage_number = beam0.stage_number
 
-        print("main_tracking_procedure() bubble_filter done.",flush=True)
+       # print("main_tracking_procedure() bubble_filter done.",flush=True)#TODO: delete
         if self.num_z_cells_main is None:
             self.num_z_cells_main = round(np.sqrt( len(driver0)+len(beam_filtered) )/2)
 
@@ -579,7 +579,7 @@ class StageReducedModels(Stage):
         # else:
         #     wake_t_fields = None
 
-        print("main_tracking_procedure() trans_wake_config...",flush=True)
+        #print("main_tracking_procedure() trans_wake_config...",flush=True) #TODO: delete
         # Set up the configuration for the instability model
         trans_wake_config = PrtclTransWakeConfig(
             plasma_density=self.plasma_density, 
@@ -609,7 +609,7 @@ class StageReducedModels(Stage):
             drive_beam_update_period=self.drive_beam_update_period, 
             #wake_t_fields=wake_t_fields  # TODO: remove when driver evolution has been implemented.
         )
-        print("main_tracking_procedure() trans_wake_config done.",flush=True)
+        #print("main_tracking_procedure() trans_wake_config done.",flush=True) #TODO: delete
         
         #TODO: Modify this test
         inputs = [driver0, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
@@ -627,7 +627,7 @@ class StageReducedModels(Stage):
         info_rho.imshow_extent[2] = rs_rho.min()
         info_rho.imshow_extent[3] = rs_rho.max()
 
-        print("main_tracking_procedure() CHECKPOINT1",flush=True)
+        #print("main_tracking_procedure() CHECKPOINT1",flush=True) #TODO: delete
         
         # Save the initial step with ramped beams in rotated coordinate system after upramp
         Ez_axis_wakeT = wake_t_evolution.initial.plasma.wakefield.onaxis.Ezs
@@ -635,22 +635,23 @@ class StageReducedModels(Stage):
         self.__save_initial_step(Ez0_axial=Ez_axis_wakeT, zs_Ez0=zs_Ez_wakeT, rho0=rho, metadata_rho0=info_rho, driver0=driver0, beam0=beam_filtered)
         
         # Perform main tracking
-        print("main_tracking_procedure() PERFORMING MAIN TRACKING...",flush=True)
+        #print("main_tracking_procedure() PERFORMING MAIN TRACKING...",flush=True) #TODO: delete
+
         beam, drive_beam, evolution = transverse_wake_instability_particles(beam_filtered, driver0, Ez_fit_obj=self.Ez_fit_obj, rb_fit_obj=self.rb_fit_obj, trans_wake_config=trans_wake_config)
 
-        print("main_tracking_procedure() PERFORMED MAIN TRACKING!.",flush=True)
+        #print("main_tracking_procedure() PERFORMED MAIN TRACKING!.",flush=True) #TODO: delete
         self.evolution = evolution
 
         ## NOTE: beam and driver cannot be changed after this line in order to probe for continuity between ramps and stage.
 
         # Save the final step with ramped beams in rotated coordinate system before downramp
-        print("main_tracking_procedure() save_final_step...",flush=True)
+        # print("main_tracking_procedure() save_final_step...",flush=True) #TODO: delete
         if self.save_final_step:
             self.__save_final_step(Ez_axis_wakeT, zs_Ez_wakeT, rho, info_rho, drive_beam, beam)
         else:
             self.final = None
 
-        print("main_tracking_procedure() return.",flush=True)
+        #print("main_tracking_procedure() return.",flush=True) #TODO: delete
         return beam, drive_beam
 
 
@@ -722,7 +723,7 @@ class StageReducedModels(Stage):
         # Set driver
         upramp.driver_source = SourceCapsule(beam=driver0)
 
-        upramp.print_summary()
+        #upramp.print_summary() #TODO: delete
         
         # ========== Main tracking sequence ==========
         beam, driver = upramp.main_tracking_procedure(beam0, driver0, shot_path, tmpfolder=None)
@@ -783,22 +784,22 @@ class StageReducedModels(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        print("Saved beams.", flush=True)
+        #print("Saved beams.", flush=True) #TODO: delete
             
         # Convert PlasmaRamp to a StageReducedModels
         if type(self.downramp) is PlasmaRamp:
-            print("Convert PlasmaRamp", flush=True)
+            #print("Convert PlasmaRamp", flush=True) #TODO: delete
             downramp = self.convert_PlasmaRamp(self.downramp)
             if type(downramp) is not StageReducedModels:
                 raise TypeError('downramp is not a StageReducedModels.')
             
         elif type(self.downramp) is Stage:
-            print("Set Stage",flush=True)
+            #print("Set Stage",flush=True) #TODO: delete
             downramp = self.downramp  # Allow for other types of ramps
         else:
             raise StageError('Ramp is not an instance of Stage class.')
 
-        print("Sanity checking",flush=True)
+        #print("Sanity checking",flush=True)  #TODO: delete
         if downramp.plasma_density is None:
             raise ValueError('Downramp plasma density is invalid.')
         if downramp.nom_energy is None:
@@ -817,7 +818,7 @@ class StageReducedModels(Stage):
             raise ValueError('Downramp nominal acceleration gradient is invalid.')
         if downramp.nom_accel_gradient_flattop is None:
             raise ValueError('Downramp flattop nominal acceleration gradient is invalid.')
-        print("Is sane.",flush=True)
+        #print("Is sane.",flush=True)  #TODO: delete
 
         # set driver
         downramp.driver_source = SourceCapsule(beam=driver0)
@@ -826,7 +827,7 @@ class StageReducedModels(Stage):
         
         # ========== Main tracking sequence ==========
         print("Calling downramp.main_tracking_procedure()...",flush=True)
-        print("Downramp = ", downramp, flush=True)
+        #print("Downramp = ", downramp, flush=True)  #TODO: delete
         beam, driver = downramp.main_tracking_procedure(beam0, driver0, shot_path, tmpfolder=None)
         print("Done with downramp.main_tracking_procedure()...",flush=True)
 

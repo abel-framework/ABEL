@@ -141,7 +141,7 @@ def test_stage_length_gradient_energyGain():
     stage.length_flattop = 7.8                                                    # [m]
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
 
-    stage.print_summary()
+    #stage.print_summary()
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=True)
@@ -152,7 +152,7 @@ def test_stage_length_gradient_energyGain():
     assert np.allclose(stage.nom_accel_gradient_flattop, 1.0e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length, stage.length_flattop + stage.upramp.length_flattop + stage.downramp.length_flattop, rtol=1e-15, atol=0.0)
 
-    print("\n\n\n")
+    #print("\n\n\n")
 
     # ========== Set nominal energy gain and flattop nominal acceleration gradient ==========
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False, length_flattop=None)
@@ -161,7 +161,7 @@ def test_stage_length_gradient_energyGain():
     stage.nom_energy_gain_flattop = 7.8e9                                         # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
 
-    stage.print_summary()
+    #stage.print_summary()
 
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=True)
