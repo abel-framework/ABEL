@@ -41,4 +41,4 @@ jobs:
 
     - name: Run Unit Tests
       #run: python -m pytest -v tests/
-      run: python -m pytest -v tests/test_StageReducedModels.py::test_rb_Ez_tracing
+      run: python -m pytest -v tests/test_StageReducedModels.py::test_stage_length_gradient_energyGain
