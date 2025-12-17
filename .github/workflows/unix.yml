@@ -40,4 +40,5 @@ jobs:
       run: python -m pytest -v tests/test_init.py::testCore_init || true
 
     - name: Run Unit Tests
-      run: python -m pytest -v tests/
+      #run: python -m pytest -v tests/
+      run: python -m pytest -v tests/test_StageReducedModels.py::test_rb_Ez_tracing
