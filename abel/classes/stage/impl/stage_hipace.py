@@ -30,62 +30,87 @@ class StageHipace(Stage):
     prepares input files, launches HiPACE++ runs, extracts beam and plasma 
     diagnostics, and post-processes simulation data.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes
     ----------
-    keep_data : bool
-        Flag for whether to keep raw HiPACE++ output after simulation.
+    keep_data : bool, optional
+        Flag for whether to keep raw HiPACE++ output after simulation. 
+        Defaults to ``False``.
 
-    save_drivers : bool
-        Flag for whether to save input and output driver beams to disk.
+    save_drivers : bool, optional
+        Flag for whether to save input and output driver beams to disk. 
+        Defaults to ``False``.
 
-    output : int
+    output : int, optional
         Frequency (in simulation steps) for HiPACE++ field/particle outputs.
+        If ``None``, will output the last time step. Defaults to ``None``. 
 
-    ion_motion : bool
-        Flag to include ion motion in the plasma.
+    ion_motion : bool, optional
+            Flag to include ion motion in the plasma. Defaults to ``True``.
 
-    ion_species : str
-        Ion species used in the plasma (e.g. 'H', 'He', 'Li').
+    ion_species : str, optional
+        Ion species used in the plasma (e.g. 'H', 'He', 'Li'). Defaults to 
+        ``'H'``.
 
-    beam_ionization : bool
-        Flag for enabling beam-induced ionization.
+    beam_ionization : bool, optional
+        Flag for enabling beam-induced ionization. Defaults to ``True``.
 
-    radiation_reaction : bool
-        Flag for enabling radiation reaction effects.
+    radiation_reaction : bool, optional
+        Flag for enabling radiation reaction effects. Defaults to ``False``.
 
-    num_nodes : int
-        Number of compute nodes to request in the job script.
+    num_nodes : int, optional
+        Number of compute nodes to request in the job script. Defaults to 1.
 
-    num_cell_xy : int
-        Number of transverse grid cells in HiPACE++.
+    num_cell_xy : int, optional
+        Number of transverse grid cells in HiPACE++. Defaults to 511.
 
-    driver_only : bool
-        Flag for running simulation with only the driver (no witness beam).
+    driver_only : bool, optional
+        Flag for running simulation with only the driver (no witness beam). 
+        Defaults to ``False``.
 
-    plasma_density_from_file : str
-        Path to plasma density profile file (overrides uniform density).
+    plasma_density_from_file : str, optional
+        Path to plasma density profile file (overrides uniform density). Is 
+        ignored when set to ``None``. Defaults to ``None``. Expected format for 
+        the file:
 
-    no_plasma : bool
-        If ``True``, runs the stage without plasma.
+            - Must be a plain text file.
+            - Each line must contain exactly two whitespace-separated numeric values (SI units):
+              <longitudinal position> <plasma density>
 
-    external_focusing : bool
-        Flag for whether to include external focusing (APL-like quadrupoles).
+    no_plasma : bool, optional
+        If ``True``, runs the stage without plasma. Defaults to ``False``.
 
-    mesh_refinement : bool
-        Enable HiPACE++ mesh refinement.
+    external_focusing : bool, optional
+        Flag for enabling drive beam guiding by applying a linear transverse 
+        external magnetic field across the beams. If ``True``, the field 
+        gradient of the external field is set to enforce the drive beam to 
+        undergo an half-interger number of betatron oscillations along the 
+            stage. Defaults to ``False``.
 
-    do_spin_tracking : bool
-        Flag for enabling particle spin tracking.
+    mesh_refinement : bool, optional
+        Enable HiPACE++ mesh refinement. See the 
+        :func:`HiPACE++ wrapper <abel.wrappers.hipace.hipace_wrapper.hipace_write_inputs>`
+        for more details. Defaults to ``True``. 
 
-    run_path : str
-        Path to store plots and outputs.
+    do_spin_tracking : bool, optional
+        Flag for enabling particle spin tracking. Defaults to ``False``.
 
-    plasma_profile : SimpleNamespace
+    run_path : str, optional
+        Path to store plots and outputs. Defaults to ``None``.
+
+    plasma_profile : :class:`types.SimpleNamespace`
         Holds arrays for longitudinal positions (`ss`) and densities (`ns`)
         when ramps are generated internally.
+
+    stage_number : int
+        Keeps track of which stage it is in the beamline.
+
+        
+    References
+    ----------
+    .. [1] HiPACE++ User Guide, https://hipace.readthedocs.io/
     """
     
     def __init__(self, length=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, keep_data=False, save_drivers=False, output=None, ion_motion=True, ion_species='H', beam_ionization=True, radiation_reaction=False, num_nodes=1, num_cell_xy=511, driver_only=False, plasma_density_from_file=None, no_plasma=False, external_focusing=False, mesh_refinement=True, do_spin_tracking=False, run_path=None):
@@ -94,71 +119,86 @@ class StageHipace(Stage):
 
         Parameters
         ----------
-        length : [m] float, optional
-            Total length of the plasma stage.
+        length : [m] float
+            Total length of the plasma stage and its ramps if any.
+        
+        nom_energy_gain : [eV] float
+            Nominal/target energy gain of the acceleration stage.
+        
+        plasma_density : [m^-3] float
+            Plasma density.
 
-        nom_energy_gain : [eV] float, optional
-            Nominal beam energy gain.
-
-        plasma_density : [m^-3] float, optional
-            Uniform plasma density. Ignored if ``plasma_density_from_file`` is given.
-
-        driver_source : ``Source`` or ``DriverComplex``, optional (default= ``None``)
-            The source of the drive beam.
+        driver_source : ``Source`` or ``DriverComplex``, optional
+            The source of the drive beam. Default set to ``None``.
 
         ramp_beta_mag : float, optional
-            Beta function magnitude used in ramp design.
+            Used for demagnifying and magnifying beams passing through entrance 
+            and exit plasma ramps. Defaults to ``None``
 
-        keep_data : bool, optional (default= ``False``)
-            Flag for whether to keep raw HiPACE++ output after simulation.
+        keep_data : bool, optional
+            Flag for whether to keep raw HiPACE++ output after simulation. 
+            Defaults to ``False``.
 
-        save_drivers : bool, optional (default= ``False``)
-            Flag for whether to save input and output driver beams to disk.
+        save_drivers : bool, optional
+            Flag for whether to save input and output driver beams to disk. 
+            Defaults to ``False``.
 
         output : int, optional
             Frequency (in simulation steps) for HiPACE++ field/particle outputs.
+            If ``None``, will output the last time step. Defaults to ``None``. 
 
-        ion_motion : bool, optional (default= ``True``)
-            Flag to include ion motion in the plasma.
+        ion_motion : bool, optional
+                Flag to include ion motion in the plasma. Defaults to ``True``.
 
-        ion_species : str, optional (default= ``'H'``)
-            Ion species used in the plasma (e.g. 'H', 'He', 'Li').
+        ion_species : str, optional
+            Ion species used in the plasma (e.g. 'H', 'He', 'Li'). Defaults to 
+            ``'H'``.
 
-        beam_ionization : bool, optional (default= ``True``)
-            Flag for enabling beam-induced ionization.
+        beam_ionization : bool, optional
+            Flag for enabling beam-induced ionization. Defaults to ``True``.
 
-        radiation_reaction : bool, optional (default= ``False``)
-            Flag for enabling radiation reaction effects.
+        radiation_reaction : bool, optional
+            Flag for enabling radiation reaction effects. Defaults to ``False``.
 
-        num_nodes : int, optional (default=1)
-            Number of compute nodes to request in the job script.
+        num_nodes : int, optional
+            Number of compute nodes to request in the job script. Defaults to 1.
 
-        num_cell_xy : int, optional (default=511)
-            Number of transverse grid cells in HiPACE++.
+        num_cell_xy : int, optional
+            Number of transverse grid cells in HiPACE++. Defaults to 511.
 
-        driver_only : bool, optional (default= ``False``)
-            Flag for running simulation with only the driver (no witness beam).
+        driver_only : bool, optional
+            Flag for running simulation with only the driver (no witness beam). 
+            Defaults to ``False``.
 
-        plasma_density_from_file : str, optional (default= ``None``)
-            Path to plasma density profile file (overrides uniform density).
+        plasma_density_from_file : str, optional
+            Path to plasma density profile file (overrides uniform density). Is 
+            ignored when set to ``None``. Defaults to ``None``. Expected format 
+            for the file:
 
-        no_plasma : bool, optional (default= ``False``)
-            If ``True``, runs the stage without plasma.
+                - Must be a plain text file.
+                - Each line must contain exactly two whitespace-separated numeric values (SI units):
+                <longitudinal position> <plasma density>
 
-        external_focusing : bool, optional (default= ``False``)
-            Flag for whether to include external focusing (APL-like quadrupoles).
+        no_plasma : bool, optional
+            If ``True``, runs the stage without plasma. Defaults to ``False``.
 
-        mesh_refinement : bool, optional (default= ``True``)
-            Enable HiPACE++ mesh refinement.
+        external_focusing : bool, optional
+            Flag for enabling drive beam guiding by applying a linear transverse 
+            external magnetic field across the beams. If ``True``, the field 
+            gradient of the external field is set to enforce the drive beam to 
+            undergo an half-interger number of betatron oscillations along the 
+            stage. Defaults to ``False``.
 
-        do_spin_tracking : bool, optional (default= ``False``)
-            Flag for enabling particle spin tracking.
+        mesh_refinement : bool, optional
+            Enable HiPACE++ mesh refinement. See the 
+            :func:`HiPACE++ wrapper <abel.wrappers.hipace.hipace_wrapper.hipace_write_inputs>`
+            for more details. Defaults to ``True``. 
 
-        run_path : str, optional (default= ``None``)
-            Path to store plots and outputs.
+        do_spin_tracking : bool, optional
+            Flag for enabling particle spin tracking. Defaults to ``False``.
 
-        stage_number : int
-            Keeps track of which stage it is in the beamline.
+        run_path : str, optional
+            Path to store plots and outputs. Defaults to ``None``.
         """
 
         super().__init__(length, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
@@ -227,7 +267,7 @@ class StageHipace(Stage):
             self._external_focusing_gradient = 0
         if self.external_focusing == True and self._external_focusing_gradient is None:
             num_half_oscillations = 1
-            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2
+            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
         
         beam0 = beam_incoming
         driver0 = driver_incoming
@@ -643,47 +683,56 @@ class StageHipace(Stage):
     
     # ==================================================
     # Apply waterfall function to all beam dump files
-    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', clean=False, remove_halo_nsigma=20, args=None):
+    def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', remove_halo_nsigma=None, args=None):
         """
-        Applies waterfall function to all beam dump files in ``data_dir``.
+        Applies waterfall function to all HiPACE++ HDF5 output files in 
+        ``data_dir``.
 
          Parameters
         ----------
-        fcns : A list of Beam class methods
-            Beam class profile methods such as ``Beam.current_profile``, ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, ``Beam.transverse_profile_y``.
+        fcns : A list of ``Beam`` class methods
+            Beam class profile methods such as ``Beam.current_profile``, 
+            ``Beam.rel_energy_spectrum``, ``Beam.transverse_profile_x``, 
+            ``Beam.transverse_profile_y``.
 
         edges : float list
-            Specifies the bins to be used to create the histogram(s) in the waterfall plot(s).
+            Specifies the bins to be used to create the histogram(s) in the 
+            waterfall plot(s).
 
         data_dir : str
             Path to the directory containing all HiPACE++ HDF5 output files.
 
         species : str, optional
-            Specifies the name of the beam to be extracted.
-
-        clean : bool, optional
-            Determines whether the extracted beams from the HiPACE++ HDF5 output files should be cleaned before further processing.
+            Specifies the name of the beam to be extracted. Defaults to 
+            ``'beam'``.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles based on their deviation from the core of the particle beam.
+            If not ``None``, defines a threshold for identifying and excluding 
+            outlier particles based on their deviation from the core of the 
+            particle beam. Defaults to ``None``.
 
         args : float list, optional
-            Allows passing additional arguments to the functions in fcns.
+            Allows passing additional arguments to the functions in ``fcns``. 
+            Defaults to ``None``.
             
             
         Returns
         ----------
         waterfalls : list of 2D float ndarrays
-            Each element in ``waterfalls`` corresponds to the output of one function in fcns applied across all files (i.e., simulation outputs). The dimension of element i is determined by the length of ``edges`` and the number of simulation outputs.
+            Each element in ``waterfalls`` corresponds to the output of one 
+            function in ``fcns`` applied across all files (i.e., simulation 
+            outputs). The dimension of element i is determined by the length of 
+            ``edges`` and the number of simulation outputs.
         
         locations : [m] 1D float ndarray
             Stores the location for each slice of ``waterfalls``.
         
         bins : list of 1D float ndarrays
-            Each element contains the bins used for the slices/histograms in ``waterfalls``.
+            Each element contains the bins used for the slices/histograms in 
+            ``waterfalls``.
         """
 
-        from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
+        from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
         
         # find number of beam outputs to plot
         files = sorted(os.listdir(data_dir))
@@ -702,7 +751,7 @@ class StageHipace(Stage):
             # load phase space
             beam = hipaceHdf5_2_abelBeam(data_dir, index, species=species)
 
-            if clean:
+            if remove_halo_nsigma is not None and remove_halo_nsigma > 0.0:
                 beam.remove_halo_particles(nsigma=remove_halo_nsigma)
             
             # find beam location
@@ -719,7 +768,7 @@ class StageHipace(Stage):
 
         
     # ==================================================
-    def plot_waterfalls(self, data_dir, species='beam', clean=False, remove_halo_nsigma=20, save_fig=False):
+    def plot_waterfalls(self, data_dir, species='beam', remove_halo_nsigma=20, save_path=None): # TODO move dependencies and move this to Stage
         '''
         Create waterfall plots for current profile, relative energy spectrum, 
         horizontal transverse profile and vertical transverse profile.
@@ -730,21 +779,26 @@ class StageHipace(Stage):
             Path to the directory containing all HiPACE++ HDF5 output files.
 
         species : str, optional
-            Specifies the name of the beam to be extracted.
-
-        clean : bool, optional
-            Determines whether the extracted beams from the HiPACE++ HDF5 output 
-            files should be cleaned before further processing.
+            Specifies the name of the beam to be extracted. Defaults to 
+            ``'beam'``.
 
         remove_halo_nsigma : float, optional
-            Defines a threshold for identifying and removing "halo" particles 
-            based on their deviation from the core of the particle beam.
+            If not ``None``, defines a threshold for identifying and excluding 
+            outlier particles based on their deviation from the core of the 
+            particle beam. Defaults to 20.
 
-        save_fig : bool, optional
-            Flag for saving the output figure.
+        save_path : str, optional
+            If not ``None``, saves the output figure to the specified file path. 
+            Defaults to ``None``.
+
+
+        Returns
+        ----------
+        ``None``
         '''
 
-        from abel.apis.hipace.hipace_api import hipaceHdf5_2_abelBeam
+        from abel.wrappers.hipace.hipace_wrapper import hipaceHdf5_2_abelBeam
+        from abel.classes.beam import Beam
         from matplotlib import pyplot as plt
         
         files = sorted(os.listdir(data_dir))
@@ -761,7 +815,7 @@ class StageHipace(Stage):
         xedges = (nsig*beam0.beam_size_x() + abs(beam0.x_offset()))*np.linspace(-1, 1, num_bins)
         yedges = (nsig*beam0.beam_size_y() + abs(beam0.y_offset()))*np.linspace(-1, 1, num_bins)
         
-        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, clean=clean, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
+        waterfalls, locations, bins = self.__waterfall_fcn([Beam.current_profile, Beam.rel_energy_spectrum, Beam.transverse_profile_x, Beam.transverse_profile_y], [tedges, deltaedges, xedges, yedges], data_dir, species=species, remove_halo_nsigma=remove_halo_nsigma, args=[None, None, None, None])
 
         # prepare figure
         fig, axs = plt.subplots(4,1)
@@ -801,9 +855,5 @@ class StageHipace(Stage):
         axs[3].set_xlabel('Location along the stage [m]')
         
         plt.show()
-        if save_fig:
-            plot_path = self.run_path + 'plots' + os.sep
-            if not os.path.exists(plot_path):
-                os.makedirs(plot_path)
-            filename = plot_path + 'waterfalls' + '.png'
-            fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
+        if save_path is not None:
+            fig.savefig(save_path, format='png', dpi=600, bbox_inches='tight', transparent=False)

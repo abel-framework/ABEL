@@ -53,24 +53,29 @@ class StageReducedModels(Stage):
     The drive beam, longitudinal electric field and blow-out bubble radius are 
     assumed unchanged throughout the tracking process through the stage.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
 
     
     Attributes
     ----------
-    time_step_mod : [betatron wavelength/c] float
-        Time step modifier that sets the time step in units of betatron wavelength/c for beam tracking.
+    ramp_beta_mag : float, optional
+        Betatron magnification used for ramps. Default set to 1.0
 
-    enable_tr_instability : bool
-        Flag for enabling transverse intra-beam instability calculations.
+    time_step_mod : [beta_wave_length/c] float, optional
+        Determines the time step of the instability tracking in units of 
+        betatron wave length/c. Defaults to 0.05.
 
-    enable_radiation_reaction : bool
-        Flag for enabling radiation reaction effects.
+    enable_tr_instability : bool, optional
+        Flag for enabling transverse intra-beam instability calculations. 
+        Defaults to ``True``.
 
-    enable_ion_motion : bool
-        Flag for enabling plasma ion motion effects.
+    enable_radiation_reaction : bool, optional
+        Flag for enabling radiation reaction effects. Defaults to ``True``.
 
-    Ez_fit_obj : [V/m] interpolation object
+    enable_ion_motion : bool, optional
+        Flag for enabling plasma ion motion effects. Defaults to ``False``.
+
+    Ez_fit_obj : [V/m] :class:`scipy.interpolate._interpolate.interp1d`
         1D interpolation object of longitudinal electric field fitted to axial 
         electric field using a selection of longitudinal coordinates ``zs`` 
         along the main beam. Used to determine the value of the longitudinal 
@@ -80,7 +85,7 @@ class StageReducedModels(Stage):
         Longitudinal E-field in the region of interest fitted to a selection of 
         ``zs`` along the main beam (main beam head to tail).
 
-    rb_fit_obj : [m] interpolation object
+    rb_fit_obj : [m] :class:`scipy.interpolate._interpolate.interp1d`
         1D interpolation object of plasma bubble radius fitted to axial bubble 
         radius using a selection of ``zs`` along the main beam. Used to 
         determine the value of the bubble radius for all beam ``zs``.
@@ -88,43 +93,51 @@ class StageReducedModels(Stage):
     bubble_radius_roi : [m] 1D ndarray
         Plasma bubble radius in the region of interest.
 
-    ion_charge_num : [e] float
-        Charge number of ions.
+    ion_charge_num : [e] float, optional
+        Ion charge number in unit of elementary charge. Defaults to 1.0.
 
-    ion_mass : [kg] float
-        Ion mass.
+    ion_mass : [kg] float, optional
+        Ion mass. Default set by the ion motion physics model.
 
-    num_z_cells_main : int
+    num_z_cells_main : int, optional
         Determines the binning of the z-coordinates used to probe main beam 
-        electric fields using ``RF-Track``. Used in calculating wakefield 
-        perturbation due to ion motion.
+        electric fields using RF-Track. Used in calculating wakefield 
+        perturbation due to ion motion. If ``None``, is determined by the 
+        number of macroparticles. Defaults to ``None``.
 
-    num_x_cells_rft, num_y_cells_rft : int
-        Number of grid cells along x and y used in ``RF-Track`` for calculating 
-        beam electric fields used in calculating wakefield perturbation due to 
-        ion motion.
+    num_x_cells_rft : int, optional
+        Number of grid cells along x used in RF-Track for calculating beam
+        electric fields used in calculating wakefield perturbation due to 
+        ion motion. Defaults to 50.
+        
+    num_y_cells_rft : int, optional
+        Number of grid cells along y used in RF-Track for calculating beam 
+        electric fields used in calculating wakefield perturbation due to 
+        ion motion. Defaults to 50.
 
-    num_xy_cells_probe : int
-        Number of grid cells along x and y used to probe beam electric fields 
-        calculated by ``RF-Track``. Used in calculating wakefield perturbation 
-        due to ion motion.
+    num_xy_cells_probe : int, optional
+        Number of grid cells along x and y used to probe beam electric 
+        fields calculated by RF-Track. Used in calculating wakefield 
+        perturbation due to ion motion. Defaults to 41.
 
-    uniform_z_grid : bool
-        Flag to determine whether the grid along z is uniform (``True``) or finely 
-        resolved along the drive beam and main beam regions, while the region 
-        between the beams are coarsely resolved (``False``).
+    uniform_z_grid : bool, optional
+        Flag to determine whether the grid along z is uniform (``True``) or 
+        finely resolved along the drive beam and main beam regions, while the 
+        region between the beams are coarsely resolved (``False``). Defaults 
+        to ``False``.
 
-    ion_wkfld_update_period : int
-        Determines the ion wakefield perturbation update period. This is given 
-        in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will 
-        update the ion wakefield perturbation every 3rd time step. 
+    ion_wkfld_update_period : int, optional
+        Determines the ion wakefield perturbation update period. This is 
+        given in units of time steps, so that e.g. 
+        ``ion_wkfld_update_period=3`` will update the ion wakefield 
+        perturbation every 3rd time step. Defaults to 1.
 
-    probe_evol_period : int
-        Time step interval for probing beam evolution. Set to larger than 0 to 
-        record beam parameters for beam evolution diagnostics. The probing 
-        interval is given in units of time steps, so that e.g. 
+    probe_evol_period : int, optional
+        Time step interval for probing beam evolution. Set to larger than 0 
+        to record beam parameters for beam evolution diagnostics. The 
+        probing interval is given in units of time steps, so that e.g. 
         ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
-        step.
+        step. Defaults to 0`.
 
     evolution : dict
         Contains the beam parameter evolution across the stage.
@@ -132,18 +145,28 @@ class StageReducedModels(Stage):
     stage_number : int
         Keeps track of which stage it is in the beamline.
 
-    save_final_step : bool
+    save_final_step : bool, optional
         Flag for storing the output data including beam, driver, and plasma 
-        quantities.
+        quantities. Defaults to ``False``.
 
-    make_animations : bool
-        Flag for creating side-view and phase-space animations.
+    make_animations : bool, optional
+        Flag for creating side-view and phase-space animations. Defaults to 
+        ``False``.
 
-    store_beams_for_tests : bool
-        Flag for storing intermediate beam states for testing.
+    store_beams_for_tests : bool, optional
+        Flag for storing intermediate beam states for testing. Defaults to 
+        ``False``.
 
-    show_prog_bar : bool
-        Flag for displaying the progress bar for beam tracking.
+    show_prog_bar : bool, optional
+        Flag for displaying the progress bar for beam tracking. Set to 
+        ``None`` to let ``StageReducedModels.track()`` decide whether to 
+        display the progress bar. Defaults to ``None``.
+
+        
+    References
+    ----------
+    .. [1] Wake-T documentation: https://wake-t.readthedocs.io/en/latest/index.html
+    .. [2] RF-Track reference manual: https://gitlab.cern.ch/rf-track/rf-track-reference-manual
     """
 
     # ==================================================
@@ -154,92 +177,97 @@ class StageReducedModels(Stage):
 
         Parameters
         ----------
-        nom_accel_gradient : [V/m] float, optional (default= ``None``)
+        nom_accel_gradient : [V/m] float
             Nominal acceleration gradient.
 
-        nom_energy_gain : [eV] float, optional (default= ``None``)
+        nom_energy_gain : [eV] float
             Nominal energy gain across the plasma stage.
 
-        plasma_density : [m^-3] float, optional (default= ``None``)
+        plasma_density : [m^-3] float
             The plasma density of the plasma stage.
         
-        driver_source : ``Source`` or ``DriverComplex``, optional (default= ``None``)
-            The source of the drive beam.
+        driver_source : ``Source`` or ``DriverComplex``, optional
+            The source of the drive beam. Default set to ``None``.
 
-        ramp_beta_mag : float, optional (default=1.0)
-            Betatron magnification used for defining ramps.
+        ramp_beta_mag : float, optional
+            Betatron magnification used for ramps. Default set to 1.0.
 
-        time_step_mod : [beta_wave_length/c] float, optional (default=0.05)
+        time_step_mod : [beta_wave_length/c] float, optional
             Determines the time step of the instability tracking in units of 
-            betatron wave length/c.
+            betatron wave length/c. Defaults to 0.05.
             
-        enable_tr_instability : bool, optional (default= ``True``)
-            Flag for enabling transverse intra-beam instability calculations.
+        enable_tr_instability : bool, optional
+            Flag for enabling transverse intra-beam instability calculations. 
+            Defaults to ``True``.
 
-        enable_radiation_reaction : bool, optional (default= ``True``)
-            Flag for enabling radiation reaction effects.
+        enable_radiation_reaction : bool, optional
+            Flag for enabling radiation reaction effects. Defaults to ``True``.
 
-        enable_ion_motion : bool, optional (default= ``False``)
-            Flag for enabling plasma ion motion effects.
+        enable_ion_motion : bool, optional
+            Flag for enabling plasma ion motion effects. Defaults to ``False``.
 
         ion_charge_num : [e] float, optional
-            Charge number of ions. Default set by the ion motion physics model.
+            Ion charge number in unit of elementary charge. Defaults to 1.0.
 
         ion_mass : [kg] float, optional
             Ion mass. Default set by the ion motion physics model.
 
         num_z_cells_main : int, optional
             Determines the binning of the z-coordinates used to probe main beam 
-            electric fields using ``RF-Track``. Used in calculating wakefield 
-            perturbation due to ion motion. Default set by the ion motion 
-            physics model.
+            electric fields using RF-Track. Used in calculating wakefield 
+            perturbation due to ion motion. If ``None``, is determined by the 
+            number of macroparticles. Defaults to ``None``.
 
-        num_x_cells_rft : int, optional (default=50)
-            Number of grid cells along x used in ``RF-Track`` for calculating 
-            beam electric fields used in calculating wakefield perturbation due to 
-            ion motion.
+        num_x_cells_rft : int, optional
+            Number of grid cells along x used in RF-Track for calculating beam
+            electric fields used in calculating wakefield perturbation due to 
+            ion motion. Defaults to 50.
         
-        num_y_cells_rft : int, optional (default=50)
-            Number of grid cells along y used in ``RF-Track`` for calculating 
-            beam electric fields used in calculating wakefield perturbation due to 
-            ion motion.
+        num_y_cells_rft : int, optional
+            Number of grid cells along y used in RF-Track for calculating beam 
+            electric fields used in calculating wakefield perturbation due to 
+            ion motion. Defaults to 50.
 
-        num_xy_cells_probe : int, optional (default=41)
-            Number of grid cells along x and y used to probe beam electric fields 
-            calculated by ``RF-Track``. Used in calculating wakefield perturbation 
-            due to ion motion.
+        num_xy_cells_probe : int, optional
+            Number of grid cells along x and y used to probe beam electric 
+            fields calculated by RF-Track. Used in calculating wakefield 
+            perturbation due to ion motion. Defaults to 41.
 
-        uniform_z_grid : bool, optional (default= ``False``)
-            Flag to determine whether the grid along z is uniform (``True``) or finely 
-            resolved along the drive beam and main beam regions, while the region 
-            between the beams are coarsely resolved (``False``).
+        uniform_z_grid : bool, optional
+            Flag to determine whether the grid along z is uniform (``True``) or 
+            finely resolved along the drive beam and main beam regions, while the 
+            region between the beams are coarsely resolved (``False``). Defaults 
+            to ``False``.
 
-        ion_wkfld_update_period : int, optional (default=1)
-            Determines the ion wakefield perturbation update period. This is given 
-            in units of time steps, so that e.g. ``ion_wkfld_update_period=3`` will 
-            update the ion wakefield perturbation every 3rd time step.
+        ion_wkfld_update_period : int, optional
+            Determines the ion wakefield perturbation update period. This is 
+            given in units of time steps, so that e.g. 
+            ``ion_wkfld_update_period=3`` will update the ion wakefield 
+            perturbation every 3rd time step. Defaults to 1.
 
         show_prog_bar : bool, optional
             Flag for displaying the progress bar for beam tracking. Set to 
             ``None`` to let ``StageReducedModels.track()`` decide whether to 
-            display the progress bar.
+            display the progress bar. Defaults to ``None``.
 
-        probe_evol_period : int, optional (default=0)
-            Time step interval for probing beam evolution. Set to larger than 0 to 
-            record beam parameters for beam evolution diagnostics. The probing 
-            interval is given in units of time steps, so that e.g. 
+        probe_evol_period : int, optional
+            Time step interval for probing beam evolution. Set to larger than 0 
+            to record beam parameters for beam evolution diagnostics. The 
+            probing interval is given in units of time steps, so that e.g. 
             ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
-            step.
+            step. Defaults to 0`.
 
-        save_final_step : bool, optional (default= ``False``)
+        save_final_step : bool, optional
             Flag for storing the output data including beam, driver, and plasma 
-            quantities.
+            quantities. Defaults to ``False``.
 
-        make_animations : bool, optional (default= ``False``)
-            Flag for creating side-view and phase-space animations.
+        make_animations : bool, optional
+            Flag for creating side-view and phase-space animations. Defaults to 
+            ``False``.
 
-        store_beams_for_tests : bool, optional (default= ``False``)
-            Flag for storing intermediate beam states for testing.
+        store_beams_for_tests : bool, optional
+            Flag for storing intermediate beam states for testing. Defaults to 
+            ``False``.
         """
 
         #drive_beam_update_period : int, optional
@@ -465,6 +493,7 @@ class StageReducedModels(Stage):
         Prepare and perform the main reduced model beam tracking.
         
         - Perform single time step Wake-T simulation and extracts relevant information.
+        - Adds the transverse offsets of ``driver0`` to the Wake-T output coordinates to undo the transverse shift in ``run_single_step_wake_t()``.
         - Filter out beam particles outside of the plasma bubble.
         - Set up the configuration for the reduced model tracking.
         - Make corrections to the Wake-T r-coordinate before saving the initial time step.
@@ -500,7 +529,7 @@ class StageReducedModels(Stage):
 
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -566,6 +595,7 @@ class StageReducedModels(Stage):
             #wake_t_fields=wake_t_fields  # TODO: remove when driver evolution has been implemented.
         )
         
+        #TODO: Modify this test
         inputs = [driver0, beam_filtered, trans_wake_config.plasma_density, self.Ez_fit_obj, self.rb_fit_obj, trans_wake_config.stage_length, trans_wake_config.time_step_mod]
         some_are_none = any(input is None for input in inputs)
         
@@ -621,7 +651,7 @@ class StageReducedModels(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -636,7 +666,7 @@ class StageReducedModels(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        # Convert PlasmaRamp to a StageReducedModels
         if type(self.upramp) is PlasmaRamp:
 
             upramp = self.convert_PlasmaRamp(self.upramp)
@@ -715,7 +745,7 @@ class StageReducedModels(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -730,7 +760,7 @@ class StageReducedModels(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        # Convert PlasmaRamp to a StageReducedModels
         if type(self.downramp) is PlasmaRamp:
 
             downramp = self.convert_PlasmaRamp(self.downramp)
@@ -796,7 +826,7 @@ class StageReducedModels(Stage):
             step.
             
         Returns
-        ----------
+        -------
         stage_copy : ``StageReducedModels``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
@@ -1298,7 +1328,7 @@ class StageReducedModels(Stage):
 
             
         Returns
-        ----------
+        -------
         rb_roi : [m] 1D float ndarray
             Plasma ion bubble radius for the region of interest shifted to the 
             location of the beam.
@@ -1377,7 +1407,7 @@ class StageReducedModels(Stage):
     
             
         Returns
-        ----------
+        -------
         None
         """
 
@@ -1600,8 +1630,8 @@ class StageReducedModels(Stage):
         Plot the wake structure (2D plot) as a new pyplot.figure.
 
         
-        Other parameters
-        ----------------
+        Parameters
+        ----------
         show_Ez : bool, optional (default= ``True``)
             Flag for including the axial longitudinal electric field in the 
             plot.
@@ -1618,9 +1648,9 @@ class StageReducedModels(Stage):
             simulation box.
 
             
-        Returns:
-        --------
-        ``None``
+        Returns
+        -------
+        None
         """
         
         from matplotlib.colors import LogNorm

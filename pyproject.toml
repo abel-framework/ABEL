@@ -20,7 +20,7 @@ dependencies = [
    "matplotlib",
    "PyQt6",
    "pyqtgraph",
-   "Wake-T",
+   "Wake-T == 0.8.0",
    "ax-platform",
    "CLICopti >= 2.2",
    "RF-Track",
@@ -66,4 +66,5 @@ markers = [
   "StageQuasistatic2d: Tests for the StageQuasistatic2d class",
   "StageWakeT: Tests for the StageWakeT class",
   "presets: Tests for collider presets",
+  "impactx: Tests for ImpactX",
 ]

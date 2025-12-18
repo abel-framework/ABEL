@@ -20,23 +20,24 @@ class StageBasic(Stage):
     and decreases the energy of all drive beam macro particles with the same 
     energy gain.
 
-    Inherits all attributes from ``Stage``.
+    Inherits all attributes from :class:`Stage <abel.classes.stage.stage.Stage>`.
     
 
     Attributes
     ----------
-    transformer_ratio : float
-        Transformer ratio. Default set to 1.0.
+    transformer_ratio : float, optional
+        Transformer ratio. Defaults to 1.0
 
-    depletion_efficiency : float
-        Energy depletion efficiency for the drive beam. Default set to 0.75.
+    depletion_efficiency : float, optional
+        Energy depletion efficiency for the drive beam. Defaults to 0.75.
 
-    probe_evolution : bool
-        Flag for storing the beam parameter evolution data. Default set to 
+    probe_evolution : bool, optional
+        Flag for storing the beam parameter evolution data. Defaults to 
         ``False``.
 
-    store_beams_for_tests : bool
-        Flag for storing intermediate beam states for testing.
+    store_beams_for_tests : bool, optional
+        Flag for storing intermediate beam states for testing. Defaults to 
+        ``False``.
 
     stage_number : int
         Keeps track of which stage it is in the beamline.
@@ -55,24 +56,26 @@ class StageBasic(Stage):
         plasma_density : [m^-3] float
             Plasma density.
 
-        driver_source : ``Source``
-            Driver source for the acceleration stage.
+        driver_source : ``Source`` or ``DriverComplex``, optional
+            The source of the drive beam. Default set to ``None``.
 
-        ramp_beta_mag : float, optional (default= ``None``)
+        ramp_beta_mag : float, optional
             Used for demagnifying and magnifying beams passing through entrance 
-            and exit plasma ramps.
+            and exit plasma ramps. Defaults to ``None``
 
-        transformer_ratio : float, optional (default=1.0)
-            Transformer ratio.
+        transformer_ratio : float, optional
+            Transformer ratio. Defaults to 1.0
 
-        depletion_efficiency : float, optional (default=0.75)
-            Energy depletion efficiency for the drive beam.
+        depletion_efficiency : float, optional
+            Energy depletion efficiency for the drive beam. Defaults to 0.75.
 
-        probe_evolution : bool, optional (default= ``False``)
-            Flag for storing the beam parameter evolution data.
+        probe_evolution : bool, optional
+            Flag for storing the beam parameter evolution data. Defaults to 
+            ``False``.
 
-        store_beams_for_tests : bool, optional (default= ``False``)
-            Flag for storing intermediate beam states for testing..
+        store_beams_for_tests : bool, optional
+            Flag for storing intermediate beam states for testing. Defaults to 
+            ``False``.
         """
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
@@ -198,7 +201,7 @@ class StageBasic(Stage):
 
             
         Returns
-        ----------
+        -------
         beam : ``Beam`` 
             Main beam after tracking.
 
@@ -248,7 +251,7 @@ class StageBasic(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -327,7 +330,7 @@ class StageBasic(Stage):
     
             
         Returns
-        ----------
+        -------
         beam : ``Beam``
             Main beam after tracking.
 
@@ -399,8 +402,8 @@ class StageBasic(Stage):
             ``Source`` object.
 
         Returns
-        ----------
-        ``None``
+        -------
+        None
         """
         
         # approximate extraction efficiency
@@ -437,8 +440,8 @@ class StageBasic(Stage):
             same value as ``self.probe_evolution``.
             
         Returns
-        ----------
-        stage_copy : ``Stage``
+        -------
+        stage_copy : ``StageBasic``
             A modified deep copy of the original stage. 
             ``stage_copy.plasma_density``, ``stage_copy.length``, 
             ``stage_copy.length_flattop``, ``stage_copy.nom_energy_gain``, 
