@@ -674,7 +674,7 @@ class StageReducedModels(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        # Convert PlasmaRamp to a StageReducedModels
         if type(self.upramp) is PlasmaRamp:
 
             upramp = self.convert_PlasmaRamp(self.upramp)
@@ -768,7 +768,7 @@ class StageReducedModels(Stage):
             ramp_beam_in = copy.deepcopy(beam0)
             ramp_driver_in = copy.deepcopy(driver0)
 
-        # Convert PlasmaRamp to a StagePrtclWakeInstability
+        # Convert PlasmaRamp to a StageReducedModels
         if type(self.downramp) is PlasmaRamp:
 
             downramp = self.convert_PlasmaRamp(self.downramp)
