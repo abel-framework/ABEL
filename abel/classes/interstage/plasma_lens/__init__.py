@@ -143,9 +143,9 @@ class InterstagePlasmaLens(Interstage, ABC):
     def strength_plasma_lens(self) -> float:
         """
         Effective integrated focusing strength of the plasma lens (equivalent to 
-        gql/(cp), where g [V/m^2] is the gradient of the focusing fields, q is 
-        the particle charge, l is th length of the lens, c is the speed of 
-        light in vacuum and p [kg m/s] is the nominal particle momentum).
+        gql/p, where g [T/m] is the gradient of the focusing magnetic fields, q 
+        is the particle charge, l is the length of the lens, and p [kg m/s] is 
+        the nominal particle momentum).
 
 
         Returns
@@ -269,9 +269,9 @@ class InterstagePlasmaLens(Interstage, ABC):
         ----------
         k_lens : [m^-2] float, optional
             Effective focusing strength of the plasma lens (equivalent to 
-            gq/(cp), where g [V/m^2] is the gradient of the focusing fields, q 
-            is the particle charge, c is the speed of light in vacuum and 
-            p [kg m/s] is the nominal particle momentum). Defaults to 
+            gq/p, where g [T/m] is the gradient of the focusing magnetic fields, 
+            q is the particle charge, and p [kg m/s] is the nominal particle 
+            momentum). Defaults to 
             :attr:`InterstagePlasmaLens.strength_plasma_lens` / :attr:`InterstagePlasmaLens.length_plasma_lens`.
 
         tau_lens : [m^-1] float, optional
@@ -308,10 +308,9 @@ class InterstagePlasmaLens(Interstage, ABC):
             Inverse bending radii.
 
         ks : [m^-2] 1D float ndarray
-            Plasma lens focusing strengths equivalent to gq/(cp), where 
-            g [V/m^2] is the gradient of the focusing fields, q is the 
-            particle charge, c is the speed of light in vacuum and p [kg m/s] 
-            is the nominal particle momentum.
+            Plasma lens focusing strengths equivalent to gq/p, where g [T/m] is 
+            the gradient of the focusing magnetic fields, q is the particle 
+            charge, and p [kg m/s] is the nominal particle momentum.
 
         ms : [m^-3] 1D float ndarray
             Sextupole strengths.
