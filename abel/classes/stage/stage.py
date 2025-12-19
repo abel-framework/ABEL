@@ -2233,7 +2233,7 @@ class Stage(Trackable, CostModeled):
         if nom_energy_gain is None:
             print(f"Nominal energy gain [GeV]:\t\t\t\t Not set")
         else:
-            print(f"Nominal energy gain [GeV]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")            
+            print(f"Nominal energy gain [GeV]:\t\t\t\t {nom_energy_gain/1e9 :.3f}")
 
         if self.nom_energy_gain_flattop is None:
             print(f"Nominal energy gain flattop [GeV]:\t\t\t Not set")
