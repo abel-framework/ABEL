@@ -54,15 +54,9 @@ class PlasmaLinac(Linac):
                 self.num_stages = 1
             else:
                 self.num_stages = 0
-        
-        # figure out the nominal energy gain if not set
-        if self.nom_energy is None:
-            if self.stage is not None:
-                self.nom_energy = self.source.energy + self.num_stages * self.stage.nom_energy_gain
-            else:
-                self.nom_energy = self.source.energy
-        else:
-            self.stage.nom_energy_gain = (self.nom_energy - self.source.get_nom_energy()) / self.num_stages
+
+        if self.nom_energy is not None:
+            self.stage.nom_energy_gain = (self.nom_energy - self.source.get_nom_energy()) / self.num_stages #TODO: this overrides any nominal energy already set for the stages. Should perhaps rather check for inconsistency and raise an error.
         
         # get or set the driver complex
         if self.driver_complex is not None:
@@ -208,6 +202,13 @@ class PlasmaLinac(Linac):
         
         # set the bunch train pattern etc.
         super().assemble_trackables()
+
+        # Correct the linac nominal energy using each stage's nominal energy gain
+        corrected_nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+        
+        if self.nom_energy is not None and not np.isclose(self.nom_energy, corrected_nom_energy, rtol=1e-10, atol=0.0):
+            raise ValueError(f'Inconsistency between the defined linac nominal energy and the nominal energy gains of the plasma acceleration stages.\n linac.nom_energy: {self.nom_energy}, nomimal energy calculated from stage nominal energy gains and source.energy: {corrected_nom_energy}')
+        self.nom_energy = corrected_nom_energy
 
         # Clear attributes that are now stored in self.trackables
         self.trim_attr_reduce_pickle_size()
@@ -1458,24 +1459,16 @@ class PlasmaLinac(Linac):
         print('Nominal energy [GeV]: ', self.nom_energy/1e9 if self.nom_energy is not None else "None")
 
         print('\n== Driver source ==========')
-        self.stage.driver_source.print_summary()
+        self.stages[0].driver_source.print_summary()
 
         print('\n== Source ==========')
         self.source.print_summary()
 
-        print('\n== Stage ==========')
-        self.stage.print_summary()
-
-        if self.stage.upramp is not None:
-            print('\n== Upramp ==========')
-            self.stage.upramp.print_summary(print_params=False)
-
-        if self.stage.downramp is not None:
-            print('\n== Downramp ==========')
-            self.stage.downramp.print_summary(print_params=False)
-
-        print('\n== Interstage ==========')
+        print('\n== First stage ==========')
+        self.stages[0].print_summary()
+        
+        print('\n== First interstage ==========')
         if self.interstage is None:
             print('Type: ', 'None')
         else:
-            self.interstage.print_summary()
+            self.interstages[0].print_summary()
