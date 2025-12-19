@@ -332,7 +332,63 @@ def Dmat(l, inv_rho=0, k=0):
 # =============================================
 def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False):
     """
-    Evolution of the beta function.
+    Evolution the beta function through a 
+
+    Compute the evolution of the Twiss beta and alpha functions through a
+    sequence of linear focusing elements.
+
+    This routine propagates an initial set of Twiss parameters
+    ``(beta0, alpha0)`` through a piecewise-constant lattice specified by
+    element lengths and focusing strengths. The full beta-function
+    evolution is (optionally) sampled along the lattice for plotting or analysis.
+
+
+    Parameters
+    ----------
+    ls : [m] 1D float ndarray
+        Lattice element lengths.
+
+    ks : [m^-2] 1D float ndarray
+        Lattice element quadrupole focusing strengths (equivalent to q/p*dB/dr, 
+        where q is the particle charge, p is the nominal particle momentum and 
+        dB/dr is the magnetic field transverse gradient).
+
+    beta0 : float
+        Initial beta function at the lattice entrance [m].
+
+    alpha0 : float, optional
+        Initial Twiss alpha parameter at the lattice entrance.
+        
+    inv_rhos : [m^-1] 1D float ndarray, optional
+        Inverse bending radii for each lattice segment. If provided,
+        weak focusing is added as ``k_eff = ks + inv_rhos**2``.
+
+    fast : bool, optional
+        If ``True``, skips detailed integration within each element for faster 
+        computation (no intermediate data are returned). Defaults to ``False``.
+
+    plot : bool, optional
+        If ``True``, sets ``fast`` to ``False`` and plots the evolution of the 
+        sqyare root of the beta function along the beamline. Defaults to ``False``.
+
+        
+    Returns
+    -------
+    beta : [m] float
+        Final beta function at the end of the lattice.
+
+    alpha : float
+        Final Twiss alpha function at the end of the lattice.
+
+    evolution : ndarray or None
+        Array of shape (3, N) containing sampled evolution along the
+        lattice, where:
+
+            - ``evolution[0, :]``: longitudinal position s [m]
+            - ``evolution[1, :]``: beta(s) [m]
+            - ``evolution[1, :]``: alpha(s) [m]
+
+        If ``fast=True``, returns ``None``.
     """
     
     # overwrite fast-calculation toggle if plotting 
@@ -397,10 +453,12 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
         Lattice element lengths.
 
     inv_rhos : [m^-1] 1D float ndarray
-            Inverse bending radii.
+        Inverse bending radii.
 
     ks : [m^-2] 1D float ndarray
-        Plasma lens focusing strengths.
+        Lattice element quadrupole focusing strengths (equivalent to q/p*dB/dr, 
+        where q is the particle charge, p is the nominal particle momentum and 
+        dB/dr is the magnetic field transverse gradient).
 
     Dx0 : float [m], optional
         Initial horizontal dispersion value at s=0.
@@ -497,10 +555,12 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
         Lattice element lengths.
 
     inv_rhos : [m^-1] 1D float ndarray
-            Inverse bending radii.
+        Inverse bending radii.
 
     ks : [m^-2] 1D float ndarray
-        Plasma lens focusing strengths.
+        Lattice element quadrupole focusing strengths (equivalent to q/p*dB/dr, 
+        where q is the particle charge, p is the nominal particle momentum and 
+        dB/dr is the magnetic field transverse gradient).
 
     ms : [m^-3] 1D float ndarray
         Sextupole strengths.
