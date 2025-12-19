@@ -90,8 +90,9 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         Disable plasma entirely (useful for vacuum beam transport). Defaults to ``False``.
 
     external_focusing_gradient : [T/m] float, optional
-        Field gradient for an external magnetic field applied traversely across 
-        the plasma. A value > 0 enables external focusing. Defaults to ``0``.
+        Transverse field gradient for an external linear azimuthal magnetic 
+        field applied traversely across the plasma. A value > 0 enables external 
+        focusing. Defaults to ``0``.
 
     mesh_refinement : bool, optional
         Enable mesh refinement (1 refinement level). Defaults to ``False``.
