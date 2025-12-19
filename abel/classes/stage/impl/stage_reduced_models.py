@@ -674,9 +674,9 @@ class StageReducedModels(Stage):
                 raise TypeError('upramp is not a StageReducedModels.')
             
             # Set a new time step for the ramp
-            n_steps = 25  # Do n_steps time steps in the tracking of the ramp
+            n_steps = 15  # Do n_steps time steps in the tracking of the ramp
             lambda_beta = upramp.matched_beta_function_flattop(beam0_energy) * 2*np.pi  # [m], betatron wavelength
-            upramp.time_step_mod = min(upramp.length_flattop / (lambda_beta*n_steps), 0.02)  # Step size in in units of betatron wavelength, equivalent to time step size in units of betatron wavelength/c.
+            upramp.time_step_mod = min(upramp.length_flattop / (lambda_beta*n_steps), 0.04)  # Step size in in units of betatron wavelength, equivalent to time step size in units of betatron wavelength/c.
 
         elif type(self.upramp) is Stage:
             upramp = self.upramp  # Allow for other types of ramps
@@ -774,9 +774,9 @@ class StageReducedModels(Stage):
                 raise TypeError('downramp is not a StageReducedModels.')
             
             # Set a new time step for the ramp
-            n_steps = 25  # Do n_steps time steps in the tracking of the ramp
+            n_steps = 15  # Do n_steps time steps in the tracking of the ramp
             lambda_beta = downramp.matched_beta_function_flattop(beam0_energy) * 2*np.pi  # [m], betatron wavelength
-            downramp.time_step_mod = min(downramp.length_flattop / (lambda_beta*n_steps), 0.02)  # Step size in in units of betatron wavelength, equivalent to time step size in units of betatron wavelength/c.
+            downramp.time_step_mod = min(downramp.length_flattop / (lambda_beta*n_steps), 0.04)  # Step size in in units of betatron wavelength, equivalent to time step size in units of betatron wavelength/c.
             
         elif type(self.downramp) is Stage:
             downramp = self.downramp  # Allow for other types of ramps
