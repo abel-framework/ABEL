@@ -32,7 +32,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         recording intermediate beam states. Defaults to ``False``.
 
     enable_isr_on_ref_part : bool, optional
-        Flag for applying `ISR to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`_.
+        Flag for applying `ISR to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`__.
         Note that this does not have any effect if 
         :attr:`self.enable_isr <abel.Interstage.enable_isr>` is ``False``. 
         Defaults to ``True``.
@@ -81,7 +81,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
     @property
     def isr_on_ref_part(self) -> bool | None:
         """
-        Whether `ISR will be applied to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`_.
+        Whether `ISR will be applied to the reference particle <https://impactx.readthedocs.io/en/latest/usage/python.html#impactx.ImpactX.isr_on_ref_part>`__.
         to cause the reference particle to lose energy due to radiation. This 
         should be activated when the lattice optics, magnet settings, etc. 
         are chosen to account for radiative energy loss. This can prevent beam 
@@ -135,10 +135,8 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
 
         # add lens offset for ISR mitigation
         if self.enable_isr and self.cancel_isr_kicks:
-            #self._isr_on_ref_part = True
             dx_isr = self.lens_offset_isr_kick_mitigation()
         else:
-            #self._isr_on_ref_part = False
             dx_isr = 0
             
         # define plasma lens
