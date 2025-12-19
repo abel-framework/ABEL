@@ -2256,8 +2256,10 @@ class Stage(Trackable, CostModeled):
             print(f"Driver source type: {type(self.driver_source)}")
 
         if self.has_ramp():
-            #print(f"Has ramp(s):\t\t\t\t\t\t Yes")
             print('')
+            # Print information calling on PlasmaRamp.print_summary(). 
+            # Also includes information on whether it is up/down ramp and the 
+            # ramp shape.
             if self.upramp is not None:
                 self.upramp.print_summary(print_params=True)
             if self.downramp is not None:
