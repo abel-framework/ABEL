@@ -24,7 +24,7 @@ dependencies = [
    "ax-platform",
    "CLICopti >= 2.2",
    "RF-Track",
-   "impactx-noacc >= 25.11",
+   "impactx-noacc >=25.11, <=25.12",
    "toml"
 ]
 requires-python = ">=3,<3.13"
