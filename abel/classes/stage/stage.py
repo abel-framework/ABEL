@@ -8,7 +8,7 @@ from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
-from abel.classes.source.impl.source_capsule import Source
+from abel.classes.source.source import Source
 from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import copy, warnings
@@ -1469,14 +1469,19 @@ class Stage(Trackable, CostModeled):
         import sys
         machine_zero = sys.float_info.epsilon
 
-        drive_beam_rotated = driver_incoming
-        beam_rotated = beam_incoming
+        # Check if the driver source generates a drive beam alignmed to its propagation direction, which is required by many Stage subclasses
+        driver_source = self.get_driver_source()
+
+        if not driver_source.align_beam_axis:
+            raise ValueError("Currently does not support drive beam axis not aligned with its propagation direction. I.e. driver_source.align_beam_axis must be set to True.")
 
         # Check if the driver source of the stage has angular offset
-        driver_source = self.get_driver_source()
         has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
 
         # Perform rotation if there is angular offset
+        drive_beam_rotated = driver_incoming
+        beam_rotated = beam_incoming
+        
         if has_angular_offset:
 
             driver_x_angle = driver_incoming.x_angle()
@@ -1488,9 +1493,6 @@ class Stage(Trackable, CostModeled):
             # Calculate the angles that will be used to rotate the beams' frame
             rotation_angle_x, rotation_angle_y = drive_beam_rotated.beam_alignment_angles()
             rotation_angle_y = -rotation_angle_y  # Minus due to right hand rule.
-
-            # The model currently does not support drive beam tilt not aligned with beam propagation, so need to first ensure that the drive beam is aligned to its own propagation direction. This is done using active transformation to rotate the beam around x- and y-axis
-            drive_beam_rotated.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
 
             # Use passive transformation to rotate the frame of the beams
             drive_beam_rotated.xy_rotate_coord_sys(rotation_angle_x, rotation_angle_y)  # Align the z-axis to the drive beam propagation.
@@ -2256,7 +2258,14 @@ class Stage(Trackable, CostModeled):
             print(f"Driver source type: {type(self.driver_source)}")
 
         if self.has_ramp():
-            print(f"Has ramp(s):\t\t\t\t\t\t Yes")
+            print('')
+            # Print information calling on PlasmaRamp.print_summary(). 
+            # Also includes information on whether it is up/down ramp and the 
+            # ramp shape.
+            if self.upramp is not None:
+                self.upramp.print_summary(print_params=True)
+            if self.downramp is not None:
+                self.downramp.print_summary(print_params=True)
         else:
             print(f"Has ramp(s):\t\t\t\t\t\t No")
 
@@ -2377,10 +2386,26 @@ class PlasmaRamp(Stage):
             print('Ramp type: \t\t\t\t\t\t upramp')
         if self.is_downramp():
             print('Ramp type: \t\t\t\t\t\t downramp')
-        print('Ramp shape: \t\t\t\t\t\t', self.ramp_shape)
+        print('\tRamp shape: \t\t\t\t\t', self.ramp_shape)
 
         if print_params:
-            super().print_summary()
+            #super().print_summary()
+            if self.plasma_density is None:
+                print(f"\tPlasma density [m^-3]:\t\t\t\t Not set")
+            else:
+                print(f"\tPlasma density [m^-3]:\t\t\t\t {self.plasma_density :.3e}")
+            if self.length is None:
+                print(f"\tLength [m]:\t\t\t\t\t Not set")
+            else:
+                print(f"\tLength [m]:\t\t\t\t\t {self.length :.3f}")
+            if self.nom_energy_gain is None:
+                print(f"\tNominal energy gain [GeV]:\t\t\t Not set")
+            else:
+                print(f"\tNominal energy gain [GeV]:\t\t\t {self.nom_energy_gain /1e9 :.3f}") 
+            if self.nom_accel_gradient is None:
+                print(f"\tNominal acceleration gradient [GV/m]:\t\t Not set")
+            else:
+                print(f"\tNominal acceleration gradient [GV/m]:\t\t {self.nom_accel_gradient/1e9 :.3f}")
 
 
 ###################################################

@@ -167,12 +167,15 @@ class InterstageQuads(Interstage, ABC):
     @property
     def strength_quadrupole1(self) -> float:
         """
-        Effective focusing strength of the outer quadrupole.
+        Effective integrated focusing strength of the outer quadrupole 
+        (equivalent to ql/p*dB/dr, where q is the particle charge, p is the 
+        nominal particle momentum and dB/dr is the magnetic field transverse 
+        gradient).
 
         Returns
         -------
         strength_quadrupole1 : [1/m] float
-            Focusing strength k = 1/f of quadrupole 1, matched via 
+            Effective integrated focusing strength of quadrupole 1, matched via 
             :meth:`InterstageQuads.match_beta_function`.
         """
         if self._strength_quadrupole1 is None:
@@ -188,12 +191,15 @@ class InterstageQuads(Interstage, ABC):
     @property
     def strength_quadrupole2(self) -> float:
         """
-        Effective focusing strength of the middle quadrupole.
+        Effective integrated focusing strength of the middle quadrupole 
+        (equivalent to ql/p*dB/dr, where q is the particle charge, p is the 
+        nominal particle momentum and dB/dr is the magnetic field transverse 
+        gradient).
 
         Returns
         -------
         strength_quadrupole2 : [1/m] float
-            Focusing strength k = 1/f quadrupole 2, matched via 
+            Effective integrated focusing strength of quadrupole 2, matched via 
             :meth:`InterstageQuads.match_beta_function`.
         """
         if self._strength_quadrupole2 is None:
@@ -209,12 +215,15 @@ class InterstageQuads(Interstage, ABC):
     @property
     def strength_quadrupole3(self) -> float:
         """
-        Effective focusing strength of the inner quadrupole.
+        Effective integrated focusing strength of the inner quadrupole 
+        (equivalent to ql/p*dB/dr, where q is the particle charge, p is the 
+        nominal particle momentum and dB/dr is the magnetic field transverse 
+        gradient).
 
         Returns
         -------
         strength_quadrupole3 : [1/m] float
-            Focusing strength k = 1/f quadrupole 3, matched via 
+            Effective integrated focusing strength of quadrupole 3, matched via 
             :meth:`InterstageQuads.match_beta_function`.
         """
         if self._strength_quadrupole3 is None:
@@ -302,7 +311,10 @@ class InterstageQuads(Interstage, ABC):
         Parameters
         ----------
         k1 : [m^-2] float, optional
-            Effective focusing strength of quadrupole 1. Defaults to 
+            Effective focusing strength of quadrupole 1 (equivalent to 
+            q/p*dB/dr, where q is the particle charge, p is the nominal particle 
+            momentum and dB/dr is the magnetic field transverse gradient). 
+            Defaults to 
             :attr:`InterstageQuads.strength_quadrupole1` / :attr:`InterstageQuads.length_quadrupole`.
 
         k2 : [m^-2] float, optional
