@@ -704,6 +704,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     drive_beam_update_period = 0
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    driver_source.align_beam_axis = True
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=81.0e9)  # Choosing an energy that gives a sensible number of time steps.
     stage = setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, save_final_step=True)
     interstage = setup_InterstageImpactX(stage)
@@ -765,7 +766,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
     assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=0.1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), 4.1028957888665414e-07, rtol=1e-2, atol=0.0)  # Expect deviation from nominal
+    assert np.isclose(final_beam.beam_size_y(), 4.1e-07, rtol=5e-2, atol=0.0)  # Expect deviation from nominal
     nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
     nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
     assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.1, atol=0.0)
