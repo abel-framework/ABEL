@@ -26,9 +26,7 @@ from abel.utilities.other import find_closest_value_in_arr, pad_downwards, pad_u
 from abel.wrappers.wake_t.wake_t_wrapper import run_single_step_wake_t
 from abel.classes.stage.stage import Stage, StageError
 from abel.classes.stage.stage import Stage, PlasmaRamp
-from abel.classes.source.source import Source
 from abel.classes.source.impl.source_capsule import SourceCapsule
-from abel.classes.beamline.impl.driver_complex import DriverComplex
 from abel.classes.beam import Beam
 from abel.CONFIG import CONFIG
 
@@ -60,16 +58,12 @@ class StageReducedModels(Stage):
     
     Attributes
     ----------
-    driver_source : ``Source`` or ``DriverComplex``
-        The source of the drive beam. The beam axis is always aligned to its 
-        propagation direction. Defaults to ``None``.
-
-    time_step_mod : [beta_wave_length/c] float, optional
-        Determines the time step of the beam tracking in units of 
-        betatron wave length/c. Defaults to 0.05.
-    
     ramp_beta_mag : float, optional
         Betatron magnification used for ramps. Default set to 1.0
+
+    time_step_mod : [beta_wave_length/c] float, optional
+        Determines the time step of the instability tracking in units of 
+        betatron wave length/c. Defaults to 0.05.
 
     enable_tr_instability : bool, optional
         Flag for enabling transverse intra-beam instability calculations. 
@@ -192,9 +186,8 @@ class StageReducedModels(Stage):
         plasma_density : [m^-3] float
             The plasma density of the plasma stage.
         
-        driver_source : ``Source`` or ``DriverComplex``
-            The source of the drive beam. The beam axis is always aligned to its 
-            propagation direction. Defaults to ``None``.
+        driver_source : ``Source`` or ``DriverComplex``, optional
+            The source of the drive beam. Default set to ``None``.
 
         ramp_beta_mag : float, optional
             Betatron magnification used for ramps. Default set to 1.0.
@@ -281,7 +274,6 @@ class StageReducedModels(Stage):
             # Set to larger than 0 to activate driver evolution and determine 
             # the drive beam update period. Default value: 0.
         
-        # Pass to the parent class' constructor
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
 
@@ -866,29 +858,6 @@ class StageReducedModels(Stage):
         stage_copy.show_prog_bar = False
 
         return stage_copy
-    
-
-    # ==================================================
-    @property
-    def driver_source(self) -> Source | DriverComplex | None:
-        """
-        The driver source or the driver complex of the stage. The generated 
-        drive beam's beam axis is always aligned to its propagation direction.
-        """
-        return self._driver_source
-    @driver_source.setter
-    def driver_source(self, source : Source | DriverComplex | None):
-        # Set the driver source to always align drive beam axis to its propagation direction
-        if isinstance(source, DriverComplex):
-            if source.source is None:
-                raise ValueError("The source of the driver complex is not set.")
-            source.source.align_beam_axis = True
-            self._driver_source = source
-        elif isinstance(source, Source):
-            source.align_beam_axis = True
-            self._driver_source = source
-        else:
-            self._driver_source = None
     
 
     # ==================================================
