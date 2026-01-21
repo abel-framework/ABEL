@@ -5,9 +5,7 @@
 # License: GPL-3.0-or-later
 
 from abel.classes.stage.stage import Stage, PlasmaRamp
-from abel.classes.source.source import Source
 from abel.classes.source.impl.source_capsule import SourceCapsule
-from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import scipy.constants as SI
 import copy, warnings
@@ -27,12 +25,8 @@ class StageBasic(Stage):
 
     Attributes
     ----------
-    driver_source : ``Source`` or ``DriverComplex``
-        The source of the drive beam. The beam axis is always aligned to its 
-        propagation direction. Defaults to ``None``.
-
-    transformer_ratio : float
-        Transformer ratio. Default set to 1.0.
+    transformer_ratio : float, optional
+        Transformer ratio. Defaults to 1.0
 
     depletion_efficiency : float, optional
         Energy depletion efficiency for the drive beam. Defaults to 0.75.
@@ -62,9 +56,8 @@ class StageBasic(Stage):
         plasma_density : [m^-3] float
             Plasma density.
 
-        driver_source : ``Source`` or ``DriverComplex``
-            The source of the drive beam. The beam axis is always aligned to its 
-            propagation direction. Defaults to ``None``.
+        driver_source : ``Source`` or ``DriverComplex``, optional
+            The source of the drive beam. Default set to ``None``.
 
         ramp_beta_mag : float, optional
             Used for demagnifying and magnifying beams passing through entrance 
@@ -469,29 +462,6 @@ class StageBasic(Stage):
             stage_copy.probe_evolution = self.probe_evolution
 
         return stage_copy
-    
-
-    # ==================================================
-    @property
-    def driver_source(self) -> Source | DriverComplex | None:
-        """
-        The driver source or the driver complex of the stage. The generated 
-        drive beam's beam axis is always aligned to its propagation direction.
-        """
-        return self._driver_source
-    @driver_source.setter
-    def driver_source(self, source : Source | DriverComplex | None):
-        # Set the driver source to always align drive beam axis to its propagation direction
-        if isinstance(source, DriverComplex):
-            if source.source is None:
-                raise ValueError("The source of the driver complex is not set.")
-            source.source.align_beam_axis = True
-            self._driver_source = source
-        elif isinstance(source, Source):
-            source.align_beam_axis = True
-            self._driver_source = source
-        else:
-            self._driver_source = None
 
     
     
