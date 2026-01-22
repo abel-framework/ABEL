@@ -20,6 +20,7 @@ dependencies = [
    "matplotlib",
    "PyQt6",
    "pyqtgraph",
+   "pytz",
    "Wake-T == 0.8.0",
    "ax-platform",
    "CLICopti >= 2.2",
