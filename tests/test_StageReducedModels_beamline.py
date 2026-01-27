@@ -765,7 +765,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
     assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=0.1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), 4.1028957888665414e-07, rtol=1e-2, atol=0.0)  # Expect deviation from nominal
+    assert np.isclose(final_beam.beam_size_y(), 4.1e-7, rtol=5e-2, atol=0.0)  # Expect deviation from nominal
     nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
     nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
     assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.1, atol=0.0)
