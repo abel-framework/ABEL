@@ -13,7 +13,7 @@ dependencies = [
    "numba",
    "tqdm",
    "openpmd-api >=0.16.1, <0.17",
-   "openpmd-viewer"
+   "openpmd-viewer",
    "joblib",
    "joblib-progress",
    "dill",
