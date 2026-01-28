@@ -20,11 +20,12 @@ dependencies = [
    "matplotlib",
    "PyQt6",
    "pyqtgraph",
+   "pytz",
    "Wake-T == 0.8.0",
-   "ax-platform",
+   "ax-platform == 1.1.2",
    "CLICopti >= 2.2",
-   "RF-Track",
-   "impactx-noacc >= 25.11",
+   "RF-Track == 2.5.3",
+   "impactx-noacc >=25.11, <=25.12",
    "toml"
 ]
 requires-python = ">=3,<3.13"
