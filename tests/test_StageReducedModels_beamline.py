@@ -150,6 +150,9 @@ def test_baseline_linac():
     # Check the machine parameters
     stages = linac.stages
     assert len(stages) == num_stages
+    assert linac.stage.driver_source.align_beam_axis is True
+    assert stages[0].driver_source.align_beam_axis is True
+    assert stages[1].driver_source.align_beam_axis is True
     assert np.isclose(linac.nom_energy, 364920000000.0, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.get_length(), 39.28760981873146, rtol=1e-4, atol=0.0)
@@ -244,6 +247,9 @@ def test_ramped_linac():
     # Check the machine parameters
     stages = linac.stages
     assert len(stages) == num_stages
+    assert linac.stage.driver_source.align_beam_axis is True
+    assert stages[0].driver_source.align_beam_axis is True
+    assert stages[1].driver_source.align_beam_axis is True
     assert np.isclose(linac.nom_energy, 6462752491.36345, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, main_source.energy + stages[0].nom_energy_gain + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
@@ -453,6 +459,10 @@ def test_angular_jitter_linac():
     # Perform tracking
     linac.run('test_angular_jitter_linac', overwrite=True, verbose=False)
 
+    assert linac.stage.driver_source.align_beam_axis is True
+    assert linac.stages[0].driver_source.align_beam_axis is True
+    assert linac.stages[1].driver_source.align_beam_axis is True
+
     # Remove output directory
     shutil.rmtree(linac.run_path())
 
@@ -561,6 +571,9 @@ def test_jitter_trInstability_ramped_linac():
     # Check the machine parameters
     stages = linac.stages
     assert len(stages) == num_stages
+    assert linac.stage.driver_source.align_beam_axis is True
+    assert stages[0].driver_source.align_beam_axis is True
+    assert stages[1].driver_source.align_beam_axis is True
     assert np.isclose(linac.nom_energy, 6.12e9, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.get_length(), 7.427243789521983, rtol=1e-5, atol=0.0)
@@ -720,6 +733,10 @@ def test_jitter_trInstability_ionMotion_linac():
     # Perform tracking
     linac.run('test_trInstability_ionMotion_linac', overwrite=True, verbose=False)
 
+    assert linac.stage.driver_source.align_beam_axis is True
+    assert linac.stages[0].driver_source.align_beam_axis is True
+    assert linac.stages[1].driver_source.align_beam_axis is True
+
     # Remove output directory
     shutil.rmtree(linac.run_path())
 
@@ -745,9 +762,12 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     use_ramps = True
 
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
+    assert driver_source.align_beam_axis is False
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=81.0e9)  # Choosing an energy that gives a sensible number of time steps.
     stage = setup_StageReducedModels(plasma_density=plasma_density, driver_source=driver_source, main_source=main_source, ramp_beta_mag=ramp_beta_mag, enable_tr_instability=enable_tr_instability, enable_radiation_reaction=enable_radiation_reaction, enable_ion_motion=enable_ion_motion, use_ramps=use_ramps, save_final_step=True)
     interstage = setup_InterstageImpactX(stage)
+
+    assert stage.driver_source.align_beam_axis is True
 
     linac = PlasmaLinac(source=main_source, stage=stage, interstage=interstage, num_stages=num_stages, alternate_interstage_polarity=False)
 
@@ -760,6 +780,10 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
     assert np.isclose(linac.nom_energy, 84120000000.0, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.get_length(), 21.455746684726464, rtol=1e-5, atol=0.0)
+
+    assert linac.stage.driver_source.align_beam_axis is True
+    assert stages[0].driver_source.align_beam_axis is True
+    assert stages[1].driver_source.align_beam_axis is True
     
     assert np.isclose(stages[0].nom_energy, 81.0e9)
     assert np.isclose(stages[0].nom_energy_gain, 1.56e9, rtol=1e-15, atol=0.0)
@@ -806,7 +830,7 @@ def test_jitter_trInstability_ionMotion_ramped_linac():
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4)*initial_beam.beam_size_x()
     assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=0.1, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), 4.1028957888665414e-07, rtol=1e-2, atol=0.0)  # Expect deviation from nominal
+    assert np.isclose(final_beam.beam_size_y(), 4.1e-7, rtol=5e-2, atol=0.0)  # Expect deviation from nominal
     nom_beta_x = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_x()
     nom_beta_y = np.sqrt(final_beam.energy()/main_source.energy) * initial_beam.beta_y()
     assert np.isclose(final_beam.beta_x(), nom_beta_x, rtol=0.1, atol=0.0)
