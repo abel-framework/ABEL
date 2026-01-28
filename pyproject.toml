@@ -12,7 +12,7 @@ dependencies = [
    "scipy",
    "numba",
    "tqdm",
-   "openpmd-api >=0.16.1, <0.17",
+   "openpmd-api >=0.16.1, <0.17",  # Newer versions break Beam.load(). See PR #196.
    "openpmd-viewer",
    "joblib",
    "joblib-progress",
