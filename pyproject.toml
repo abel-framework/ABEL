@@ -12,8 +12,8 @@ dependencies = [
    "scipy",
    "numba",
    "tqdm",
-   "openpmd-api",
    "openpmd-api >=0.16.1, <0.17",
+   "openpmd-viewer"
    "joblib",
    "joblib-progress",
    "dill",
