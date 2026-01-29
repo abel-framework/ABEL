@@ -34,7 +34,7 @@ def elegant_missing():
     bool: False if the file exists and is executable, True otherwise.
     """
     file_path = CONFIG.elegant_exec
-    if os.path.exists(file_path) and os.path.isfile(file_path + 'elegant'):
+    if os.path.exists(file_path) and os.path.isfile(os.path.join(file_path,'elegant')):
         if os.access(file_path, os.X_OK):
             return False
     return True
