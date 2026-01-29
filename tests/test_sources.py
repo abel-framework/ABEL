@@ -56,7 +56,7 @@ def setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=16
     source.gaussian_blur = 50e-6                                                    # [m]
     source.rel_energy_spread = 0.01                                              
 
-    source.emit_nx, source.emit_ny = 40e-6, 80e-6                                   # [m rad]
+    source.emit_nx, source.emit_ny = 20e-6, 40e-6                                   # [m rad]
     source.beta_x, source.beta_y = 0.5, 0.5                                         # [m]
 
      # Offsets
