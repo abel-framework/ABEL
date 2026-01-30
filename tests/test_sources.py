@@ -301,7 +301,7 @@ def test_SourceTrapezoid_beam_alignment():
 
     source3 = setup_trapezoid_source()
     source3.align_beam_axis = True
-    source3.x_angle = 1.3e-5                                                        # [rad]
+    source3.x_angle = 1.3e-6                                                        # [rad]
     source3.y_angle = -2e-6                                                         # [rad]
     beam3 = source3.track()
     assert np.isclose(beam3.x_angle(), beam3.x_tilt_angle(), rtol=1e-2, atol=0.0)
@@ -329,8 +329,8 @@ def test_SourceTrapezoid_beam_alignment():
 
     source6 = setup_trapezoid_source()
     source6.align_beam_axis = True
-    source6.x_angle = 5.0e-4                                                        # [rad]
-    source6.y_angle = -5.0e-4                                                       # [rad]
+    source6.x_angle = 1.0e-5                                                        # [rad]
+    source6.y_angle = -1.0e-5                                                       # [rad]
     beam6 = source6.track()
     assert np.isclose(beam6.x_angle(), beam6.x_tilt_angle(), rtol=1e-1, atol=0.0)
     assert np.isclose(beam6.y_angle(), beam6.y_tilt_angle(), rtol=1e-1, atol=0.0)
