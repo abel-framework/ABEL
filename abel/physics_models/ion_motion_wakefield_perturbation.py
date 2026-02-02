@@ -34,12 +34,16 @@ class IonMotionConfig():
         
         Parameters
         ----------
-        drive_beam : ABEL ``Beam`` object
-            Drive beam.
+        drive_beam : ``Beam``
+            Drive beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the drive beam in ion motion 
+            wakefield perturbation calculations.
 
-        main_beam : ABEL ``Beam`` object
-            Main beam.
-        
+        main_beam : ``Beam``
+            Main beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the main beam in ion motion 
+            wakefield perturbation calculations.
+            
         plasma_ion_density : [m^-3] float
             Plasma ion density.
         
@@ -168,11 +172,15 @@ class IonMotionConfig():
 
         Parameters
         ----------
-        drive_beam : ABEL ``Beam`` object
-            Drive beam.
+        drive_beam : ``Beam``
+            Drive beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the drive beam in ion motion 
+            wakefield perturbation calculations.
 
-        main_beam : ABEL ``Beam`` object
-            Main beam.
+        main_beam : ``Beam``
+            Main beam. Not used for tracking. Only used in setting coordinates 
+            used to probe the beam fields of the main beam in ion motion 
+            wakefield perturbation calculations.
 
         set_driver_sc_coords : bool, optional
             Sets the xy limits used by 
@@ -516,7 +524,7 @@ def ion_wakefield_perturbation(ion_motion_config, main_Exs_3d, main_Eys_3d, driv
         
     References
     ----------
-    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, "Emittance preservation in plasma-based accelerators with ion motion," Phys. Rev. Accel. Beams. 20, 111301 (2017);. https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
+    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, "Emittance preservation in plasma-based accelerators with ion motion," Phys. Rev. Accel. Beams. 20, 111301 (2017), https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
     """
 
     # Get parameters

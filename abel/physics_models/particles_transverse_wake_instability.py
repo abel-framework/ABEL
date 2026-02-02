@@ -32,7 +32,131 @@ import abel.physics_models.ion_motion_wakefield_perturbation as ion_motion
 ###################################################
 class PrtclTransWakeConfig():
     """
-    Stores configuration for the transverse wake instability calculations.
+    Configuration container for the transverse wakefield instability model.
+
+    This class defines all numerical and physical settings required to run
+    particle-tracking simulations including transverse wakefields, radiation
+    reaction, and (optionally) plasma ion motion. It is typically passed to
+    the :func:`transverse_wake_instability_particles 
+    <abel.physics_models.particles_transverse_wake_instability.transverse_wake_instability_particles>` 
+    to configure physics parameters, set simulation parameters and control which 
+    physics modules are enabled.
+
+    Parameters
+    ----------
+    plasma_density : [m^-3] float
+        Background plasma electron density.
+
+    stage_length : [m] float
+        Total length of the plasma acceleration stage.
+
+    drive_beam : ``Beam``, optional
+        Drive beam. Not used for tracking. Only used in setting coordinates used 
+        to probe the beam fields of the drive beam in ion motion wakefield 
+        perturbation calculations.
+
+    main_beam : ``Beam``, optional
+        Main beam. Not used for tracking. Only used in setting coordinates used 
+        to probe the beam fields of the main beam in ion motion wakefield 
+        perturbation calculations.
+
+    time_step_mod : [beta_wave_length/c] float, optional
+        Determines the time step of the instability tracking in units of 
+        betatron wave length/c. Defaults to 0.05.
+
+    show_prog_bar : bool, optional
+        Flag for displaying the progress bar for beam tracking. Set to 
+        ``None`` to let ``StageReducedModels.track()`` decide whether to 
+        display the progress bar. Defaults to ``None``.
+
+    probe_evol_period : int, optional
+        Time step interval for probing beam evolution. Set to larger than 0 
+        to record beam parameters for beam evolution diagnostics. The 
+        probing interval is given in units of time steps, so that e.g. 
+        ``probe_evol_period=3`` will probe the beam evolution every 3rd time 
+        step. Defaults to 0`.
+
+    make_animations : bool, optional
+        If ``True``, stores snapshots of the main beam along the plasma stage 
+        for creating side-view and phase-space animations. The frequency for 
+        writing the main beam to file is given by ``probe_evol_period``. 
+        Defaults to ``False``.
+
+    tmpfolder : str, optional
+        Directory for temporary data output (e.g. animation frames).
+
+    stage_num : int, optional
+        Stage index in a multi-stage plasma accelerator.
+
+    enable_tr_instability : bool, optional
+        Flag for enabling transverse intra-beam instability calculations. 
+        Defaults to ``True``.
+
+    enable_radiation_reaction : bool, optional
+        Flag for enabling radiation reaction effects. Defaults to ``True``.
+
+    enable_ion_motion : bool, optional
+        Flag for enabling plasma ion motion effects. Defaults to ``False``.
+
+    ion_charge_num : [e] float, optional
+        Ion charge number in unit of elementary charge. Defaults to 1.0.
+
+    ion_mass : [kg] float, optional
+        Ion mass. Default set by the ion motion physics model.
+
+    num_z_cells_main : int, optional
+        Determines the binning of the z-coordinates used to probe main beam 
+        electric fields using RF-Track. Used in calculating wakefield 
+        perturbation due to ion motion. If ``None``, is determined by the 
+        number of macroparticles. Defaults to ``None``.
+
+    num_x_cells_rft : int, optional
+        Number of grid cells along x used in RF-Track for calculating beam
+        electric fields used in calculating wakefield perturbation due to 
+        ion motion. Defaults to 50.
+        
+    num_y_cells_rft : int, optional
+        Number of grid cells along y used in RF-Track for calculating beam 
+        electric fields used in calculating wakefield perturbation due to 
+        ion motion. Defaults to 50.
+
+    num_xy_cells_probe : int, optional
+        Number of grid cells along x and y used to probe beam electric 
+        fields calculated by RF-Track. Used in calculating wakefield 
+        perturbation due to ion motion. Defaults to 41.
+
+    uniform_z_grid : bool, optional
+        Flag to determine whether the grid along z is uniform (``True``) or 
+        finely resolved along the drive beam and main beam regions, while the 
+        region between the beams are coarsely resolved (``False``). Defaults 
+        to ``False``.
+
+    driver_x_jitter, driver_y_jitter : float [m], optional
+        Random transverse jitter applied to driver centroid by the driver source.
+
+    ion_wkfld_update_period : int, optional
+        Determines the ion wakefield perturbation update period. This is 
+        given in units of time steps, so that e.g. 
+        ``ion_wkfld_update_period=3`` will update the ion wakefield 
+        perturbation every 3rd time step. Defaults to 1.
+
+    drive_beam_update_period : TODO: not in use. remove.
+
+    wake_t_fields : TODO: not in use. remove.
+
+
+    Attributes
+    ----------
+    ion_motion_config : IonMotionConfig or None
+        Sub-configuration for ion wakefield perturbation calculations, created 
+        automatically only when ``enable_ion_motion=True``.
+
+
+    Notes
+    -----
+    This class provides no physics itself — it only defines which physics
+    and numerical settings the instability kernel will use. 
+
     """
 
     # =============================================
@@ -292,13 +416,13 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
     
     Parameters
     ----------
-    beam : ABEL ``Beam`` object
+    beam : ``Beam``
         The main beam to be tracked.
 
-    drive_beam : ABEL ``Beam`` object
+    drive_beam : ``Beam``
         The drive beam.
 
-    trans_wake_config : ``PrtclTransWakeConfig`` object
+    trans_wake_config : ``PrtclTransWakeConfig``
         Contains the configurations for the transverse wake instability 
         calculations.
 
@@ -316,9 +440,9 @@ def calc_ion_wakefield_perturbation(beam, drive_beam, trans_wake_config):
         
     References
     ----------
-    .. [1] C. Benedetti, C. B. Schroeder CB, E. Esarey and W. P. Leemans, 
+    .. [1] C. Benedetti, C. B. Schroeder, E. Esarey and W. P. Leemans, 
     "Emittance preservation in plasma-based accelerators with ion motion", 
-    Phys. Rev. Accel. Beams. 20, 111301 (2017);. 
+    Phys. Rev. Accel. Beams. 20, 111301 (2017), 
     https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.20.111301
     """
     
@@ -455,10 +579,10 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
 
     Parameters
     ----------
-    beam : ABEL ``Beam`` object
+    beam : ``Beam``
         The main beam to be tracked.
 
-    drive_beam0 : ABEL ``Beam`` object
+    drive_beam0 : ``Beam``
         The input drive beam.
         
     Ez_fit_obj : [V/m] interpolation object
@@ -471,17 +595,17 @@ def transverse_wake_instability_particles(beam, drive_beam0, Ez_fit_obj, rb_fit_
         bubble radius using a selection of zs along the main beam. Used to 
         determine the value of the bubble radius for all beam zs.
 
-    trans_wake_config : ``PrtclTransWakeConfig`` object
+    trans_wake_config : ``PrtclTransWakeConfig``
         Contains the configurations for the transverse wake instability 
         calculations.
     
         
     Returns
     ----------
-    beam_out : ABEL ``Beam`` object
+    beam_out : ``Beam``
         ...
     
-    evolution : ``PrtclTransWakeEvolution`` object
+    evolution : ``PrtclTransWakeEvolution``
         ...
     """
 
