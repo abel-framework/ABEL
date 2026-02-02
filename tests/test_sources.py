@@ -45,6 +45,40 @@ def setup_basic_source(plasma_density=6.0e20):
     return source
 
 
+def setup_trapezoid_source(current_head=0.1e3, bunch_length=1050e-6, z_offset=1620e-6, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, enable_xy_jitter=False, enable_xpyp_jitter=False):
+    source = SourceTrapezoid()
+    source.current_head = current_head                                              # [A]
+    source.bunch_length = bunch_length                                              # [m]
+
+    source.num_particles = 10000                                                 
+    source.charge = 5.0e10 * -SI.e                                                  # [C]
+    source.energy = 4.0e9                                                           # [eV] 
+    source.gaussian_blur = 50e-6                                                    # [m]
+    source.rel_energy_spread = 0.01                                              
+
+    source.emit_nx, source.emit_ny = 20e-6, 40e-6                                   # [m rad]
+    source.beta_x, source.beta_y = 0.5, 0.5                                         # [m]
+
+     # Offsets
+    source.z_offset = z_offset                                                      # [m]
+    source.x_offset = x_offset                                                      # [m]
+    source.y_offset = y_offset                                                      # [m]
+    source.x_angle = x_angle                                                        # [rad]
+    source.y_angle = y_angle                                                        # [rad]
+
+    if enable_xy_jitter:
+        source.jitter.x = 100e-9                                                    # [m], std
+        source.jitter.y = 100e-9                                                    # [m], std
+
+    if enable_xpyp_jitter:
+        source.jitter.xp = 1.0e-6                                                   # [rad], std
+        source.jitter.yp = 1.0e-6                                                   # [rad], std
+
+    source.symmetrize = True
+
+    return source
+
+
 def check_beam_source_parameters(beam, source):
     assert np.allclose(beam.particle_mass, SI.m_e, rtol=1e-05, atol=1e-08)
     assert np.allclose(len(beam), source.num_particles, rtol=1e-05, atol=1e-08)
@@ -116,6 +150,79 @@ def test_SourceBasic2Beam():
 
 
 @pytest.mark.sources
+def test_SourceBasic_beam_alignment():
+    """
+    Check that the generated ``Beam`` from a ``SourceBasic`` is aligned to its 
+    propgation direction.
+    """
+
+    np.random.seed(42)
+
+    source0 = setup_basic_source()
+    #source0.align_beam_axis = False                                                # False by default
+    source0.x_angle = 1.3e-6                                                        # [rad]
+    source0.y_angle = 2e-6                                                          # [rad]
+    beam0 = source0.track()
+    assert np.isclose(beam0.x_angle(), source0.x_angle, rtol=1e-5, atol=0.0)
+    assert np.isclose(beam0.y_angle(), source0.y_angle, rtol=1e-5, atol=0.0)
+    assert np.isclose(0.0, beam0.x_tilt_angle(), rtol=0.0, atol=1e-15)
+    assert np.isclose(0.0, beam0.y_tilt_angle(), rtol=0.0, atol=1e-15)
+
+    source = setup_basic_source()
+    source.align_beam_axis = True
+    source.x_angle = 1.3e-6                                                         # [rad]
+    source.y_angle = 2e-6                                                           # [rad]
+    beam = source.track()
+    assert np.isclose(beam.x_angle(), beam.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.y_angle(), beam.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source2 = setup_basic_source()
+    source2.align_beam_axis = True
+    source2.x_angle = -1.3e-6                                                       # [rad]
+    source2.y_angle = -2e-6                                                         # [rad]
+    beam2 = source2.track()
+    assert np.isclose(beam2.x_angle(), beam2.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam2.y_angle(), beam2.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source3 = setup_basic_source()
+    source3.align_beam_axis = True
+    source3.x_angle = 1.3e-5                                                        # [rad]
+    source3.y_angle = -2e-6                                                         # [rad]
+    beam3 = source3.track()
+    assert np.isclose(beam3.x_angle(), beam3.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam3.y_angle(), beam3.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source4 = setup_basic_source()
+    source4.align_beam_axis = True
+    source4.x_angle = -1.3e-6                                                       # [rad]
+    source4.y_angle = 2.3e-5                                                        # [rad]
+    source4.x_offset = 5.1e-6                                                       # [m]
+    source4.y_offset = -4.3e-6                                                      # [m]
+    beam4 = source4.track()
+    assert np.isclose(beam4.x_angle(), beam4.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam4.y_angle(), beam4.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source5 = setup_basic_source()
+    source5.align_beam_axis = True
+    source5.x_angle = -1.3e-8                                                       # [rad]
+    source5.y_angle = 2.3e-8                                                        # [rad]
+    source5.x_offset = 5.1e-6                                                       # [m]
+    source5.y_offset = -4.3e-6                                                      # [m]
+    beam5 = source5.track()
+    assert np.isclose(beam5.x_angle(), beam5.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam5.y_angle(), beam5.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source6 = setup_basic_source()
+    source6.align_beam_axis = True
+    source6.x_angle = 5.0e-5                                                        # [rad]
+    source6.y_angle = -5.0e-5                                                       # [rad]
+    beam6 = source6.track()
+    assert np.isclose(beam6.x_angle(), beam6.x_tilt_angle(), rtol=1e-1, atol=0.0)
+    assert np.isclose(beam6.y_angle(), beam6.y_tilt_angle(), rtol=1e-1, atol=0.0)
+
+
+
+@pytest.mark.sources
 def test_SourceTrapezoid2Beam():
     """
     Check that the generated ``Beam`` from a ``SourceTrapezoid`` has the desired 
@@ -155,6 +262,78 @@ def test_SourceTrapezoid2Beam():
     beam = source.track()
     beam.print_summary()
     check_beam_source_parameters(beam, source)
+
+
+@pytest.mark.sources
+def test_SourceTrapezoid_beam_alignment():
+    """
+    Check that the generated ``Beam`` from a ``SourceTrapezoid`` is aligned to its 
+    propgation direction.
+    """
+
+    np.random.seed(42)
+
+    source0 = setup_trapezoid_source()
+    #source0.align_beam_axis = False                                                # False by default
+    source0.x_angle = 1.3e-6                                                        # [rad]
+    source0.y_angle = 2e-6                                                          # [rad]
+    beam0 = source0.track()
+    assert np.isclose(beam0.x_angle(), source0.x_angle, rtol=1e-5, atol=0.0)
+    assert np.isclose(beam0.y_angle(), source0.y_angle, rtol=1e-5, atol=0.0)
+    assert np.isclose(0.0, beam0.x_tilt_angle(), rtol=0.0, atol=1e-15)
+    assert np.isclose(0.0, beam0.y_tilt_angle(), rtol=0.0, atol=1e-15)
+
+    source = setup_trapezoid_source()
+    source.align_beam_axis = True
+    source.x_angle = 1.3e-6                                                         # [rad]
+    source.y_angle = 2e-6                                                           # [rad]
+    beam = source.track()
+    assert np.isclose(beam.x_angle(), beam.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.y_angle(), beam.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source2 = setup_trapezoid_source()
+    source2.align_beam_axis = True
+    source2.x_angle = -1.3e-6                                                       # [rad]
+    source2.y_angle = -2e-6                                                         # [rad]
+    beam2 = source2.track()
+    assert np.isclose(beam2.x_angle(), beam2.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam2.y_angle(), beam2.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source3 = setup_trapezoid_source()
+    source3.align_beam_axis = True
+    source3.x_angle = 1.3e-6                                                        # [rad]
+    source3.y_angle = -2e-6                                                         # [rad]
+    beam3 = source3.track()
+    assert np.isclose(beam3.x_angle(), beam3.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam3.y_angle(), beam3.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source4 = setup_trapezoid_source()
+    source4.align_beam_axis = True
+    source4.x_angle = -1.3e-6                                                       # [rad]
+    source4.y_angle = 2e-6                                                          # [rad]
+    source4.x_offset = 5.1e-6                                                       # [m]
+    source4.y_offset = -4.3e-6                                                      # [m]
+    beam4 = source4.track()
+    assert np.isclose(beam4.x_angle(), beam4.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam4.y_angle(), beam4.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source5 = setup_trapezoid_source()
+    source5.align_beam_axis = True
+    source5.x_angle = -1.3e-8                                                       # [rad]
+    source5.y_angle = 2.3e-8                                                        # [rad]
+    source5.x_offset = 5.1e-6                                                       # [m]
+    source5.y_offset = -4.3e-6                                                      # [m]
+    beam5 = source5.track()
+    assert np.isclose(beam5.x_angle(), beam5.x_tilt_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(beam5.y_angle(), beam5.y_tilt_angle(), rtol=1e-2, atol=0.0)
+
+    source6 = setup_trapezoid_source()
+    source6.align_beam_axis = True
+    source6.x_angle = 1.0e-5                                                        # [rad]
+    source6.y_angle = -1.0e-5                                                       # [rad]
+    beam6 = source6.track()
+    assert np.isclose(beam6.x_angle(), beam6.x_tilt_angle(), rtol=1e-1, atol=0.0)
+    assert np.isclose(beam6.y_angle(), beam6.y_tilt_angle(), rtol=1e-1, atol=0.0)
 
 
 @pytest.mark.sources
