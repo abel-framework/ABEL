@@ -27,7 +27,7 @@ class StageBasic(Stage):
 
     Attributes
     ----------
-    driver_source : ``Source`` or ``DriverComplex``
+    driver_source : ``Source`` or ``DriverComplex``, optional
         The source of the drive beam. The beam axis is always aligned to its 
         propagation direction. Defaults to ``None``.
 

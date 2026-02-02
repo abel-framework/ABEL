@@ -64,15 +64,12 @@ class StageReducedModels(Stage):
         The source of the drive beam. The beam axis is always aligned to its 
         propagation direction. Defaults to ``None``.
 
+    time_step_mod : [beta_wave_length/c] float, optional
+        Determines the time step of the beam tracking in units of 
+        betatron wave length/c. Defaults to 0.05.
+    
     ramp_beta_mag : float, optional
         Betatron magnification used for ramps. Default set to 1.0
-
-    time_step_mod : [betatron wavelength/c] float
-        Time step modifier that sets the time step in units of betatron wavelength/c for beam tracking.
-
-    time_step_mod : [beta_wave_length/c] float, optional
-        Determines the time step of the instability tracking in units of 
-        betatron wave length/c. Defaults to 0.05.
 
     enable_tr_instability : bool, optional
         Flag for enabling transverse intra-beam instability calculations. 
