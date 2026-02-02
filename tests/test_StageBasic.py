@@ -118,6 +118,7 @@ def test_stage_length_gradient_energyGain():
     linac = PlasmaLinac(source=main_source, stage=stage, num_stages=1, alternate_interstage_polarity=False)
     linac.run('test_stage_length_gradient_energyGain', overwrite=True, verbose=False)
 
+    assert stage.driver_source.align_beam_axis is True
     assert np.allclose(stage.nom_energy_gain, 31.9e9, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.length_flattop, 4.82, rtol=1e-15, atol=0.0)
     assert np.allclose(stage.nom_accel_gradient, stage.nom_energy_gain/stage.length, rtol=1e-15, atol=0.0)
@@ -127,6 +128,7 @@ def test_stage_length_gradient_energyGain():
 
     # ========== Set flattop nominal accelertaion gradient and nominal energy gain ==========
     stage = setup_StageBasic(driver_source=driver_source, use_ramps=True, store_beams_for_tests=False)
+    assert stage.driver_source.align_beam_axis is True
     main_source = setup_basic_main_source(ramp_beta_mag=stage.ramp_beta_mag)
 
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
