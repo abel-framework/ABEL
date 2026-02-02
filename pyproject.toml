@@ -12,7 +12,7 @@ dependencies = [
    "scipy",
    "numba",
    "tqdm",
-   "openpmd-api",
+   "openpmd-api >=0.16.1, <0.17",  # Newer versions break Beam.load(). See PR #196.
    "openpmd-viewer",
    "joblib",
    "joblib-progress",
@@ -20,11 +20,12 @@ dependencies = [
    "matplotlib",
    "PyQt6",
    "pyqtgraph",
-   "Wake-T",
-   "ax-platform",
+   "pytz",
+   "Wake-T == 0.8.0",
+   "ax-platform == 1.1.2",
    "CLICopti >= 2.2",
-   "RF-Track",
-   "impactx-noacc >= 25.6",
+   "RF-Track == 2.5.3",
+   "impactx-noacc >=25.11, <=25.12",
    "toml"
 ]
 requires-python = ">=3,<3.13"

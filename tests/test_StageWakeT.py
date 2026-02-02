@@ -112,6 +112,7 @@ def test_tracking():
     beam = stage.track(main_source.track())
 
     # Inspect stage configurations
+    assert stage.driver_source.align_beam_axis is True
     assert stage.has_ramp() is False
     assert np.isclose(stage.plasma_density, 7.0e21, rtol=1e-15, atol=0.0)
     assert np.isclose(stage.nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
@@ -171,6 +172,7 @@ def test_ramped_tracking():
     beam = stage.track(main_source.track())
 
     # Inspect stage configurations
+    assert stage.driver_source.align_beam_axis is True
     assert stage.has_ramp() is True
     assert np.isclose(stage.plasma_density, 7.0e21, rtol=1e-15, atol=0.0)
     assert np.isclose(stage.nom_energy, 5.0e9, rtol=1e-15, atol=0.0)

@@ -6,8 +6,43 @@
 
 import numpy as np
 
-# generate trace space from geometric emittance and twiss parameters
+
+# =============================================
 def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
+    """
+    Generate a 2D transverse trace space defined by geometric emittance 
+    ``epsilon`` and beam Twiss parameters ``beta`` and ``alpha``.
+    
+
+    Parameters
+    ----------
+    epsilon : [m rad] float
+        Geometric emittance of the beam in the plane of interest.
+
+    beta : [m] float
+        Beta function value at the sampling location. Determines beam size
+        and correlation structure together with ``alpha``.
+
+    alpha : float
+        Twiss parameter representing the correlation between ``x`` and ``x'``.
+
+    N : int
+        Number of particles to generate. If ``symmetrize=True`` this represents
+        the final number of returned samples.
+
+    symmetrize : bool, optional
+        If ``True``, generate only ``N/2`` unique samples and then mirror them
+        symmetrically in phase space (zero mean). Defaults to ``False``.
+
+
+    Returns
+    -------
+    xs : [m] 1D float ndarray
+        Transverse particle positions.
+
+    xps : [rad] 1D float ndarray
+        Transverse particle angles sampled with correct correlation to ``xs``.
+    """
 
     # calculate beam size, divergence and correlation
     sigx = np.sqrt(epsilon * beta)
@@ -33,8 +68,63 @@ def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
     return xs, xps
 
 
-# generate trace space from geometric emittance and twiss parameters (2 planes)
+# =============================================
 def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, L=0, symmetrize=False):
+    """
+    Generate transverse trace-space samples in both x- and y-planes.
+
+    The samples reproduce a correlated 4D Gaussian phase-space defined by
+    the beam Twiss parameters in each plane and an optional canonical
+    angular momentum correlation term ``L``. 
+
+
+    Parameters
+    ----------
+    epsilon_x : [m rad] float
+        Geometric emittance in the horizontal plane.
+
+    beta_x : [m] float
+        Horizontal beta function at the sampling location.
+
+    alpha_x : float
+        Horizontal Twiss alpha parameter.
+
+    epsilon_y : [m rad] float
+        Geometric emittance in the vertical plane.
+
+    beta_y : [m] float
+        Vertical beta function at the sampling location.
+
+    alpha_y : float
+        Vertical Twiss alpha parameter.
+
+    N : int
+        Number of macroparticles to generate. If ``symmetrize=True`` this
+        represents the final number of returned samples.
+
+    L : [m rad] float, optional
+        Canonical angular momentum (x–y coupling). ``L = 0`` produces
+        uncoupled transverse motion. Defaults to 0.
+
+    symmetrize : bool, optional
+        If ``True``, generate ``N/4`` unique samples and mirror them to
+        enforce transverse symmetry (zero mean). Defaults to ``False``.
+
+
+    Returns
+    -------
+    xs : [m] 1D float ndarray
+        Transverse positions in the horizontal plane.
+
+    xps : [rad] 1D float ndarray
+        Transverse angles (slopes) in the horizontal plane.
+
+    ys : [m] 1D float ndarray
+        Transverse positions in the vertical plane.
+
+    yps : [rad] 1D float ndarray
+        Transverse angles (slopes) in the vertical plane.
+    """
 
     # calculate beam size, divergence and correlation
     sigx = np.sqrt(epsilon_x * beta_x)
@@ -76,8 +166,73 @@ def generate_trace_space_xy(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha
     return xs, xps, ys, yps
 
 
-# generate trace space from geometric emittance and twiss parameters for a beam symmetrised in 6D
+# =============================================
 def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y, alpha_y, N, bunch_length, energy_spread, L=0):
+    """
+    Generate a fully symmetrized 6D trace-space particle distribution.
+
+    This function constructs a Gaussian beam distribution symmetrised around 
+    zero in all six phase-space dimensions (x, x', y, y', z, E). The 
+    distribution is defined by the geometric emittances, Twiss parameters,
+    bunch length, and relative energy spread. Optional canonical angular
+    momentum ``L`` introduces correlated x–y coupling.
+
+
+    Parameters
+    ----------
+    epsilon_x : [m rad] float
+        Geometric emittance in the horizontal plane.
+
+    beta_x : [m] float
+        Horizontal beta function at the sampling location.
+
+    alpha_x : float
+        Horizontal Twiss alpha parameter.
+
+    epsilon_y : [m rad] float
+        Geometric emittance in the vertical plane.
+
+    beta_y : [m] float
+        Vertical beta function at the sampling location.
+
+    alpha_y : float
+        Vertical Twiss alpha parameter.
+
+    N : int
+        Number of macroparticles to generate. If ``symmetrize=True`` this
+        represents the final number of returned samples.
+
+    bunch_length : [m] float
+        RMS bunch length.
+
+    energy_spread : [eV] float
+        Energy spread (std).
+
+    L : [m rad] float, optional
+        Canonical angular momentum (x–y coupling). ``L = 0`` produces
+        uncoupled transverse motion. Defaults to 0.
+
+
+    Returns
+    -------
+    xs : [m] 1D float ndarray
+        Transverse positions in the horizontal plane.
+
+    xps : [rad] 1D float ndarray
+        Transverse angles (slopes) in the horizontal plane.
+
+    ys : [m] 1D float ndarray
+        Transverse positions in the vertical plane.
+
+    yps : [rad] 1D float ndarray
+        Transverse angles (slopes) in the vertical plane.
+
+    zs : [m] 1D float ndarray
+        Longitudinal positions.
+
+    Es : [eV] 1D float ndarray
+        Particle energies.
+    """
 
     # calculate beam size, divergence and correlation
     sigx = np.sqrt(epsilon_x * beta_x)
@@ -120,9 +275,12 @@ def generate_symm_trace_space_xyz(epsilon_x, beta_x, alpha_x, epsilon_y, beta_y,
     
     return xs, xps, ys, yps, zs, Es
 
-    
-# general focusing transfer matrix (quadrupole and drift)
+
+# =============================================
 def Rmat(l, k=0, plasmalens=True):
+    """
+    General focusing transfer matrix (quadrupole and drift)
+    """
     import warnings
     warnings.filterwarnings("ignore")
     
@@ -155,8 +313,11 @@ def Rmat(l, k=0, plasmalens=True):
                           [0,0,-np.sin(np.sqrt(-k)*l)*np.sqrt(-k),np.cos(np.sqrt(-k)*l)]])
 
 
-# general dispersion transfer matrix (dipole, quadrupole and drift)
+# =============================================
 def Dmat(l, inv_rho=0, k=0):
+    """
+    General dispersion transfer matrix (dipole, quadrupole and drift)
+    """
     R = Rmat(l,k)
     if inv_rho == 0:
         return np.matrix([[R[0,0], R[0,1], 0],
@@ -168,10 +329,66 @@ def Dmat(l, inv_rho=0, k=0):
                           [0, 0, 1]])
     
     
-
+# =============================================
 def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False):
     """
-    Evolution of the beta function.
+    Evolution the beta function through a 
+
+    Compute the evolution of the Twiss beta and alpha functions through a
+    sequence of linear focusing elements.
+
+    This routine propagates an initial set of Twiss parameters
+    ``(beta0, alpha0)`` through a piecewise-constant lattice specified by
+    element lengths and focusing strengths. The full beta-function
+    evolution is (optionally) sampled along the lattice for plotting or analysis.
+
+
+    Parameters
+    ----------
+    ls : [m] 1D float ndarray
+        Lattice element lengths.
+
+    ks : [m^-2] 1D float ndarray
+        Lattice element quadrupole focusing strengths (equivalent to q/p*dB/dr, 
+        where q is the particle charge, p is the nominal particle momentum and 
+        dB/dr is the magnetic field transverse gradient).
+
+    beta0 : float
+        Initial beta function at the lattice entrance [m].
+
+    alpha0 : float, optional
+        Initial Twiss alpha parameter at the lattice entrance.
+        
+    inv_rhos : [m^-1] 1D float ndarray, optional
+        Inverse bending radii for each lattice segment. If provided,
+        weak focusing is added as ``k_eff = ks + inv_rhos**2``.
+
+    fast : bool, optional
+        If ``True``, skips detailed integration within each element for faster 
+        computation (no intermediate data are returned). Defaults to ``False``.
+
+    plot : bool, optional
+        If ``True``, sets ``fast`` to ``False`` and plots the evolution of the 
+        sqyare root of the beta function along the beamline. Defaults to ``False``.
+
+        
+    Returns
+    -------
+    beta : [m] float
+        Final beta function at the end of the lattice.
+
+    alpha : float
+        Final Twiss alpha function at the end of the lattice.
+
+    evolution : ndarray or None
+        Array of shape (3, N) containing sampled evolution along the
+        lattice, where:
+
+            - ``evolution[0, :]``: longitudinal position s [m]
+            - ``evolution[1, :]``: beta(s) [m]
+            - ``evolution[1, :]``: alpha(s) [m]
+
+        If ``fast=True``, returns ``None``.
     """
     
     # overwrite fast-calculation toggle if plotting 
@@ -223,9 +440,42 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
     return beta, alpha, evolution
 
 
+# =============================================
 def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
     """
-    Evolution of the first-order transverse dispersion.
+    Numerically compute the evolution of the first-order transverse dispersion 
+    along a beamline with dipole and quadrupole fields.
+
+
+    Parameters
+    ----------
+    ls : [m] 1D float ndarray
+        Lattice element lengths.
+
+    inv_rhos : [m^-1] 1D float ndarray
+        Inverse bending radii.
+
+    ks : [m^-2] 1D float ndarray
+        Lattice element quadrupole focusing strengths (equivalent to q/p*dB/dr, 
+        where q is the particle charge, p is the nominal particle momentum and 
+        dB/dr is the magnetic field transverse gradient).
+
+    Dx0 : float [m], optional
+        Initial horizontal dispersion value at s=0.
+
+    Dpx0 : float, optional
+        Initial derivative of dispersion at s=0.
+
+    fast : bool, optional
+        If ``True``, skips detailed integration within each element for faster 
+        computation (no intermediate data are returned). Defaults to ``False``.
+
+    plot : bool, optional
+        If ``True``, sets ``fast`` to ``False`` and plots the evolution of the 
+        first-order dispersion along the beamline. Defaults to ``False``.
+
+    high_res : bool, optional
+        Increase the evolution sampling frequency. Defaults to ``False``.
     """
     
     # overwrite fast-calculation toggle if plotting 
@@ -282,9 +532,75 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
     return Dx, Dpx, evolution
 
 
+# =============================================
 def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=False):
     """
-    Evolution of the second-order transverse dispersion.
+    Numerically compute the evolution of second- and higher-order horizontal 
+    dispersion functions along a beamline with dipole, quadrupole, and sextupole 
+    fields.
+
+    This routine tracks several particles with different relative momentum 
+    deviations through a sequence of magnetic elements, integrates their 
+    trajectories, and computes the derivatives of transverse displacement with 
+    respect to relative momentum deviation (``delta``) up to fourth order using 
+    a five-point finite difference stencil. 
+
+    It can return the final second-order dispersion values (``DDx``, ``DDpx``) 
+    and, optionally, the full evolution of ``DDx`` and ``DDpx`` along the 
+    beamline.
+
+    Parameters
+    ----------
+    ls : [m] 1D float ndarray
+        Lattice element lengths.
+
+    inv_rhos : [m^-1] 1D float ndarray
+        Inverse bending radii.
+
+    ks : [m^-2] 1D float ndarray
+        Lattice element quadrupole focusing strengths (equivalent to q/p*dB/dr, 
+        where q is the particle charge, p is the nominal particle momentum and 
+        dB/dr is the magnetic field transverse gradient).
+
+    ms : [m^-3] 1D float ndarray
+        Sextupole strengths.
+
+    taus : [m^-1] 1D float ndarray
+        Plasma lens transverse taper coefficients.
+
+    fast : bool, optional
+        If ``True``, skips detailed integration within each element for faster 
+        computation (no intermediate data are returned). Defaults to ``False``.
+
+    plot : bool, optional
+        If ``True``, sets ``fast`` to ``False`` and plots the evolution of the 
+        second-order dispersion along the beamline. Defaults to ``False``.
+
+    Returns
+    -------
+    DDx : [m] float
+        Final second-order dispersion at the end of the beamline.
+
+    DDpx : float
+        Final derivative of the second-order dispersion wrt. s.
+
+    evolution : ndarray or None
+        If ``fast=False``, an array of shape (5, N) containing:
+
+            - ``evolution[0, :]``: longitudinal position s [m]
+            - ``evolution[1, :]``: first-order dispersion [m]
+            - ``evolution[2, :]``: second-order dispersion [m]
+            - ``evolution[3, :]``: third-order dispersion [m]
+            - ``evolution[4, :]``: fourth-order dispersion [m]
+
+        If ``fast=True``, returns ``None``.
+
+    Notes
+    -----
+    - The integration uses a simple symplectic (leapfrog) method for stability.
+    - Derivatives with respect to ``delta`` are computed using a five-point stencil for high accuracy.
+    - The dispersion expansion follows:
+          x(delta) = x_0 + Dx * delta + DDx * delta^2 + DDDx * delta^3 + DDDDx * delta^4 + O(delta^5)
     """
     
     # overwrite fast-calculation toggle if plotting 
@@ -385,6 +701,7 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
     return DDx, DDpx, evolution
 
 
+# =============================================
 def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False, evolution_disp=None):
     """
     Evolution of longitudinal dispersion, R56.
@@ -447,8 +764,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res
     return R56, evolution
 
 
-
-
+# =============================================
 def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
     """
     Evolution of the beam orbit (i.e., the top view).
@@ -501,6 +817,7 @@ def evolve_orbit(ls, inv_rhos, x0=0, y0=0, s0=0, theta0=0, plot=False):
     return theta, evolution
 
 
+# =============================================
 def evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, plot=False):
     """
     Evolution of the curly H function (i.e., single-particle emittance of the dispersion).
@@ -537,6 +854,7 @@ def evolve_curlyH(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, plot=False):
     return curlyH, evolution
 
 
+# =============================================
 def evolve_I2(ls, inv_rhos, fast=False, plot=False):
     """
     Evolution of the second synchrotron radiation integral I_2.
@@ -575,6 +893,7 @@ def evolve_I2(ls, inv_rhos, fast=False, plot=False):
     return I2, evolution
 
 
+# =============================================
 def evolve_I3(ls, inv_rhos, fast=False, plot=False):
     """
     Evolution of the third synchrotron radiation integral I_3.
@@ -613,6 +932,7 @@ def evolve_I3(ls, inv_rhos, fast=False, plot=False):
     return I3, evolution
 
 
+# =============================================
 def evolve_I4(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False):
     """
     Evolution of the fourth synchrotron radiation integral I_4.
@@ -673,6 +993,7 @@ def evolve_I4(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False):
     return I4, evolution
 
 
+# =============================================
 def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False):
     """
     Evolution of the fifth synchrotron radiation integral I_5.
@@ -730,6 +1051,7 @@ def evolve_I5(ls, inv_rhos, ks, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot
     return I5, evolution
 
 
+# =============================================
 def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=0, Dpx0=0, fast=False, plot=False, bending_plane=True):
     """
     Evolution of the first-order chromatic amplitude W.
@@ -829,5 +1151,4 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
         ax.set_ylabel('W_x')
 
     return W, evolution
-    
 
