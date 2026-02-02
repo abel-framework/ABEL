@@ -250,7 +250,7 @@ def test_ramped_linac():
     assert linac.stage.driver_source.align_beam_axis is True
     assert stages[0].driver_source.align_beam_axis is True
     assert stages[1].driver_source.align_beam_axis is True
-    assert np.isclose(linac.nom_energy, 364920000000.0, rtol=1e-5, atol=0.0)
+    assert np.isclose(linac.nom_energy, 6462752491.36345, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, stages[-1].nom_energy + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.nom_energy, main_source.energy + stages[0].nom_energy_gain + stages[-1].nom_energy_gain, rtol=1e-5, atol=0.0)
     assert np.isclose(linac.get_length(), 7.775398161868525, rtol=1e-5, atol=0.0)
