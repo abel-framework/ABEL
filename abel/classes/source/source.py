@@ -12,6 +12,7 @@ import numpy as np
 import scipy.constants as SI
 from abel.utilities.beam_physics import generate_trace_space
 from abel.utilities.relativity import energy2gamma
+import warnings
 
 class Source(Trackable, CostModeled):
     """
@@ -45,8 +46,13 @@ class Source(Trackable, CostModeled):
     x_angle, y_angle : [rad] float
         Transverse angular offsets applied to the beam.
 
+    align_beam_axis : bool, optional
+        Flag for aligning the generated beam's axis to its propagation direction 
+        defined by ``x_angle`` and ``y_angle`` (plus angular jitters). Defaults 
+        to ``False``.
+
     norm_jitter_emittance_x, norm_jitter_emittance_y : [m rad] float
-        Used to generate jitter in position and angle by samling from a jitter 
+        Used to generate jitter in position and angle by sampling from a jitter 
         phase space defined by Twiss functions and the given emittance jitter.
 
     waist_shift_x, waist_shift_y : [m] float
@@ -74,7 +80,7 @@ class Source(Trackable, CostModeled):
     #TODO: Why is accel_gradient needed??
     
     @abstractmethod
-    def __init__(self, length=0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0, y_offset=0, x_angle=0, y_angle=0, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0, waist_shift_y=0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
+    def __init__(self, length=0.0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, align_beam_axis=False, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0.0, waist_shift_y=0.0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
 
         super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -88,6 +94,7 @@ class Source(Trackable, CostModeled):
         self.y_offset = y_offset
         self.x_angle = x_angle
         self.y_angle = y_angle
+        self.align_beam_axis = align_beam_axis
 
         self.norm_jitter_emittance_x = norm_jitter_emittance_x
         self.norm_jitter_emittance_y = norm_jitter_emittance_y
@@ -153,7 +160,26 @@ class Source(Trackable, CostModeled):
 
         # set spin polarization
         beam.set_arbitrary_spin_polarization(self.spin_polarization, direction=self.spin_polarization_direction)
-        
+
+        # rotate the beam according to its pointing angles
+        do_beam_rotation = False
+        rotation_angle_x = 0.0
+        rotation_angle_y = 0.0
+
+        if self.align_beam_axis and np.abs(beam.x_angle()) > 1e-15:
+            rotation_angle_x = beam.x_angle()  # Use the generated beam's angle (insterad of the source's angle) to also take account of angular jitter.
+            do_beam_rotation = True
+        if self.align_beam_axis and np.abs(beam.y_angle()) > 1e-15:
+            rotation_angle_y = -beam.y_angle()  # Minus due to right hand rule.
+            do_beam_rotation = True
+
+        if do_beam_rotation:
+            beam.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
+
+            if not np.isclose(beam.x_angle(), beam.x_tilt_angle(), rtol=1e-2, atol=0.0) or not np.isclose(beam.y_angle(), beam.y_tilt_angle(), rtol=1e-2, atol=0.0):
+                pointing_error_string = 'The beam may not have been accurately aligned to its propagation direction.\n' + 'beam x_angle: ' + str(beam.x_angle()) + '\nbeam x_tilt_angle: ' + str(beam.x_tilt_angle()) + '\nbeam y_angle: ' + str(beam.y_angle()) + '\nbeam y_tilt_angle: ' + str(beam.y_tilt_angle())
+                warnings.warn(pointing_error_string)
+
         # set metadata
         beam.location = 0
         beam.stage_number = 0
@@ -210,7 +236,9 @@ class Source(Trackable, CostModeled):
     def wallplug_power(self):
         if self.rep_rate is not None:
             return self.energy_usage() * self.rep_rate
-    
+
+
+    # ==================================================
     def survey_object(self):
         npoints = 10
         x_points = np.linspace(0, self.get_length(), npoints)
@@ -219,8 +247,9 @@ class Source(Trackable, CostModeled):
         label = 'Source'
         color = 'black'
         return x_points, y_points, final_angle, label, color
-        
     
+        
+    # ==================================================
     def print_summary(self):
         """
         Print a summary for the source.
