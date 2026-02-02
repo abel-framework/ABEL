@@ -38,6 +38,7 @@ class HALHFv1(Collider):
         driver_source.num_particles = 5000
         driver_source.wallplug_efficiency = 0.5
         driver_source.accel_gradient = 10e6 # [V/m]
+        driver_source.symmetrize = True
         
         # define driver accelerator
         driver_accel = RFAcceleratorBasic()
