@@ -126,6 +126,8 @@ class Stage(Trackable, CostModeled):
         self.ramp_beta_mag = ramp_beta_mag
         
         self.stage_number = None
+
+        self._external_focusing_gradient = None
         
         # nominal initial energy
         self.nom_energy = None 
@@ -1537,12 +1539,16 @@ class Stage(Trackable, CostModeled):
         if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
             return self.phase_advance_beta_evolution()/(2*np.pi)
         else:
+            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+            if self._external_focusing_gradient is not None:
+                g = g + self._external_focusing_gradient
             
-            integral = 2*np.sqrt(initial_energy*q + q*nom_accel_gradient_flattop*length_flattop)/(q*nom_accel_gradient_flattop) - 2*np.sqrt(initial_energy*q)/(q*nom_accel_gradient_flattop)
+            prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient_flattop)
+            energy_scaling = np.sqrt(initial_energy*SI.e + q*nom_accel_gradient_flattop*length_flattop) - np.sqrt(initial_energy*SI.e)
 
-            num_beta_osc = k_p(plasma_density)*np.sqrt(m*SI.c**2/2) * integral/(2*np.pi)
+            num_beta_osc = prefactor * energy_scaling / (2*np.pi)
 
-        return num_beta_osc
+            return num_beta_osc
     
     
     # ==================================================
