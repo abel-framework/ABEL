@@ -1350,7 +1350,8 @@ class Stage(Trackable, CostModeled):
             ``self.plasma_density``.
 
         q : [C] float, optional
-            Particle charge. Defaults to elementary charge.
+            Particle charge. q * nom_accel_gradient must be positive. Defaults 
+            to elementary charge.
 
         m : [kg] float, optional
             Particle mass. Defaults to electron mass.
@@ -1366,10 +1367,17 @@ class Stage(Trackable, CostModeled):
         from abel.utilities.plasma_physics import k_p
 
         if initial_energy is None:
+            if self.nom_energy is None:
+                raise ValueError('Stage.nom_energy not set.')
             initial_energy = self.nom_energy
 
         if nom_accel_gradient is None:
+            if self.nom_accel_gradient_flattop is None:
+                raise ValueError('Stage.nom_accel_gradient_flattop not set.')
             nom_accel_gradient = self.nom_accel_gradient_flattop
+
+        if q * nom_accel_gradient < 0:
+            raise ValueError('q * nom_accel_gradient must be positive.')
 
         if plasma_density is None:
             plasma_density = self.plasma_density
@@ -1489,7 +1497,8 @@ class Stage(Trackable, CostModeled):
             ``self.plasma_density``.
 
         q : [C] float, optional
-            Particle charge. Defaults to elementary charge.
+            Particle charge. q * nom_accel_gradient_flattop must be positive. 
+            Defaults to elementary charge.
 
         m : [kg] float, optional
             Particle mass. Defaults to electron mass.
@@ -1519,12 +1528,16 @@ class Stage(Trackable, CostModeled):
                 raise ValueError('Stage.nom_accel_gradient_flattop not set.')
             nom_accel_gradient_flattop = self.nom_accel_gradient_flattop
 
+        if q * nom_accel_gradient_flattop < 0:
+            raise ValueError('q * nom_accel_gradient_flattop must be positive.')
+
         if plasma_density is None:
             plasma_density = self.plasma_density
 
         if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
             return self.phase_advance_beta_evolution()/(2*np.pi)
         else:
+            
             integral = 2*np.sqrt(initial_energy*q + q*nom_accel_gradient_flattop*length_flattop)/(q*nom_accel_gradient_flattop) - 2*np.sqrt(initial_energy*q)/(q*nom_accel_gradient_flattop)
 
             num_beta_osc = k_p(plasma_density)*np.sqrt(m*SI.c**2/2) * integral/(2*np.pi)
