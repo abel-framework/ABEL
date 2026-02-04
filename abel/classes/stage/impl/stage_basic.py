@@ -481,19 +481,17 @@ class StageBasic(Stage):
         return self._driver_source
     @driver_source.setter
     def driver_source(self, source : Source | DriverComplex | None):
+        # Delegate to parent setter
+        Stage.driver_source.fset(self, source)
+        
         # Set the driver source to always align drive beam axis to its propagation direction
-        if isinstance(source, DriverComplex):
-            if source.source is None:
-                raise ValueError("The source of the driver complex is not set.")
-            source.source.align_beam_axis = True
-            self._driver_source = source
-        elif isinstance(source, Source):
-            source.align_beam_axis = True
-            self._driver_source = source
-        else:
-            self._driver_source = None
+        if source is not None:
 
-    
+            if isinstance(source, DriverComplex):
+                self.driver_source.source.align_beam_axis = True
+            elif isinstance(source, Source):
+                self.driver_source.align_beam_axis = True
+
     
 ###################################################
 # Custom formatting that omits the line of source code
