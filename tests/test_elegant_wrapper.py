@@ -19,26 +19,6 @@ from abel.wrappers.elegant.elegant_wrapper import *
 from string import Template
 
 
-def elegant_missing():
-    """
-    Checks if the elegant executable exists and has executable permissions.
-    Returns True if missing.
-
-    Parameters
-    ----------
-    file_path: str
-      The path to the file.
-
-    Returns
-    -------
-    bool: False if the file exists and is executable, True otherwise.
-    """
-    file_path = CONFIG.elegant_exec
-    if os.path.exists(file_path) and os.path.isfile(os.path.join(file_path,'elegant')):
-        if os.access(file_path, os.X_OK):
-            return False
-    return True
-
 
 def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
     from abel.utilities.plasma_physics import beta_matched
@@ -119,7 +99,7 @@ def setup_basic_main_source(plasma_density=6.0e20, ramp_beta_mag=5.0):
 #             fout.write(results)
             
 
-@pytest.mark.skipif(elegant_missing(), reason="ELEGANT is not available")
+@pytest.mark.skipif(not CONFIG.elegant_is_installed, reason="ELEGANT is not available")
 @pytest.mark.elegant_wrapper_unit_test
 def test_elegant_write_read_beam():
     """
@@ -154,7 +134,7 @@ def test_elegant_write_read_beam():
     # Remove temporary files
     shutil.rmtree(tmpfolder)
 
-# @pytest.mark.skipif(elegant_missing(), reason="ELEGANT is not available")
+# @pytest.mark.skipif(not CONFIG.elegant_is_installed, reason="ELEGANT is not available")
 # @pytest.mark.elegant_wrapper_unit_test
 # def test_elegant_run():
 #     """
@@ -191,7 +171,7 @@ def test_elegant_write_read_beam():
 #     beam = elegant_run(runfile, beam0, inputbeamfile, outputbeamfile, quiet=True, tmpfolder=tmpfolder) #This is not executed correctly yet...
 
 
-@pytest.mark.skipif(elegant_missing(), reason="ELEGANT is not available")
+@pytest.mark.skipif(not CONFIG.elegant_is_installed, reason="ELEGANT is not available")
 @pytest.mark.elegant_wrapper_unit_test
 def test_elegant_apl_fieldmap2D():
     """

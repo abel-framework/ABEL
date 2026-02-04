@@ -119,18 +119,28 @@ class CONFIG:
         # External codes - ELEGANT
         cls.elegant_use_container = cfdata['external_codes']['elegant']['elegant_use_container']
         cls.elegant_path   = parsePath(cfdata['external_codes']['elegant']['elegant_path'])
+        cls.elegant_is_installed = False
         if cls.elegant_use_container:
             cls.bind_path  = parsePath(cfdata['external_codes']['elegant']['bind_path'])
             cls.elegant_exec = 'singularity exec --bind ' + cls.bind_path + ':' + cls.bind_path + ' ' + cls.elegant_path + os.path.sep + 'elegant.sif '
             cls.elegant_rpnflag = ''
+            if os.path.isfile(os.path.join(cls.elegant_path,'elegant.sif')):
+                if os.access(os.path.join(cls.elegant_path,'elegant.sif'), os.X_OK):
+                    cls.elegant_is_installed = True
         else:
             cls.elegant_exec = cls.elegant_path
             cls.elegant_rpnflag = ' -rpnDefns=' + CONFIG.elegant_path + 'defns.rpn'
+            if os.path.isfile(os.path.join(cls.elegant_path,'elegant')):
+                if os.access(os.path.join(cls.elegant_path,'elegant'), os.X_OK):
+                    cls.elegant_is_installed = True
+                
         #Optional overrides
         if 'elegant_exec' in cfdata['external_codes']['elegant']:
             cls.elegant_exec = cfdata['external_codes']['elegant']['elegant_exec']
         if 'elegant_rpnflag' in cfdata['external_codes']['elegant']:
             cls.elegant_rpnflag = cfdata['external_codes']['elegant']['elegant_rpnflag']
+        if 'elegant_is_installed' in cfdata['external_codes']['elegant']:
+            cls.elegant_is_installed = cfdata['external_codes']['elegant']['elegant_is_installed']
 
         # External codes - HIPACE++
         cls.hipace_path    = parsePath(cfdata['external_codes']['hipace']['hipace_path'])

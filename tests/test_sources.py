@@ -267,8 +267,9 @@ def test_SourceTrapezoid2Beam():
 @pytest.mark.sources
 def test_SourceTrapezoid_beam_alignment():
     """
-    Check that the generated ``Beam`` from a ``SourceTrapezoid`` is aligned to its 
-    propgation direction.
+    Check that the generated ``Beam`` from a ``SourceTrapezoid`` is aligned to 
+    its propgation direction. The number chosen here are mostly randomly 
+    selected, but are supposed to probe the typical parameter space.
     """
 
     np.random.seed(42)
