@@ -190,7 +190,8 @@ class Stage(Trackable, CostModeled):
         self._driver_source = source
     _driver_source = None
 
-    def get_driver_source(self):
+
+    def get_actual_driver_source(self):
         """
         Return the driver source of the stage or the driver source of the 
         associated driver complex of the stage.
@@ -207,8 +208,6 @@ class Stage(Trackable, CostModeled):
             driver_source = self.driver_source
         
         # driver_source.setter ensures that self.driver_source is a valid type.
-
-        
         
         return driver_source
     
