@@ -1483,7 +1483,7 @@ class Stage(Trackable, CostModeled):
         machine_zero = sys.float_info.epsilon
 
         # Check if the driver source generates a drive beam alignmed to its propagation direction, which is required by many Stage subclasses
-        driver_source = self.get_driver_source()
+        driver_source = self.get_actual_driver_source()
 
         if not driver_source.align_beam_axis:
             raise ValueError("Currently does not support drive beam axis not aligned with its propagation direction. I.e. driver_source.align_beam_axis must be set to True.")
@@ -1564,7 +1564,7 @@ class Stage(Trackable, CostModeled):
         machine_zero = sys.float_info.epsilon
 
         # Check if the driver source of the stage has angular offset
-        driver_source = self.get_driver_source()
+        driver_source = self.get_actual_driver_source()
         has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
         
         if has_angular_offset:
@@ -1973,7 +1973,7 @@ class Stage(Trackable, CostModeled):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source is not None:  # A ramp may not have a driver source
-            driver_source = self.get_driver_source()
+            driver_source = self.get_actual_driver_source()
             if driver_source.energy is not None:
                 Ez_driver_max = driver_source.energy/self.length_flattop
                 axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
@@ -2038,7 +2038,7 @@ class Stage(Trackable, CostModeled):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source is not None:  # A ramp may not have a driver source
-            driver_source = self.get_driver_source()
+            driver_source = self.get_actual_driver_source()
             if driver_source.energy is not None:
                 Ez_driver_max = driver_source.energy/self.get_length()
                 axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
