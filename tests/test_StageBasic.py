@@ -149,6 +149,47 @@ def test_stage_length_gradient_energyGain():
 
 
 @pytest.mark.StageBasic
+def test_driver_source_setter():
+    """
+    Tests ensuring that the driver source setter does not set invalid classes 
+    and that the driver source has valid energy.
+    """
+
+    driver_source = setup_basic_driver_source()
+    driver_complex = DriverComplex()
+    driver_complex.source = driver_source
+    stage = StageBasic()
+
+    # Valid options
+    stage.driver_source = driver_source
+    assert isinstance(stage.driver_source, Source)
+    stage.driver_source = None
+    assert stage.driver_source is None
+    stage.driver_source = driver_complex
+    assert isinstance(stage.driver_source, DriverComplex)
+
+    # Invalid instances
+    with pytest.raises(TypeError):
+        stage.driver_source = 42
+    with pytest.raises(TypeError):
+        stage.driver_source = 4.2
+    with pytest.raises(TypeError):
+        stage.driver_source = 'lorem'
+
+    # Invalid driver source energy
+    stage2 = StageBasic()
+    driver_source2 = setup_basic_driver_source()
+    driver_source2.energy = None
+    with pytest.raises(ValueError):
+        stage2.driver_source = driver_source2 # driver source energy must be set before being added to a stage.
+    
+    driver_complex2 = DriverComplex()
+    driver_complex2.source = driver_source2
+    with pytest.raises(ValueError):
+        stage2.driver_source = driver_complex2 # driver source energy must be set before being added to a stage.
+
+
+@pytest.mark.StageBasic
 def test_driver_unrotation():
     """
     Tests for checking the driver being correctly un-rotated back to its 
@@ -396,4 +437,3 @@ def test_copy_config2blank_stage():
     assert np.isclose(stage_copy.probe_evolution, stage.probe_evolution, rtol=1e-5, atol=0.0)
 
 
-    
