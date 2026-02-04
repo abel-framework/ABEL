@@ -9,6 +9,7 @@ from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
 from abel.classes.source.source import Source
+from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import copy, warnings
@@ -184,7 +185,7 @@ class Stage(Trackable, CostModeled):
                 driver_source = source.source
             elif isinstance(source, Source):
                 driver_source = source
-            if driver_source.energy is None:
+            if not isinstance(driver_source, SourceCapsule) and driver_source.energy is None:
                 raise ValueError('The energy of the driver source of the stage is not set.')
         
         self._driver_source = source
