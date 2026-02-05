@@ -5,6 +5,7 @@
 # License: GPL-3.0-or-later
 
 import numpy as np
+import matplotlib.ticker as ticker
 
 # generate trace space from geometric emittance and twiss parameters
 def generate_trace_space(epsilon, beta, alpha, N, symmetrize=False):
@@ -157,19 +158,64 @@ def Rmat(l, k=0, plasmalens=False):
 
 # general dispersion transfer matrix (dipole, quadrupole and drift)
 def Dmat(l, inv_rho=0, k=0):
-    R = Rmat(l,k)
-    if inv_rho == 0:
-        return np.matrix([[R[0,0], R[0,1], 0],
-                          [R[1,0], R[1,1], 0],
-                          [0, 0, 1]])
+    # 1. Calculate the Total Focusing Strength
+    # For a sector bend, the horizontal focusing is K_total = k + 1/rho^2
+    # (Vertical focusing is just -k, but Dmat implies horizontal here)
+    
+    # We use a small epsilon to avoid division by zero if K_total is exactly 0
+    K_total = k + inv_rho**2
+    
+    if abs(K_total) < 1e-12:
+        # DRIFT CASE (Limit as K->0)
+        # This handles the pure Drift or weak magnet limit
+        # D_term approx l^2 * inv_rho / 2
+        return np.array([
+            [1, l, l**2 * inv_rho / 2],
+            [0, 1, l * inv_rho],
+            [0, 0, 1]
+        ])
+    
+    sqrt_K = np.sqrt(abs(K_total))
+    
+    if K_total > 0:
+        # FOCUSING (Standard Sector Bend)
+        c  = np.cos(l * sqrt_K)
+        s  = np.sin(l * sqrt_K)
+        
+        # 2x2 Transfer Matrix (Hill's Equation Solution)
+        r11 = c
+        r12 = s / sqrt_K
+        r21 = -s * sqrt_K
+        r22 = c
+        
+        # Dispersion Terms (Green's Function Solution)
+        # These naturally include the 1/rho^2 focusing effect
+        d_term  = (inv_rho / K_total) * (1 - c)
+        dp_term = (inv_rho / sqrt_K) * s
+        
     else:
-        return np.matrix([[R[0,0], R[0,1], -(1-np.cos(l*inv_rho))/inv_rho],
-                          [R[1,0], R[1,1], -2*np.tan(l*inv_rho/2)],
-                          [0, 0, 1]])
+        # DEFOCUSING (If k is strong and negative, overpowering the geometric focusing)
+        # Uses hyperbolic functions
+        ch = np.cosh(l * sqrt_K)
+        sh = np.sinh(l * sqrt_K)
+        
+        r11 = ch
+        r12 = sh / sqrt_K
+        r21 = sh * sqrt_K
+        r22 = ch
+        
+        d_term  = (inv_rho / abs(K_total)) * (ch - 1)
+        dp_term = (inv_rho / sqrt_K) * sh
+
+    return np.array([
+        [r11, r12, d_term],
+        [r21, r22, dp_term],
+        [0,   0,   1]
+    ])
     
     
 
-def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False):
+def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False, plane='x', return_fig=False):
     """
     Evolution of the beta function.
     """
@@ -218,14 +264,18 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
         fig, ax = plt.subplots(1,1)
         ax.plot(evolution[0,:], np.sqrt(evolution[1,:]))
         ax.set_xlabel('s (m)')
-        ax.set_ylabel('Square root of beta function (m^0.5)]')
+        ax.set_ylabel(fr'$\sqrt{{\beta_\text{{{plane}}}}}$ ($\sqrt{{\text{{m}}}}$)')
         ax.grid()
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
         plt.show()
+
+    if return_fig and plot:
+        return beta, alpha, evolution, fig
         
-    return beta, alpha, evolution
+    return beta, alpha, evolution, None
 
 
-def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False):
+def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False, return_fig=False):
     """
     Evolution of the first-order transverse dispersion.
     """
@@ -235,7 +285,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
         fast = False
         
     if not fast:
-        Nres_high = 200
+        Nres_high = 600
         Nres_low = 10
         if high_res:
             Nres_high = Nres_high*10
@@ -279,17 +329,26 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
         fig, ax = plt.subplots(1,1)
         ax.plot(evolution[0,:], evolution[1,:])
         ax.set_xlabel('s (m)')
-        ax.set_ylabel('Dispersion (m)')
+        ax.set_ylabel(r'$\text{D}_\text{x}$ ($\text{m}$)')
         ax.grid()
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
         plt.show()
+
+    if return_fig and plot:
+        return Dx, Dpx, evolution, fig
         
-    return Dx, Dpx, evolution
+    return Dx, Dpx, evolution, None
 
 
-def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=False):
+def evolve_second_order_dispersion(ls, inv_rhos, ks, ms=None, taus=None, fast=False, plot=False):
     """
     Evolution of the second-order transverse dispersion.
     """
+    if ms is None:
+        ms = np.zeros_like(ls)
+    
+    if taus is None:
+        taus = np.zeros_like(ls)
     
     # overwrite fast-calculation toggle if plotting 
     if plot and fast:
@@ -385,13 +444,14 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
         ax.plot(evolution[0,:], evolution[2,:])
         ax.set_xlabel('s (m)')
         ax.set_ylabel('Second-order dispersion (m)')
+        ax.grid()
         
         plt.show()
         
     return DDx, DDpx, evolution
 
 
-def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, high_res=False, evolution_disp=None):
+def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, high_res=False, evolution_disp=None, return_fig=False):
     """
     Evolution of longitudinal dispersion, R56.
     """
@@ -402,7 +462,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, 
        
     # get the dispersion evolution
     if evolution_disp is None:
-        _, _, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=high_res)
+        _, _, evolution_disp, _ = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=high_res)
     ss = evolution_disp[0]
     Dxs = evolution_disp[1]
     R56s = np.empty_like(ss)
@@ -448,12 +508,16 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, 
         fig, ax = plt.subplots(1,1)
         ax.plot(evolution[0,:], evolution[1,:])
         ax.set_xlabel('s (m)')
-        ax.set_ylabel('Longitudinal dispersion, R56 (m)')
+        ax.set_ylabel(r'$\text{R}_{56}$ ($\text{m}$)')
         ax.grid()
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
 
         plt.show()
+    
+    if return_fig and plot:
+        return R56, evolution, fig
 
-    return R56, evolution
+    return R56, evolution, None
 
 
 
@@ -839,4 +903,32 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
 
     return W, evolution
     
+def evolve_m12(ls, ks=None, inv_rhos=None):
+    m12 = np.zeros(len(ls)+1)
+    S = np.zeros_like(m12)
+    if inv_rhos is not None:
+        S_dipoles = []
+    
+    if ks is None:
+        ks = [0]*len(ls)
 
+    if inv_rhos is None:
+        inv_rhos_ = [0]*len(ls)
+    else:
+        inv_rhos_ = inv_rhos
+
+    Mtot = np.identity(3)
+    m12[0]=0
+    for i, l in enumerate(ls):
+        mat = Dmat(l=l, k=ks[i], inv_rho=inv_rhos_[i]) #get the transfer matrix for each element.
+
+        Mtot = mat @ Mtot
+        m12[i+1] = Mtot[0,1]
+        S[i+1] = S[i] + l
+        if inv_rhos_[i]>1e-12 or inv_rhos_[i]<-1e-12:
+            S_dipoles.append((S[i],S[i+1])) # add the bounds of the dipole
+    if inv_rhos is not None:
+        return m12, S, S_dipoles
+    else:
+        return m12, S
+    
