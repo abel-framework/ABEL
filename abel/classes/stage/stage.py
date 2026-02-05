@@ -1472,10 +1472,14 @@ class Stage(Trackable, CostModeled):
         
     
     # ==================================================
-    def length_flattop2num_beta_osc(self, length_flattop=None, initial_energy=None, nom_accel_gradient_flattop=None, plasma_density=None, q=SI.e, m=SI.m_e):
+    def length_flattop2num_beta_osc(self, length_flattop=None, initial_energy=None, nom_accel_gradient_flattop=None, plasma_density=None, q=SI.e):
         """
         Calculate the number of betatron oscillations a particle can undergo in 
         the stage (excluding ramps).
+
+        Will take into account the contribution from an external linear magnetic 
+        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.external_focusing>`
+        is not ``None``.
 
         Parameters
         ----------
@@ -1499,9 +1503,6 @@ class Stage(Trackable, CostModeled):
         q : [C] float, optional
             Particle charge. q * nom_accel_gradient_flattop must be positive. 
             Defaults to elementary charge.
-
-        m : [kg] float, optional
-            Particle mass. Defaults to electron mass.
 
             
         Returns
@@ -1537,7 +1538,7 @@ class Stage(Trackable, CostModeled):
         if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
             return self.phase_advance_beta_evolution()/(2*np.pi)
         else:
-            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
             if self._external_focusing_gradient is not None:
                 g = g + self._external_focusing_gradient
 
