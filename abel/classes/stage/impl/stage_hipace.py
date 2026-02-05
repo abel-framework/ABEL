@@ -337,6 +337,10 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
+
+        if self.external_focusing and self._external_focusing_gradient is None:
+            self._external_focusing_gradient = self.calc_external_focusing_gradient() # Set the gradient for external focusing fields if not already set.
+
         hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
         
@@ -845,6 +849,14 @@ class StageHipace(Stage):
         oscillations for a particle with given initial energy ``initial_energy`` 
         in a uniform plasma stage (excluding ramps) with nominal acceleration 
         gradient ``nom_accel_gradient`` and plasma density ``plasma_density``.
+
+        Will take into account the contribution from an external linear magnetic 
+        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
+        is set to ``True`` before calling this method.
+
+        Also set :attr:`self._external_focusing_gradient <abel.Stage.StageHipace._external_focusing_gradient>`
+        if it is not already set, and :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
+        is ``True``. 
 
         Parameters
         ----------
