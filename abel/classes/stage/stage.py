@@ -1326,7 +1326,7 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, rhs=None, q=SI.e, m=SI.m_e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
@@ -1351,15 +1351,9 @@ class Stage(Trackable, CostModeled):
             The plasma density of the plasma stage. Defaults to 
             ``self.plasma_density``.
 
-        rhs : ...
-            ...
-
         q : [C] float, optional
             Particle charge. q * nom_accel_gradient must be positive. Defaults 
             to elementary charge.
-
-        m : [kg] float, optional
-            Particle mass. Defaults to electron mass.
 
             
         Returns
@@ -1368,8 +1362,6 @@ class Stage(Trackable, CostModeled):
             Length of the plasma stage excluding ramps matched to the given 
             number of betatron oscillations.
         """
-
-        from scipy.optimize import fsolve
 
         if initial_energy is None:
             if self.nom_energy is None:
@@ -1393,20 +1385,10 @@ class Stage(Trackable, CostModeled):
         if num_beta_osc < 0:
             raise ValueError('Number of input betatron oscillations must be positive.')
 
-        if rhs is None:
-            def rhs(L):
-                g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        gradient_prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
 
-                prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
-                energy_scaling = np.sqrt(initial_energy + q*nom_accel_gradient*L) - np.sqrt(initial_energy)
-                return prefactor * energy_scaling
-
-        # Solve 2*np.pi*num_beta_osc = rhs(L)
-        solution = fsolve(lambda L: rhs(L) - 2*np.pi*num_beta_osc , x0=1)
-        length = solution[0]
-
-
-        #self._external_focusing_gradient = self.driver_source.energy/SI.c*(2.0*np.pi/length)**2 ############TODO: delete
+        length = ((2*np.pi*num_beta_osc/gradient_prefactor + np.sqrt(initial_energy))**2 - initial_energy) / (q*nom_accel_gradient)
 
         return length
     
@@ -1558,7 +1540,7 @@ class Stage(Trackable, CostModeled):
             g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
             if self._external_focusing_gradient is not None:
                 g = g + self._external_focusing_gradient
-            
+
             prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient_flattop)
             energy_scaling = np.sqrt(initial_energy*SI.e + q*nom_accel_gradient_flattop*length_flattop) - np.sqrt(initial_energy*SI.e)
 

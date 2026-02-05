@@ -683,7 +683,7 @@ class StageHipace(Stage):
         self._external_focusing = bool(enable_external_focusing)
 
         if self._external_focusing is False:
-            self._external_focusing_gradient = 0.0
+            self._external_focusing_gradient = 0.0  # TODO: set to None instead?
         elif self._external_focusing_gradient is None or self._external_focusing_gradient < 1e-15:
             #if self.get_length() is None:
 
@@ -702,7 +702,7 @@ class StageHipace(Stage):
                 self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=1)  # [T/m]
             else:
                 self._external_focusing_gradient = None
-                
+
     _external_focusing = False
 
 
@@ -839,7 +839,7 @@ class StageHipace(Stage):
     
 
     # ==================================================
-    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, num_half_oscillations=1, q=SI.e, m=SI.m_e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, driver_half_oscillations=1.0, q=SI.e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
@@ -864,15 +864,13 @@ class StageHipace(Stage):
             The plasma density of the plasma stage. Defaults to 
             ``self.plasma_density``.
 
-        num_half_oscillations : ...
-            ...
+        driver_half_oscillations : float, optional
+            Number of half betatron oscillations that the drive beam is 
+            expected to perform. Defaults to 1.0.
 
         q : [C] float, optional
             Particle charge. q * nom_accel_gradient must be positive. Defaults 
             to elementary charge.
-
-        m : [kg] float, optional
-            Particle mass. Defaults to electron mass.
 
             
         Returns
@@ -881,6 +879,8 @@ class StageHipace(Stage):
             Length of the plasma stage excluding ramps matched to the given 
             number of betatron oscillations.
         """
+
+        from scipy.optimize import fsolve
 
         if initial_energy is None:
             if self.nom_energy is None:
@@ -908,18 +908,19 @@ class StageHipace(Stage):
             g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
 
             if self.external_focusing:  # Add contribution from external field used for driver guiding
-                g = g + self.calc_external_focusing_gradient(num_half_oscillations=num_half_oscillations, L=L)
+                g = g + self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L)
 
             prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
             energy_scaling = np.sqrt(initial_energy + q*nom_accel_gradient*L) - np.sqrt(initial_energy)
             return prefactor * energy_scaling
         
         # Solve 2*np.pi*num_beta_osc = rhs(L)
-        length = super().calc_length_num_beta_osc(num_beta_osc, initial_energy, nom_accel_gradient, plasma_density, rhs=rhs, q=q, m=m)
+        solution = fsolve(lambda L: rhs(L) - 2*np.pi*num_beta_osc , x0=1)
+        length = solution[0]
 
-        # Set the focusing gradient if not already set
+        # Set the external focusing gradient for the driver guiding field if not already set
         if self.external_focusing and self._external_focusing_gradient is None:
-            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=num_half_oscillations, L=length)
+            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length)
 
         return length
     
