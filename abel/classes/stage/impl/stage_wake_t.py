@@ -43,11 +43,14 @@ class StageWakeT(Stage):
     run_path : str
         Path to store plots and outputs.
 
+    use_single_beam : bool
+        Enable tracking the main beam only. Defaults to ``False``
+
     stage_number : int
         Keeps track of which stage it is in the beamline.
     """
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False, run_path=None):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, keep_data=False, ion_motion=False, run_path=None, use_single_beam=False):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
@@ -57,8 +60,8 @@ class StageWakeT(Stage):
         # physics flags
         self.ion_motion = ion_motion
 
-        #self.drive_beam = drive_beam
         self.run_path = run_path
+        self.use_single_beam = use_single_beam
 
 
     # ==================================================
@@ -79,47 +82,69 @@ class StageWakeT(Stage):
         if not os.path.exists(tmpfolder):
             os.mkdir(tmpfolder)
 
-        # make driver (and convert to WakeT bunch)
-        driver0 = self.driver_source.track()
-        driver_original = copy.deepcopy(driver0)
-        
-        # rotate the beam coordinate system to align with the driver
-        if self.parent is None:
-            driver0, beam0 = self.rotate_beam_coordinate_systems(driver0, beam0)
-        
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
         self._prepare_ramps()
         plasma_profile = self.get_plasma_profile()
         
-        # convert beams to WakeT bunches
-        driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
-        beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
-        
-        # make longitudinal box range
-        num_sigmas = 6
-        #box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
-        box_min_z = driver0.z_offset() - 4.0 * R_blowout
-        #box_min_z = driver0.z_offset() - 3.3 * R_blowout
-        #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
-        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
 
-        if box_min_z > beam0.zs().min() or box_max_z < driver0.zs().max():
-            raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
+        # ========== Convert main beam to WakeT bunches ==========
+        beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
+
+
+        # ========== Make driver (and convert to WakeT bunch) ==========
+        if not self.use_single_beam:
+            driver0 = self.driver_source.track()
+            driver_original = copy.deepcopy(driver0)
+            
+            # rotate the beam coordinate system to align with the driver
+            if self.parent is None:
+                driver0, beam0 = self.rotate_beam_coordinate_systems(driver0, beam0)
+
+            # convert driver to WakeT bunches
+            driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         
-        # making transverse box size
-        box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, driver0.peak_current())])
         
-        # calculate number of cells in x to get similar resolution
+        # ========== Calculate box range ==========
+        num_sigmas = 6
+        if not self.use_single_beam:
+            R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
+
+            box_min_z = driver0.z_offset() - 4.0 * R_blowout
+            #box_min_z = driver0.z_offset() - 3.3 * R_blowout
+            #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
+            box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
+
+            if box_min_z > beam0.zs().min() or box_max_z < driver0.zs().max():
+                raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
+            
+            # calculate transverse box size
+            box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, driver0.peak_current())])
+        else:
+            box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+            box_max_z = beam0.z_offset() + num_sigmas * beam0.bunch_length()
+
+            if box_min_z > beam0.zs().min():
+                raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
+            
+            # calculate transverse box size
+            box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, beam0.peak_current())])
+        
+        
+        # ========== Calculate number of cells in x to get similar resolution ==========
         dr = box_size_r/self.num_cell_xy
         num_cell_z = round((box_max_z-box_min_z)/dr)
         
-        # find stepsize
-        matched_beta = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
+
+        # ========== Find stepsize ==========
+        if not self.use_single_beam:
+            matched_beta = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
+        else:
+            matched_beta = np.sqrt(2*beam0.gamma())/k_p(self.plasma_density)
         dz = matched_beta/10
 
-        # select the wakefield model (ion motion or not)
+
+        # ========== Select the wakefield model (ion motion or not) ==========
         if self.ion_motion:
 
             # Check the version number of Wake-T in order to see if it supports the ion motion wakefield model
@@ -145,18 +170,24 @@ class StageWakeT(Stage):
         else: # Exclude ion motion effects
             wakefield_model='quasistatic_2d'
             
+        
+        # ========== Set up a Wake-T plasma stage ==========
         n_out = round(self.length/dz/8)
         plasma = wake_t.PlasmaStage(length=self.length, density=plasma_profile, wakefield_model=wakefield_model,
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=n_out, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
-        # do tracking
-        bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
-        #bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
-        
-        # save evolution of the beam and driver
-        self.__extract_evolution(bunches)
-        self.__extract_initial_and_final_step(tmpfolder)
+
+        # ========== Do tracking ==========
+        if not self.use_single_beam:
+            bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
+            #bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
+        else:
+            bunches = plasma.track(beam0_wake_t, opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
+
+        # ========== Save evolution of the beam and driver ==========
+        self.__extract_evolution([bunches])
+        #self.__extract_initial_and_final_step(tmpfolder)
 
         # delete or move data
         #if self.keep_data:
@@ -167,25 +198,32 @@ class StageWakeT(Stage):
         # remove temporary directory
         shutil.rmtree(tmpfolder)
         
-        # extract beams
-        beam = wake_t_bunch2beam(bunches[1][-1])
-        driver = wake_t_bunch2beam(bunches[0][-1])
 
-        # undo coordinate system rotation
-        if self.parent is None:
-            driver, beam = self.undo_beam_coordinate_systems_rotation(driver_original, driver, beam)
+        # ========== Extract beams ==========
+        if not self.use_single_beam:
+            beam = wake_t_bunch2beam(bunches[1][-1])
+            driver = wake_t_bunch2beam(bunches[0][-1])
+
+            # undo coordinate system rotation
+            if self.parent is None:
+                driver, beam = self.undo_beam_coordinate_systems_rotation(driver_original, driver, beam)
+        else:
+            beam = wake_t_bunch2beam(bunches[-1])
 
         
+        # ========== Bookkeeping ==========
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
         # calculate efficiency
-        self.calculate_efficiency(beam0, driver0, beam, driver)
+        if not self.use_single_beam:
+            self.calculate_efficiency(beam0, driver0, beam, driver)
         
         # save current profile
-        self.calculate_beam_current(beam0, driver0, beam, driver)
+        if not self.use_single_beam:
+            self.calculate_beam_current(beam0, driver0, beam, driver)  # TODO: make it possible to also save current profile without drive beam.
         
         return super().track(beam, savedepth, runnable, verbose)
 
