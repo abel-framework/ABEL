@@ -44,7 +44,7 @@ class StageWakeT(Stage):
         Path to store plots and outputs.
 
     use_single_beam : bool
-        Enable tracking the main beam only. Defaults to ``False``
+        Enable tracking only the main beam. Defaults to ``False``.
 
     stage_number : int
         Keeps track of which stage it is in the beamline.
@@ -186,7 +186,10 @@ class StageWakeT(Stage):
             bunches = plasma.track(beam0_wake_t, opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
 
         # ========== Save evolution of the beam and driver ==========
-        self.__extract_evolution([bunches])
+        if not self.use_single_beam:
+            self.__extract_evolution(bunches)
+        else:
+            self.__extract_evolution([bunches])
         #self.__extract_initial_and_final_step(tmpfolder)
 
         # delete or move data
@@ -253,6 +256,22 @@ class StageWakeT(Stage):
 
     # ==================================================
     def __extract_evolution(self, bunches):
+        """
+        Extract beam parameter evolution along the stage and store it as a 
+        :class:`types.SimpleNamespace` object under the stage in the class 
+        attribute :attr:`Stage.evolution <abel.Stage.evolution>`.
+
+    
+        Parameters
+        ----------
+        bunches : ``list``
+            A ``list`` containing one or more Wake-T ``ParticleBunch``.
+
+
+        Returns
+        -------
+        ``None``
+        """
         
         # get beam
         from wake_t.diagnostics import analyze_bunch_list
@@ -295,9 +314,12 @@ class StageWakeT(Stage):
                 evol.plasma_density = np.ones_like(evol.location)*self.plasma_density
             
             # assign it to the right beam
-            if i == 0:
-                self.evolution.driver = evol
-            elif i == 1:
+            if not self.use_single_beam:
+                if i == 0:
+                    self.evolution.driver = evol
+                elif i == 1:
+                    self.evolution.beam = evol
+            else:
                 self.evolution.beam = evol
 
 
