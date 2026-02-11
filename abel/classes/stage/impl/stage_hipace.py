@@ -214,7 +214,7 @@ class StageHipace(Stage):
         self.no_plasma = no_plasma
 
         # external focusing (APL-like) [T/m]
-        self.driver_half_oscillations = 1.0  # TODO: make use of this everywhere
+        self.driver_half_oscillations = 1.0 
         self._external_focusing_gradient = None
         self.external_focusing = external_focusing
 
@@ -752,14 +752,14 @@ class StageHipace(Stage):
                 stage_copy = self
             
             if self.get_length() is not None:
-                self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=1)  # [T/m]
+                self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=self.driver_half_oscillations)  # [T/m]
             else:
                 self._external_focusing_gradient = None
 
     _external_focusing = False
 
 
-    def calc_external_focusing_gradient(self, num_half_oscillations=1, L=None):
+    def calc_external_focusing_gradient(self, num_half_oscillations=None, L=None):
         """
         Calculate the external focusing gradient g for an azimuthal magnetic 
         field B=[gy,-gx,0] that gives ``num_half_oscillations`` half 
@@ -770,6 +770,10 @@ class StageHipace(Stage):
                 raise ValueError('Stage length is not set.')
             L = self.length_flattop
         #return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
+
+        if num_half_oscillations is None:
+            num_half_oscillations = self.driver_half_oscillations
+
         return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/L)**2  # [T/m]
 
 
@@ -842,15 +846,7 @@ class StageHipace(Stage):
             raise ValueError('The energy depletion will be too severe. This estimate is only valid for a relativistic beam.')
         
         g = self._external_focusing_gradient  # [T/m]
-        if g is None:
-            g = 0.0
-            num_half_oscillations = 1
-        elif g < 1e-15:
-            num_half_oscillations = 1
-        else:
-            #num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.get_length()
-            num_half_oscillations = np.sqrt(g*SI.c/stage_copy.driver_source.energy)/np.pi*stage_copy.length_flattop
-        ds = self.length_flattop/num_half_oscillations/num_steps_per_half_osc  # [m], step size
+        ds = self.length_flattop/self.driver_half_oscillations/num_steps_per_half_osc  # [m], step size
 
         prop_length = 0
         s_trajectory = np.array([0.0])
@@ -892,7 +888,7 @@ class StageHipace(Stage):
     
 
     # ==================================================
-    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, driver_half_oscillations=1.0, q=SI.e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, driver_half_oscillations=None, q=SI.e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
@@ -927,7 +923,7 @@ class StageHipace(Stage):
 
         driver_half_oscillations : float, optional
             Number of half betatron oscillations that the drive beam is 
-            expected to perform. Defaults to 1.0.
+            expected to perform. Defaults to ``self.driver_half_oscillations``.
 
         q : [C] float, optional
             Particle charge. q * nom_accel_gradient must be positive. Defaults 
@@ -964,6 +960,9 @@ class StageHipace(Stage):
 
         if num_beta_osc < 0:
             raise ValueError('Number of input betatron oscillations must be positive.')
+        
+        if driver_half_oscillations is None:
+            driver_half_oscillations = self.driver_half_oscillations
 
         def rhs(L):
             g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
