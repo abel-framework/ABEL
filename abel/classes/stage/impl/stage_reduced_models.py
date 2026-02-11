@@ -869,15 +869,13 @@ class StageReducedModels(Stage):
     
 
     # ==================================================
-    @property
-    def driver_source(self) -> Source | DriverComplex | None:
+    @Stage.driver_source.setter
+    def driver_source(self, source : Source | DriverComplex | None):
         """
         The driver source or the driver complex of the stage. The generated 
         drive beam's beam axis is always aligned to its propagation direction.
         """
-        return self._driver_source
-    @driver_source.setter
-    def driver_source(self, source : Source | DriverComplex | None):
+        
         # Delegate to parent setter
         Stage.driver_source.fset(self, source)
         
