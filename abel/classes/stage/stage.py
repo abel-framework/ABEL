@@ -1274,7 +1274,9 @@ class Stage(Trackable, CostModeled):
     def matched_beta_function(self, energy_incoming, match_entrance=True):
         '''
         Calculates the matched beta function of the stage. If there is an 
-        upramp, the beta function is matched to the upramp by default.
+        upramp, the beta function the beta function is magnified by default so 
+        that it shrinks to the correct size when it enters the main flattop 
+        plasma stage.
     
         
         Parameters
