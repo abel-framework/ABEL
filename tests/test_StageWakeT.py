@@ -13,6 +13,8 @@ ABEL : StageWakeT unit tests
 import pytest
 from abel import *
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use a backend that does not display figure to suppress plots.
 
 
 def setup_basic_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=False, x_angle=0.0, y_angle=0.0):
@@ -94,8 +96,12 @@ def setup_StageWakeT(driver_source=None, nom_accel_gradient_flattop=6.4e9, nom_e
 def test_tracking():
     """
     Tests for tracking ``StageWakeT`` without ramps.
-    Examines stage configurations and the output main beam parameters.
+
+    Examine stage configurations and the output main beam parameters. Also run 
+    some diagnostics.
     """
+
+    import matplotlib.pyplot as plt
 
     # reset seed (for reproducibility)
     np.random.seed(42)
@@ -148,16 +154,26 @@ def test_tracking():
     assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
     assert np.isclose(beam.rel_energy_spread(), 0.0097, rtol=1e-1, atol=0.0)
 
+    # Test that the diagnostics can be executed
+    stage.plot_wakefield()
+    stage.plot_wake()
+    stage.plot_driver_evolution()
+    stage.plot_evolution()
 
-    
-    
+    # Close all plots
+    plt.close('all')
+
 
 @pytest.mark.StageWakeT
 def test_ramped_tracking():
     """
     Tests for tracking ``StageWakeT`` with ramps.
-    Examines stage configurations and the output main beam parameters.
+
+    Examine stage configurations and the output main beam parameters. Also run 
+    some diagnostics.
     """
+
+    import matplotlib.pyplot as plt
 
     np.random.seed(42)
 
@@ -212,8 +228,85 @@ def test_ramped_tracking():
     assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
     assert np.isclose(beam.rel_energy_spread(), 0.0097, rtol=1e-1, atol=0.0)
 
-    
+    # Test that the diagnostics can be executed
+    stage.plot_wakefield()
+    stage.plot_wake()
+    stage.plot_driver_evolution()
+    stage.plot_evolution()
 
+    # Close all plots
+    plt.close('all')
+
+    
+@pytest.mark.StageWakeT
+def test_tracking_only_main_beam():
+    """
+    Tests for tracking ``StageWakeT`` without ramps tracking only a single main 
+    beam.
+
+    Examine stage configurations and the output main beam parameters. Also run 
+    some diagnostics.
+    """
+
+    import matplotlib.pyplot as plt
+
+    # reset seed (for reproducibility)
+    np.random.seed(42)
+
+    nom_energy_gain=0.319e9
+    
+    # setup beams and stage
+    stage = setup_StageWakeT(driver_source=None, nom_energy_gain_flattop=nom_energy_gain, use_ramps=False)
+    stage.use_single_beam = True
+    main_source = setup_basic_main_source()
+    stage.nom_energy = main_source.energy
+
+    # perform simulation
+    beam = stage.track(main_source.track())
+
+    # Inspect stage configurations
+    assert stage.has_ramp() is False
+    assert np.isclose(stage.plasma_density, 7.0e21, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy, 5.0e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_flattop, stage.nom_energy, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain, nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_energy_gain_flattop, stage.nom_energy_gain, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient, 6.4e9, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.nom_accel_gradient_flattop, 6.4e9, rtol=1e-2, atol=0.0)
+    assert np.isclose(stage.length, stage.nom_energy_gain/stage.nom_accel_gradient, rtol=1e-15, atol=0.0)
+    assert np.isclose(stage.length_flattop, stage.nom_energy_gain_flattop/stage.nom_accel_gradient_flattop, rtol=1e-15, atol=0.0)
+
+    # examine the plasma density profile
+    assert np.isclose(stage.get_plasma_profile(), stage.plasma_density, rtol=1e-15, atol=0.0)
+    
+    # Examine output beam
+    assert np.isclose(beam.energy(), 4821973619.821054, rtol=3e-2, atol=0.0)
+    assert np.isclose(beam.charge(), main_source.charge, rtol=1e-3, atol=0.0)
+    assert len(beam) == main_source.num_particles
+    assert beam.stage_number == 1
+    assert np.isclose(beam.location, stage.length, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.particle_mass, SI.m_e, rtol=1e-15, atol=0.0)
+    assert np.isclose(beam.x_offset(), main_source.x_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_offset(), main_source.y_offset, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.z_offset(), main_source.z_offset, rtol=0.0, atol=1.0e-6)
+    assert np.isclose(beam.x_angle(), main_source.x_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.y_angle(), main_source.y_angle, rtol=0.0, atol=1.0e-8)
+    assert np.isclose(beam.norm_emittance_x(), 0.0003031640487476247, rtol=1e-2, atol=0.0)
+    assert np.isclose(beam.norm_emittance_y(), 1.019663344335304e-06, rtol=7e-2, atol=0.0)
+    assert np.isclose(beam.beta_x(), 0.023933341262344372, rtol=1e-1, atol=0.0)
+    assert np.isclose(beam.beta_y(), 0.01761011889735352, rtol=1e-1, atol=0.0)
+    assert np.isclose(beam.bunch_length(), main_source.bunch_length, rtol=5e-2, atol=0.0)
+    assert np.isclose(beam.rel_energy_spread(), 0.02030454802939791, rtol=1e-1, atol=0.0)
+
+    # Test that the diagnostics can be executed
+    stage.plot_wakefield()
+    stage.plot_wake()
+    stage.plot_evolution()
+
+    # Close all plots
+    plt.close('all')
+
+    
 
 
 
