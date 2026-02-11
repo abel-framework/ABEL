@@ -214,6 +214,7 @@ class StageHipace(Stage):
         self.no_plasma = no_plasma
 
         # external focusing (APL-like) [T/m]
+        self.driver_half_oscillations = 1.0  # TODO: make use of this everywhere
         self._external_focusing_gradient = None
         self.external_focusing = external_focusing
 
@@ -676,6 +677,54 @@ class StageHipace(Stage):
             #ss = density_table[:,0]
             return ss.max()-ss.min()
         return super().get_length()
+    
+
+    # ==================================================
+    def matched_beta_function(self, energy_incoming, match_entrance=True, q=SI.e):
+        '''
+        Calculates the matched beta function of the stage. If there is an 
+        upramp, the beta function is magnified by default so that it shrinks to 
+        the correct size when it enters the main flattop plasma stage. Also 
+        takes into account external focusing field B=[gy,-gx,0] if present. 
+    
+        
+        Parameters
+        ----------
+        energy_incoming : [eV] float
+            The energy used for matching.
+
+        match_entrance : bool, optional
+            Matches the beta function to the upramp or the stage entrance if 
+            ``True``. Otherwise, will match the beta function to the downramp. 
+            Default set to ``True``.
+
+        q : [C] float, optional
+            Particle charge. Defaults to elementary charge.
+            
+        Returns
+        -------
+        beta_function : [m], float
+            The matched beta function.
+        '''
+        
+        energy_incoming = energy_incoming*SI.e  # [J]
+
+        g = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+        if self._external_focusing_gradient is not None:  # Add contribution from external field
+            g = g + self._external_focusing_gradient
+
+        k_beta = np.sqrt(np.abs(q)*g*SI.c/energy_incoming)  # [m^-1], betatron wavenumber.
+
+        if match_entrance:
+            if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
+                return 1/k_beta * self.upramp.ramp_beta_mag
+            else:
+                return 1/k_beta
+        else:
+            if self.downramp.ramp_beta_mag is not None:
+                return 1/k_beta * self.downramp.ramp_beta_mag
+            else:
+                raise ValueError('Downramp ramp_beta_mag not defined.')
 
 
     # =============================================
