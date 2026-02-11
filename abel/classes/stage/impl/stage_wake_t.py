@@ -128,7 +128,7 @@ class StageWakeT(Stage):
                 raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
             
             # calculate transverse box size
-            box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, beam0.peak_current())])
+            box_size_r = np.max([3/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, beam0.peak_current())])
         
         
         # ========== Calculate number of cells in x to get similar resolution ==========
