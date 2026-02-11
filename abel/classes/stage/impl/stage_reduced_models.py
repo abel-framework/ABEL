@@ -881,11 +881,7 @@ class StageReducedModels(Stage):
         
         # Set the driver source to always align drive beam axis to its propagation direction
         if source is not None:
-
-            if isinstance(source, DriverComplex):
-                self.driver_source.source.align_beam_axis = True
-            elif isinstance(source, Source):
-                self.driver_source.align_beam_axis = True
+            self.get_actual_driver_source().align_beam_axis = True
     
 
     # ==================================================
