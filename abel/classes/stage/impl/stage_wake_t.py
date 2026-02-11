@@ -190,7 +190,7 @@ class StageWakeT(Stage):
             self.__extract_evolution(bunches)
         else:
             self.__extract_evolution([bunches])
-        #self.__extract_initial_and_final_step(tmpfolder)
+        self.__extract_initial_and_final_step(tmpfolder)
 
         # delete or move data
         #if self.keep_data:
@@ -226,7 +226,9 @@ class StageWakeT(Stage):
         
         # save current profile
         if not self.use_single_beam:
-            self.calculate_beam_current(beam0, driver0, beam, driver)  # TODO: make it possible to also save current profile without drive beam.
+            self.calculate_beam_current(beam0, driver0, beam, driver)
+        else:
+            self.calculate_beam_current(beam0, None, beam, None)
         
         return super().track(beam, savedepth, runnable, verbose)
 
@@ -252,6 +254,78 @@ class StageWakeT(Stage):
             self._driver_source = source
         else:
             self._driver_source = None
+
+
+    # ==================================================
+    def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
+        """
+        Calculate and store the beam current profile.
+
+        This method computes the current profile of the initial (input) and 
+        optionally final (output) beams using a temporal binning scheme based on 
+        the RMS bunch lengths of the driver and beam. The results are stored in 
+        the class attribute :attr:`Stage.initial.beam.current <abel.Stage.initial.beam.current>` 
+        and, if output beams are provided, in 
+        :attr:`Stage.final.beam.current <abel.Stage.final.beam.current>`.
+
+
+        Parameters
+        ----------
+        beam0 : ``Beam``
+            Input beam before the stage.
+
+        driver0 : ``Beam``
+            Input drive beam before the stage.
+
+        beam : ``Beam``, optional
+            Output beam after the stage.
+
+        driver : ``Beam``, optional
+            Output drive beam after the stage.
+
+        Returns
+        -------
+        None
+            Results are stored in ``self.initial.beam.current`` and, if provided, 
+            ``self.final.beam.current`` with attributes:
+            - ``zs`` : longitudinal positions [m]  
+            - ``Is`` : beam current profile [A]
+        """
+
+        if driver0 is None:
+            only_main_beam = True
+        else:
+            only_main_beam = False
+
+        num_sigmas = 6
+        z_min = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+
+        if not only_main_beam:
+            dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
+            z_max = driver0.z_offset() + num_sigmas * driver0.bunch_length()
+        else:
+            dz = 40*np.mean( beam0.bunch_length(clean=True)/np.sqrt(len(beam0)) )
+            z_max = beam0.z_offset() + num_sigmas * beam0.bunch_length()
+
+        tbins = np.arange(z_min, z_max, dz)/SI.c
+        
+        if only_main_beam:
+            Is0, ts0 = beam0.current_profile(bins=tbins)
+        else:
+            Is0, ts0 = (driver0 + beam0).current_profile(bins=tbins)
+        self.initial.beam.current.zs = ts0*SI.c
+        self.initial.beam.current.Is = Is0
+        
+        Is = None
+        zs = None
+        if only_main_beam and beam is not None:
+            Is, ts = beam.current_profile(bins=tbins)
+            zs = ts*SI.c
+        elif not only_main_beam and beam is not None and driver is not None:
+            Is, ts = (driver + beam).current_profile(bins=tbins)
+            zs = ts*SI.c
+        self.final.beam.current.zs = zs
+        self.final.beam.current.Is = Is
 
 
     # ==================================================
@@ -396,31 +470,39 @@ class StageWakeT(Stage):
         
         # extract initial beam density
         data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
-        data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
         extent0 = metadata0_plasma.imshow_extent
         Nbins0 = self.initial.plasma.density.rho.shape
         dr0 = (extent0[3]-extent0[2])/Nbins0[0]
         dz0 = (extent0[1]-extent0[0])/Nbins0[1]
         mask0_beam = np.logical_and(data0_beam[1] < dr0/2, data0_beam[1] > -dr0/2)
         jz0_beam, _, _ = np.histogram2d(data0_beam[0][mask0_beam], data0_beam[2][mask0_beam], weights=data0_beam[3][mask0_beam], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
-        mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
-        jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
         self.initial.beam.density.extent = metadata0_plasma.imshow_extent
-        self.initial.beam.density.rho = (jz0_beam+jz0_driver)/(dr0*dr0*dz0)
+
+        if not self.use_single_beam:
+            data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
+            mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
+            jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
+            self.initial.beam.density.rho = (jz0_beam + jz0_driver)/(dr0*dr0*dz0)
+        else:
+            self.initial.beam.density.rho = (jz0_beam)/(dr0*dr0*dz0)
 
         # extract final beam density
         data_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=max(ts.iterations))
-        data_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=max(ts.iterations))
         extent = metadata_plasma.imshow_extent
         Nbins = self.final.plasma.density.rho.shape
         dr = (extent[3]-extent[2])/Nbins[0]
         dz = (extent[1]-extent[0])/Nbins[1]
         mask_beam = np.logical_and(data_beam[1] < dr/2, data_beam[1] > -dr/2)
         jz_beam, _, _ = np.histogram2d(data_beam[0][mask_beam], data_beam[2][mask_beam], weights=data_beam[3][mask_beam], bins=Nbins, range=[extent[2:4],extent[0:2]])
-        mask_driver = np.logical_and(data_driver[1] < dr/2, data_driver[1] > -dr/2)
-        jz_driver, _, _ = np.histogram2d(data_driver[0][mask_driver], data_driver[2][mask_driver], weights=data_driver[3][mask_driver], bins=Nbins, range=[extent[2:4],extent[0:2]])
         self.final.beam.density.extent = metadata_plasma.imshow_extent
-        self.final.beam.density.rho = (jz_beam+jz_driver)/(dr*dr*dz)
+
+        if not self.use_single_beam:
+            data_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=max(ts.iterations))
+            mask_driver = np.logical_and(data_driver[1] < dr/2, data_driver[1] > -dr/2)
+            jz_driver, _, _ = np.histogram2d(data_driver[0][mask_driver], data_driver[2][mask_driver], weights=data_driver[3][mask_driver], bins=Nbins, range=[extent[2:4],extent[0:2]])
+            self.final.beam.density.rho = (jz_beam + jz_driver)/(dr*dr*dz)
+        else:
+            self.final.beam.density.rho = (jz_beam)/(dr*dr*dz)
 
 
     def get_plasma_profile(self):
