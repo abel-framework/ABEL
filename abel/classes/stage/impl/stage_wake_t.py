@@ -213,25 +213,19 @@ class StageWakeT(Stage):
 
 
     # ==================================================
-    @property
-    def driver_source(self) -> Source | DriverComplex | None:
+    @Stage.driver_source.setter
+    def driver_source(self, source : Source | DriverComplex | None):
         """
         The driver source or the driver complex of the stage. The generated 
         drive beam's beam axis is always aligned to its propagation direction.
         """
-        return self._driver_source
-    @driver_source.setter
-    def driver_source(self, source : Source | DriverComplex | None):
+        
         # Delegate to parent setter
         Stage.driver_source.fset(self, source)
         
         # Set the driver source to always align drive beam axis to its propagation direction
         if source is not None:
-
-            if isinstance(source, DriverComplex):
-                self.driver_source.source.align_beam_axis = True
-            elif isinstance(source, Source):
-                self.driver_source.align_beam_axis = True
+            self.get_actual_driver_source().align_beam_axis = True
 
     # ==================================================
     def __extract_evolution(self, bunches):
