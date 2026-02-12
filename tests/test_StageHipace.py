@@ -53,7 +53,7 @@ def setup_trapezoid_driver_source(enable_xy_jitter=False, enable_xpyp_jitter=Fal
 @pytest.mark.StageHipace
 def test_external_focusing():
     """
-    Tests for StageHipace.calc_length_num_beta_osc() for accurately matching the 
+    Tests for ``StageHipace.calc_length_num_beta_osc()`` for accurately matching the 
     stage length and external driver guiding field gradient to a desired number 
     of drive beam and main beam betatron oscillation.
     """
