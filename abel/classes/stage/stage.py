@@ -127,6 +127,8 @@ class Stage(Trackable, CostModeled):
         self.ramp_beta_mag = ramp_beta_mag
         
         self.stage_number = None
+
+        self._external_focusing_gradient = None
         
         # nominal initial energy
         self.nom_energy = None 
@@ -1286,7 +1288,9 @@ class Stage(Trackable, CostModeled):
     def matched_beta_function(self, energy_incoming, match_entrance=True):
         '''
         Calculates the matched beta function of the stage. If there is an 
-        upramp, the beta function is matched to the upramp by default.
+        upramp, the beta function the beta function is magnified by default so 
+        that it shrinks to the correct size when it enters the main flattop 
+        plasma stage.
     
         
         Parameters
@@ -1338,7 +1342,7 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e, m=SI.m_e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
@@ -1364,10 +1368,8 @@ class Stage(Trackable, CostModeled):
             ``self.plasma_density``.
 
         q : [C] float, optional
-            Particle charge. Defaults to elementary charge.
-
-        m : [kg] float, optional
-            Particle mass. Defaults to electron mass.
+            Particle charge. q * nom_accel_gradient must be positive. Defaults 
+            to elementary charge.
 
             
         Returns
@@ -1377,24 +1379,32 @@ class Stage(Trackable, CostModeled):
             number of betatron oscillations.
         """
 
-        from abel.utilities.plasma_physics import k_p
-
         if initial_energy is None:
+            if self.nom_energy is None:
+                raise ValueError('Stage.nom_energy not set.')
             initial_energy = self.nom_energy
+        initial_energy = initial_energy*SI.e  # [J]
 
         if nom_accel_gradient is None:
+            if self.nom_accel_gradient_flattop is None:
+                raise ValueError('Stage.nom_accel_gradient_flattop not set.')
             nom_accel_gradient = self.nom_accel_gradient_flattop
 
+        if q * nom_accel_gradient < 0:
+            raise ValueError('q * nom_accel_gradient must be positive.')
+
         if plasma_density is None:
+            if self.plasma_density is None:
+                raise ValueError('Stage.plasma_density not set.')
             plasma_density = self.plasma_density
 
         if num_beta_osc < 0:
             raise ValueError('Number of input betatron oscillations must be positive.')
 
-        phase_advance = num_beta_osc * 2*np.pi
-        phase_advance_factor = phase_advance / k_p(plasma_density) * np.sqrt(2/(m*SI.c**2))
+        g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        gradient_prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
 
-        length = (phase_advance_factor/2)**2 * q*nom_accel_gradient + np.sqrt(initial_energy*SI.e) * phase_advance_factor
+        length = ((2*np.pi*num_beta_osc/gradient_prefactor + np.sqrt(initial_energy))**2 - initial_energy) / (q*nom_accel_gradient)
 
         return length
     
@@ -1478,10 +1488,14 @@ class Stage(Trackable, CostModeled):
         
     
     # ==================================================
-    def length_flattop2num_beta_osc(self, length_flattop=None, initial_energy=None, nom_accel_gradient_flattop=None, plasma_density=None, q=SI.e, m=SI.m_e):
+    def length_flattop2num_beta_osc(self, length_flattop=None, initial_energy=None, nom_accel_gradient_flattop=None, plasma_density=None, q=SI.e):
         """
         Calculate the number of betatron oscillations a particle can undergo in 
         the stage (excluding ramps).
+
+        Will take into account the contribution from an external linear magnetic 
+        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.external_focusing>`
+        is not ``None``.
 
         Parameters
         ----------
@@ -1503,10 +1517,8 @@ class Stage(Trackable, CostModeled):
             ``self.plasma_density``.
 
         q : [C] float, optional
-            Particle charge. Defaults to elementary charge.
-
-        m : [kg] float, optional
-            Particle mass. Defaults to electron mass.
+            Particle charge. q * nom_accel_gradient_flattop must be positive. 
+            Defaults to elementary charge.
 
             
         Returns
@@ -1533,17 +1545,25 @@ class Stage(Trackable, CostModeled):
                 raise ValueError('Stage.nom_accel_gradient_flattop not set.')
             nom_accel_gradient_flattop = self.nom_accel_gradient_flattop
 
+        if q * nom_accel_gradient_flattop < 0:
+            raise ValueError('q * nom_accel_gradient_flattop must be positive.')
+
         if plasma_density is None:
             plasma_density = self.plasma_density
 
         if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
             return self.phase_advance_beta_evolution()/(2*np.pi)
         else:
-            integral = 2*np.sqrt(initial_energy*q + q*nom_accel_gradient_flattop*length_flattop)/(q*nom_accel_gradient_flattop) - 2*np.sqrt(initial_energy*q)/(q*nom_accel_gradient_flattop)
+            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+            if self._external_focusing_gradient is not None:
+                g = g + self._external_focusing_gradient
 
-            num_beta_osc = k_p(plasma_density)*np.sqrt(m*SI.c**2/2) * integral/(2*np.pi)
+            prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient_flattop)
+            energy_scaling = np.sqrt(initial_energy*SI.e + q*nom_accel_gradient_flattop*length_flattop) - np.sqrt(initial_energy*SI.e)
 
-        return num_beta_osc
+            num_beta_osc = prefactor * energy_scaling / (2*np.pi)
+
+            return num_beta_osc
     
     
     # ==================================================
