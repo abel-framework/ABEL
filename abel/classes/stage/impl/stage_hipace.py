@@ -1119,7 +1119,7 @@ class StageHipace(Stage):
         tedges = (beam0.z_offset(clean=True) + nsig*beam0.bunch_length(clean=True)*np.linspace(-1, 1, num_bins)) / SI.c
 
         # Set up the bins for x and y based on drive beam trajectory
-        driver_source = self.get_driver_source()
+        driver_source = self.get_actual_driver_source()
         _, x_trajectory, y_trajectory = self.driver_guiding_trajectory(driver_source.track(), dacc_gradient=0.0e9, num_steps_per_half_osc=100)
         xedge_min = np.min(x_trajectory) - nsig*beam0.beam_size_x()
         xedge_max = nsig*beam0.beam_size_x() + np.max(x_trajectory)
