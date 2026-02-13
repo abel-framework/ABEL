@@ -510,6 +510,26 @@ class Stage(Trackable, CostModeled):
         return ramp_length
     
 
+     # ==================================================
+    def get_ramp_length(self) -> float:
+        """
+        Get the length of the ramps if the stage has ramps. Returns 0.0 
+        otherwise.
+        """
+
+        if self.has_ramp():
+            if self.upramp is not None and self.upramp.length is not None:
+                upramp_length = self.upramp.length
+            else:
+                upramp_length = 0.0
+            if self.downramp is not None and self.downramp.length is not None:
+                downramp_length = self.downramp.length
+            else:
+                downramp_length = 0.0
+            return upramp_length + downramp_length
+        else:
+            return 0.0
+
     # ==================================================
     @property
     def parent(self) -> Self | None:
@@ -1400,7 +1420,7 @@ class Stage(Trackable, CostModeled):
         """
         For a given total number of betatron oscillations ``num_beta_osc`` that 
         an electron with energy ``self.nom_energy`` will undergo across the 
-        whole plasma stage inclusing its uniform ramps, this function calculates 
+        whole plasma stage including its uniform ramps, this function calculates 
         the number of betatron oscillations that should be performed in the main 
         flattop plasma stage by subtracting the contributions from the ramps.
 
