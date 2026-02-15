@@ -736,11 +736,10 @@ class StageHipace(Stage):
         self._external_focusing = bool(enable_external_focusing)
 
         if self._external_focusing is False:
-            self._external_focusing_gradient = 0.0  # TODO: set to None instead?
+            self._external_focusing_gradient = None
         elif self._external_focusing_gradient is None or self._external_focusing_gradient < 1e-15:
-            #if self.get_length() is None:
 
-            # Make a copy of the stage and set up its ramps if they are not set yp
+            # Make a copy of the stage and set up its ramps if they are not set up
             ramps_not_set_up = (
                 (self.upramp is not None and self.upramp.length is None) or
                 (self.downramp is not None and self.downramp.length is None)
@@ -800,7 +799,7 @@ class StageHipace(Stage):
                 stage_copy = self
                 L = stage_copy.get_length()
                 if L is None:
-                    L = stage_copy.length_flattop # If there are no ramps, can use either length or legnth_flattop.
+                    L = stage_copy.length_flattop # If there are no ramps, can use either length or length_flattop.
             
             if L is None:
                 raise ValueError('Stage length is not set.')
@@ -862,7 +861,7 @@ class StageHipace(Stage):
         if q * dacc_gradient > 0.0:
             raise ValueError('Drive beam charge * decceleration gradient must be negative.')
         
-        # Make a copy of the stage and set up its ramps if they are not set yp
+        # Make a copy of the stage and set up its ramps if they are not set up
         ramps_not_set_up = (
             (self.upramp is not None and self.upramp.length is None) or
             (self.downramp is not None and self.downramp.length is None)
