@@ -80,7 +80,7 @@ def test_external_focusing():
     stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
     
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-5, atol=0.0)
-    assert np.isclose(0.0, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert stage._external_focusing_gradient is None
     assert np.isclose(3.440220555221998, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
@@ -89,7 +89,7 @@ def test_external_focusing():
     stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
     
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-5, atol=0.0)
-    assert np.isclose(0.0, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert stage._external_focusing_gradient is None
     assert np.isclose(3.440220555221998, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
