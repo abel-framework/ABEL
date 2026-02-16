@@ -872,8 +872,7 @@ class StageHipace(Stage):
         else: 
             stage_copy = self
         
-        #L = stage_copy.get_length()  # [m]
-        L = stage_copy.length_flattop  # [m]
+        L = stage_copy.get_length()  # [m]
         
         if pz0 + q * dacc_gradient * L/SI.c < pz_thres:
             raise ValueError('The energy depletion will be too severe. This estimate is only valid for a relativistic beam.')
