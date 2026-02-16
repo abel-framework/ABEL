@@ -702,8 +702,19 @@ class Stage(Trackable, CostModeled):
     _nom_energy_gain_calc = None
 
     def get_nom_energy_gain(self):
-        "Alias of nom_energy_gain"
-        return self.nom_energy_gain
+        """
+        Return :attr:`Stage.nom_energy_gain <abel.Stage.nom_energy_gain>` if it 
+        is set. Otherwise, return 
+        :attr:`Stage.nom_energy_gain_flattop <abel.Stage.nom_energy_gain_flattop>`, 
+        taking upramp nominal energy into account if necessary.
+        """
+        if self.nom_energy_gain is None:
+            if self.upramp is not None and self.upramp.nom_energy_gain_flattop is not None:
+                return self.upramp.nom_energy_gain + self.nom_energy_gain_flattop
+            else:
+                return self.nom_energy_gain_flattop
+        else:
+            return self.nom_energy_gain
 
 
     # ==================================================
