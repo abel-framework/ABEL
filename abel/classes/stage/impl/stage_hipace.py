@@ -736,11 +736,10 @@ class StageHipace(Stage):
         self._external_focusing = bool(enable_external_focusing)
 
         if self._external_focusing is False:
-            self._external_focusing_gradient = 0.0  # TODO: set to None instead?
+            self._external_focusing_gradient = None
         elif self._external_focusing_gradient is None or self._external_focusing_gradient < 1e-15:
-            #if self.get_length() is None:
 
-            # Make a copy of the stage and set up its ramps if they are not set yp
+            # Make a copy of the stage and set up its ramps if they are not set up
             ramps_not_set_up = (
                 (self.upramp is not None and self.upramp.length is None) or
                 (self.downramp is not None and self.downramp.length is None)
@@ -751,7 +750,7 @@ class StageHipace(Stage):
             else: 
                 stage_copy = self
             
-            if self.get_length() is not None:
+            if stage_copy.get_length() is not None:
                 self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=self.driver_half_oscillations)  # [T/m]
             else:
                 self._external_focusing_gradient = None
@@ -764,12 +763,46 @@ class StageHipace(Stage):
         Calculate the external focusing gradient g for an azimuthal magnetic 
         field B=[gy,-gx,0] that gives ``num_half_oscillations`` half 
         oscillations for the drive beam over the length of the stage.
+
+        Parameters
+        ----------
+        num_half_oscillations : float, optional
+            Number of half betatron oscillations that the drive beam is 
+            intended to perform. If ``None``, will use ``self.driver_half_oscillations``.
+            Defaults to ``None``.
+
+        L : [m] float, optional
+            The length over which the driver will be guided. If ``None``, will 
+            extract the value using ``self.get_length()``. If the stage does 
+            have ramps that have not been fully set up, a deepcopy of the stage 
+            is created to set up its ramps using 
+            :func:`Stage._prepare_ramps() <abel.Stage._prepare_ramps>` so that 
+            the stage total length is defined.
+
+        Returns
+        -------
+        g : [T/m] float
+            The gradient for the azimuthal magnetic field.
         """
         if L is None:
-            if self.get_length() is None:
+
+            # Make a copy of the stage and set up its ramps if they are not set up
+            ramps_not_set_up = (
+                (self.upramp is not None and self.upramp.length is None) or
+                (self.downramp is not None and self.downramp.length is None)
+            )
+            if ramps_not_set_up:
+                stage_copy = copy.deepcopy(self)
+                stage_copy._prepare_ramps()
+                L = stage_copy.get_length()
+            else: 
+                stage_copy = self
+                L = stage_copy.get_length()
+                if L is None:
+                    L = stage_copy.length_flattop # If there are no ramps, can use either length or length_flattop.
+            
+            if L is None:
                 raise ValueError('Stage length is not set.')
-            L = self.length_flattop
-        #return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
 
         if num_half_oscillations is None:
             num_half_oscillations = self.driver_half_oscillations
@@ -828,7 +861,7 @@ class StageHipace(Stage):
         if q * dacc_gradient > 0.0:
             raise ValueError('Drive beam charge * decceleration gradient must be negative.')
         
-        # Make a copy of the stage and set up its ramps if they are not set yp
+        # Make a copy of the stage and set up its ramps if they are not set up
         ramps_not_set_up = (
             (self.upramp is not None and self.upramp.length is None) or
             (self.downramp is not None and self.downramp.length is None)
@@ -923,7 +956,8 @@ class StageHipace(Stage):
 
         driver_half_oscillations : float, optional
             Number of half betatron oscillations that the drive beam is 
-            expected to perform. Defaults to ``self.driver_half_oscillations``.
+            intended to perform. If ``None``, will use ``self.driver_half_oscillations``.
+            Defaults to ``None``.
 
         q : [C] float, optional
             Particle charge. q * nom_accel_gradient must be positive. Defaults 
@@ -964,11 +998,30 @@ class StageHipace(Stage):
         if driver_half_oscillations is None:
             driver_half_oscillations = self.driver_half_oscillations
 
+        # Determine whether the ramps have been set up
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        
+        # Make a copy of the stage
+        stage_copy = copy.deepcopy(self)
+
+        # The function to be used for solving the equation for phase advance numerically
         def rhs(L):
             g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+            L_ramps = 0.0
+
+            # Set up the ramps using the stage copy
+            if ramps_not_set_up:
+                stage_copy.nom_energy_gain_flattop = nom_accel_gradient * L[0]  # L is an ndarray with one element
+                stage_copy.length_flattop = L[0]
+                stage_copy._prepare_ramps()
+                L_ramps = stage_copy.get_ramp_length()
 
             if self.external_focusing:  # Add contribution from external field used for driver guiding
-                g = g + self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L)
+                g_ext = stage_copy.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L+L_ramps)
+                g = g + g_ext
 
             prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
             energy_scaling = np.sqrt(initial_energy + q*nom_accel_gradient*L) - np.sqrt(initial_energy)
@@ -980,7 +1033,7 @@ class StageHipace(Stage):
 
         # Set the external focusing gradient for the driver guiding field if not already set
         if self.external_focusing and self._external_focusing_gradient is None:
-            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length)
+            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length+stage_copy.get_ramp_length())
 
         return length
     
