@@ -288,7 +288,13 @@ class StageWakeT(Stage):
             - ``Is`` : beam current profile [A]
         """
 
-        if driver0 is None and driver is None:
+        if driver0 is None:
+            assert driver is None
+
+        if driver is None:
+            assert driver0 is None
+
+        if driver0 is None:
             only_main_beam = True
         else:
             only_main_beam = False
