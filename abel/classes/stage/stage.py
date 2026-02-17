@@ -1661,7 +1661,7 @@ class Stage(Trackable, CostModeled):
         """
         Calculate the efficiency of energy transfer in the stage.
 
-        This method computes the following efficiency metrics:
+        This method computes the following efficiency data:
         
         - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
         - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
@@ -1673,14 +1673,16 @@ class Stage(Trackable, CostModeled):
         beam0 : ``Beam``
             Input beam before the stage.
 
-        driver0 : ``Beam``
-            Input drive beam before the stage.
+        driver0 : ``Beam`` or None
+            Input drive beam before the stage. If ``None``, all efficiency data 
+            are set to ``None.``
 
         beam : ``Beam``
             Output beam after the stage.
 
-        driver : ``Beam``
-            Output drive beam after the stage.
+        driver : ``Beam`` or None
+            Output drive beam after the stage. If ``None``, all efficiency data 
+            are set to ``None.``
 
         Returns
         -------
@@ -1688,6 +1690,13 @@ class Stage(Trackable, CostModeled):
             Results are stored in :attr:`Stage.efficiency <abel.Stage.efficiency>`.
         """
 
+        if driver0 is None or driver is None:
+            self.efficiency.driver_to_wake = None
+            self.efficiency.wake_to_beam = None
+            self.efficiency.driver_to_beam = None
+            self.efficiency.dumped_power = None
+            return
+        
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
         Etot0_driver = driver0.total_energy()
