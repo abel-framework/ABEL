@@ -9,6 +9,7 @@ from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
 from abel.classes.source.source import Source
+from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import copy, warnings
@@ -178,10 +179,20 @@ class Stage(Trackable, CostModeled):
     def driver_source(self, source : Source | DriverComplex | None):
         if source is not None and not isinstance(source, (Source, DriverComplex)):
             raise TypeError("driver_source must be a Source, DriverComplex, or None")
+        
+        if source is not None:
+            if isinstance(source, DriverComplex):
+                driver_source = source.source
+            elif isinstance(source, Source):
+                driver_source = source
+            if not isinstance(driver_source, SourceCapsule) and driver_source.energy is None:
+                raise ValueError('The energy of the driver source of the stage is not set.')
+        
         self._driver_source = source
     _driver_source = None
 
-    def get_driver_source(self):
+
+    def get_actual_driver_source(self):
         """
         Return the driver source of the stage or the driver source of the 
         associated driver complex of the stage.
@@ -190,11 +201,14 @@ class Stage(Trackable, CostModeled):
         -------
         driver_source : ``Source``
         """
-    
-        if isinstance(self.driver_source, DriverComplex):
+        if self.driver_source is None:
+            raise ValueError('The driver source of the stage is not set.')
+        elif isinstance(self.driver_source, DriverComplex):
             driver_source = self.driver_source.source
         elif isinstance(self.driver_source, Source):
             driver_source = self.driver_source
+        
+        # driver_source.setter ensures that self.driver_source is a valid type.
         
         return driver_source
     
@@ -1344,7 +1358,7 @@ class Stage(Trackable, CostModeled):
         """
         Calculate the efficiency of energy transfer in the stage.
 
-        This method computes the following efficiency metrics:
+        This method computes the following efficiency data:
         
         - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
         - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
@@ -1356,14 +1370,16 @@ class Stage(Trackable, CostModeled):
         beam0 : ``Beam``
             Input beam before the stage.
 
-        driver0 : ``Beam``
-            Input drive beam before the stage.
+        driver0 : ``Beam`` or None
+            Input drive beam before the stage. If ``None``, all efficiency data 
+            are set to ``None.``
 
         beam : ``Beam``
             Output beam after the stage.
 
-        driver : ``Beam``
-            Output drive beam after the stage.
+        driver : ``Beam`` or None
+            Output drive beam after the stage. If ``None``, all efficiency data 
+            are set to ``None.``
 
         Returns
         -------
@@ -1371,6 +1387,13 @@ class Stage(Trackable, CostModeled):
             Results are stored in :attr:`Stage.efficiency <abel.Stage.efficiency>`.
         """
 
+        if driver0 is None or driver is None:
+            self.efficiency.driver_to_wake = None
+            self.efficiency.wake_to_beam = None
+            self.efficiency.driver_to_beam = None
+            self.efficiency.dumped_power = None
+            return
+        
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
         Etot0_driver = driver0.total_energy()
@@ -1470,7 +1493,7 @@ class Stage(Trackable, CostModeled):
         machine_zero = sys.float_info.epsilon
 
         # Check if the driver source generates a drive beam alignmed to its propagation direction, which is required by many Stage subclasses
-        driver_source = self.get_driver_source()
+        driver_source = self.get_actual_driver_source()
 
         if not driver_source.align_beam_axis:
             raise ValueError("Currently does not support drive beam axis not aligned with its propagation direction. I.e. driver_source.align_beam_axis must be set to True.")
@@ -1551,7 +1574,7 @@ class Stage(Trackable, CostModeled):
         machine_zero = sys.float_info.epsilon
 
         # Check if the driver source of the stage has angular offset
-        driver_source = self.get_driver_source()
+        driver_source = self.get_actual_driver_source()
         has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
         
         if has_angular_offset:
@@ -1960,7 +1983,7 @@ class Stage(Trackable, CostModeled):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source is not None:  # A ramp may not have a driver source
-            driver_source = self.get_driver_source()
+            driver_source = self.get_actual_driver_source()
             if driver_source.energy is not None:
                 Ez_driver_max = driver_source.energy/self.length_flattop
                 axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
@@ -2025,7 +2048,7 @@ class Stage(Trackable, CostModeled):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source is not None:  # A ramp may not have a driver source
-            driver_source = self.get_driver_source()
+            driver_source = self.get_actual_driver_source()
             if driver_source.energy is not None:
                 Ez_driver_max = driver_source.energy/self.get_length()
                 axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)

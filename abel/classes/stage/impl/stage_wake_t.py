@@ -49,6 +49,9 @@ class StageWakeT(Stage):
     run_path : str, optional
         Path to store plots and outputs. Defaults to ``None``.
 
+    use_single_beam : bool
+        Enable tracking only the main beam. Defaults to ``False``.
+
     stage_number : int
         Keeps track of which stage it is in the beamline.
 
@@ -61,7 +64,7 @@ class StageWakeT(Stage):
 
     # TODO: allow the user to set the box size and step size.
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, output_period=None, keep_data=False, ion_motion=False, run_path=None):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, num_cell_xy=256, output_period=None, keep_data=False, ion_motion=False, run_path=None, use_single_beam=False):
         
         super().__init__(nom_accel_gradient=nom_accel_gradient, nom_energy_gain=nom_energy_gain, plasma_density=plasma_density, driver_source=driver_source, ramp_beta_mag=ramp_beta_mag)
         
@@ -72,8 +75,8 @@ class StageWakeT(Stage):
         # physics flags
         self.ion_motion = ion_motion
 
-        #self.drive_beam = drive_beam
         self.run_path = run_path
+        self.use_single_beam = use_single_beam
 
 
     # ==================================================
@@ -99,47 +102,69 @@ class StageWakeT(Stage):
         if not os.path.exists(diag_dir):
             os.mkdir(diag_dir)
 
-        # make driver (and convert to WakeT bunch)
-        driver0 = self.driver_source.track()
-        driver_original = copy.deepcopy(driver0)
-        
-        # rotate the beam coordinate system to align with the driver
-        if self.parent is None:
-            driver0, beam0 = self.rotate_beam_coordinate_systems(driver0, beam0)
-        
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
         self._prepare_ramps()
         plasma_profile = self.get_plasma_profile()
         
-        # convert beams to WakeT bunches
-        driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
-        beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
-        
-        # make longitudinal box range
-        num_sigmas = 6
-        #box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
-        R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
-        box_min_z = driver0.z_offset() - 4.0 * R_blowout
-        #box_min_z = driver0.z_offset() - 3.3 * R_blowout
-        #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
-        box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
 
-        if box_min_z > beam0.zs().min() or box_max_z < driver0.zs().max():
-            raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
+        # ========== Convert main beam to WakeT bunches ==========
+        beam0_wake_t = beam2wake_t_bunch(beam0, name='beam')
+
+
+        # ========== Make driver (and convert to WakeT bunch) ==========
+        if not self.use_single_beam:
+            driver0 = self.driver_source.track()
+            driver_original = copy.deepcopy(driver0)
+            
+            # rotate the beam coordinate system to align with the driver
+            if self.parent is None:
+                driver0, beam0 = self.rotate_beam_coordinate_systems(driver0, beam0)
+
+            # convert driver to WakeT bunches
+            driver0_wake_t = beam2wake_t_bunch(driver0, name='driver')
         
-        # making transverse box size
-        box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, driver0.peak_current())])
         
-        # calculate number of cells in x to get similar resolution
+        # ========== Calculate box range ==========
+        num_sigmas = 6
+        if not self.use_single_beam:
+            R_blowout = blowout_radius(self.plasma_density, driver0.peak_current())
+
+            box_min_z = driver0.z_offset() - 4.0 * R_blowout
+            #box_min_z = driver0.z_offset() - 3.3 * R_blowout
+            #box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs())+0.25/k_p(self.plasma_density))
+            box_max_z = min(driver0.z_offset() + num_sigmas * driver0.bunch_length(), np.max(driver0.zs()) + 0.5*R_blowout)
+
+            if box_min_z > beam0.zs().min() or box_max_z < driver0.zs().max():
+                raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
+            
+            # calculate transverse box size
+            box_size_r = np.max([4/k_p(self.plasma_density), 3*blowout_radius(self.plasma_density, driver0.peak_current())])
+        else:
+            box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+            box_max_z = beam0.z_offset() + num_sigmas * beam0.bunch_length()
+
+            if box_min_z > beam0.zs().min() or box_max_z < beam0.zs().max():
+                raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
+            
+            # calculate transverse box size
+            box_size_r = np.max([3/k_p(self.plasma_density), 2*blowout_radius(self.plasma_density, beam0.peak_current())])
+        
+        
+        # ========== Calculate number of cells in x to get similar resolution ==========
         dr = box_size_r/self.num_cell_xy
         num_cell_z = round((box_max_z-box_min_z)/dr)
         
-        # find stepsize
-        matched_beta = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
+
+        # ========== Find stepsize ==========
+        if not self.use_single_beam:
+            matched_beta = np.sqrt(2*min(beam0.gamma(),driver0.gamma()/2))/k_p(self.plasma_density)
+        else:
+            matched_beta = np.sqrt(2*beam0.gamma())/k_p(self.plasma_density)
         dz = matched_beta/10
 
-        # select the wakefield model (ion motion or not)
+
+        # ========== Select the wakefield model (ion motion or not) ==========
         if self.ion_motion:
 
             # Check the version number of Wake-T in order to see if it supports the ion motion wakefield model
@@ -168,16 +193,24 @@ class StageWakeT(Stage):
         if self.output_period is None:
             self.output_period = round(self.length/dz/8)
             
+        # ========== Set up a Wake-T plasma stage ==========
         plasma = wake_t.PlasmaStage(length=self.length, density=plasma_profile, wakefield_model=wakefield_model,
                                     r_max=box_size_r, r_max_plasma=box_size_r, xi_min=box_min_z, xi_max=box_max_z, 
                                     n_out=self.output_period, n_r=int(self.num_cell_xy), n_xi=int(num_cell_z), dz_fields=dz, ppc=1)
         
-        # do tracking
-        bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
-        #bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
-        
-        # save evolution of the beam and driver
-        self.__extract_evolution(bunches)
+
+        # ========== Do tracking ==========
+        if not self.use_single_beam:
+            bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)  # v0.8.0
+            #bunches = plasma.track([driver0_wake_t, beam0_wake_t], opmd_diag=True, diag_dir=tmpfolder)
+        else:
+            bunches = plasma.track(beam0_wake_t, opmd_diag=True, diag_dir=tmpfolder, show_progress_bar=verbose)
+
+        # ========== Save evolution of the beam and driver ==========
+        if not self.use_single_beam:
+            self.__extract_evolution(bunches)
+        else:
+            self.__extract_evolution([bunches])
         self.__extract_initial_and_final_step(diag_dir)
 
         # delete or move data
@@ -189,54 +222,153 @@ class StageWakeT(Stage):
         # remove temporary directory
         shutil.rmtree(tmpfolder)
         
-        # extract beams
-        beam = wake_t_bunch2beam(bunches[1][-1])
-        driver = wake_t_bunch2beam(bunches[0][-1])
 
-        # undo coordinate system rotation
-        if self.parent is None:
-            driver, beam = self.undo_beam_coordinate_systems_rotation(driver_original, driver, beam)
+        # ========== Extract beams ==========
+        if not self.use_single_beam:
+            beam = wake_t_bunch2beam(bunches[1][-1])
+            driver = wake_t_bunch2beam(bunches[0][-1])
+
+            # undo coordinate system rotation
+            if self.parent is None:
+                driver, beam = self.undo_beam_coordinate_systems_rotation(driver_original, driver, beam)
+        else:
+            beam = wake_t_bunch2beam(bunches[-1])
 
         
+        # ========== Bookkeeping ==========
         # copy meta data from input beam (will be iterated by super)
         beam.trackable_number = beam0.trackable_number
         beam.stage_number = beam0.stage_number
         beam.location = beam0.location
         
         # calculate efficiency
-        self.calculate_efficiency(beam0, driver0, beam, driver)
+        if not self.use_single_beam:
+            self.calculate_efficiency(beam0, driver0, beam, driver)
+        else:
+            # Drive beam to main beam efficiency is undefined when there is no 
+            # drive beam. Effieciency data are set to None.
+            self.calculate_efficiency(beam0, None, beam, None)
         
         # save current profile
-        self.calculate_beam_current(beam0, driver0, beam, driver)
+        if not self.use_single_beam:
+            self.calculate_beam_current(beam0, driver0, beam, driver)
+        else:
+            self.calculate_beam_current(beam0, None, beam, None)
         
         return super().track(beam, savedepth, runnable, verbose)
 
 
     # ==================================================
-    @property
-    def driver_source(self) -> Source | DriverComplex | None:
+    @Stage.driver_source.setter
+    def driver_source(self, source : Source | DriverComplex | None):
         """
         The driver source or the driver complex of the stage. The generated 
         drive beam's beam axis is always aligned to its propagation direction.
         """
-        return self._driver_source
-    @driver_source.setter
-    def driver_source(self, source : Source | DriverComplex | None):
+        
+        # Delegate to parent setter
+        Stage.driver_source.fset(self, source)
+        
         # Set the driver source to always align drive beam axis to its propagation direction
-        if isinstance(source, DriverComplex):
-            if source.source is None:
-                raise ValueError("The source of the driver complex is not set.")
-            source.source.align_beam_axis = True
-            self._driver_source = source
-        elif isinstance(source, Source):
-            source.align_beam_axis = True
-            self._driver_source = source
+        if source is not None:
+            self.get_actual_driver_source().align_beam_axis = True
+
+    # ==================================================
+    def calculate_beam_current(self, beam0: Beam, driver0: Beam | None, beam: Beam | None=None, driver: Beam | None=None) -> None:
+        """
+        Calculate and store the beam current profile.
+
+        This method computes the current profile of the initial (input) and 
+        optionally final (output) beams using a temporal binning scheme based on 
+        the RMS bunch lengths of the driver and beam. The results are stored in 
+        the class attribute :attr:`Stage.initial.beam.current <abel.Stage.initial.beam.current>` 
+        and, if output beams are provided, in 
+        :attr:`Stage.final.beam.current <abel.Stage.final.beam.current>`.
+
+
+        Parameters
+        ----------
+        beam0 : ``Beam``
+            Input beam before the stage.
+
+        driver0 : ``Beam`` or None
+            Input drive beam before the stage.
+
+        beam : ``Beam`` or None, optional
+            Output beam after the stage.
+
+        driver : ``Beam`` or None, optional
+            Output drive beam after the stage.
+
+        Returns
+        -------
+        None
+            Results are stored in ``self.initial.beam.current`` and, if provided, 
+            ``self.final.beam.current`` with attributes:
+            - ``zs`` : longitudinal positions [m]  
+            - ``Is`` : beam current profile [A]
+        """
+
+        if driver0 is None:
+            assert driver is None
+
+        if driver is None:
+            assert driver0 is None
+
+        if driver0 is None:
+            only_main_beam = True
         else:
-            self._driver_source = None
+            only_main_beam = False
+
+        num_sigmas = 6
+        z_min = beam0.z_offset() - num_sigmas * beam0.bunch_length()
+
+        if not only_main_beam:
+            dz = 40*np.mean([driver0.bunch_length(clean=True)/np.sqrt(len(driver0)), beam0.bunch_length(clean=True)/np.sqrt(len(beam0))])
+            z_max = driver0.z_offset() + num_sigmas * driver0.bunch_length()
+        else:
+            dz = 40*np.mean( beam0.bunch_length(clean=True)/np.sqrt(len(beam0)) )
+            z_max = beam0.z_offset() + num_sigmas * beam0.bunch_length()
+
+        tbins = np.arange(z_min, z_max, dz)/SI.c
+        
+        if only_main_beam:
+            Is0, ts0 = beam0.current_profile(bins=tbins)
+        else:
+            Is0, ts0 = (driver0 + beam0).current_profile(bins=tbins)
+        self.initial.beam.current.zs = ts0*SI.c
+        self.initial.beam.current.Is = Is0
+        
+        Is = None
+        zs = None
+        if only_main_beam and beam is not None:
+            Is, ts = beam.current_profile(bins=tbins)
+            zs = ts*SI.c
+        elif not only_main_beam and beam is not None and driver is not None:
+            Is, ts = (driver + beam).current_profile(bins=tbins)
+            zs = ts*SI.c
+        self.final.beam.current.zs = zs
+        self.final.beam.current.Is = Is
 
 
     # ==================================================
     def __extract_evolution(self, bunches):
+        """
+        Extract beam parameter evolution along the stage and store it as a 
+        :class:`types.SimpleNamespace` object under the stage in the class 
+        attribute :attr:`Stage.evolution <abel.Stage.evolution>`.
+
+    
+        Parameters
+        ----------
+        bunches : ``list``
+            A ``list`` containing one or more Wake-T ``ParticleBunch``.
+
+
+        Returns
+        -------
+        ``None``
+        """
         
         # get beam
         from wake_t.diagnostics import analyze_bunch_list
@@ -279,9 +411,12 @@ class StageWakeT(Stage):
                 evol.plasma_density = np.ones_like(evol.location)*self.plasma_density
             
             # assign it to the right beam
-            if i == 0:
-                self.evolution.driver = evol
-            elif i == 1:
+            if not self.use_single_beam:
+                if i == 0:
+                    self.evolution.driver = evol
+                elif i == 1:
+                    self.evolution.beam = evol
+            else:
                 self.evolution.beam = evol
 
 
@@ -357,31 +492,39 @@ class StageWakeT(Stage):
         
         # extract initial beam density
         data0_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=min(ts.iterations))
-        data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
         extent0 = metadata0_plasma.imshow_extent
         Nbins0 = self.initial.plasma.density.rho.shape
         dr0 = (extent0[3]-extent0[2])/Nbins0[0]
         dz0 = (extent0[1]-extent0[0])/Nbins0[1]
         mask0_beam = np.logical_and(data0_beam[1] < dr0/2, data0_beam[1] > -dr0/2)
         jz0_beam, _, _ = np.histogram2d(data0_beam[0][mask0_beam], data0_beam[2][mask0_beam], weights=data0_beam[3][mask0_beam], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
-        mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
-        jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
         self.initial.beam.density.extent = metadata0_plasma.imshow_extent
-        self.initial.beam.density.rho = (jz0_beam+jz0_driver)/(dr0*dr0*dz0)
+
+        if not self.use_single_beam:
+            data0_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=min(ts.iterations))
+            mask0_driver = np.logical_and(data0_driver[1] < dr0/2, data0_driver[1] > -dr0/2)
+            jz0_driver, _, _ = np.histogram2d(data0_driver[0][mask0_driver], data0_driver[2][mask0_driver], weights=data0_driver[3][mask0_driver], bins=Nbins0, range=[extent0[2:4],extent0[0:2]])
+            self.initial.beam.density.rho = (jz0_beam + jz0_driver)/(dr0*dr0*dz0)
+        else:
+            self.initial.beam.density.rho = (jz0_beam)/(dr0*dr0*dz0)
 
         # extract final beam density
         data_beam = ts.get_particle(species='beam', var_list=['x','y','z','w'], iteration=max(ts.iterations))
-        data_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=max(ts.iterations))
         extent = metadata_plasma.imshow_extent
         Nbins = self.final.plasma.density.rho.shape
         dr = (extent[3]-extent[2])/Nbins[0]
         dz = (extent[1]-extent[0])/Nbins[1]
         mask_beam = np.logical_and(data_beam[1] < dr/2, data_beam[1] > -dr/2)
         jz_beam, _, _ = np.histogram2d(data_beam[0][mask_beam], data_beam[2][mask_beam], weights=data_beam[3][mask_beam], bins=Nbins, range=[extent[2:4],extent[0:2]])
-        mask_driver = np.logical_and(data_driver[1] < dr/2, data_driver[1] > -dr/2)
-        jz_driver, _, _ = np.histogram2d(data_driver[0][mask_driver], data_driver[2][mask_driver], weights=data_driver[3][mask_driver], bins=Nbins, range=[extent[2:4],extent[0:2]])
         self.final.beam.density.extent = metadata_plasma.imshow_extent
-        self.final.beam.density.rho = (jz_beam+jz_driver)/(dr*dr*dz)
+
+        if not self.use_single_beam:
+            data_driver = ts.get_particle(species='driver', var_list=['x','y','z','w'], iteration=max(ts.iterations))
+            mask_driver = np.logical_and(data_driver[1] < dr/2, data_driver[1] > -dr/2)
+            jz_driver, _, _ = np.histogram2d(data_driver[0][mask_driver], data_driver[2][mask_driver], weights=data_driver[3][mask_driver], bins=Nbins, range=[extent[2:4],extent[0:2]])
+            self.final.beam.density.rho = (jz_beam + jz_driver)/(dr*dr*dz)
+        else:
+            self.final.beam.density.rho = (jz_beam)/(dr*dr*dz)
 
 
     def get_plasma_profile(self):
