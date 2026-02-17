@@ -149,7 +149,7 @@ class PlasmaLinac(Linac):
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 
-                stage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in stages[:(i+1)]])
+                stage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                 
                 # reassign the same driver complex
                 if self.driver_complex is not None:
@@ -166,7 +166,7 @@ class PlasmaLinac(Linac):
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
-                    interstage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in stages[:(i+1)]])
+                    interstage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
                     
                     if self.alternate_interstage_polarity:
                         interstage_instance.field_dipole = (2*(i%2)-1)*interstage_instance.field_dipole
@@ -204,7 +204,7 @@ class PlasmaLinac(Linac):
         super().assemble_trackables()
 
         # Correct the linac nominal energy using each stage's nominal energy gain
-        corrected_nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+        corrected_nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in self.stages])
         
         if self.nom_energy is not None and not np.isclose(self.nom_energy, corrected_nom_energy, rtol=1e-10, atol=0.0):
             raise ValueError(f'Inconsistency between the defined linac nominal energy and the nominal energy gains of the plasma acceleration stages.\n linac.nom_energy: {self.nom_energy}, nomimal energy calculated from stage nominal energy gains and source.energy: {corrected_nom_energy}')
