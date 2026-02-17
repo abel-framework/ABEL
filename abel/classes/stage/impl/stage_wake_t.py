@@ -269,10 +269,10 @@ class StageWakeT(Stage):
         driver0 : ``Beam``
             Input drive beam before the stage.
 
-        beam : ``Beam``, optional
+        beam : ``Beam`` or None, optional
             Output beam after the stage.
 
-        driver : ``Beam``, optional
+        driver : ``Beam`` or None, optional
             Output drive beam after the stage.
 
         Returns
