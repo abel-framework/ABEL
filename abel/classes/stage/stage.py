@@ -715,16 +715,55 @@ class Stage(Trackable, CostModeled):
     _nom_energy_gain      = None
     _nom_energy_gain_calc = None
 
-    def get_nom_energy_gain(self):
+    def get_nom_energy_gain(self, ignore_ramps_if_undefined=False):
         """
         Return :attr:`Stage.nom_energy_gain <abel.Stage.nom_energy_gain>` if it 
-        is set. Otherwise, return 
-        :attr:`Stage.nom_energy_gain_flattop <abel.Stage.nom_energy_gain_flattop>`, 
-        taking upramp nominal energy into account if necessary.
+        is defined. Otherwise, return 
+        :attr:`Stage.nom_energy_gain_flattop <abel.Stage.nom_energy_gain_flattop>`.
+
+        If the stage includes ramps, the nominal energy gain of the upramp and 
+        downramp is added to the flattop nominal energy gain when available.
+
+        If a ramp exists but its nominal energy gain has not been defined or 
+        calculated, a ``ValueError`` is raised unless 
+        ``ignore_ramps_if_undefined`` is ``True``.
+
+        Parameters
+        ----------
+        ignore_ramps_if_undefined : bool, optional
+            If ``True``, ignore upramp or downramp nominal energy gain when it is
+            undefined. If ``True`` (default), raise a ``ValueError`` when a ramp
+            exists, but its nominal energy gain has not been defined.
+
+        Returns
+        -------
+        nom_energy_gain : [eV] float
+            The total nominal energy gain of the stage.
         """
+
         if self.nom_energy_gain is None:
-            if self.upramp is not None and self.upramp.nom_energy_gain_flattop is not None:
-                return self.upramp.nom_energy_gain + self.nom_energy_gain_flattop
+            
+            if self.has_ramp():
+                nom_energy_gain = self.nom_energy_gain_flattop
+                
+                if self.upramp is not None and self.upramp.nom_energy_gain_flattop is not None:
+                    nom_energy_gain += self.upramp.nom_energy_gain
+                elif self.upramp is not None and self.upramp.nom_energy_gain_flattop is None and ignore_ramps_if_undefined is False:
+                    # I.e. upramp exists, upramp nominal energy gain has not 
+                    # been calculated/defined, but not allowed to ignore ramp 
+                    # energy gain if undefined:
+                    raise ValueError('Upramp nominal energy gain not defined/calculated.')
+                
+                if self.downramp is not None and self.downramp.nom_energy_gain_flattop is not None:
+                    nom_energy_gain += self.downramp.nom_energy_gain
+                elif self.downramp is not None and self.downramp.nom_energy_gain_flattop is None and ignore_ramps_if_undefined is False:
+                    # I.e. downramp exists, downramp nominal energy gain has not 
+                    # been calculated/defined, but not allowed to ignore ramp 
+                    # energy gain if undefined:
+                    raise ValueError('Downramp nominal energy gain not defined/calculated.')
+                
+                return nom_energy_gain
+            
             else:
                 return self.nom_energy_gain_flattop
         else:
