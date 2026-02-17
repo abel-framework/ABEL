@@ -124,7 +124,7 @@ class StageWakeT(Stage):
             box_min_z = beam0.z_offset() - num_sigmas * beam0.bunch_length()
             box_max_z = beam0.z_offset() + num_sigmas * beam0.bunch_length()
 
-            if box_min_z > beam0.zs().min():
+            if box_min_z > beam0.zs().min() or box_max_z < beam0.zs().max():
                 raise SimulationDomainSizeError('The Wake-T simulation domain is too small along z.')
             
             # calculate transverse box size
@@ -223,6 +223,10 @@ class StageWakeT(Stage):
         # calculate efficiency
         if not self.use_single_beam:
             self.calculate_efficiency(beam0, driver0, beam, driver)
+        else:
+            # Drive beam to main beam efficiency is undefined when there is no 
+            # drive beam. Effieciency data are set to None.
+            self.calculate_efficiency(beam0, None, beam, None)
         
         # save current profile
         if not self.use_single_beam:
