@@ -284,7 +284,7 @@ class StageWakeT(Stage):
             - ``Is`` : beam current profile [A]
         """
 
-        if driver0 is None:
+        if driver0 is None and driver is None:
             only_main_beam = True
         else:
             only_main_beam = False
