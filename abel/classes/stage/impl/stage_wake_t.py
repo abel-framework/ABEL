@@ -249,7 +249,7 @@ class StageWakeT(Stage):
             self.get_actual_driver_source().align_beam_axis = True
 
     # ==================================================
-    def calculate_beam_current(self, beam0, driver0, beam=None, driver=None):
+    def calculate_beam_current(self, beam0: Beam, driver0: Beam | None, beam: Beam | None=None, driver: Beam | None=None) -> None:
         """
         Calculate and store the beam current profile.
 
@@ -266,7 +266,7 @@ class StageWakeT(Stage):
         beam0 : ``Beam``
             Input beam before the stage.
 
-        driver0 : ``Beam``
+        driver0 : ``Beam`` or None
             Input drive beam before the stage.
 
         beam : ``Beam`` or None, optional
