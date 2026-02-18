@@ -919,7 +919,7 @@ class StageHipace(Stage):
     
 
     # ==================================================
-    def match_length_guiding_2_num_beta_osc(self, num_beta_osc, driver_half_oscillations=None, q=SI.e, set_consistent_params=True):
+    def match_length_guiding_2_num_beta_osc(self, num_beta_osc, driver_half_oscillations=None, set_consistent_params=True, q=SI.e):
         """
         Set :attr:`self.length_flattop <abel.Stage.length_flattop>` for a 
         uniform plasma stage such that a particle with initial energy 
@@ -948,15 +948,15 @@ class StageHipace(Stage):
             intended to perform. If ``None``, will use :attr:`StageHipace.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`
             Defaults to ``None``.
 
-        q : [C] float, optional
-            Particle charge. q * nom_accel_gradient must be positive. Defaults 
-            to elementary charge.
-
         set_consistent_params : bool, optional
             Flag for setting :attr:`self._external_focusing_gradient <abel.Stage._external_focusing_gradient>`
             and :attr:`self.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`
             to be consistent with the calculated stage length. Defaults to 
             ``True``.
+
+        q : [C] float, optional
+            Particle charge. q * nom_accel_gradient must be positive. Defaults 
+            to elementary charge.
 
             
         Returns
