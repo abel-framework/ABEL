@@ -1412,12 +1412,12 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, q=SI.e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, plasma_density=None, q=SI.e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
-        in a uniform plasma stage (excluding ramps) with nominal acceleration 
-        gradient ``nom_accel_gradient`` and plasma density ``plasma_density``.
+        in a uniform plasma stage (excluding ramps) with defined nominal 
+        acceleration gradient and plasma density ``plasma_density``.
 
         Parameters
         ----------
@@ -1428,10 +1428,6 @@ class Stage(Trackable, CostModeled):
         initial_energy : [eV] float, optional
             The initial energy of the particle at the start of the plasma stage. 
             Defaults to ``self.nom_energy``.
-
-        nom_accel_gradient : [V/m] float, optional
-            Nominal accelerating gradient of the plasma stage exclusing ramps. 
-            Defaults to ``self.nom_accel_gradient_flattop``.
 
         plasma_density : [m^-3] float, optional
             The plasma density of the plasma stage. Defaults to 
@@ -1455,10 +1451,9 @@ class Stage(Trackable, CostModeled):
             initial_energy = self.nom_energy
         initial_energy = initial_energy*SI.e  # [J]
 
-        if nom_accel_gradient is None:
-            if self.nom_accel_gradient_flattop is None:
-                raise ValueError('Stage.nom_accel_gradient_flattop not set.')
-            nom_accel_gradient = self.nom_accel_gradient_flattop
+        if self.nom_accel_gradient_flattop is None:
+            raise ValueError('Stage.nom_accel_gradient_flattop not set.')
+        nom_accel_gradient = self.nom_accel_gradient_flattop
 
         if q * nom_accel_gradient < 0:
             raise ValueError('q * nom_accel_gradient must be positive.')
