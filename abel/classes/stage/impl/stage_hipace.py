@@ -811,7 +811,119 @@ class StageHipace(Stage):
     
 
     # ==================================================
-    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, driver_half_oscillations=None, q=SI.e):
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, plasma_density=None, driver_half_oscillations=None, q=SI.e):
+        """
+        Calculate the stage length that gives ``num_beta_osc`` betatron 
+        oscillations for a particle with given initial energy ``initial_energy`` 
+        in a uniform plasma stage (excluding ramps) with defined nominal 
+        acceleration gradient and plasma density ``plasma_density``.
+
+        Will take into account the contribution from an external linear magnetic 
+        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
+        is set to ``True`` before calling this method.
+
+        Also set :attr:`self._external_focusing_gradient <abel.Stage.StageHipace._external_focusing_gradient>`
+        if it is not already set, and :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
+        is ``True``. 
+
+        Parameters
+        ----------
+        num_beta_osc : float
+            Total number of design betatron oscillations that the electron 
+            should perform through the plasma stage excluding ramps. 
+
+        initial_energy : [eV] float, optional
+            The initial energy of the particle at the start of the plasma stage. 
+            Defaults to ``self.nom_energy``.
+
+        plasma_density : [m^-3] float, optional
+            The plasma density of the plasma stage. Defaults to 
+            ``self.plasma_density``.
+
+        driver_half_oscillations : float, optional
+            Number of half betatron oscillations that the drive beam is 
+            intended to perform. If ``None``, will use ``self.driver_half_oscillations``.
+            Defaults to ``None``.
+
+        q : [C] float, optional
+            Particle charge. q * nom_accel_gradient must be positive. Defaults 
+            to elementary charge.
+
+            
+        Returns
+        -------
+        length : [m] float
+            Length of the plasma stage excluding ramps matched to the given 
+            number of betatron oscillations.
+        """
+
+        from scipy.optimize import fsolve
+
+        if initial_energy is None:
+            if self.nom_energy is None:
+                raise ValueError('Stage.nom_energy not set.')
+            initial_energy = self.nom_energy
+        initial_energy = initial_energy*SI.e  # [J]
+
+        if self.nom_accel_gradient_flattop is None:
+            raise ValueError('Stage.nom_accel_gradient_flattop not set.')
+        nom_accel_gradient = self.nom_accel_gradient_flattop
+
+        if q * nom_accel_gradient < 0:
+            raise ValueError('q * nom_accel_gradient must be positive.')
+
+        if plasma_density is None:
+            if self.plasma_density is None:
+                raise ValueError('Stage.plasma_density not set.')
+            plasma_density = self.plasma_density
+
+        if num_beta_osc < 0:
+            raise ValueError('Number of input betatron oscillations must be positive.')
+        
+        if driver_half_oscillations is None:
+            driver_half_oscillations = self.driver_half_oscillations
+
+        # Determine whether the ramps have been set up
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        
+        # Make a copy of the stage
+        stage_copy = copy.deepcopy(self)
+
+        # The function to be used for solving the equation for phase advance numerically
+        def rhs(L):
+            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+            L_ramps = 0.0
+
+            # Set up the ramps using the stage copy
+            if ramps_not_set_up:
+                stage_copy.length_flattop = L[0]  # L is an ndarray with one element
+                stage_copy._prepare_ramps()
+                L_ramps = stage_copy.get_ramp_length()
+
+            if self.external_focusing:  # Add contribution from external field used for driver guiding
+                g_ext = stage_copy.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L+L_ramps)
+                g = g + g_ext
+
+            prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
+            energy_scaling = np.sqrt(initial_energy + q*nom_accel_gradient*L) - np.sqrt(initial_energy)
+            return prefactor * energy_scaling
+        
+        # Solve 2*np.pi*num_beta_osc = rhs(L)
+        solution = fsolve(lambda L: rhs(L) - 2*np.pi*num_beta_osc , x0=1)
+        length = solution[0]
+
+        # Set the external focusing gradient for the driver guiding field if not already set
+        if self.external_focusing and self._external_focusing_gradient is None:
+            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length+stage_copy.get_ramp_length())
+
+        return length
+    
+
+    # ==================================================
+    def match_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, driver_half_oscillations=None, q=SI.e):
         """
         Calculate the stage length that gives ``num_beta_osc`` betatron 
         oscillations for a particle with given initial energy ``initial_energy`` 
@@ -860,73 +972,6 @@ class StageHipace(Stage):
             Length of the plasma stage excluding ramps matched to the given 
             number of betatron oscillations.
         """
-
-        from scipy.optimize import fsolve
-
-        if initial_energy is None:
-            if self.nom_energy is None:
-                raise ValueError('Stage.nom_energy not set.')
-            initial_energy = self.nom_energy
-        initial_energy = initial_energy*SI.e  # [J]
-
-        if nom_accel_gradient is None:
-            if self.nom_accel_gradient_flattop is None:
-                raise ValueError('Stage.nom_accel_gradient_flattop not set.')
-            nom_accel_gradient = self.nom_accel_gradient_flattop
-
-        if q * nom_accel_gradient < 0:
-            raise ValueError('q * nom_accel_gradient must be positive.')
-
-        if plasma_density is None:
-            if self.plasma_density is None:
-                raise ValueError('Stage.plasma_density not set.')
-            plasma_density = self.plasma_density
-
-        if num_beta_osc < 0:
-            raise ValueError('Number of input betatron oscillations must be positive.')
-        
-        if driver_half_oscillations is None:
-            driver_half_oscillations = self.driver_half_oscillations
-
-        # Determine whether the ramps have been set up
-        ramps_not_set_up = (
-            (self.upramp is not None and self.upramp.length is None) or
-            (self.downramp is not None and self.downramp.length is None)
-        )
-        
-        # Make a copy of the stage
-        stage_copy = copy.deepcopy(self)
-
-        # The function to be used for solving the equation for phase advance numerically
-        def rhs(L):
-            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-            L_ramps = 0.0
-
-            # Set up the ramps using the stage copy
-            if ramps_not_set_up:
-                stage_copy.nom_energy_gain_flattop = nom_accel_gradient * L[0]  # L is an ndarray with one element
-                stage_copy.length_flattop = L[0]
-                stage_copy._prepare_ramps()
-                L_ramps = stage_copy.get_ramp_length()
-
-            if self.external_focusing:  # Add contribution from external field used for driver guiding
-                g_ext = stage_copy.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L+L_ramps)
-                g = g + g_ext
-
-            prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
-            energy_scaling = np.sqrt(initial_energy + q*nom_accel_gradient*L) - np.sqrt(initial_energy)
-            return prefactor * energy_scaling
-        
-        # Solve 2*np.pi*num_beta_osc = rhs(L)
-        solution = fsolve(lambda L: rhs(L) - 2*np.pi*num_beta_osc , x0=1)
-        length = solution[0]
-
-        # Set the external focusing gradient for the driver guiding field if not already set
-        if self.external_focusing and self._external_focusing_gradient is None:
-            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length+stage_copy.get_ramp_length())
-
-        return length
-    
 
     # =============================================
     def driver_guiding_trajectory(self, driver, dacc_gradient=0.0, num_steps_per_half_osc=100):
