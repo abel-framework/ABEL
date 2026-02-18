@@ -730,6 +730,7 @@ class StageHipace(Stage):
     # =============================================
     @property
     def external_focusing(self) -> bool:
+        "Flag for enabling driver guiding using an external magnetic field."
         return self._external_focusing
     @external_focusing.setter
     def external_focusing(self, enable_external_focusing : bool | None):
@@ -758,6 +759,7 @@ class StageHipace(Stage):
     _external_focusing = False
 
 
+    # =============================================
     def calc_external_focusing_gradient(self, num_half_oscillations=None, L=None):
         """
         Calculate the external focusing gradient g for an azimuthal magnetic 
@@ -819,12 +821,8 @@ class StageHipace(Stage):
         acceleration gradient and plasma density ``plasma_density``.
 
         Will take into account the contribution from an external linear magnetic 
-        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
-        is set to ``True`` before calling this method.
-
-        Also set :attr:`self._external_focusing_gradient <abel.Stage.StageHipace._external_focusing_gradient>`
-        if it is not already set, and :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
-        is ``True``. 
+        field B=[gy,-gx,0] if :attr:`self.external_focusing <abel.StageHipace.external_focusing>` 
+        is set to ``True``.
 
         Parameters
         ----------
@@ -842,7 +840,7 @@ class StageHipace(Stage):
 
         driver_half_oscillations : float, optional
             Number of half betatron oscillations that the drive beam is 
-            intended to perform. If ``None``, will use ``self.driver_half_oscillations``.
+            intended to perform. If ``None``, will use :attr:`StageHipace.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`.
             Defaults to ``None``.
 
         q : [C] float, optional
@@ -882,8 +880,10 @@ class StageHipace(Stage):
         
         if driver_half_oscillations is None:
             driver_half_oscillations = self.driver_half_oscillations
+        if driver_half_oscillations < 0:
+            raise ValueError('Number of driver oscillations must be positive.')
 
-        # Determine whether the ramps have been set up
+        # Assess whether the ramps have been set up
         ramps_not_set_up = (
             (self.upramp is not None and self.upramp.length is None) or
             (self.downramp is not None and self.downramp.length is None)
@@ -915,28 +915,27 @@ class StageHipace(Stage):
         solution = fsolve(lambda L: rhs(L) - 2*np.pi*num_beta_osc , x0=1)
         length = solution[0]
 
-        # Set the external focusing gradient for the driver guiding field if not already set
-        if self.external_focusing and self._external_focusing_gradient is None:
-            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length+stage_copy.get_ramp_length())
-
         return length
     
 
     # ==================================================
-    def match_length_num_beta_osc(self, num_beta_osc, initial_energy=None, nom_accel_gradient=None, plasma_density=None, driver_half_oscillations=None, q=SI.e):
+    def match_length_guiding_2_num_beta_osc(self, num_beta_osc, driver_half_oscillations=None, q=SI.e, set_consistent_params=True):
         """
-        Calculate the stage length that gives ``num_beta_osc`` betatron 
-        oscillations for a particle with given initial energy ``initial_energy`` 
-        in a uniform plasma stage (excluding ramps) with nominal acceleration 
-        gradient ``nom_accel_gradient`` and plasma density ``plasma_density``.
+        Set :attr:`self.length_flattop <abel.Stage.length_flattop>` for a 
+        uniform plasma stage such that a particle with initial energy 
+        :attr:`self.nom_energy <abel.Stage.nom_energy>` will perform
+        ``num_beta_osc`` betatron oscillations through the stage (including any 
+        existing ramps). 
 
-        Will take into account the contribution from an external linear magnetic 
-        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
-        is set to ``True`` before calling this method.
+        The stage length calculation is performed using 
+        :meth:`StageHipace.calc_flattop_num_beta_osc() <abel.StageHipace.calc_flattop_num_beta_osc>`.
 
-        Also set :attr:`self._external_focusing_gradient <abel.Stage.StageHipace._external_focusing_gradient>`
-        if it is not already set, and :attr:`self._external_focusing_gradient <abel.Stage.StageHipace.external_focusing>` 
-        is ``True``. 
+        Also set :attr:`self._external_focusing_gradient <abel.Stage._external_focusing_gradient>`
+        and :attr:`self.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`
+        to be consistent with the calculated stage length
+        if ``set_consistent_params`` and set :attr:`self.external_focusing <abel.StageHipace.external_focusing>` 
+        are ``True``. 
+
 
         Parameters
         ----------
@@ -944,34 +943,73 @@ class StageHipace(Stage):
             Total number of design betatron oscillations that the electron 
             should perform through the plasma stage excluding ramps. 
 
-        initial_energy : [eV] float, optional
-            The initial energy of the particle at the start of the plasma stage. 
-            Defaults to ``self.nom_energy``.
-
-        nom_accel_gradient : [V/m] float, optional
-            Nominal accelerating gradient of the plasma stage exclusing ramps. 
-            Defaults to ``self.nom_accel_gradient_flattop``.
-
-        plasma_density : [m^-3] float, optional
-            The plasma density of the plasma stage. Defaults to 
-            ``self.plasma_density``.
-
         driver_half_oscillations : float, optional
             Number of half betatron oscillations that the drive beam is 
-            intended to perform. If ``None``, will use ``self.driver_half_oscillations``.
+            intended to perform. If ``None``, will use :attr:`StageHipace.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`
             Defaults to ``None``.
 
         q : [C] float, optional
             Particle charge. q * nom_accel_gradient must be positive. Defaults 
             to elementary charge.
 
+        set_consistent_params : bool, optional
+            Flag for setting :attr:`self._external_focusing_gradient <abel.Stage._external_focusing_gradient>`
+            and :attr:`self.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`
+            to be consistent with the calculated stage length. Defaults to 
+            ``True``.
+
             
         Returns
         -------
-        length : [m] float
-            Length of the plasma stage excluding ramps matched to the given 
-            number of betatron oscillations.
+        None
         """
+
+        # Assess whether length flattop can be set
+        if self._length_flattop_calc is not None and self._length_flattop is None:
+            from abel.classes.stage.stage import VariablesOverspecifiedError
+            raise VariablesOverspecifiedError("Stage length already known/calculateable, cannot set.")
+
+        if self.has_ramp():
+            # Calculate the number of betatron oscillations that the main beam 
+            # should perform in the flattop:
+            num_beta_osc_flattop = self.calc_flattop_num_beta_osc(num_beta_osc)
+        else:
+            num_beta_osc_flattop = num_beta_osc
+
+        if driver_half_oscillations is None:
+            driver_half_oscillations = self.driver_half_oscillations
+
+        # Calculate the length of the flattop stage
+        length_flattop = self.calc_length_num_beta_osc(num_beta_osc=num_beta_osc_flattop, 
+                                                       initial_energy=self.nom_energy, 
+                                                       plasma_density=self.plasma_density, 
+                                                       driver_half_oscillations=driver_half_oscillations, 
+                                                       q=q)
+
+        # Set the length of the flattop stage
+        self.length_flattop = length_flattop
+
+        # Set the external focusing gradient for the driver guiding field and 
+        # the number of half betatron oscillations that the drive beam is 
+        # intended to perform.
+        if self.external_focusing and set_consistent_params:
+            # Assess whether the ramps have been set up
+            ramps_not_set_up = (
+                (self.upramp is not None and self.upramp.length is None) or
+                (self.downramp is not None and self.downramp.length is None)
+            )
+
+            if ramps_not_set_up:
+                # Make a copy of the stage
+                stage_copy = copy.deepcopy(self)
+                stage_copy._prepare_ramps()
+            else:
+                stage_copy = self
+
+            length = length_flattop + stage_copy.get_ramp_length()
+            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length)
+            self.driver_half_oscillations = driver_half_oscillations
+
 
     # =============================================
     def driver_guiding_trajectory(self, driver, dacc_gradient=0.0, num_steps_per_half_osc=100):
