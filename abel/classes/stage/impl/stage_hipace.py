@@ -927,10 +927,13 @@ class StageHipace(Stage):
         ``num_beta_osc`` betatron oscillations through the stage (including any 
         existing ramps). 
 
-        The stage length calculation is performed using 
+        - Assumes that each of the (uniform) ramps are configured to give pi/2 
+        phase advance for the main beam.
+
+        - The stage length calculation is performed using 
         :meth:`StageHipace.calc_flattop_num_beta_osc() <abel.StageHipace.calc_flattop_num_beta_osc>`.
 
-        Also set :attr:`self._external_focusing_gradient <abel.Stage._external_focusing_gradient>`
+        - Also set :attr:`self._external_focusing_gradient <abel.Stage._external_focusing_gradient>`
         and :attr:`self.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`
         to be consistent with the calculated stage length
         if ``set_consistent_params`` and set :attr:`self.external_focusing <abel.StageHipace.external_focusing>` 
@@ -972,7 +975,11 @@ class StageHipace(Stage):
         if self.has_ramp():
             # Calculate the number of betatron oscillations that the main beam 
             # should perform in the flattop:
-            num_beta_osc_flattop = self.calc_flattop_num_beta_osc(num_beta_osc)
+            if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
+                raise ValueError('This method assumes uniform ramps.')
+            if self.upramp.length_flattop is not None or self.downramp.length_flattop is not None:
+                raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam.')
+            num_beta_osc_flattop = num_beta_osc - 0.5  # The ramps are by default set up to give pi/2 phase advance for the main beam.
         else:
             num_beta_osc_flattop = num_beta_osc
 
