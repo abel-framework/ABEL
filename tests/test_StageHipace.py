@@ -58,35 +58,31 @@ def test_external_focusing():
     of drive beam and main beam betatron oscillation.
     """
 
-    def setup_minimal_StageHipace(nom_energy=100e9, plasma_density=6e20, external_focusing=False):
+    def setup_minimal_StageHipace(nom_energy=100e9, plasma_density=6e20, external_focusing=False, nom_accel_gradient_flattop=1e9):
         stage = StageHipace()
         stage.nom_energy = nom_energy  # [eV]
         stage.plasma_density = plasma_density  # [m^-3]
         stage.driver_source = setup_trapezoid_driver_source()
         stage.external_focusing = external_focusing
+        stage.nom_accel_gradient_flattop = nom_accel_gradient_flattop  # [V/m]
 
         return stage
 
     num_beta_osc = 4.0  # The number of betatron oscilations that the main beam is expected to perform.
-    nom_accel_gradient = 1e9  # [V/m]
 
     stage = setup_minimal_StageHipace()
 
     # ========== Tests without any external fields ==========
     assert stage.external_focusing is False
 
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=1.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, initial_energy=stage.nom_energy, driver_half_oscillations=1.0)
     
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-5, atol=0.0)
     assert stage._external_focusing_gradient is None
     assert np.isclose(3.440220555221998, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=2.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, driver_half_oscillations=2.0)
     
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-5, atol=0.0)
     assert stage._external_focusing_gradient is None
@@ -95,9 +91,7 @@ def test_external_focusing():
 
     # ========== Tests with external fields ==========
     stage = setup_minimal_StageHipace(external_focusing=True)
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=1.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, driver_half_oscillations=1.0)
     
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(140.1695315279373, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
@@ -105,9 +99,7 @@ def test_external_focusing():
 
 
     stage = setup_minimal_StageHipace(external_focusing=True)
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=2.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc, driver_half_oscillations=2.0)
     
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(574.1247168375805, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
@@ -117,9 +109,7 @@ def test_external_focusing():
     # ========== With external fields, lower stage nominal energy ==========
     num_beta_osc2 = 8.0
     stage = setup_minimal_StageHipace(nom_energy=3e9, external_focusing=True)
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=1.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, driver_half_oscillations=1.0)
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(1038.1202586404845, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
@@ -127,9 +117,7 @@ def test_external_focusing():
 
 
     stage = setup_minimal_StageHipace(nom_energy=3e9, external_focusing=True)
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=2.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, driver_half_oscillations=2.0)
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(5119.8513420067175, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
@@ -139,9 +127,7 @@ def test_external_focusing():
     # ========== With external fields, lower stage nominal energy, lower driver energy ==========
     stage = setup_minimal_StageHipace(nom_energy=3e9, external_focusing=True)
     stage.driver_source.energy = 4.5e9  # [eV]
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=1.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, driver_half_oscillations=1.0)
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(88.3976616856249, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
@@ -150,9 +136,7 @@ def test_external_focusing():
 
     stage = setup_minimal_StageHipace(nom_energy=3e9, external_focusing=True)
     stage.driver_source.energy = 4.5e9  # [eV]
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, initial_energy=stage.nom_energy, 
-                                                       nom_accel_gradient=nom_accel_gradient, driver_half_oscillations=2.0)
-    stage.nom_energy_gain = nom_accel_gradient * stage.length_flattop  # [eV]
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc2, driver_half_oscillations=2.0)
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(359.3285677857948, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
