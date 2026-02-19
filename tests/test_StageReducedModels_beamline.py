@@ -72,7 +72,7 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag=1.0, energy=361.8e9): 
     return main
 
 
-def setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, length_flattop=1.56, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, save_final_step=False):
+def setup_StageReducedModels(plasma_density, driver_source, ramp_beta_mag, length_flattop=1.56, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, save_final_step=False):
     
     stage = StageReducedModels()
     stage.time_step_mod = 0.03*2                                                    # In units of betatron wavelengths/c.
@@ -81,7 +81,6 @@ def setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_be
         stage.nom_energy_gain = stage.length_flattop*1e9                            # [eV]
     stage.plasma_density = plasma_density                                           # [m^-3]
     stage.driver_source = driver_source
-    #stage.main_source = main_source
     stage.ramp_beta_mag = ramp_beta_mag
     stage.enable_tr_instability = enable_tr_instability 
     stage.enable_radiation_reaction = enable_radiation_reaction
