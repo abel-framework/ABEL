@@ -149,7 +149,7 @@ class PlasmaLinac(Linac):
                 else:
                     stage_instance = copy.deepcopy(self.stage)
                 
-                stage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
+                stage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in stages[:(i+1)]])
                 
                 # reassign the same driver complex
                 if self.driver_complex is not None:
@@ -166,7 +166,7 @@ class PlasmaLinac(Linac):
                     else:
                         interstage_instance = copy.deepcopy(self.interstage)
                         
-                    interstage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain() for stg in stages[:(i+1)]])
+                    interstage_instance.nom_energy = self.source.energy + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in stages[:(i+1)]])
                     
                     if self.alternate_interstage_polarity:
                         interstage_instance.field_dipole = (2*(i%2)-1)*interstage_instance.field_dipole
@@ -188,7 +188,7 @@ class PlasmaLinac(Linac):
             # set the nominal energy and length
             if self.bds.length is None or self.bds.length == 0:
                 self.bds.length = None
-                self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain() for stg in self.stages])
+                self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in self.stages])
                 self.bds.length = self.bds.get_length()
 
             # add to trackables
