@@ -72,15 +72,15 @@ def setup_basic_main_source(plasma_density, ramp_beta_mag=1.0, energy=361.8e9): 
     return main
 
 
-def setup_StageReducedModels(plasma_density, driver_source, main_source, ramp_beta_mag, length_flattop=1.56, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, save_final_step=False):
+def setup_StageReducedModels(plasma_density, driver_source, ramp_beta_mag, length_flattop=1.56, enable_tr_instability=True, enable_radiation_reaction=True, enable_ion_motion=False, use_ramps=False, drive_beam_update_period=0, save_final_step=False):
     
     stage = StageReducedModels()
     stage.time_step_mod = 0.03*2                                                    # In units of betatron wavelengths/c.
     stage.length_flattop = length_flattop                                           # [m]
-    stage.nom_energy_gain = stage.length_flattop*1e9                                # [eV]
+    if length_flattop is not None:
+        stage.nom_energy_gain = stage.length_flattop*1e9                            # [eV]
     stage.plasma_density = plasma_density                                           # [m^-3]
     stage.driver_source = driver_source
-    stage.main_source = main_source
     stage.ramp_beta_mag = ramp_beta_mag
     stage.enable_tr_instability = enable_tr_instability 
     stage.enable_radiation_reaction = enable_radiation_reaction
@@ -226,13 +226,16 @@ def test_ramped_linac():
     driver_source.z_offset = 1602e-6                                                # [m]
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag, energy=3.0e9)
 
-    stage = setup_StageReducedModels(plasma_density=plasma_density, driver_source=driver_source, main_source=main_source, ramp_beta_mag=ramp_beta_mag,  enable_tr_instability=enable_tr_instability, enable_radiation_reaction=enable_radiation_reaction, enable_ion_motion=enable_ion_motion, use_ramps=use_ramps)
+    stage = setup_StageReducedModels(plasma_density=plasma_density, driver_source=driver_source, main_source=main_source, ramp_beta_mag=ramp_beta_mag,  length_flattop=None, enable_tr_instability=enable_tr_instability, enable_radiation_reaction=enable_radiation_reaction, enable_ion_motion=enable_ion_motion, use_ramps=use_ramps)
+
+    stage.nom_energy = main_source.energy
+    stage.nom_accel_gradient_flattop = 1e9  # [V/m]
 
     # Adjust the lengths of the two stages in the linac to match the number of betatron oscillation 
-    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc=9.5, initial_energy=main_source.energy, nom_accel_gradient=1e9)
-    stage.nom_energy_gain = stage.length_flattop*1e9
+    stage.length_flattop = stage.calc_length_num_beta_osc(num_beta_osc=9.5)
+
     last_stage = copy.deepcopy(stage)
-    last_stage.length_flattop = last_stage.calc_length_num_beta_osc(num_beta_osc=9.5, initial_energy=main_source.energy+stage.nom_energy_gain, nom_accel_gradient=1e9)
+    last_stage.length_flattop = last_stage.calc_length_num_beta_osc(num_beta_osc=9.5, initial_energy=main_source.energy+stage.nom_energy_gain_flattop)
     last_stage.nom_energy_gain = last_stage.length_flattop*1e9
 
     # Set up the interstage

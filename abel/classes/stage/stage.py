@@ -1629,8 +1629,68 @@ class Stage(Trackable, CostModeled):
             num_beta_osc = prefactor * energy_scaling / (2*np.pi)
 
             return num_beta_osc
+        
+
+    # ==================================================
+    def match_length_2_num_beta_osc(self, num_beta_osc, q=SI.e):
+        """
+        Set :attr:`self.length_flattop <abel.Stage.length_flattop>` for a 
+        uniform plasma stage such that a particle with initial energy 
+        :attr:`self.nom_energy <abel.Stage.nom_energy>` will perform
+        ``num_beta_osc`` betatron oscillations through the stage (including any 
+        existing ramps). 
+
+        - Assumes that each of the (uniform) ramps are configured to give pi/2 
+        phase advance for the main beam.
+
+        - The stage length calculation is performed using 
+        :meth:`Stage.calc_flattop_num_beta_osc() <abel.Stage.calc_flattop_num_beta_osc>`.
+
+
+        Parameters
+        ----------
+        num_beta_osc : float
+            Total number of design betatron oscillations that the electron 
+            should perform through the plasma stage excluding ramps. 
+
+        q : [C] float, optional
+            Particle charge. q * nom_accel_gradient must be positive. Defaults 
+            to elementary charge.
+
+            
+        Returns
+        -------
+        None
+        """
+
+        # Assess whether length flattop can be set
+        if self._length_flattop_calc is not None and self._length_flattop is None:
+            from abel.classes.stage.stage import VariablesOverspecifiedError
+            raise VariablesOverspecifiedError("Stage length already known/calculateable, cannot set.")
+
+        if self.has_ramp():
+            # Calculate the number of betatron oscillations that the main beam 
+            # should perform in the flattop:
+            if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
+                raise ValueError('This method assumes uniform ramps.')
+            if self.upramp.length_flattop is not None or self.downramp.length_flattop is not None:
+                raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam.')
+            
+            num_beta_osc_flattop = num_beta_osc - 0.5  # The ramps are by default set up to give pi/2 phase advance for the main beam.
+            # num_beta_osc_flattop = self.calc_flattop_num_beta_osc(num_beta_osc)
+        else:
+            num_beta_osc_flattop = num_beta_osc
+
+        # Calculate the length of the flattop stage
+        length_flattop = self.calc_length_num_beta_osc(num_beta_osc=num_beta_osc_flattop, 
+                                                       initial_energy=self.nom_energy, 
+                                                       plasma_density=self.plasma_density, 
+                                                       q=q)
+
+        # Set the length of the flattop stage
+        self.length_flattop = length_flattop
     
-    
+
     # ==================================================
     def phase_advance_beta_evolution(self, beta0=None):
         """

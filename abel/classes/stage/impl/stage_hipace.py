@@ -919,7 +919,7 @@ class StageHipace(Stage):
     
 
     # ==================================================
-    def match_length_guiding_2_num_beta_osc(self, num_beta_osc, driver_half_oscillations=None, set_consistent_params=True, q=SI.e):
+    def match_length_2_num_beta_osc(self, num_beta_osc, driver_half_oscillations=None, set_consistent_params=True, q=SI.e):
         """
         Set :attr:`self.length_flattop <abel.Stage.length_flattop>` for a 
         uniform plasma stage such that a particle with initial energy 
