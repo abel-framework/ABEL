@@ -127,6 +127,8 @@ class Stage(Trackable, CostModeled):
         self.ramp_beta_mag = ramp_beta_mag
         
         self.stage_number = None
+
+        self._external_focusing_gradient = None
         
         # nominal initial energy
         self.nom_energy = None 
@@ -521,6 +523,26 @@ class Stage(Trackable, CostModeled):
             raise ValueError(f"ramp_length = {ramp_length} [m] < 0.0")
         return ramp_length
     
+
+     # ==================================================
+    def get_ramp_length(self) -> float:
+        """
+        Get the length of the ramps if the stage has ramps. Returns 0.0 
+        otherwise.
+        """
+
+        if self.has_ramp():
+            if self.upramp is not None and self.upramp.length is not None:
+                upramp_length = self.upramp.length
+            else:
+                upramp_length = 0.0
+            if self.downramp is not None and self.downramp.length is not None:
+                downramp_length = self.downramp.length
+            else:
+                downramp_length = 0.0
+            return upramp_length + downramp_length
+        else:
+            return 0.0
 
     # ==================================================
     @property
@@ -1336,7 +1358,9 @@ class Stage(Trackable, CostModeled):
     def matched_beta_function(self, energy_incoming, match_entrance=True):
         '''
         Calculates the matched beta function of the stage. If there is an 
-        upramp, the beta function is matched to the upramp by default.
+        upramp, the beta function the beta function is magnified by default so 
+        that it shrinks to the correct size when it enters the main flattop 
+        plasma stage.
     
         
         Parameters
@@ -1385,7 +1409,330 @@ class Stage(Trackable, CostModeled):
         '''
 
         return beta_matched(self.plasma_density, energy)
+
+
+    # ==================================================
+    def calc_length_num_beta_osc(self, num_beta_osc, initial_energy=None, plasma_density=None, q=SI.e):
+        """
+        Calculate the stage length that gives ``num_beta_osc`` betatron 
+        oscillations for a particle with given initial energy ``initial_energy`` 
+        in a uniform plasma stage (excluding ramps) with defined nominal 
+        acceleration gradient and plasma density ``plasma_density``.
+
+        Parameters
+        ----------
+        num_beta_osc : float
+            Total number of design betatron oscillations that the electron 
+            should perform through the plasma stage excluding ramps. 
+
+        initial_energy : [eV] float, optional
+            The initial energy of the particle at the start of the plasma stage. 
+            Defaults to ``self.nom_energy``.
+
+        plasma_density : [m^-3] float, optional
+            The plasma density of the plasma stage. Defaults to 
+            ``self.plasma_density``.
+
+        q : [C] float, optional
+            Particle charge. q * nom_accel_gradient must be positive. Defaults 
+            to elementary charge.
+
+            
+        Returns
+        -------
+        length : [m] float
+            Length of the plasma stage excluding ramps matched to the given 
+            number of betatron oscillations.
+        """
+
+        if initial_energy is None:
+            if self.nom_energy is None:
+                raise ValueError('Stage.nom_energy not set.')
+            initial_energy = self.nom_energy
+        initial_energy = initial_energy*SI.e  # [J]
+
+        if self.nom_accel_gradient_flattop is None:
+            raise ValueError('Stage.nom_accel_gradient_flattop not set.')
+        nom_accel_gradient = self.nom_accel_gradient_flattop
+
+        if q * nom_accel_gradient < 0:
+            raise ValueError('q * nom_accel_gradient must be positive.')
+
+        if plasma_density is None:
+            if self.plasma_density is None:
+                raise ValueError('Stage.plasma_density not set.')
+            plasma_density = self.plasma_density
+
+        if num_beta_osc < 0:
+            raise ValueError('Number of input betatron oscillations must be positive.')
+
+        g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        gradient_prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient)
+
+        length = ((2*np.pi*num_beta_osc/gradient_prefactor + np.sqrt(initial_energy))**2 - initial_energy) / (q*nom_accel_gradient)
+
+        return length
     
+
+    # ==================================================
+    def calc_flattop_num_beta_osc(self, num_beta_osc):
+        """
+        For a given total number of betatron oscillations ``num_beta_osc`` that 
+        an electron with energy ``self.nom_energy`` will undergo across the 
+        whole plasma stage including its uniform ramps, this function calculates 
+        the number of betatron oscillations that should be performed in the main 
+        flattop plasma stage by subtracting the contributions from the ramps.
+
+        The contributions from the ramps are calculated from the phase advances 
+        in the ramps as L_ramp/beta_matched_ramp.
+
+        - If the stage does have ramps that have not been fully set up, a 
+        deepcopy of the stage is created to set up its ramps using 
+        :func:`Stage._prepare_ramps() <abel.Stage._prepare_ramps>`. 
+
+        - If the stage does not have ramps, will simply return the input total 
+        number of betatron oscillations ``num_beta_osc``.
+
+        
+        Parameters
+        ----------
+        num_beta_osc : float
+            Total number of design betatron oscillations that the electron 
+            should perform through the whole plasma stage including ramps.
+
+            
+        Returns
+        -------
+        float
+            The number of betatron oscillations the electron should undergo in 
+            the flattop stage after the contributions from the ramps (if 
+            applicable) have been subtracted from ``num_beta_osc``.
+        """
+
+        if num_beta_osc < 0:
+            raise ValueError('Number of input betatron oscillations must be positive.')
+
+        if not self.has_ramp():
+            return num_beta_osc
+        
+        if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
+            raise ValueError('This method assumes uniform ramps.')
+
+        # Make a copy of the stage and set up its ramps if they are not set yp
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+
+        # Calculate the upramp length and phase advance
+        if stage_copy.upramp is not None:
+            upramp_phase_advance = stage_copy.upramp.phase_advance_beta_evolution()
+        else:
+            upramp_phase_advance = 0.0
+        
+        # Calculate the downramp length and matched beta function
+        if stage_copy.nom_energy_gain_flattop is None:
+            raise ValueError('Stage.nom_energy_gain_flattop not set.')
+
+        # Calculate the downramp length and phase advance
+        if stage_copy.downramp is not None:
+            downramp_phase_advance = stage_copy.downramp.phase_advance_beta_evolution()
+        else:
+            downramp_phase_advance = 0.0
+
+        # Calculate the phase advance in the flattop stage
+        tot_phase_advance = num_beta_osc * 2*np.pi
+        flattop_phase_advance = tot_phase_advance - upramp_phase_advance - downramp_phase_advance
+
+        return flattop_phase_advance/(2*np.pi)
+        
+    
+    # ==================================================
+    def length_flattop2num_beta_osc(self, length_flattop=None, initial_energy=None, nom_accel_gradient_flattop=None, plasma_density=None, q=SI.e):
+        """
+        Calculate the number of betatron oscillations a particle can undergo in 
+        the stage (excluding ramps).
+
+        Will take into account the contribution from an external linear magnetic 
+        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.external_focusing>`
+        is not ``None``.
+
+        Parameters
+        ----------
+        length_flattop : [m] float, optional
+            Length of a plasma stage excluding ramps that the particle can 
+            perform betatron scillations in. Defaults to 
+            ``self.length_flattop``.
+
+        initial_energy : [eV] float, optional
+            The initial energy of the particle at the start of the plasma stage. 
+            Defaults to ``self.nom_energy``.
+
+        nom_accel_gradient_flattop : [V/m] float, optional
+            Nominal accelerating gradient of the plasma stage exclusing ramps. 
+            Defaults to ``self.nom_accel_gradient_flattop``.
+
+        plasma_density : [m^-3] float, optional
+            The plasma density of the plasma stage. Defaults to 
+            ``self.plasma_density``.
+
+        q : [C] float, optional
+            Particle charge. q * nom_accel_gradient_flattop must be positive. 
+            Defaults to elementary charge.
+
+            
+        Returns
+        -------
+        num_beta_osc : float
+            Total number of betatron oscillations that the particle will perform
+            across the plasma stage.
+        """
+
+        from abel.utilities.plasma_physics import k_p
+
+        if length_flattop is None:
+            if self.length_flattop is None:
+                raise ValueError('Stage.length_flattop not set.')
+            length_flattop = self.length_flattop
+
+        if initial_energy is None:
+            if self.nom_energy is None:
+                raise ValueError('Stage.nom_energy not set.')
+            initial_energy = self.nom_energy
+
+        if nom_accel_gradient_flattop is None:
+            if self.nom_accel_gradient_flattop is None:
+                raise ValueError('Stage.nom_accel_gradient_flattop not set.')
+            nom_accel_gradient_flattop = self.nom_accel_gradient_flattop
+
+        if q * nom_accel_gradient_flattop < 0:
+            raise ValueError('q * nom_accel_gradient_flattop must be positive.')
+
+        if plasma_density is None:
+            plasma_density = self.plasma_density
+
+        if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
+            return self.phase_advance_beta_evolution()/(2*np.pi)
+        else:
+            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+            if self._external_focusing_gradient is not None:
+                g = g + self._external_focusing_gradient
+
+            prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient_flattop)
+            energy_scaling = np.sqrt(initial_energy*SI.e + q*nom_accel_gradient_flattop*length_flattop) - np.sqrt(initial_energy*SI.e)
+
+            num_beta_osc = prefactor * energy_scaling / (2*np.pi)
+
+            return num_beta_osc
+        
+
+    # ==================================================
+    def match_length_2_num_beta_osc(self, num_beta_osc, q=SI.e):
+        """
+        Set :attr:`self.length_flattop <abel.Stage.length_flattop>` for a 
+        uniform plasma stage such that a particle with initial energy 
+        :attr:`self.nom_energy <abel.Stage.nom_energy>` will perform
+        ``num_beta_osc`` betatron oscillations through the stage (including any 
+        existing ramps). 
+
+        - Assumes that each of the (uniform) ramps are configured to give pi/2 
+        phase advance for the main beam.
+
+        - The stage length calculation is performed using 
+        :meth:`Stage.calc_flattop_num_beta_osc() <abel.Stage.calc_flattop_num_beta_osc>`.
+
+
+        Parameters
+        ----------
+        num_beta_osc : float
+            Total number of design betatron oscillations that the electron 
+            should perform through the plasma stage excluding ramps. 
+
+        q : [C] float, optional
+            Particle charge. q * nom_accel_gradient must be positive. Defaults 
+            to elementary charge.
+
+            
+        Returns
+        -------
+        None
+        """
+
+        # Assess whether length flattop can be set
+        if self._length_flattop_calc is not None and self._length_flattop is None:
+            from abel.classes.stage.stage import VariablesOverspecifiedError
+            raise VariablesOverspecifiedError("Stage length already known/calculateable, cannot set.")
+
+        if self.has_ramp():
+            # Calculate the number of betatron oscillations that the main beam 
+            # should perform in the flattop:
+            if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
+                raise ValueError('This method assumes uniform ramps.')
+            if self.upramp.length_flattop is not None or self.downramp.length_flattop is not None:
+                raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam.')
+            
+            num_beta_osc_flattop = num_beta_osc - 0.5  # The ramps are by default set up to give pi/2 phase advance for the main beam.
+            # num_beta_osc_flattop = self.calc_flattop_num_beta_osc(num_beta_osc)
+        else:
+            num_beta_osc_flattop = num_beta_osc
+
+        # Calculate the length of the flattop stage
+        length_flattop = self.calc_length_num_beta_osc(num_beta_osc=num_beta_osc_flattop, 
+                                                       initial_energy=self.nom_energy, 
+                                                       plasma_density=self.plasma_density, 
+                                                       q=q)
+
+        # Set the length of the flattop stage
+        self.length_flattop = length_flattop
+    
+
+    # ==================================================
+    def phase_advance_beta_evolution(self, beta0=None):
+        """
+        Calculate the phase advance in a stage by evolving the beta function 
+        through a single element lattice set up using the stage's focusing 
+        strength and length. The evolved beta function is then integrated along 
+        the stage.
+
+        Parameters
+        ----------
+        beta0 : [m] float
+            The initial beta function at the start of the stage. If ``None``, 
+            will calculate the matched beta function for the flattop stage and 
+            scale it according the the ramp's ramp_beta_mag if ``self`` is a 
+            ramp.
+
+            
+        Returns
+        -------
+        float
+            The phase advance calculated by integrating the beta function 
+            evolution through the stage.
+        """
+
+        from abel.utilities.beam_physics import evolve_beta_function
+        from abel.utilities.beam_physics import phase_advance
+        
+        g_ion = SI.e*self.plasma_density/(2*SI.epsilon_0)
+        p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
+        if beta0 is None:
+            if self.is_upramp():
+                beta0 = self.matched_beta_function(self.nom_energy, match_entrance=True)
+            elif self.is_downramp():
+                beta0 = beta_matched(self.parent.plasma_density, self.nom_energy)
+            else:
+                beta0 = beta_matched(self.plasma_density, self.nom_energy)
+
+        ls = np.array([self.length_flattop])
+        ks = np.array([g_ion*SI.e/SI.c/p0])
+        _, _, beta_evolution = evolve_beta_function(ls=ls, ks=ks, beta0=beta0, fast=False, plot=False)
+        return phase_advance(beta_evolution[0,:], beta_evolution[1,:])
+
 
     # ==================================================
     def energy_usage(self):
