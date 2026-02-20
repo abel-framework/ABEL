@@ -745,7 +745,10 @@ class StageHipace(Stage):
                 (self.upramp is not None and self.upramp.length is None) or
                 (self.downramp is not None and self.downramp.length is None)
             )
-            if ramps_not_set_up:
+
+            can_set_up_ramps = (self.nom_energy_gain_flattop is not None and self.nom_energy is not None)
+
+            if ramps_not_set_up and can_set_up_ramps:
                 stage_copy = copy.deepcopy(self)
                 stage_copy._prepare_ramps()
             else: 
