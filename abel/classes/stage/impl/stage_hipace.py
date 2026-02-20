@@ -214,8 +214,7 @@ class StageHipace(Stage):
         self.no_plasma = no_plasma
 
         # external focusing (APL-like) [T/m]
-        self.driver_half_oscillations = 1.0 
-        self._external_focusing_gradient = None
+        self.driver_half_oscillations = 1.0
         self.external_focusing = external_focusing
 
         # plasma profile
@@ -339,10 +338,10 @@ class StageHipace(Stage):
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
 
-        if self.external_focusing and self._external_focusing_gradient is None:
-            self._external_focusing_gradient = self.calc_external_focusing_gradient() # Set the gradient for external focusing fields if not already set.
+        if self.external_focusing and self.external_focusing_gradient is None:
+            self.external_focusing_gradient = self.calc_external_focusing_gradient() # Set the gradient for external focusing fields if not already set.
 
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self.external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
         
         ## RUN SIMULATION
@@ -685,7 +684,7 @@ class StageHipace(Stage):
         Calculates the matched beta function of the stage. If there is an 
         upramp, the beta function is magnified by default so that it shrinks to 
         the correct size when it enters the main flattop plasma stage. Also 
-        takes into account external focusing field B=[gy,-gx,0] if present. 
+        takes into account external focusing field B=[g_ext*y, -g_ext*x, 0] if present. 
     
         
         Parameters
@@ -710,8 +709,8 @@ class StageHipace(Stage):
         energy_incoming = energy_incoming*SI.e  # [J]
 
         g = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-        if self._external_focusing_gradient is not None:  # Add contribution from external field
-            g = g + self._external_focusing_gradient
+        if self.external_focusing_gradient is not None:  # Add contribution from external field
+            g = g + self.external_focusing_gradient
 
         k_beta = np.sqrt(np.abs(q)*g*SI.c/energy_incoming)  # [m^-1], betatron wavenumber.
 
@@ -735,19 +734,32 @@ class StageHipace(Stage):
     @external_focusing.setter
     def external_focusing(self, enable_external_focusing : bool | None):
         self._external_focusing = bool(enable_external_focusing)
+    _external_focusing = False
 
-        if self._external_focusing is False:
-            self._external_focusing_gradient = None
-        elif self._external_focusing_gradient is None or self._external_focusing_gradient < 1e-15:
 
-            # Make a copy of the stage and set up its ramps if they are not set up
+    # =============================================
+    @property
+    def external_focusing_gradient(self) -> float:
+        """
+        The external focusing gradient g_ext [T/m] for an azimuthal magnetic 
+        field B = [g_ext*y, -g_ext*x, 0].
+        """
+
+        if self.external_focusing is True and self._external_focusing_gradient is None:
+            # If external focusing is enabled, but the gradient of the external 
+            # focusing field is not yet set, try to calculate it:
+
+            # Check whether the ramps have been set up if they exist
             ramps_not_set_up = (
                 (self.upramp is not None and self.upramp.length is None) or
                 (self.downramp is not None and self.downramp.length is None)
             )
 
-            can_set_up_ramps = (self.nom_energy_gain_flattop is not None and self.nom_energy is not None)
+            # Check if there is enough information to set up the ramps
+            can_set_up_ramps = (self.get_nom_energy_gain(ignore_ramps_if_undefined=True) is not None 
+                                and self.nom_energy is not None)
 
+            # Make a copy of the stage and set up its ramps if they are not set up
             if ramps_not_set_up and can_set_up_ramps:
                 stage_copy = copy.deepcopy(self)
                 stage_copy._prepare_ramps()
@@ -755,19 +767,28 @@ class StageHipace(Stage):
                 stage_copy = self
             
             if stage_copy.get_length() is not None:
-                self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=self.driver_half_oscillations)  # [T/m]
-            else:
-                self._external_focusing_gradient = None
+                self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=self.driver_half_oscillations)
 
-    _external_focusing = False
+        return self._external_focusing_gradient
+    
+    @external_focusing_gradient.setter
+    def external_focusing_gradient(self, g_ext : float | None):
+        if g_ext is not None and not isinstance(g_ext, float):
+            raise ValueError("External focusing gradient must be a float or None.")
+        if self.external_focusing is False:
+            self._external_focusing_gradient = None
+            raise ValueError("Cannot set external focusing gradient when self.external_focusing is False.")
+        self._external_focusing_gradient = g_ext
+
+    _external_focusing_gradient = None
 
 
     # =============================================
     def calc_external_focusing_gradient(self, num_half_oscillations=None, L=None):
         """
-        Calculate the external focusing gradient g for an azimuthal magnetic 
-        field B=[gy,-gx,0] that gives ``num_half_oscillations`` half 
-        oscillations for the drive beam over the length of the stage.
+        Calculate the external focusing gradient g_ext for an azimuthal magnetic 
+        field B = [g_ext*y, -g_ext*x, 0] that gives ``num_half_oscillations`` 
+        half oscillations for the drive beam over the length of the stage.
 
         Parameters
         ----------
@@ -786,7 +807,7 @@ class StageHipace(Stage):
 
         Returns
         -------
-        g : [T/m] float
+        g_ext : [T/m] float
             The gradient for the azimuthal magnetic field.
         """
         if L is None:
@@ -824,7 +845,7 @@ class StageHipace(Stage):
         acceleration gradient and plasma density ``plasma_density``.
 
         Will take into account the contribution from an external linear magnetic 
-        field B=[gy,-gx,0] if :attr:`self.external_focusing <abel.StageHipace.external_focusing>` 
+        field B=[g_ext*y, -g_ext*x, 0] if :attr:`self.external_focusing <abel.StageHipace.external_focusing>` 
         is set to ``True``.
 
         Parameters
@@ -1017,7 +1038,7 @@ class StageHipace(Stage):
                 stage_copy = self
 
             length = length_flattop + stage_copy.get_ramp_length()
-            self._external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length)
+            self.external_focusing_gradient = self.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=length)
             self.driver_half_oscillations = driver_half_oscillations
 
 
@@ -1088,7 +1109,7 @@ class StageHipace(Stage):
         if pz0 + q * dacc_gradient * L/SI.c < pz_thres:
             raise ValueError('The energy depletion will be too severe. This estimate is only valid for a relativistic beam.')
         
-        g = self._external_focusing_gradient  # [T/m]
+        g = self.external_focusing_gradient  # [T/m]
         ds = self.length_flattop/self.driver_half_oscillations/num_steps_per_half_osc  # [m], step size
 
         prop_length = 0
