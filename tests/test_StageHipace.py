@@ -61,9 +61,9 @@ def setup_minimal_StageHipace(nom_energy=100e9, plasma_density=6e20, external_fo
 @pytest.mark.StageHipace
 def test_external_focusing():
     """
-    Tests for ``StageHipace.external_focusing()`` for setting and calculating 
-    the gradient g_ext [T/m] for an external azimuthal magnetic field 
-    B = [g_ext*y, -g_ext*x, 0].
+    Tests for ``StageHipace.external_focusing_gradient`` for setting and 
+    calculating the gradient g_ext [T/m] for an external azimuthal magnetic 
+    field B = [g_ext*y, -g_ext*x, 0].
     """
 
     # ========== Tests withexternal focusing disabled ==========
@@ -142,12 +142,6 @@ def test_external_focusing():
     stage.external_focusing_gradient = None  # Overwrite the focusing gradient
     assert np.isclose(1097.699359490811, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)  # Should again automatically calculate a focusing gradient.
     assert np.isclose(1097.699359490811, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
-    
-
-    # stage.length = 1.2841918239865389
-    # assert np.isclose(88.3976616856249, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)  # Still the previous focusing gradient.
-    # stage.external_focusing_gradient = None  # Overwrite the focusing gradient
-    # assert np.isclose(359.3285677857948, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)  # Should again automatically calculate a focusing gradient.
     
 
 @pytest.mark.StageHipace
