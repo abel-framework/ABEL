@@ -741,13 +741,13 @@ class StageHipace(Stage):
     @property
     def external_focusing_gradient(self) -> float:
         """
-        The external focusing gradient g_ext [T/m] for an azimuthal magnetic 
+        The focusing gradient g_ext [T/m] for an external azimuthal magnetic 
         field B = [g_ext*y, -g_ext*x, 0].
         """
 
         if self.external_focusing is True and self._external_focusing_gradient is None:
             # If external focusing is enabled, but the gradient of the external 
-            # focusing field is not yet set, try to calculate it:
+            # focusing field is not yet set, try to calculate and set it:
 
             # Check whether the ramps have been set up if they exist
             ramps_not_set_up = (
@@ -759,7 +759,8 @@ class StageHipace(Stage):
             can_set_up_ramps = (self.get_nom_energy_gain(ignore_ramps_if_undefined=True) is not None 
                                 and self.nom_energy is not None)
 
-            # Make a copy of the stage and set up its ramps if they are not set up
+            # Make a copy of the stage and set up its ramps if they are not set 
+            # up and can be set up
             if ramps_not_set_up and can_set_up_ramps:
                 stage_copy = copy.deepcopy(self)
                 stage_copy._prepare_ramps()
