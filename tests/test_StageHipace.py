@@ -61,6 +61,92 @@ def setup_minimal_StageHipace(nom_energy=100e9, plasma_density=6e20, external_fo
 @pytest.mark.StageHipace
 def test_external_focusing():
     """
+    Tests for ``StageHipace.external_focusing_gradient`` for setting and 
+    calculating the gradient g_ext [T/m] for an external azimuthal magnetic 
+    field B = [g_ext*y, -g_ext*x, 0].
+    """
+
+    # ========== Tests withexternal focusing disabled ==========
+    stage = setup_minimal_StageHipace(nom_energy=3e9, external_focusing=False, nom_accel_gradient_flattop=None)
+    assert stage.external_focusing is False
+    assert stage._external_focusing_gradient is None
+    assert stage.external_focusing_gradient is None
+    with pytest.raises(ValueError):
+        stage.external_focusing_gradient = 3.14  # Cannot set any value when stage.external_focusing is False.
+
+
+    # ========== Tests with external focusing enabled ==========
+    stage = setup_minimal_StageHipace(nom_energy=3e9, external_focusing=True, nom_accel_gradient_flattop=None)
+    assert stage.external_focusing is True
+    assert stage._external_focusing_gradient is None
+    assert stage.external_focusing_gradient is None
+    with pytest.raises(ValueError):
+        stage.external_focusing_gradient = 'test'
+    stage.external_focusing_gradient = 3.14
+    assert np.isclose(3.14, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)
+    stage.external_focusing_gradient = 314.0
+    assert np.isclose(314.0, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)
+
+
+    # ========== Test the external gradient calculation without ramps ==========
+    stage = setup_minimal_StageHipace(nom_energy=3e9, external_focusing=True, nom_accel_gradient_flattop=1e9)
+    stage.driver_source.energy = 4.5e9  # [eV]
+    assert stage.external_focusing is True
+    assert stage._external_focusing_gradient is None
+    assert stage.external_focusing_gradient is None
+    assert np.isclose(1.0, stage.driver_half_oscillations, rtol=1e-10, atol=0.0)
+    stage.length = 1.2945695557961696  # [m]
+    assert np.isclose(1.2945695557961696*1e9, stage.nom_energy_gain, rtol=1e-10, atol=0.0)
+    assert np.isclose(1.2945695557961696*1e9, stage.nom_energy_gain_flattop, rtol=1e-10, atol=0.0)
+    assert np.isclose(88.3976616856249, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)
+
+    stage.external_focusing_gradient = 3.14  # Overwrite the focusing gradient
+    assert np.isclose(3.14, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)
+    stage.external_focusing_gradient = None  # Overwrite the focusing gradient
+    assert np.isclose(88.3976616856249, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)  # Should again automatically calculate a focusing gradient.
+
+    # Match the focusing gradient to more driver betatron oscillations
+    stage.driver_half_oscillations = 2.0
+    stage.length = 1.2841918239865389
+    assert np.isclose(88.3976616856249, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)  # Still the previous focusing gradient.
+    stage.external_focusing_gradient = None  # Overwrite the focusing gradient
+    assert np.isclose(359.3285677857948, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)  # Should again automatically calculate a focusing gradient.
+
+
+    # ========== Test the external gradient calculation with ramps ==========
+    stage = setup_minimal_StageHipace(nom_energy=10e9, external_focusing=True, nom_accel_gradient_flattop=1e9)
+    stage.driver_source.energy = 20e9  # [eV]
+    stage.ramp_beta_mag = 2.0
+    stage.upramp = PlasmaRamp()
+    stage.downramp = PlasmaRamp()
+    assert stage.external_focusing is True
+    assert stage._external_focusing_gradient is None
+    assert stage.external_focusing_gradient is None
+    assert np.isclose(1.0, stage.driver_half_oscillations, rtol=1e-10, atol=0.0)
+    stage.length_flattop = 1.3834379291754226  # [m]
+
+    assert stage._external_focusing_gradient is None
+    assert np.isclose(263.5820977342094, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(263.5820977342094, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+
+    stage.external_focusing_gradient = 3.14  # Overwrite the focusing gradient
+    assert np.isclose(3.14, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)
+    stage.external_focusing_gradient = None  # Overwrite the focusing gradient
+    assert np.isclose(263.5820977342094, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)  # Should again automatically calculate a focusing gradient.
+
+    # Match the focusing gradient to more driver betatron oscillations
+    stage.driver_half_oscillations = 2.0
+    stage.length_flattop = 1.3520401015419283  # [m]
+    assert np.isclose(2.0, stage.driver_half_oscillations, rtol=1e-10, atol=0.0)
+    assert np.isclose(263.5820977342094, stage.external_focusing_gradient, rtol=1e-10, atol=0.0)  # Still the previous focusing gradient.
+    stage.external_focusing_gradient = None  # Overwrite the focusing gradient
+    assert np.isclose(1097.699359490811, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)  # Should again automatically calculate a focusing gradient.
+    assert np.isclose(1097.699359490811, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    
+
+@pytest.mark.StageHipace
+def test_calc_length_num_beta_osc():
+    """
     Tests for ``StageHipace.calc_length_num_beta_osc()`` for accurately matching the 
     stage length and external driver guiding field gradient to a desired number 
     of drive beam and main beam betatron oscillations.
@@ -164,17 +250,20 @@ def test_match_length_2_num_beta_osc():
     # ========== Tests without any external fields ==========
     assert stage.external_focusing is False
     assert stage._external_focusing_gradient is None
+    assert stage.external_focusing_gradient is None
     assert np.isclose(1.0, stage.driver_half_oscillations, rtol=1e-15, atol=0.0)
 
     stage.match_length_2_num_beta_osc(num_beta_osc=num_beta_osc, driver_half_oscillations=1.0, set_consistent_params=True)
     assert np.isclose(1.0, stage.driver_half_oscillations, rtol=1e-15, atol=0.0)
     assert stage._external_focusing_gradient is None
+    assert stage.external_focusing_gradient is None
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-5, atol=0.0)
     assert np.isclose(3.440220555221998, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
     stage.match_length_2_num_beta_osc(num_beta_osc=num_beta_osc, driver_half_oscillations=2.0, set_consistent_params=True)
     assert np.isclose(1.0, stage.driver_half_oscillations, rtol=1e-15, atol=0.0) # Should still be the default value 1.0, since stage.external_focusing is False.
+    assert stage.external_focusing_gradient is None
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-5, atol=0.0)
     assert stage._external_focusing_gradient is None
     assert np.isclose(3.440220555221998, stage.length_flattop, rtol=1e-5, atol=0.0)
@@ -182,10 +271,16 @@ def test_match_length_2_num_beta_osc():
 
     # ========== Tests with external fields ==========
     stage = setup_minimal_StageHipace(external_focusing=True)
+    assert stage._external_focusing_gradient is None
+    assert stage.external_focusing_gradient is None
+    stage.external_focusing_gradient = 3.14  # Set a random gradient which will be overwritten later
+    assert np.isclose(3.14, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
+
     stage.match_length_2_num_beta_osc(num_beta_osc=num_beta_osc)
     
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(140.1695315279373, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(140.1695315279373, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(3.4268706541720553, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
@@ -195,6 +290,7 @@ def test_match_length_2_num_beta_osc():
     assert np.isclose(2.0, stage.driver_half_oscillations, rtol=1e-15, atol=0.0)
     assert np.isclose(num_beta_osc, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(574.1247168375805, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(574.1247168375805, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(3.3865024719148242, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
@@ -205,6 +301,7 @@ def test_match_length_2_num_beta_osc():
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(1038.1202586404845, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(1038.1202586404845, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(1.259217324849329, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
@@ -213,6 +310,7 @@ def test_match_length_2_num_beta_osc():
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(5119.8513420067175, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(5119.8513420067175, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(1.13403339406399, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
@@ -223,6 +321,7 @@ def test_match_length_2_num_beta_osc():
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(88.3976616856249, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(88.3976616856249, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(1.2945695557961696, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
@@ -232,6 +331,7 @@ def test_match_length_2_num_beta_osc():
     
     assert np.isclose(num_beta_osc2, stage.length_flattop2num_beta_osc(), rtol=1e-10, atol=0.0)
     assert np.isclose(359.3285677857948, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(359.3285677857948, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(1.2841918239865389, stage.length_flattop, rtol=1e-5, atol=0.0)
 
 
@@ -246,6 +346,7 @@ def test_match_length_2_num_beta_osc():
     stage.match_length_2_num_beta_osc(num_beta_osc=num_beta_osc3, driver_half_oscillations=1.0)
 
     assert np.isclose(263.5820977342094, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(263.5820977342094, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(1.3834379291754226, stage.length_flattop, rtol=1e-5, atol=0.0)
     assert np.isclose(num_beta_osc3 - 0.5, stage.length_flattop2num_beta_osc(), rtol=1e-4, atol=0.0)
     
@@ -260,6 +361,7 @@ def test_match_length_2_num_beta_osc():
 
     assert np.isclose(2.0, stage.driver_half_oscillations, rtol=1e-10, atol=0.0)
     assert np.isclose(1097.699359490811, stage._external_focusing_gradient, rtol=1e-5, atol=0.0)
+    assert np.isclose(1097.699359490811, stage.external_focusing_gradient, rtol=1e-5, atol=0.0)
     assert np.isclose(1.3520401015419283, stage.length_flattop, rtol=1e-5, atol=0.0)
     assert np.isclose(num_beta_osc3 - 0.5, stage.length_flattop2num_beta_osc(), rtol=1e-4, atol=0.0)
     
