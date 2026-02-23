@@ -127,8 +127,6 @@ class Stage(Trackable, CostModeled):
         self.ramp_beta_mag = ramp_beta_mag
         
         self.stage_number = None
-
-        self._external_focusing_gradient = None
         
         # nominal initial energy
         self.nom_energy = None 
@@ -1559,7 +1557,7 @@ class Stage(Trackable, CostModeled):
         the stage (excluding ramps).
 
         Will take into account the contribution from an external linear magnetic 
-        field B=[gy,-gx,0] if :attr:`self._external_focusing_gradient <abel.Stage.external_focusing>`
+        field B=[gy,-gx,0] if :attr:`self.external_focusing_gradient <abel.Stage.external_focusing>`
         is not ``None``.
 
         Parameters
@@ -1620,8 +1618,8 @@ class Stage(Trackable, CostModeled):
             return self.phase_advance_beta_evolution()/(2*np.pi)
         else:
             g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-            if self._external_focusing_gradient is not None:
-                g = g + self._external_focusing_gradient
+            if self.external_focusing_gradient is not None:
+                g = g + self.external_focusing_gradient
 
             prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient_flattop)
             energy_scaling = np.sqrt(initial_energy*SI.e + q*nom_accel_gradient_flattop*length_flattop) - np.sqrt(initial_energy*SI.e)
@@ -1689,6 +1687,16 @@ class Stage(Trackable, CostModeled):
 
         # Set the length of the flattop stage
         self.length_flattop = length_flattop
+
+
+    # =============================================
+    @property
+    def external_focusing_gradient(self) -> float:
+        """
+        Return None by default for ``Stage`` subclasses not supporting external 
+        focusing fields.
+        """
+        return None
     
 
     # ==================================================
