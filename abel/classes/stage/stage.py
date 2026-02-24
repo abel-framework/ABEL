@@ -2621,7 +2621,7 @@ class Stage(Trackable, CostModeled):
     # ==================================================
     def plot_phase_space_trajectory_x(self, bunch='beam', savefig=None):
         """
-        Plot the trajectory of the beam centroid in horizontal phase space (x).
+        Plot the trajectory of the beam centroid in vertical phase space (x).
 
 
         Parameters
@@ -2630,6 +2630,7 @@ class Stage(Trackable, CostModeled):
             Specifies which bunch to plot. Options are:
             - ``'beam'`` : plot the beam evolution (default)
             - ``'driver'`` : plot the drive beam evolution
+            - ``'both'`` : plot the both the drive and main beam evolution
             
         savefig : str or None
             If not ``None``, defines the path to save the figure.
@@ -2643,48 +2644,69 @@ class Stage(Trackable, CostModeled):
 
         from matplotlib import pyplot as plt
         
-        # select bunch
+        # Select bunch
         if bunch == 'beam':
             evol = copy.deepcopy(self.evolution.beam)
         elif bunch == 'driver':
             evol = copy.deepcopy(self.evolution.driver)
+        elif bunch == 'both':
+            evol = copy.deepcopy(self.evolution.beam)
+            evol_d = copy.deepcopy(self.evolution.driver)
+            assert hasattr(evol_d, 'x'), 'No data for centroid x-offset.'
+            assert hasattr(evol_d, 'xp'), "No data for centroid angular x-offset."
+            x_d = evol_d.x
+            xp_d = evol_d.xp
 
         assert hasattr(evol, 'x'), 'No data for centroid x-offset.'
         assert hasattr(evol, 'xp'), "No data for centroid angular x-offset."
+
         x = evol.x
         xp = evol.xp
-
-        # add upramp evolution
-        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            
+        # Add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'x'):
             if bunch == 'beam':
                 upramp_evol = self.upramp.evolution.beam
             elif bunch == 'driver':
                 upramp_evol = self.upramp.evolution.driver
+            if bunch == 'both':
+                upramp_evol = self.upramp.evolution.beam
+                x_d = np.append(self.upramp.evolution.driver.x, x_d)
+                xp_d = np.append(self.upramp.evolution.driver.xp, xp_d)
             x = np.append(upramp_evol.x, x)
             xp = np.append(upramp_evol.xp, xp)
 
-        # add downramp evolution
-        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+        # Add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'x'):
             if bunch == 'beam':
                 downramp_evol = self.downramp.evolution.beam
             elif bunch == 'driver':
                 downramp_evol = self.downramp.evolution.driver
+            if bunch == 'both':
+                downramp_evol = self.downramp.evolution.beam
+                x_d = np.append(x_d, self.downramp.evolution.driver.x)
+                xp_d = np.append(xp_d, self.downramp.evolution.driver.xp)
             x = np.append(x, downramp_evol.x)
             xp = np.append(xp, downramp_evol.xp)
 
+        # Create the plot
         fig, ax = plt.subplots()
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.5)
 
-        ax.plot(x*1e6, xp*1e6, color="tab:blue")
-        ax.plot(x[-1]*1e6, xp[-1]*1e6, 'o', color="tab:blue")
+        ax.plot(x*1e6, xp*1e6, color='tab:blue', label='Main beam trajectory')
+        ax.plot(x[-1]*1e6, xp[-1]*1e6, 'o', color='tab:blue')
+        if bunch == 'both':
+            ax.plot(x_d*1e6, xp_d*1e6, '--', color='tab:orange', label='Drive beam trajectory')
+            ax.plot(x_d[-1]*1e6, xp_d[-1]*1e6, 'o', color='tab:orange')
+            ax.legend(fontsize=8)
         ax.set_xlabel(r"Centroid $x$" ' [µm]')
         ax.set_ylabel(r"Centroid $x'$" ' [µrad]')
         ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
 
-        # save the figure
+        # Save the figure
         if savefig is not None:
-            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)
+            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)       
 
 
     # ==================================================
@@ -2699,6 +2721,7 @@ class Stage(Trackable, CostModeled):
             Specifies which bunch to plot. Options are:
             - ``'beam'`` : plot the beam evolution (default)
             - ``'driver'`` : plot the drive beam evolution
+            - ``'both'`` : plot the both the drive and main beam evolution
             
         savefig : str or None
             If not ``None``, defines the path to save the figure.
@@ -2712,52 +2735,71 @@ class Stage(Trackable, CostModeled):
 
         from matplotlib import pyplot as plt
         
-        # select bunch
+        # Select bunch
         if bunch == 'beam':
             evol = copy.deepcopy(self.evolution.beam)
         elif bunch == 'driver':
             evol = copy.deepcopy(self.evolution.driver)
+        elif bunch == 'both':
+            evol = copy.deepcopy(self.evolution.beam)
+            evol_d = copy.deepcopy(self.evolution.driver)
+            assert hasattr(evol_d, 'y'), 'No data for centroid y-offset.'
+            assert hasattr(evol_d, 'yp'), "No data for centroid angular y-offset."
+            y_d = evol_d.y
+            yp_d = evol_d.yp
 
         assert hasattr(evol, 'y'), 'No data for centroid y-offset.'
         assert hasattr(evol, 'yp'), "No data for centroid angular y-offset."
+
         y = evol.y
         yp = evol.yp
-
-        # add upramp evolution
-        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            
+        # Add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'y'):
             if bunch == 'beam':
                 upramp_evol = self.upramp.evolution.beam
             elif bunch == 'driver':
                 upramp_evol = self.upramp.evolution.driver
+            if bunch == 'both':
+                upramp_evol = self.upramp.evolution.beam
+                y_d = np.append(self.upramp.evolution.driver.y, y_d)
+                yp_d = np.append(self.upramp.evolution.driver.yp, yp_d)
             y = np.append(upramp_evol.y, y)
             yp = np.append(upramp_evol.yp, yp)
 
-        # add downramp evolution
-        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+        # Add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'y'):
             if bunch == 'beam':
                 downramp_evol = self.downramp.evolution.beam
             elif bunch == 'driver':
                 downramp_evol = self.downramp.evolution.driver
+            if bunch == 'both':
+                downramp_evol = self.downramp.evolution.beam
+                y_d = np.append(y_d, self.downramp.evolution.driver.y)
+                yp_d = np.append(yp_d, self.downramp.evolution.driver.yp)
             y = np.append(y, downramp_evol.y)
             yp = np.append(yp, downramp_evol.yp)
 
+        # Create the plot
         fig, ax = plt.subplots()
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.5)
 
-        ax.plot(y*1e6, yp*1e6, color="tab:orange")
-        ax.plot(y[-1]*1e6, yp[-1]*1e6, 'o', color="tab:orange")
+        ax.plot(y*1e6, yp*1e6, color='tab:blue', label='Main beam trajectory')
+        ax.plot(y[-1]*1e6, yp[-1]*1e6, 'o', color='tab:blue')
+        if bunch == 'both':
+            ax.plot(y_d*1e6, yp_d*1e6, '--', color='tab:orange', label='Drive beam trajectory')
+            ax.plot(y_d[-1]*1e6, yp_d[-1]*1e6, 'o', color='tab:orange')
+            ax.legend(fontsize=8)
         ax.set_xlabel(r"Centroid $y$" ' [µm]')
         ax.set_ylabel(r"Centroid $y'$" ' [µrad]')
         ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
 
-        # save the figure
+        # Save the figure
         if savefig is not None:
-            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)
-        
+            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)        
 
 
-    
     # ==================================================
     def survey_object(self):
         npoints = 10
