@@ -2261,6 +2261,146 @@ class Stage(Trackable, CostModeled):
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
         
         return
+    
+
+    # ==================================================
+    def plot_phase_space_trajectory_x(self, bunch='beam', savefig=None):
+        """
+        Plot the trajectory of the beam centroid in horizontal phase space (x).
+
+
+        Parameters
+        ----------
+        bunch : str, optional
+            Specifies which bunch to plot. Options are:
+            - ``'beam'`` : plot the beam evolution (default)
+            - ``'driver'`` : plot the drive beam evolution
+            
+        savefig : str or None
+            If not ``None``, defines the path to save the figure.
+            Defaults to ``None``.
+
+
+        Returns
+        -------
+        None
+        """
+
+        from matplotlib import pyplot as plt
+        
+        # select bunch
+        if bunch == 'beam':
+            evol = copy.deepcopy(self.evolution.beam)
+        elif bunch == 'driver':
+            evol = copy.deepcopy(self.evolution.driver)
+
+        assert hasattr(evol, 'x'), 'No data for centroid x-offset.'
+        assert hasattr(evol, 'xp'), "No data for centroid angular x-offset."
+        x = evol.x
+        xp = evol.xp
+
+        # add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                upramp_evol = self.upramp.evolution.beam
+            elif bunch == 'driver':
+                upramp_evol = self.upramp.evolution.driver
+            x = np.append(upramp_evol.x, x)
+            xp = np.append(upramp_evol.xp, xp)
+
+        # add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                downramp_evol = self.downramp.evolution.beam
+            elif bunch == 'driver':
+                downramp_evol = self.downramp.evolution.driver
+            x = np.append(x, downramp_evol.x)
+            xp = np.append(xp, downramp_evol.xp)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+
+        ax.plot(x*1e6, xp*1e6, color="tab:blue")
+        ax.plot(x[-1]*1e6, xp[-1]*1e6, 'o', color="tab:blue")
+        ax.set_xlabel(r"Centroid $x$" ' [µm]')
+        ax.set_ylabel(r"Centroid $x'$" ' [µrad]')
+        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+
+        # save the figure
+        if savefig is not None:
+            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)
+
+
+    # ==================================================
+    def plot_phase_space_trajectory_y(self, bunch='beam', savefig=None):
+        """
+        Plot the trajectory of the beam centroid in vertical phase space (y).
+
+
+        Parameters
+        ----------
+        bunch : str, optional
+            Specifies which bunch to plot. Options are:
+            - ``'beam'`` : plot the beam evolution (default)
+            - ``'driver'`` : plot the drive beam evolution
+            
+        savefig : str or None
+            If not ``None``, defines the path to save the figure.
+            Defaults to ``None``.
+
+
+        Returns
+        -------
+        None
+        """
+
+        from matplotlib import pyplot as plt
+        
+        # select bunch
+        if bunch == 'beam':
+            evol = copy.deepcopy(self.evolution.beam)
+        elif bunch == 'driver':
+            evol = copy.deepcopy(self.evolution.driver)
+
+        assert hasattr(evol, 'y'), 'No data for centroid y-offset.'
+        assert hasattr(evol, 'yp'), "No data for centroid angular y-offset."
+        y = evol.y
+        yp = evol.yp
+
+        # add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                upramp_evol = self.upramp.evolution.beam
+            elif bunch == 'driver':
+                upramp_evol = self.upramp.evolution.driver
+            y = np.append(upramp_evol.y, y)
+            yp = np.append(upramp_evol.yp, yp)
+
+        # add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'location'):
+            if bunch == 'beam':
+                downramp_evol = self.downramp.evolution.beam
+            elif bunch == 'driver':
+                downramp_evol = self.downramp.evolution.driver
+            y = np.append(y, downramp_evol.y)
+            yp = np.append(yp, downramp_evol.yp)
+
+        fig, ax = plt.subplots()
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+
+        ax.plot(y*1e6, yp*1e6, color="tab:orange")
+        ax.plot(y[-1]*1e6, yp[-1]*1e6, 'o', color="tab:orange")
+        ax.set_xlabel(r"Centroid $y$" ' [µm]')
+        ax.set_ylabel(r"Centroid $y'$" ' [µrad]')
+        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+
+        # save the figure
+        if savefig is not None:
+            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)
+        
+
 
     
     # ==================================================
