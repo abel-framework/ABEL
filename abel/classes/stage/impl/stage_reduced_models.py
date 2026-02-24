@@ -2540,8 +2540,8 @@ class StageReducedModels(Stage):
             xp0s.append(beam.x_angle())
             xlim_min = pad_downwards(np.min([np.min(x0s), np.min(self.evolution.beam.x)]), padding=0.1)*1e6
             xlim_max = pad_upwards(np.max([np.max(x0s), np.max(self.evolution.beam.x)]), padding=0.1)*1e6
-            ylim_min = pad_downwards(np.min([np.min(xp0s), np.min(self.evolution.beam.x_angle)]), padding=0.1)*1e6
-            ylim_max = pad_upwards(np.max([np.max(xp0s), np.max(self.evolution.beam.x_angle)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(xp0s), np.min(self.evolution.beam.xp)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(xp0s), np.max(self.evolution.beam.xp)]), padding=0.1)*1e6
             axs[2,1].cla()
             axs[2,1].plot(np.array(x0s)*1e6, np.array(xp0s)*1e6, '-', color=col0)
             axs[2,1].plot(x0s[-1]*1e6, xp0s[-1]*1e6, 'o', color=col1)
@@ -2745,8 +2745,8 @@ class StageReducedModels(Stage):
             yp0s.append(beam.y_angle())
             xlim_min = pad_downwards(np.min([np.min(y0s), np.min(self.evolution.beam.y)]), padding=0.1)*1e6
             xlim_max = pad_upwards(np.max([np.max(y0s), np.max(self.evolution.beam.y)]), padding=0.1)*1e6
-            ylim_min = pad_downwards(np.min([np.min(yp0s), np.min(self.evolution.beam.y_angle)]), padding=0.1)*1e6
-            ylim_max = pad_upwards(np.max([np.max(yp0s), np.max(self.evolution.beam.y_angle)]), padding=0.1)*1e6
+            ylim_min = pad_downwards(np.min([np.min(yp0s), np.min(self.evolution.beam.yp)]), padding=0.1)*1e6
+            ylim_max = pad_upwards(np.max([np.max(yp0s), np.max(self.evolution.beam.yp)]), padding=0.1)*1e6
             axs[2,1].cla()
             axs[2,1].plot(np.array(y0s)*1e6, np.array(yp0s)*1e6, '-', color=col0)
             axs[2,1].plot(y0s[-1]*1e6, yp0s[-1]*1e6, 'o', color=col1)
@@ -2849,9 +2849,9 @@ class StageReducedModels(Stage):
             print(f"Initial beam z offset [um]:\t\t\t {evol.driver.z[0]*1e6 :.3f} \t\t {initial_main_beam.z_offset(clean=clean)*1e6 :.3f}", file=f)
             print(f"Current beam z offset [um]:\t\t\t  \t\t\t {beam_out.z_offset(clean=clean)*1e6 :.3f}\n", file=f)
 
-            print(f"Initial beam x angular offset [urad]:\t\t {evol.driver.x_angle[0]*1e6 :.3f} \t\t\t {initial_main_beam.x_angle(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial beam x angular offset [urad]:\t\t {evol.driver.xp[0]*1e6 :.3f} \t\t\t {initial_main_beam.x_angle(clean=clean)*1e6 :.3f}", file=f)
             print(f"Current beam x angular offset [urad]:\t\t  \t\t\t {beam_out.x_angle(clean=clean)*1e6 :.3f}", file=f)
-            print(f"Initial beam y angular offset [urad]:\t\t {evol.driver.y_angle[0]*1e6 :.3f} \t\t {initial_main_beam.y_angle(clean=clean)*1e6 :.3f}", file=f)
+            print(f"Initial beam y angular offset [urad]:\t\t {evol.driver.yp[0]*1e6 :.3f} \t\t {initial_main_beam.y_angle(clean=clean)*1e6 :.3f}", file=f)
             print(f"Current beam y angular offset [urad]:\t\t  \t\t\t {beam_out.y_angle(clean=clean)*1e6 :.3f}\n", file=f)
 
             print(f"Initial normalised x emittance [mm mrad]:\t {evol.driver.emit_nx[0]*1e6 :.3f} \t\t\t {initial_main_beam.norm_emittance_x(clean=False)*1e6 :.3f}", file=f)
