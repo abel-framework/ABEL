@@ -2694,10 +2694,10 @@ class Stage(Trackable, CostModeled):
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.5)
 
-        ax.plot(x*1e6, xp*1e6, color='tab:blue', label='Main beam trajectory')
+        ax.plot(x*1e6, xp*1e6, color='tab:blue', label='Main beam')
         ax.plot(x[-1]*1e6, xp[-1]*1e6, 'o', color='tab:blue')
         if bunch == 'both':
-            ax.plot(x_d*1e6, xp_d*1e6, '--', color='tab:orange', label='Drive beam trajectory')
+            ax.plot(x_d*1e6, xp_d*1e6, '--', color='tab:orange', label='Drive beam')
             ax.plot(x_d[-1]*1e6, xp_d[-1]*1e6, 'o', color='tab:orange')
             ax.legend(fontsize=8)
         ax.set_xlabel(r"Centroid $x$" ' [µm]')
@@ -2785,10 +2785,10 @@ class Stage(Trackable, CostModeled):
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.5)
 
-        ax.plot(y*1e6, yp*1e6, color='tab:blue', label='Main beam trajectory')
+        ax.plot(y*1e6, yp*1e6, color='tab:blue', label='Main beam')
         ax.plot(y[-1]*1e6, yp[-1]*1e6, 'o', color='tab:blue')
         if bunch == 'both':
-            ax.plot(y_d*1e6, yp_d*1e6, '--', color='tab:orange', label='Drive beam trajectory')
+            ax.plot(y_d*1e6, yp_d*1e6, '--', color='tab:orange', label='Drive beam')
             ax.plot(y_d[-1]*1e6, yp_d[-1]*1e6, 'o', color='tab:orange')
             ax.legend(fontsize=8)
         ax.set_xlabel(r"Centroid $y$" ' [µm]')
