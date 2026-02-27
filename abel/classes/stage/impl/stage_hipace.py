@@ -1121,6 +1121,8 @@ class StageHipace(Stage):
             raise ValueError('The energy depletion will be too severe. This estimate is only valid for a relativistic beam.')
         
         g = self.external_focusing_gradient  # [T/m]
+        if g is None:
+            g = 0.0
         ds = self.length_flattop/self.driver_half_oscillations/num_steps_per_half_osc  # [m], step size
 
         prop_length = 0
