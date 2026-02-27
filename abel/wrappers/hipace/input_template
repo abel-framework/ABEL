@@ -83,11 +83,14 @@ ions.can_ionize = $beam_ionization
 ions.initial_ion_level = 1
 ions.ionization_product = electrons
 
-diagnostic.names = lev0x
+diagnostic.names = lev0y
+#diagnostic.names = lev0x lev0y
 diagnostic.output_period = $output_period
 diagnostic.beam_output_period = $output_period
-lev0x.diag_type = xz
-diagnostic.field_data = Ez ExmBy rho jz_beam
+#lev0x.diag_type = xz
+#lev0x.field_data = Ez ExmBy rho jz_beam
+lev0y.diag_type = yz
+lev0y.field_data = Ez EypBx rho jz_beam
 
 hipace.deposit_rho = true
 hipace.deposit_rho_individual = true

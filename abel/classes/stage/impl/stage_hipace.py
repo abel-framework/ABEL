@@ -543,20 +543,31 @@ class StageHipace(Stage):
         
         
     def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
-
+    
         from openpmd_viewer import OpenPMDTimeSeries
         
         # prepare to read simulation data
         source_path = tmpfolder + 'diags/hdf5/'
         ts = OpenPMDTimeSeries(source_path)
+
+        axis_labels = ts.fields_metadata['Ez']['axis_labels']
+        if 'x' in axis_labels:
+            slice_across = ['x']
+        elif 'y' in axis_labels:
+            slice_across = ['y']
+        else:
+            raise ValueError('Unknown diagnostics geometry.')
+        
+        self.initial.axis_labels = axis_labels
+        self.final.axis_labels = axis_labels
         
         # extract initial on-axis wakefield
-        Ez0, metadata0 = ts.get_field(field='Ez', slice_across=['x'], iteration=min(ts.iterations))
+        Ez0, metadata0 = ts.get_field(field='Ez', slice_across=slice_across, iteration=min(ts.iterations))
         self.initial.plasma.wakefield.onaxis.zs = metadata0.z
         self.initial.plasma.wakefield.onaxis.Ezs = Ez0
         
         # extract final on-axis wakefield
-        Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=max(ts.iterations))
+        Ez, metadata = ts.get_field(field='Ez', slice_across=slice_across, iteration=max(ts.iterations))
         self.final.plasma.wakefield.onaxis.zs = metadata.z
         self.final.plasma.wakefield.onaxis.Ezs = Ez
         
