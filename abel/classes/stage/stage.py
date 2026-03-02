@@ -2293,7 +2293,7 @@ class Stage(Trackable, CostModeled):
 
         from matplotlib import pyplot as plt
 
-        if phase_space != 'x' or phase_space != 'y':
+        if phase_space != 'x' and phase_space != 'y':
             raise ValueError("phase_space must be either 'x' or 'y'.")
         
         # Select bunch
@@ -2313,7 +2313,7 @@ class Stage(Trackable, CostModeled):
                 assert hasattr(evol_d, 'y'), 'No data for centroid y-offset.'
                 assert hasattr(evol_d, 'yp'), "No data for centroid angular y-offset."
                 offset_d = evol_d.y
-                anglep_d = evol_d.yp
+                angle_d = evol_d.yp
 
         if phase_space == 'x':
             assert hasattr(evol, 'x'), 'No data for centroid x-offset.'
@@ -2375,11 +2375,49 @@ class Stage(Trackable, CostModeled):
         fig.set_figwidth(CONFIG.plot_width_default*0.7)
         fig.set_figheight(CONFIG.plot_width_default*0.5)
 
-        ax.plot(offset*1e6, angle*1e6, color='tab:blue', label='Main beam')
-        ax.plot(offset[-1]*1e6, angle[-1]*1e6, 'o', color='tab:blue')
+        offset = offset*1e6  # [µm]
+        angle = angle*1e6  # [µrad]
+        ax.plot(offset, angle, color='tab:blue', label='Main beam')
+        dx = offset[-1] - offset[-2]
+        dy = angle[-1] - angle[-2]
+        scale = 0.9
+        #ax.arrow(offset[-1]*1e6-dx*scale, angle[-1]*1e6-dy*scale, dx*scale, dy*scale, color='tab:blue')
+
+        eps = 0.2   # Make smaller for shorter arrow.
+
+        ax.annotate(
+            '',
+            xy=(offset[-1], angle[-1]),
+            xytext=(offset[-1]-eps*dx, angle[-1]-eps*dy),
+            arrowprops=dict(
+                arrowstyle='-|>',
+                facecolor='tab:blue',
+                edgecolor='black',
+                mutation_scale=18,  # Controls arrowhead size.
+                lw=1,  # Controls thickness.
+            )
+        )
+        
         if bunch == 'both':
-            ax.plot(offset_d*1e6, angle_d*1e6, '--', color='tab:orange', label='Drive beam')
-            ax.plot(offset_d[-1]*1e6, angle_d[-1]*1e6, 'o', color='tab:orange')
+            offset_d = offset_d*1e6  # [µm]
+            angle_d = angle_d*1e6  # [µrad]
+            ax.plot(offset_d, angle_d, '--', color='tab:orange', label='Drive beam')
+            dx = offset_d[-1] - offset_d[-2]
+            dy = angle_d[-1] - angle_d[-2]
+    
+            ax.annotate(
+                '',
+                xy=(offset_d[-1], angle_d[-1]),
+                xytext=(offset_d[-1]-eps*dx, angle_d[-1]-eps*dy),
+                arrowprops=dict(
+                    arrowstyle='-|>',
+                    facecolor='tab:orange',
+                    edgecolor='black',
+                    mutation_scale=18,  # Controls arrowhead size.
+                    lw=1,  # Controls thickness.
+                )
+            )
+            
             ax.legend(fontsize=8)
         if phase_space == 'x':
             ax.set_xlabel(r"Centroid $x$" ' [µm]')
@@ -2391,7 +2429,7 @@ class Stage(Trackable, CostModeled):
 
         # Save the figure
         if savefig is not None:
-            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)       
+            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)
 
 
     # ==================================================
