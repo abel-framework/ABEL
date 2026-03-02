@@ -2606,7 +2606,14 @@ class Stage(Trackable, CostModeled):
             # set labels
             if i==(num_plots-1):
                 ax1.set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
-            ax1.set_ylabel(r'$x$ [$\mathrm{\mu}$m]')
+
+            if 'x' in self.initial.axis_labels:
+                long_axis_label = '$x$'
+            elif 'y' in self.initial.axis_labels:
+                long_axis_label = '$y$'
+            else:
+                raise ValueError('Unknown diagnostics geometry.')
+            ax1.set_ylabel(rf'{long_axis_label} [$\mathrm{{\mu}}$m]')
             ax1.set_title(title)
             ax1.grid(False)
             ax2.grid(False)
