@@ -6,6 +6,8 @@
 
 from abel.CONFIG import CONFIG
 from abel.classes.stage.stage import Stage
+from abel.classes.source.source import Source
+from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import scipy.constants as SI
 from abel.utilities.plasma_physics import *
@@ -23,6 +25,10 @@ class StageQuasistatic2d(Stage):
 
     Attributes
     ----------
+    driver_source : ``Source`` or ``DriverComplex``
+        The source of the drive beam. The beam axis is always aligned to its 
+        propagation direction. Defaults to ``None``.
+        
     enable_radiation_reaction : bool, optional
         Flag for enabling radiation reaction effects. Defaults to ``False``.
 
@@ -411,6 +417,22 @@ class StageQuasistatic2d(Stage):
             
         return beam, driver
     
+
+    # ==================================================
+    @Stage.driver_source.setter
+    def driver_source(self, source : Source | DriverComplex | None):
+        """
+        The driver source or the driver complex of the stage. The generated 
+        drive beam's beam axis is always aligned to its propagation direction.
+        """
+        
+        # Delegate to parent setter
+        Stage.driver_source.fset(self, source)
+        
+        # Set the driver source to always align drive beam axis to its propagation direction
+        if source is not None:
+            self.get_actual_driver_source().align_beam_axis = True
+
 
     # ==================================================
     def __save_initial_step(self, tmpfolder):

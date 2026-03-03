@@ -4,34 +4,34 @@
 # Affiliations: 1) University of Oslo, 2) LBNL
 # License: GPL-3.0-or-later
 
-amr.n_cell = $num_cell_x $num_cell_y $num_cell_z
+amr.n_cell = $num_cell_x $num_cell_y $num_cell_z                                            # Number of cells in x, y and z.
 
 hipace.normalized_units = 0
 hipace.bxby_solver = explicit
 
 hipace.dt = $time_step # TODO: set automatic timestep
 amr.blocking_factor = 1
-amr.max_level = $mesh_refinement_maxlevel
+amr.max_level = $mesh_refinement_maxlevel                                                   # Maximum level of mesh refinement. 
 
 hipace.verbose = 1
 max_step = $max_step # TODO: set automatic timestep
 
 hipace.depos_order_xy = 2
 geometry.coord_sys   = 0                  # 0: Cartesian
-geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z     # physical domain
-geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z
+geometry.prob_lo     = $grid_low_x $grid_low_y $grid_low_z                                  # Lower end of the simulation box in x, y and z.
+geometry.prob_hi     = $grid_high_x $grid_high_y $grid_high_z                               # Higher end of the simulation box in x, y and z.
 
 boundary.field       = Dirichlet
 boundary.particle    = Absorbing
 
 my_constants.ref_ratio_x = $ref_ratio_x
 my_constants.ref_ratio_y = $ref_ratio_y
-my_constants.patch_len_x = $num_cell_x_mr1 * (($grid_high_x / $num_cell_x) / ref_ratio_x)
-my_constants.patch_len_y = $num_cell_y_mr1 * (($grid_high_y / $num_cell_y) / ref_ratio_y)
+my_constants.patch_len_x = $num_cell_x_mr1 * (($grid_high_x / $num_cell_x) / ref_ratio_x)   # Constant used to configure the refined grid.
+my_constants.patch_len_y = $num_cell_y_mr1 * (($grid_high_y / $num_cell_y) / ref_ratio_y)   # Constant used to configure the refined grid.
 
-${mesh_refinement_comment}mr_lev1.n_cell = $num_cell_x_mr1 $num_cell_y_mr1
-${mesh_refinement_comment}mr_lev1.patch_lo = -patch_len_x -patch_len_y $grid_low_z
-${mesh_refinement_comment}mr_lev1.patch_hi =  patch_len_x patch_len_y $grid_high_z
+${mesh_refinement_comment}mr_lev1.n_cell = $num_cell_x_mr1 $num_cell_y_mr1                  # Number of cells in x and y for level 1.
+${mesh_refinement_comment}mr_lev1.patch_lo = -patch_len_x -patch_len_y $grid_low_z          # Lower end of the refined grid in x, y and z.
+${mesh_refinement_comment}mr_lev1.patch_hi =  patch_len_x patch_len_y $grid_high_z          # Upper end of the refined grid in x, y and z.
 
 beams.names = $beam_components # 'driver' or 'driver beam'
 beams.insitu_period = 1
@@ -53,8 +53,8 @@ plasmas.names = $plasma_components # 'plasma' or 'electrons ions'
 plasmas.prevent_centered_particle = true
 plasmas.reorder_period = 10
 ${mesh_refinement_comment}plasmas.fine_transition_cells = 10
-${mesh_refinement_comment}plasmas.fine_ppc = ref_ratio_x ref_ratio_y
-${mesh_refinement_comment}plasmas.fine_patch(x,y) = "x^2/(1.5*patch_len_x)^2 + y^2/(1.5*patch_len_y)^2 < 1"
+${mesh_refinement_comment}plasmas.fine_ppc = ref_ratio_x ref_ratio_y                        # The number of plasma particles per cell in x and y inside the fine plasma patch.
+${mesh_refinement_comment}plasmas.fine_patch(x,y) = "x^2/(1.5*patch_len_x)^2 + y^2/(1.5*patch_len_y)^2 < 1" # Specifies a region to increase the number of particles per cell.
 
 
 # if ion motion disabled

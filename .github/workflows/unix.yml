@@ -1,10 +1,13 @@
 name: Unix
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 concurrency:
-  group: ${{ github.ref }}-${{ github.head_ref }}-unix
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   unittest:
@@ -37,4 +40,4 @@ jobs:
       run: python -m pytest -v tests/test_init.py::testCore_init || true
 
     - name: Run Unit Tests
-      run: python -m pytest tests/
+      run: python -m pytest -v tests/

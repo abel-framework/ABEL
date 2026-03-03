@@ -138,6 +138,8 @@ def test_stage_length_gradient_energyGain():
     # ========== Set stage length and nominal energy gain ==========
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False)
 
+    assert stage.driver_source.align_beam_axis is True
+
     stage.length_flattop = 7.8                                                    # [m]
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
 
@@ -154,6 +156,8 @@ def test_stage_length_gradient_energyGain():
     # ========== Set nominal energy gain and flattop nominal acceleration gradient ==========
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver=False, store_beams_for_tests=False, length_flattop=None)
 
+    assert stage.driver_source.align_beam_axis is True
+
     stage.nom_energy_gain = 7.8e9                                                 # [eV]
     stage.nom_energy_gain_flattop = 7.8e9                                         # [eV]
     stage.nom_accel_gradient_flattop = 1.0e9                                      # [V/m]
@@ -168,6 +172,47 @@ def test_stage_length_gradient_energyGain():
 
     # Remove output directory
     shutil.rmtree(linac.run_path())
+
+
+@pytest.mark.StageReducedModels
+def test_driver_source_setter():
+    """
+    Tests ensuring that the driver source setter does not set invalid classes 
+    and that the driver source has valid energy.
+    """
+
+    driver_source = setup_trapezoid_driver_source()
+    driver_complex = DriverComplex()
+    driver_complex.source = driver_source
+    stage = StageReducedModels()
+
+    # Valid options
+    stage.driver_source = driver_source
+    assert isinstance(stage.driver_source, Source)
+    stage.driver_source = None
+    assert stage.driver_source is None
+    stage.driver_source = driver_complex
+    assert isinstance(stage.driver_source, DriverComplex)
+
+    # Invalid instances
+    with pytest.raises(TypeError):
+        stage.driver_source = 42
+    with pytest.raises(TypeError):
+        stage.driver_source = 4.2
+    with pytest.raises(TypeError):
+        stage.driver_source = 'lorem'
+
+    # Invalid driver source energy
+    stage2 = StageReducedModels()
+    driver_source2 = setup_trapezoid_driver_source()
+    driver_source2.energy = None
+    with pytest.raises(ValueError):
+        stage2.driver_source = driver_source2 # driver source energy must be set before being added to a stage.
+    
+    driver_complex2 = DriverComplex()
+    driver_complex2.source = driver_source2
+    with pytest.raises(ValueError):
+        stage2.driver_source = driver_complex2 # driver source energy must be set before being added to a stage.  
 
 
 @pytest.mark.StageReducedModels
@@ -196,6 +241,7 @@ def test_driver_unrotation():
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, store_beams_for_tests=True)
 
     stage.nom_energy = 369.6e9                                                    # [eV], HALHF v2 last stage nominal input energy
+    assert stage.driver_source.align_beam_axis is True
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -227,6 +273,7 @@ def test_driver_unrotation():
 
     stage.nom_energy = 7.8e9                                                      # [eV]
     _, driver = stage.track(main_source.track())
+    assert stage.driver_source.align_beam_axis is True
     driver0 = stage.driver_incoming
 
     Beam.comp_beams(driver, driver0, comp_location=False, rtol=1e-13, atol=0.0)
@@ -240,6 +287,7 @@ def test_driver_unrotation():
     stage = setup_StageReducedModels(driver_source, main_source, use_ramps=True, return_tracked_driver=True, store_beams_for_tests=True)
 
     stage.nom_energy = 7.8e9                                                      # [eV]
+    assert stage.driver_source.align_beam_axis is True
     _, driver = stage.track(main_source.track())
     driver0 = stage.driver_incoming
 
@@ -286,6 +334,8 @@ def test_copy_config2blank_stage():
     driver_source = setup_trapezoid_driver_source(enable_xy_jitter, enable_xpyp_jitter)
     main_source = setup_basic_main_source(plasma_density, ramp_beta_mag)
     stage = setup_StageReducedModels(driver_source, main_source, plasma_density, ramp_beta_mag, enable_tr_instability, enable_radiation_reaction, enable_ion_motion, use_ramps, drive_beam_update_period, return_tracked_driver, store_beams_for_tests=True)
+
+    assert stage.driver_source.align_beam_axis is True
 
     stage_copy = stage.copy_config2blank_stage()
 

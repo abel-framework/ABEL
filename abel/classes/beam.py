@@ -1850,7 +1850,7 @@ class Beam():
         n0 : [m^-3] float
             Plasme number density.
 
-        deltaEs : [m^-3] 1D float ndarray
+        deltaEs : [eV] 1D float ndarray
             Energy change for the macroparticles.
 
         x0_driver, y0_driver : [m] float, optional
