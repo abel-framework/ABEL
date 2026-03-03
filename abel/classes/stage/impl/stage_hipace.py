@@ -243,6 +243,12 @@ class StageHipace(Stage):
 
         self.stage_number = beam_incoming.stage_number
         
+        # Set the diagnostics directory
+        if runnable is not None and self.run_path is None:
+            self.run_path = runnable.run_path()
+        if self.run_path is not None and not os.path.exists(self.run_path):
+            os.makedirs(self.run_path)
+
         ## PREPARE TEMPORARY FOLDER
         
         # make temp folder
@@ -389,6 +395,10 @@ class StageHipace(Stage):
         # extract insitu diagnostics and wakefield data
         self.__extract_evolution(tmpfolder, beam0, runnable)
         self.__extract_initial_and_final_step(tmpfolder, beam0, runnable)
+
+        # move the HiPACE++ input file to be stored
+        if self.run_path is not None:
+            shutil.move(path_input, self.run_path)
         
         # delete temp folder
         shutil.rmtree(tmpfolder)
