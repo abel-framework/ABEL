@@ -2252,7 +2252,7 @@ class Stage(Trackable, CostModeled):
             if i==(num_plots-1):
                 ax1.set_xlabel(r'$z$ [$\mathrm{\mu}$m]')
 
-            if self.initial.axis_labels is None or 'x' in self.initial.axis_labels:
+            if not hasattr(self.initial, 'axis_labels') or 'x' in self.initial.axis_labels:
                 long_axis_label = '$x$'
             elif 'y' in self.initial.axis_labels:
                 long_axis_label = '$y$'
