@@ -9,6 +9,7 @@ from abel.classes.trackable import Trackable
 from abel.CONFIG import CONFIG
 from abel.classes.cost_modeled import CostModeled
 from abel.classes.source.source import Source
+from abel.classes.source.impl.source_capsule import SourceCapsule
 from abel.classes.beamline.impl.driver_complex import DriverComplex
 import numpy as np
 import copy, warnings
@@ -178,10 +179,20 @@ class Stage(Trackable, CostModeled):
     def driver_source(self, source : Source | DriverComplex | None):
         if source is not None and not isinstance(source, (Source, DriverComplex)):
             raise TypeError("driver_source must be a Source, DriverComplex, or None")
+        
+        if source is not None:
+            if isinstance(source, DriverComplex):
+                driver_source = source.source
+            elif isinstance(source, Source):
+                driver_source = source
+            if not isinstance(driver_source, SourceCapsule) and driver_source.energy is None:
+                raise ValueError('The energy of the driver source of the stage is not set.')
+        
         self._driver_source = source
     _driver_source = None
 
-    def get_driver_source(self):
+
+    def get_actual_driver_source(self):
         """
         Return the driver source of the stage or the driver source of the 
         associated driver complex of the stage.
@@ -190,11 +201,14 @@ class Stage(Trackable, CostModeled):
         -------
         driver_source : ``Source``
         """
-    
-        if isinstance(self.driver_source, DriverComplex):
+        if self.driver_source is None:
+            raise ValueError('The driver source of the stage is not set.')
+        elif isinstance(self.driver_source, DriverComplex):
             driver_source = self.driver_source.source
         elif isinstance(self.driver_source, Source):
             driver_source = self.driver_source
+        
+        # driver_source.setter ensures that self.driver_source is a valid type.
         
         return driver_source
     
@@ -701,9 +715,59 @@ class Stage(Trackable, CostModeled):
     _nom_energy_gain      = None
     _nom_energy_gain_calc = None
 
-    def get_nom_energy_gain(self):
-        "Alias of nom_energy_gain"
-        return self.nom_energy_gain
+    def get_nom_energy_gain(self, ignore_ramps_if_undefined=False):
+        """
+        Return :attr:`Stage.nom_energy_gain <abel.Stage.nom_energy_gain>` if it 
+        is defined. Otherwise, return 
+        :attr:`Stage.nom_energy_gain_flattop <abel.Stage.nom_energy_gain_flattop>`.
+
+        If the stage includes ramps, the nominal energy gain of the upramp and 
+        downramp is added to the flattop nominal energy gain when available.
+
+        If a ramp exists but its nominal energy gain has not been defined or 
+        calculated, a ``ValueError`` is raised unless 
+        ``ignore_ramps_if_undefined`` is ``True``.
+
+        Parameters
+        ----------
+        ignore_ramps_if_undefined : bool, optional
+            If ``True``, ignore upramp or downramp nominal energy gain when it is
+            undefined. If ``True`` (default), raise a ``ValueError`` when a ramp
+            exists, but its nominal energy gain has not been defined.
+
+        Returns
+        -------
+        nom_energy_gain : [eV] float
+            The total nominal energy gain of the stage.
+        """
+
+        if self.nom_energy_gain is None:
+            
+            if self.has_ramp():
+                nom_energy_gain = self.nom_energy_gain_flattop
+                
+                if self.upramp is not None and self.upramp.nom_energy_gain_flattop is not None:
+                    nom_energy_gain += self.upramp.nom_energy_gain
+                elif self.upramp is not None and self.upramp.nom_energy_gain_flattop is None and ignore_ramps_if_undefined is False:
+                    # I.e. upramp exists, upramp nominal energy gain has not 
+                    # been calculated/defined, but not allowed to ignore ramp 
+                    # energy gain if undefined:
+                    raise ValueError('Upramp nominal energy gain not defined/calculated.')
+                
+                if self.downramp is not None and self.downramp.nom_energy_gain_flattop is not None:
+                    nom_energy_gain += self.downramp.nom_energy_gain
+                elif self.downramp is not None and self.downramp.nom_energy_gain_flattop is None and ignore_ramps_if_undefined is False:
+                    # I.e. downramp exists, downramp nominal energy gain has not 
+                    # been calculated/defined, but not allowed to ignore ramp 
+                    # energy gain if undefined:
+                    raise ValueError('Downramp nominal energy gain not defined/calculated.')
+                
+                return nom_energy_gain
+            
+            else:
+                return self.nom_energy_gain_flattop
+        else:
+            return self.nom_energy_gain
 
 
     # ==================================================
@@ -1344,7 +1408,7 @@ class Stage(Trackable, CostModeled):
         """
         Calculate the efficiency of energy transfer in the stage.
 
-        This method computes the following efficiency metrics:
+        This method computes the following efficiency data:
         
         - ``driver_to_wake``: Fraction of driver energy transferred to the wakefield.  
         - ``wake_to_beam``: Fraction of wakefield energy transferred to the beam.  
@@ -1356,14 +1420,16 @@ class Stage(Trackable, CostModeled):
         beam0 : ``Beam``
             Input beam before the stage.
 
-        driver0 : ``Beam``
-            Input drive beam before the stage.
+        driver0 : ``Beam`` or None
+            Input drive beam before the stage. If ``None``, all efficiency data 
+            are set to ``None.``
 
         beam : ``Beam``
             Output beam after the stage.
 
-        driver : ``Beam``
-            Output drive beam after the stage.
+        driver : ``Beam`` or None
+            Output drive beam after the stage. If ``None``, all efficiency data 
+            are set to ``None.``
 
         Returns
         -------
@@ -1371,6 +1437,13 @@ class Stage(Trackable, CostModeled):
             Results are stored in :attr:`Stage.efficiency <abel.Stage.efficiency>`.
         """
 
+        if driver0 is None or driver is None:
+            self.efficiency.driver_to_wake = None
+            self.efficiency.wake_to_beam = None
+            self.efficiency.driver_to_beam = None
+            self.efficiency.dumped_power = None
+            return
+        
         Etot0_beam = beam0.total_energy()
         Etot_beam = beam.total_energy()
         Etot0_driver = driver0.total_energy()
@@ -1470,7 +1543,7 @@ class Stage(Trackable, CostModeled):
         machine_zero = sys.float_info.epsilon
 
         # Check if the driver source generates a drive beam alignmed to its propagation direction, which is required by many Stage subclasses
-        driver_source = self.get_driver_source()
+        driver_source = self.get_actual_driver_source()
 
         if not driver_source.align_beam_axis:
             raise ValueError("Currently does not support drive beam axis not aligned with its propagation direction. I.e. driver_source.align_beam_axis must be set to True.")
@@ -1551,7 +1624,7 @@ class Stage(Trackable, CostModeled):
         machine_zero = sys.float_info.epsilon
 
         # Check if the driver source of the stage has angular offset
-        driver_source = self.get_driver_source()
+        driver_source = self.get_actual_driver_source()
         has_angular_offset = np.abs(driver_source.jitter.xp) > machine_zero or np.abs(driver_source.x_angle) > machine_zero or np.abs(driver_source.jitter.yp) > machine_zero or np.abs(driver_source.y_angle) > machine_zero
         
         if has_angular_offset:
@@ -1960,7 +2033,7 @@ class Stage(Trackable, CostModeled):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.length_flattop*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source is not None:  # A ramp may not have a driver source
-            driver_source = self.get_driver_source()
+            driver_source = self.get_actual_driver_source()
             if driver_source.energy is not None:
                 Ez_driver_max = driver_source.energy/self.length_flattop
                 axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
@@ -2025,7 +2098,7 @@ class Stage(Trackable, CostModeled):
         if self.nom_energy_gain is not None:
             axs[0].plot(zs0*1e6, -self.nom_energy_gain/self.get_length()*np.ones(zs0.shape)/1e9, ':', color=col2)
         if self.driver_source is not None:  # A ramp may not have a driver source
-            driver_source = self.get_driver_source()
+            driver_source = self.get_actual_driver_source()
             if driver_source.energy is not None:
                 Ez_driver_max = driver_source.energy/self.get_length()
                 axs[0].plot(zs0*1e6, Ez_driver_max*np.ones(zs0.shape)/1e9, ':', color=col0)
@@ -2188,8 +2261,177 @@ class Stage(Trackable, CostModeled):
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
         
         return
-
     
+
+    # ==================================================
+    def plot_phase_space_trajectory(self, phase_space='x', bunch='beam', savefig=None):
+        """
+        Plot the trajectory of the beam centroid in phase space.
+
+
+        Parameters
+        ----------
+        phase_space : str, optional
+            Specify horizontal (``'x'``) or vertical (``'y'``) phase space. 
+            Defaults to ``'x'``.
+
+        bunch : str, optional
+            Specifies which bunch to plot. Options are:
+            - ``'beam'`` : plot the beam evolution (default)
+            - ``'driver'`` : plot the drive beam evolution
+            - ``'both'`` : plot the both the drive and main beam evolution
+            
+        savefig : str or None
+            If not ``None``, defines the path to save the figure.
+            Defaults to ``None``.
+
+
+        Returns
+        -------
+        None
+        """
+
+        from matplotlib import pyplot as plt
+
+        if phase_space != 'x' and phase_space != 'y':
+            raise ValueError("phase_space must be either 'x' or 'y'.")
+        
+        # Select bunch
+        if bunch == 'beam':
+            evol = copy.deepcopy(self.evolution.beam)
+        elif bunch == 'driver':
+            evol = copy.deepcopy(self.evolution.driver)
+        elif bunch == 'both':
+            evol = copy.deepcopy(self.evolution.beam)
+            evol_d = copy.deepcopy(self.evolution.driver)
+            if phase_space == 'x':
+                assert hasattr(evol_d, 'x'), 'No data for centroid x-offset.'
+                assert hasattr(evol_d, 'xp'), "No data for centroid angular x-offset."
+                offset_d = evol_d.x
+                angle_d = evol_d.xp
+            else:
+                assert hasattr(evol_d, 'y'), 'No data for centroid y-offset.'
+                assert hasattr(evol_d, 'yp'), "No data for centroid angular y-offset."
+                offset_d = evol_d.y
+                angle_d = evol_d.yp
+
+        if phase_space == 'x':
+            assert hasattr(evol, 'x'), 'No data for centroid x-offset.'
+            assert hasattr(evol, 'xp'), "No data for centroid angular x-offset."
+            offset = evol.x
+            angle = evol.xp
+        else:
+            assert hasattr(evol, 'y'), 'No data for centroid y-offset.'
+            assert hasattr(evol, 'yp'), "No data for centroid angular y-offset."
+            offset = evol.y
+            angle = evol.yp
+            
+        # Add upramp evolution
+        if self.upramp is not None and hasattr(self.upramp.evolution.beam, 'x'):
+            if bunch == 'beam':
+                upramp_evol = self.upramp.evolution.beam
+            elif bunch == 'driver':
+                upramp_evol = self.upramp.evolution.driver
+            if bunch == 'both':
+                upramp_evol = self.upramp.evolution.beam
+                if phase_space == 'x':
+                    offset_d = np.append(self.upramp.evolution.driver.x, offset_d)
+                    angle_d = np.append(self.upramp.evolution.driver.xp, angle_d)
+                else:
+                    offset_d = np.append(self.upramp.evolution.driver.y, offset_d)
+                    angle_d = np.append(self.upramp.evolution.driver.yp, angle_d)
+
+            if phase_space == 'x':
+                offset = np.append(upramp_evol.x, offset)
+                angle = np.append(upramp_evol.xp, angle)
+            else:
+                offset = np.append(upramp_evol.y, offset)
+                angle = np.append(upramp_evol.yp, angle)
+
+        # Add downramp evolution
+        if self.downramp is not None and hasattr(self.downramp.evolution.beam, 'x'):
+            if bunch == 'beam':
+                downramp_evol = self.downramp.evolution.beam
+            elif bunch == 'driver':
+                downramp_evol = self.downramp.evolution.driver
+            if bunch == 'both':
+                downramp_evol = self.downramp.evolution.beam
+                if phase_space == 'x':
+                    offset_d = np.append(self.downramp.evolution.driver.x, offset_d)
+                    angle_d = np.append(self.downramp.evolution.driver.xp, angle_d)
+                else:
+                    offset_d = np.append(self.downramp.evolution.driver.y, offset_d)
+                    angle_d = np.append(self.downramp.evolution.driver.yp, angle_d)
+
+            if phase_space == 'x':
+                offset = np.append(downramp_evol.x, offset)
+                angle = np.append(downramp_evol.xp, angle)
+            else:
+                offset = np.append(downramp_evol.y, offset)
+                angle = np.append(downramp_evol.yp, angle)
+
+        # Create the plot
+        fig, ax = plt.subplots()
+        fig.set_figwidth(CONFIG.plot_width_default*0.7)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+
+        offset = offset*1e6  # [µm]
+        angle = angle*1e6  # [µrad]
+        ax.plot(offset, angle, color='tab:blue', label='Main beam')
+        dx = offset[-1] - offset[-2]
+        dy = angle[-1] - angle[-2]
+        scale = 0.9
+        #ax.arrow(offset[-1]*1e6-dx*scale, angle[-1]*1e6-dy*scale, dx*scale, dy*scale, color='tab:blue')
+
+        eps = 0.2   # Make smaller for shorter arrow.
+
+        ax.annotate(
+            '',
+            xy=(offset[-1], angle[-1]),
+            xytext=(offset[-1]-eps*dx, angle[-1]-eps*dy),
+            arrowprops=dict(
+                arrowstyle='-|>',
+                facecolor='tab:blue',
+                edgecolor='black',
+                mutation_scale=18,  # Controls arrowhead size.
+                lw=1,  # Controls thickness.
+            )
+        )
+        
+        if bunch == 'both':
+            offset_d = offset_d*1e6  # [µm]
+            angle_d = angle_d*1e6  # [µrad]
+            ax.plot(offset_d, angle_d, '--', color='tab:orange', label='Drive beam')
+            dx = offset_d[-1] - offset_d[-2]
+            dy = angle_d[-1] - angle_d[-2]
+    
+            ax.annotate(
+                '',
+                xy=(offset_d[-1], angle_d[-1]),
+                xytext=(offset_d[-1]-eps*dx, angle_d[-1]-eps*dy),
+                arrowprops=dict(
+                    arrowstyle='-|>',
+                    facecolor='tab:orange',
+                    edgecolor='black',
+                    mutation_scale=18,  # Controls arrowhead size.
+                    lw=1,  # Controls thickness.
+                )
+            )
+            
+            ax.legend(fontsize=8)
+        if phase_space == 'x':
+            ax.set_xlabel(r"Centroid $x$" ' [µm]')
+            ax.set_ylabel(r"Centroid $x'$" ' [µrad]')
+        else:
+            ax.set_xlabel(r"Centroid $y$" ' [µm]')
+            ax.set_ylabel(r"Centroid $y'$" ' [µrad]')
+        ax.grid(True, which='both', axis='both', linestyle='--', linewidth=1, alpha=.5)
+
+        # Save the figure
+        if savefig is not None:
+            fig.savefig(str(savefig), format='png', dpi=300, bbox_inches='tight', transparent=False)
+
+
     # ==================================================
     def survey_object(self):
         npoints = 10

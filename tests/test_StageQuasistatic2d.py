@@ -97,6 +97,47 @@ def setup_StageQuasistatic2d(driver_source=None, nom_accel_gradient=6.4e9, nom_e
 
 
 @pytest.mark.StageQuasistatic2d
+def test_driver_source_setter():
+    """
+    Tests ensuring that the driver source setter does not set invalid classes 
+    and that the driver source has valid energy.
+    """
+
+    driver_source = setup_basic_driver_source()
+    driver_complex = DriverComplex()
+    driver_complex.source = driver_source
+    stage = StageQuasistatic2d()
+
+    # Valid options
+    stage.driver_source = driver_source
+    assert isinstance(stage.driver_source, Source)
+    stage.driver_source = None
+    assert stage.driver_source is None
+    stage.driver_source = driver_complex
+    assert isinstance(stage.driver_source, DriverComplex)
+
+    # Invalid instances
+    with pytest.raises(TypeError):
+        stage.driver_source = 42
+    with pytest.raises(TypeError):
+        stage.driver_source = 4.2
+    with pytest.raises(TypeError):
+        stage.driver_source = 'lorem'
+
+    # Invalid driver source energy
+    stage2 = StageQuasistatic2d()
+    driver_source2 = setup_basic_driver_source()
+    driver_source2.energy = None
+    with pytest.raises(ValueError):
+        stage2.driver_source = driver_source2 # driver source energy must be set before being added to a stage.
+    
+    driver_complex2 = DriverComplex()
+    driver_complex2.source = driver_source2
+    with pytest.raises(ValueError):
+        stage2.driver_source = driver_complex2 # driver source energy must be set before being added to a stage.  
+
+
+@pytest.mark.StageQuasistatic2d
 def test_driver_unrotation():
     """
     Tests for checking the driver being correctly un-rotated back to its 
@@ -344,10 +385,7 @@ def test_ramped_tracking():
     #from matplotlib import pyplot as plt
     #plt.ion()
     #stage.plot_evolution()
-    #time.sleep(5)  # pauses for 5 seconds
-
-
-    
+    #time.sleep(5)  # pauses for 5 seconds  
 
 
 
