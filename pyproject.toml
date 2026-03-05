@@ -42,8 +42,7 @@ authors = [
 readme = "README.md"
 license = "GPL-3.0-or-later"
 
-[tool.setuptools]
-packages = ["abel"]
+#[tool.setuptools]
 #package-dir = {"" = "Python"}
 
 [tool.pytest.ini_options]
