@@ -4,8 +4,8 @@ requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "abel"
-version = "1.0"
+name = "abel-framework"
+version = "1.0.0"
 
 dependencies = [
    "numpy",
@@ -42,7 +42,8 @@ authors = [
 readme = "README.md"
 license = "GPL-3.0-or-later"
 
-#[tool.setuptools]
+[tool.setuptools]
+packages = ["abel"]
 #package-dir = {"" = "Python"}
 
 [tool.pytest.ini_options]
