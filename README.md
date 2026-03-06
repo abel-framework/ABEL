@@ -1,17 +1,56 @@
 # ABEL: the Adaptable Beginning-to-End Linac framework
 
-<img width="100" height="100" alt="abel_logo" src="https://github.com/user-attachments/assets/23247a60-ab84-42ef-a647-c899f6932766" align="left" />
+<p>
+<img width="100" height="100" alt="abel_logo" src="https://github.com/user-attachments/assets/23247a60-ab84-42ef-a647-c899f6932766" style="float:left; padding-left:10px; padding-right:10px"/>
 
 The ABEL simulation framework is a particle-tracking framework for multi-element particle accelerators (such as plasma-accelerator linacs, colliders, experimental test facilities, etc.), implemented at varying levels of complexity, for fast investigations or optimizations. As a systems code, it can be used for physics simulations as well as generating (and optimizing for) cost estimates.
+<br><br>
+</p>
 
-## Installation with `pip`
-1. (Optional) Make and activate a new Python (version 3.11) virtual environment for ABEL: `python3.11 -m venv your_abel_venv` and `source your_abel_venv/bin/activate`
-2. Clone the repository to a local folder, e.g., `git clone https://github.com/abel-framework/ABEL`
-3. In your target python environment, run `pip install path-to-ABEL` where `path-to-ABEL` is where you have cloned ABEL to.
-   If you want to be able to modify ABEL without uninstalling and reinstalling, you can run `pip install -e path-to-abel`, and the `abel`
-   folder in your local clone will effectively be put into your `$PYTHONPATH`.
+# Installation of ABEL
+The project name is `abel-framework`, which contains the `abel` package with various sub-packages.
+The project homepage is: https://github.com/abel-framework/ABEL/
 
-To remove ABEL, run `pip uninstall abel`.
+ABEL needs Python v3.11, due to requirements from some dependencies.
+
+## 1. Creating a Pyton environment for ABEL:
+
+### Using `venv`
+Make and activate a new Python (version 3.11) virtual environment for ABEL:\
+`python3.11 -m venv your_abel_venv` and `source your_abel_venv/bin/activate`
+
+### Using `conda`
+If not already done, setup `conda-forge`:\
+`conda config --add channels conda-forge` and `conda config --set channel_priority strict`
+
+Make and activate a new Python conda environment for ABEL:\
+`conda create -p abel-2026 python=3.12` and `conda activate /home/kyrsjo/CONDA/abel-2026`
+
+You may consider to then manually install some packages:\
+`conda install numpy scipy numba matplotlib tqdm PyQt6 pyqtgraph toml dill`
+
+## Installing `abel` into the Python environment
+
+### Standard installation from PyPi
+After preparing the Python environment, simply run:\
+`pip install abel-framework`\
+This will also install any missing dependencies in the right versions, including Wake-T, RF-Track, CLICopti, ax-platform, and impactx.
+
+To remove ABEL from the python environment, run `pip uninstall abel-framework`.
+
+### Editable installation from GitHub with `pip` (for development)
+To install a specific version from GitHub, e.g. for development, you first need to clone the repository to a local folder:\
+`git clone https://github.com/abel-framework/ABEL`\
+Note that if you intend to contribute (push) to ABEL, cloning with SSH instead of HTTPS is reccomended.
+
+Once the repository has been cloned, in your target python environment, run\
+`pip install -e path-to-ABEL` where `path-to-ABEL` is the folder you have cloned ABEL to.
+
+If you want to be able to modify ABEL without uninstalling and reinstalling, you can instead run\
+ `pip install -e path-to-abel`\
+ Changes to the files in the folder `src\abel` will be reflected in the installed package, as if you had put it into your `$PYTHONPATH`.
+
+To remove ABEL, run `pip uninstall abel-framework`.
 
 ## Configuration of ABEL
 To use ABEL, you must configure it. This is done with the file `.abelconfig.toml`, which is automatically created in your home directory the first time you import ABEL.
