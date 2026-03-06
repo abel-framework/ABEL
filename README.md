@@ -29,7 +29,7 @@ Make and activate a new Python conda environment for ABEL:\
 You may consider to then manually install some packages:\
 `conda install numpy scipy numba matplotlib tqdm PyQt6 pyqtgraph toml dill`
 
-## Installing `abel` into the Python environment
+## 2. Installing `abel` into the Python environment
 
 ### Standard installation from PyPi
 After preparing the Python environment, simply run:\
