@@ -1054,7 +1054,7 @@ class StageHipace(Stage):
 
 
     # =============================================
-    def driver_guiding_trajectory(self, driver, dacc_gradient=0.0, num_steps_per_half_osc=100):
+    def driver_guiding_trajectory(self, dacc_gradient=0.0, num_steps=100):
         """
         Estimate the trajectory that the drive beam will follow when driver 
         guiding with an external linear azimuthal magnetic field is applied to a 
@@ -1063,18 +1063,12 @@ class StageHipace(Stage):
 
         Parameters
         ----------
-        driver : ``Beam``
-            The drive beam.
-        
         dacc_gradient : [V/m] float, optional
             The decceleration gradient. Drive beam charge * decceleration 
             gradient must be negative. Defaults to 0.0.
 
-        num_steps_per_half_osc : int, optional
-            Number of calcualtion steps per half-oscillation of the drive beam. 
-            The number of half-oscillations is set in 
-            :meth:`StageHipace.calc_external_focusing_gradient() <abel.StageHipace.calc_external_focusing_gradient>`. 
-            Defaults to 100.
+        num_steps : int, optional
+            Number of time steps. Defaults to 100.
         
 
         Returns
@@ -1092,6 +1086,8 @@ class StageHipace(Stage):
 
         from abel.utilities.relativity import energy2momentum
         from abel.utilities.statistics import weighted_mean
+
+        driver = self.driver_source.track()
 
         energy_thres = 10*driver.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
         pz_thres = energy2momentum(energy_thres, unit='eV', m=driver.particle_mass)
@@ -1123,7 +1119,7 @@ class StageHipace(Stage):
         g = self.external_focusing_gradient  # [T/m]
         if g is None:
             g = 0.0
-        ds = self.length_flattop/self.driver_half_oscillations/num_steps_per_half_osc  # [m], step size
+        ds = self.length_flattop/num_steps  # [m], step size
 
         prop_length = 0
         s_trajectory = np.array([0.0])
@@ -1236,7 +1232,7 @@ class StageHipace(Stage):
             num_steps = int(L/(matched_beta/20))
         ds = self.length_flattop/num_steps # [m], step size
 
-        driver_s_trajectory, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(self.driver_source.track(), dacc_gradient=0.0, num_steps_per_half_osc=num_steps)
+        _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(dacc_gradient=0.0, num_steps=num_steps)
 
         prop_length = 0
         s_trajectory = np.full(num_steps, None, dtype=object)
