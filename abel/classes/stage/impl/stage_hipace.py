@@ -1162,6 +1162,131 @@ class StageHipace(Stage):
         s_trajectory = s_trajectory + driver.z_offset()
 
         return s_trajectory, x_trajectory, y_trajectory
+
+
+    # =============================================
+    def estimate_beam_trajectory(self, beam, num_steps=None):
+        """
+        Estimate the trajectory that the drive beam will follow when driver 
+        guiding with an external linear azimuthal magnetic field is applied to a 
+        drive beam with an initial angular offset. The calculations  are done by 
+        integrating simplified equations of motion.
+
+        Parameters
+        ----------
+        beam : ``Beam``
+            The main beam.
+        
+        dacc_gradient : [V/m] float, optional
+            The decceleration gradient. Drive beam charge * decceleration 
+            gradient must be negative. Defaults to 0.0.
+
+        num_steps : int, optional
+            ...
+            Defaults to ``None``.
+        
+
+        Returns
+        -------
+        s_trajectory : [m] float
+            Longitudinal coordinate of the drive beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] float
+            x-coordinate of the drive beam trajectory.
+        
+        y_trajectory : [m] float
+            y-coordinate of the drive beam trajectory.
+        """
+
+        from abel.utilities.relativity import energy2momentum
+        from abel.utilities.statistics import weighted_mean
+
+        
+        #pz_thres = energy2momentum(energy_thres, unit='eV', m=driver.particle_mass)
+        pz0 = energy2momentum(beam.energy(), unit='eV', m=beam.particle_mass)
+
+        #if pz0 < pz_thres:
+        #    raise ValueError('This estimate is only valid for a relativistic beam.')
+        
+        q = beam.particle_charge()  # [C], particle charge including charge sign.
+        if q * self.nom_accel_gradient_flattop > 0.0:
+            raise ValueError('Beam charge * self.nom_accel_gradient_flattop  gradient must be negative.')
+        
+        # Make a copy of the stage and set up its ramps if they are not set up
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+        
+        L = stage_copy.get_length()  # [m]
+        
+        g0 = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        g = g0
+        if self.external_focusing_gradient is not None:
+            g = g0 + self.external_focusing_gradient
+
+        if num_steps is None:
+            matched_beta = self.matched_beta_function(beam.energy())
+            num_steps = int(L/(matched_beta/20))
+        ds = self.length_flattop/num_steps # [m], step size
+
+        driver_s_trajectory, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(self.driver_source.track(), dacc_gradient=0.0, num_steps_per_half_osc=num_steps)
+
+        prop_length = 0
+        s_trajectory = np.full(num_steps, None, dtype=object)
+        s_trajectory[0] = 0.0
+        x0 = beam.x_offset()
+        #x_trajectory = np.array([x0])  # [m], records the trajectory
+        x_trajectory = np.full(num_steps, None, dtype=object)
+        x_trajectory[0] = x0
+        x = x0
+        y0 = beam.y_offset()
+        #y_trajectory = np.array([y0])  # [m], records the trajectory
+        y_trajectory = np.full(num_steps, None, dtype=object)
+        y_trajectory[0] = y0
+        y = y0
+        px = weighted_mean(beam.pxs(), beam.weightings(), clean=False)
+        py = weighted_mean(beam.pys(), beam.weightings(), clean=False)
+        pz = pz0 # Can add option for deceleration using a gradient
+
+        i = 0
+
+        while prop_length < L:
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            # Kick
+            dpx = q*g*x*ds - q*g0*driver_x_trajectory[i]*ds
+            px = px + dpx
+            dpy = q*g*y*ds - q*g0*driver_y_trajectory[i]*ds
+            py = py + dpy
+            pz = pz0 - q * self.nom_accel_gradient_flattop * prop_length/SI.c
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            i = i + 1
+            s_trajectory[i] = prop_length
+            x_trajectory[i] = x
+            y_trajectory[i] = y
+            # s_trajectory = np.append(s_trajectory, prop_length)
+            # x_trajectory = np.append(x_trajectory, x)
+            # y_trajectory = np.append(y_trajectory, y)
+
+        s_trajectory = s_trajectory + beam.location
+
+        return s_trajectory, x_trajectory, y_trajectory
     
 
     # ==================================================
