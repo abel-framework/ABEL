@@ -1,5 +1,5 @@
-include abel/wrappers/elegant/templates/*.lte
-include abel/wrappers/elegant/templates/*.ele
-include abel/wrappers/guineapig/templates/*.dat
-include abel/wrappers/hipace/*_template
-include abel/abelconfig.toml
+include src/abel/wrappers/elegant/templates/*.lte
+include src/abel/wrappers/elegant/templates/*.ele
+include src/abel/wrappers/guineapig/templates/*.dat
+include src/abel/wrappers/hipace/*_template
+include src/abel/abelconfig.toml
