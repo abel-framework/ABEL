@@ -1230,7 +1230,7 @@ class StageHipace(Stage):
         if num_steps is None:
             matched_beta = self.matched_beta_function(beam.energy())
             num_steps = int(L/(matched_beta/20))
-        ds = self.length_flattop/num_steps # [m], step size
+        ds = self.length_flattop/(num_steps+1) # [m], step size
 
         _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(dacc_gradient=0.0, num_steps=num_steps)
 
@@ -1253,7 +1253,7 @@ class StageHipace(Stage):
 
         i = 0
 
-        while prop_length < L:
+        while i < num_steps-1:
 
             # Drift
             prop_length = prop_length + 1/2*ds
