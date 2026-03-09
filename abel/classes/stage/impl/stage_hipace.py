@@ -1163,15 +1163,53 @@ class StageHipace(Stage):
     # =============================================
     def estimate_beam_trajectory(self, beam, num_steps=None):
         """
-        Estimate the trajectory that the drive beam will follow when driver 
+        ...
+        """
+
+        from abel.utilities.statistics import weighted_mean
+        from abel.utilities.relativity import energy2momentum
+
+        # Prepare parameters
+        x0 = beam.x_offset()
+        y0 = beam.y_offset()
+        weights = beam.weightings()
+        px0 = weighted_mean(beam.pxs(), weights, clean=False)
+        py0 = weighted_mean(beam.pys(), weights, clean=False)
+        pz0 = energy2momentum(beam.energy(), unit='eV', m=beam.particle_mass)
+        q = beam.particle_charge()
+
+        L = self.get_length()  # [m], total length including any ramps.
+        if num_steps is None:
+            matched_beta = self.matched_beta_function(beam.energy())
+            num_steps = int(L /(matched_beta/20))
+
+        # Actual calculations
+        s_trajectory, x_trajectory, y_trajectory, _, _ = self._estimate_beam_trajectory(s0=0.0, 
+                                                        x0=x0, 
+                                                        y0=y0, 
+                                                        px0=px0, 
+                                                        py0=py0, 
+                                                        pz0=pz0, 
+                                                        q=q, 
+                                                        num_steps=num_steps, 
+                                                        driver_x_trajectory=None, 
+                                                        driver_y_trajectory=None)
+
+        return s_trajectory, x_trajectory, y_trajectory
+
+    # =============================================
+    def _estimate_beam_trajectory(self, s0, x0, y0, px0, py0, pz0, q, num_steps=None, driver_x_trajectory=None, driver_y_trajectory=None):
+        """
+        Estimate the trajectory that the main beam will follow when driver 
         guiding with an external linear azimuthal magnetic field is applied to a 
         drive beam with an initial angular offset. The calculations  are done by 
         integrating simplified equations of motion.
 
+        ...
+
         Parameters
         ----------
-        beam : ``Beam``
-            The main beam.
+        
 
         num_steps : int, optional
             ...
@@ -1189,19 +1227,9 @@ class StageHipace(Stage):
         
         y_trajectory : [m] float
             y-coordinate of the drive beam trajectory.
+
+        ...
         """
-
-        from abel.utilities.relativity import energy2momentum
-        from abel.utilities.statistics import weighted_mean
-
-        
-        #pz_thres = energy2momentum(energy_thres, unit='eV', m=driver.particle_mass)
-        pz0 = energy2momentum(beam.energy(), unit='eV', m=beam.particle_mass)
-
-        #if pz0 < pz_thres:
-        #    raise ValueError('This estimate is only valid for a relativistic beam.')
-        
-        q = beam.particle_charge()  # [C], particle charge including charge sign.
         if q * self.nom_accel_gradient_flattop > 0.0:
             raise ValueError('Beam charge * self.nom_accel_gradient_flattop  gradient must be negative.')
         
@@ -1216,38 +1244,86 @@ class StageHipace(Stage):
         else: 
             stage_copy = self
         
-        g0 = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        # Calculate the focusing field gradient
+        g0 = SI.e*stage_copy.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
         g = g0
-        if self.external_focusing_gradient is not None:
-            g = g0 + self.external_focusing_gradient
+        if stage_copy.external_focusing_gradient is not None:
+            g = g0 + stage_copy.external_focusing_gradient
 
-        L = stage_copy.get_length()  # [m]
-        if num_steps is None:
-            matched_beta = self.matched_beta_function(beam.energy())
-            num_steps = int(L /(matched_beta/20))
-        ds = L /(num_steps-1) # [m], step size
+        # Only calculate the time step size when calling estimate_beam_trajectory() from a flattop
+        if not stage_copy.is_upramp() and not stage_copy.is_downramp():
+            L = stage_copy.get_length()  # [m], total length including any ramps.
+            ds = L /(num_steps-1) # [m], step size
 
-        _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(num_steps=num_steps, dacc_gradient=0.0)
+        # Calculate the drive beam trajectory
+        if driver_x_trajectory is None or driver_y_trajectory is None:
+            _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(num_steps=num_steps, dacc_gradient=0.0)
 
-        prop_length = 0
+        # Initialise arrays
         s_trajectory = np.full(num_steps, None, dtype=object)
-        s_trajectory[0] = 0.0
-        x0 = beam.x_offset()
-        #x_trajectory = np.array([x0])  # [m], records the trajectory
         x_trajectory = np.full(num_steps, None, dtype=object)
-        x_trajectory[0] = x0
-        x = x0
-        y0 = beam.y_offset()
-        #y_trajectory = np.array([y0])  # [m], records the trajectory
         y_trajectory = np.full(num_steps, None, dtype=object)
-        y_trajectory[0] = y0
+        px_trajectory = np.full(num_steps, None, dtype=object)
+        py_trajectory = np.full(num_steps, None, dtype=object)
+
+        # Recursive call from the upramp
+        if stage_copy.upramp is not None:
+            upramp = stage_copy.convert_PlasmaRamp(stage_copy.upramp)
+            if self.external_focusing:
+                upramp.external_focusing_gradient = stage_copy.external_focusing_gradient
+
+            num_steps_upramp = int(upramp.length_flattop/ds)
+
+            s_trajectory_upramp, x_trajectory_upramp, y_trajectory_upramp, px_trajectory_upramp, py_trajectory_upramp = upramp._estimate_beam_trajectory(s0, x0, y0, px0, py0, pz0, q, num_steps_upramp, driver_x_trajectory, driver_y_trajectory)
+
+            # Initial parameters for the flattop
+            prop_length = s_trajectory_upramp[-1]
+            s_trajectory[:len(s_trajectory_upramp)] = s_trajectory_upramp
+            x0 = x_trajectory_upramp[-1]
+            x_trajectory[:len(x_trajectory_upramp)] = x_trajectory_upramp
+            y0 = y_trajectory_upramp[-1]
+            y_trajectory[:len(y_trajectory_upramp)] = y_trajectory_upramp
+            px0 = px_trajectory_upramp[-1]
+            px_trajectory[:len(px_trajectory_upramp)] = px_trajectory_upramp
+            py0 = py_trajectory_upramp[-1]
+            py_trajectory[:len(py_trajectory_upramp)] = py_trajectory_upramp
+            pz0 = pz0 - q * stage_copy.upramp.nom_accel_gradient_flattop * prop_length/SI.c
+
+            i = num_steps_upramp - 1
+
+            if stage_copy.downramp is not None:
+                num_steps_downramp = int(stage_copy.downramp.length_flattop/ds)
+                i_end = num_steps - num_steps_downramp - 1
+            else:
+                i_end = num_steps - 1
+
+        # No ramps
+        else:
+            prop_length = s0
+            s_trajectory[0] = prop_length
+            x_trajectory[0] = x0
+            y_trajectory[0] = y0
+            px_trajectory[0] = px0
+            py_trajectory[0] = py0
+
+            i = 0
+            i_end = num_steps - 1
+
+            if self.is_downramp():
+                
+                # Extract the part of drive beam trajectory for the downramp
+                driver_index = num_steps - num_steps_downramp - 1
+                driver_x_trajectory = driver_x_trajectory[driver_index:]
+                driver_y_trajectory = driver_y_trajectory[driver_index:]
+
+        # Set the initial conditions
+        x = x0
         y = y0
-        px = weighted_mean(beam.pxs(), beam.weightings(), clean=False)
-        py = weighted_mean(beam.pys(), beam.weightings(), clean=False)
+        px = px0
+        py = py0
         pz = pz0
 
-        i = 0
-        while i < num_steps-1:
+        while i < i_end:
 
             # Drift
             prop_length = prop_length + 1/2*ds
@@ -1270,14 +1346,26 @@ class StageHipace(Stage):
             s_trajectory[i] = prop_length
             x_trajectory[i] = x
             y_trajectory[i] = y
-            # s_trajectory = np.append(s_trajectory, prop_length)
-            # x_trajectory = np.append(x_trajectory, x)
-            # y_trajectory = np.append(y_trajectory, y)
+            px_trajectory[i] = px
+            py_trajectory[i] = py
 
-        #print(i, y_trajectory[i], y_trajectory[-1])
-        #s_trajectory = s_trajectory + beam.location
+        # Recursive call from the downramp
+        if stage_copy.downramp is not None:
+            downramp = stage_copy.convert_PlasmaRamp(stage_copy.downramp)
+            if self.external_focusing:
+                downramp.external_focusing_gradient = stage_copy.external_focusing_gradient
 
-        return s_trajectory, x_trajectory, y_trajectory
+            num_steps_downramp = int(downramp.length_flattop/ds)
+
+            s_trajectory_downramp, x_trajectory_downramp, y_trajectory_downramp, px_trajectory_downramp, py_trajectory_downramp = downramp._estimate_beam_trajectory(prop_length, x, y, px, py, pz, q, num_steps_downramp, driver_x_trajectory, driver_y_trajectory)
+
+            s_trajectory[-len(s_trajectory_downramp):] = s_trajectory_downramp
+            x_trajectory[-len(x_trajectory_downramp):] = x_trajectory_downramp
+            y_trajectory[-len(y_trajectory_downramp):] = y_trajectory_downramp
+            px_trajectory[-len(px_trajectory_downramp):] = px_trajectory_downramp
+            py_trajectory[-len(py_trajectory_downramp):] = py_trajectory_downramp
+
+        return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory
     
 
     # ==================================================
