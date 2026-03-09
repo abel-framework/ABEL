@@ -1054,7 +1054,7 @@ class StageHipace(Stage):
 
 
     # =============================================
-    def driver_guiding_trajectory(self, dacc_gradient=0.0, num_steps=100):
+    def driver_guiding_trajectory(self, num_steps=100, dacc_gradient=0.0):
         """
         Estimate the trajectory that the drive beam will follow when driver 
         guiding with an external linear azimuthal magnetic field is applied to a 
@@ -1063,12 +1063,12 @@ class StageHipace(Stage):
 
         Parameters
         ----------
+        num_steps : int, optional
+            Number of time steps. Defaults to 100.
+
         dacc_gradient : [V/m] float, optional
             The decceleration gradient. Drive beam charge * decceleration 
             gradient must be negative. Defaults to 0.0.
-
-        num_steps : int, optional
-            Number of time steps. Defaults to 100.
         
 
         Returns
@@ -1155,7 +1155,7 @@ class StageHipace(Stage):
             x_trajectory = np.append(x_trajectory, x)
             y_trajectory = np.append(y_trajectory, y)
 
-        s_trajectory = s_trajectory + driver.z_offset()
+        #s_trajectory = s_trajectory + driver.z_offset()
 
         return s_trajectory, x_trajectory, y_trajectory
 
@@ -1172,10 +1172,6 @@ class StageHipace(Stage):
         ----------
         beam : ``Beam``
             The main beam.
-        
-        dacc_gradient : [V/m] float, optional
-            The decceleration gradient. Drive beam charge * decceleration 
-            gradient must be negative. Defaults to 0.0.
 
         num_steps : int, optional
             ...
@@ -1220,19 +1216,18 @@ class StageHipace(Stage):
         else: 
             stage_copy = self
         
-        L = stage_copy.get_length()  # [m]
-        
         g0 = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
         g = g0
         if self.external_focusing_gradient is not None:
             g = g0 + self.external_focusing_gradient
 
+        L = stage_copy.get_length()  # [m]
         if num_steps is None:
             matched_beta = self.matched_beta_function(beam.energy())
-            num_steps = int(L/(matched_beta/20))
-        ds = self.length_flattop/(num_steps+1) # [m], step size
+            num_steps = int(L /(matched_beta/20))
+        ds = L /(num_steps-1) # [m], step size
 
-        _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(dacc_gradient=0.0, num_steps=num_steps)
+        _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(num_steps=num_steps, dacc_gradient=0.0)
 
         prop_length = 0
         s_trajectory = np.full(num_steps, None, dtype=object)
@@ -1249,10 +1244,9 @@ class StageHipace(Stage):
         y = y0
         px = weighted_mean(beam.pxs(), beam.weightings(), clean=False)
         py = weighted_mean(beam.pys(), beam.weightings(), clean=False)
-        pz = pz0 # Can add option for deceleration using a gradient
+        pz = pz0
 
         i = 0
-
         while i < num_steps-1:
 
             # Drift
@@ -1280,7 +1274,8 @@ class StageHipace(Stage):
             # x_trajectory = np.append(x_trajectory, x)
             # y_trajectory = np.append(y_trajectory, y)
 
-        s_trajectory = s_trajectory + beam.location
+        #print(i, y_trajectory[i], y_trajectory[-1])
+        #s_trajectory = s_trajectory + beam.location
 
         return s_trajectory, x_trajectory, y_trajectory
     
