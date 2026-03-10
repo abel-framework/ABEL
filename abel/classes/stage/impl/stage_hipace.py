@@ -1230,6 +1230,8 @@ class StageHipace(Stage):
 
         ...
         """
+        from abel.utilities.other import find_closest_value_in_arr
+
         if q * self.nom_accel_gradient_flattop > 0.0:
             raise ValueError('Beam charge * self.nom_accel_gradient_flattop  gradient must be negative.')
         
@@ -1252,8 +1254,60 @@ class StageHipace(Stage):
 
         # Only calculate the time step size when calling estimate_beam_trajectory() from a flattop
         if not stage_copy.is_upramp() and not stage_copy.is_downramp():
+
+            #print('not stage_copy.is_upramp() and not stage_copy.is_downramp():', not stage_copy.is_upramp() and not stage_copy.is_downramp()) # TODO: delete
+
+            # Set the step size
             L = stage_copy.get_length()  # [m], total length including any ramps.
-            ds = L /(num_steps-1) # [m], step size
+            stage_copy.ds = L /(num_steps-1) # [m], step size
+
+
+            if stage_copy.has_ramp():
+                # Set the number of time steps in the upramp and downramp
+                #ss_helper = np.linspace(0.0, L , num_steps)
+                ss_helper = np.arange(num_steps) * stage_copy.ds
+                num_steps_upramp, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length)
+                num_steps_upramp = num_steps_upramp + 1
+                idx_flat_end, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length+stage_copy.length_flattop)
+                
+                num_steps_downramp = num_steps - idx_flat_end
+                stage_copy.idx_flat_end = idx_flat_end
+                stage_copy.num_steps_upramp = num_steps_upramp
+                stage_copy.num_steps_downramp = num_steps_downramp
+
+
+
+            ds = stage_copy.ds # TODO: delete
+
+            
+            # TODO: delete
+            #print('np.max(np.diff(ss_helper))/ds', np.max(np.diff(ss_helper))/ ds)
+
+            #num_flat = idx_flat_end - stage_copy.num_steps_upramp
+            #num_down = num_steps - idx_flat_end
+
+
+            
+
+            # print('num_steps_upramp, num_steps_flattop..., :', 
+            #       stage_copy.num_steps_upramp , 
+            #       num_flat, 
+            #       stage_copy.num_steps_downramp, 
+            #       num_steps, 
+            #       stage_copy.num_steps_upramp + num_flat + stage_copy.num_steps_downramp) # TODO: delete
+
+            #print('ss_helper[stage_copy.num_steps_upramp ]', ss_helper[stage_copy.num_steps_upramp-1 ], stage_copy.upramp.length_flattop, '\n')
+
+            #print('ss_helper[stage_copy.idx_flat_end]:', ss_helper[stage_copy.idx_flat_end], stage_copy.upramp.length + stage_copy.length_flattop, stage_copy.length - stage_copy.downramp.length, '\n')
+
+            #print('ss_helper[-1], ss_helper[num_up+num_flat+num_down]', ss_helper[-1], ss_helper[stage_copy.num_steps_upramp+num_flat+stage_copy.num_steps_downramp-1], stage_copy.length, ss_helper[-1]/stage_copy.length, '\n')
+
+            
+
+        #ds = stage_copy.get_length() /(num_steps-1) # [m], step size. Determined by the total length of either ramp or flattop+ramps.
+        ds = stage_copy.ds
+
+        
 
         # Calculate the drive beam trajectory
         if driver_x_trajectory is None or driver_y_trajectory is None:
@@ -1269,10 +1323,12 @@ class StageHipace(Stage):
         # Recursive call from the upramp
         if stage_copy.upramp is not None:
             upramp = stage_copy.convert_PlasmaRamp(stage_copy.upramp)
+            stage_copy.upramp = upramp
             if self.external_focusing:
                 upramp.external_focusing_gradient = stage_copy.external_focusing_gradient
 
-            num_steps_upramp = int(upramp.length_flattop/ds)
+            #num_steps_upramp = int(upramp.length/ds)
+            num_steps_upramp = stage_copy.num_steps_upramp 
 
             s_trajectory_upramp, x_trajectory_upramp, y_trajectory_upramp, px_trajectory_upramp, py_trajectory_upramp = upramp._estimate_beam_trajectory(s0, x0, y0, px0, py0, pz0, q, num_steps_upramp, driver_x_trajectory, driver_y_trajectory)
 
@@ -1289,11 +1345,16 @@ class StageHipace(Stage):
             py_trajectory[:len(py_trajectory_upramp)] = py_trajectory_upramp
             pz0 = pz0 - q * stage_copy.upramp.nom_accel_gradient_flattop * prop_length/SI.c
 
+            print('s_trajectory_upramp[-1]/stage_copy.upramp.length', s_trajectory_upramp[-1]/stage_copy.upramp.length)
+
             i = num_steps_upramp - 1
 
             if stage_copy.downramp is not None:
-                num_steps_downramp = int(stage_copy.downramp.length_flattop/ds)
-                i_end = num_steps - num_steps_downramp - 1
+                #num_steps_downramp = int(stage_copy.downramp.length_flattop/ds)
+                # num_steps_downramp = stage_copy.num_steps_downramp
+                # print('INSIDE stage_copy.downramp is not None:', num_steps_downramp) #TODO: DELETE
+                # i_end = num_steps - num_steps_downramp - 1
+                i_end = stage_copy.idx_flat_end
             else:
                 i_end = num_steps - 1
 
@@ -1309,12 +1370,25 @@ class StageHipace(Stage):
             i = 0
             i_end = num_steps - 1
 
+
+            # # TODO: delete
+            # s_test = np.full(num_steps, ds, dtype=float)
+            # s_test[0] = 0.0
+            # s_test = np.cumsum(s_test)
+            # print('s_test[-1]: ...', s_test[-1], self.length, s_test[-1]/self.length)
+
             if self.is_downramp():
                 
                 # Extract the part of drive beam trajectory for the downramp
-                driver_index = num_steps - num_steps_downramp - 1
-                driver_x_trajectory = driver_x_trajectory[driver_index:]
-                driver_y_trajectory = driver_y_trajectory[driver_index:]
+                #num_steps_downramp = int(self.length_flattop/ds)
+                #num_steps_downramp = len(s_trajectory)
+                num_steps_downramp = stage_copy.num_steps_downramp 
+                driver_index = num_steps_downramp
+                driver_x_trajectory = driver_x_trajectory[-driver_index:]
+                driver_y_trajectory = driver_y_trajectory[-driver_index:]
+
+                
+                print('inside self.is_downramp():', len(driver_y_trajectory), driver_index, len(s_trajectory), num_steps) # TODO: delete
 
         # Set the initial conditions
         x = x0
@@ -1323,6 +1397,9 @@ class StageHipace(Stage):
         py = py0
         pz = pz0
 
+        #print('ds:', ds) #TODO:delete
+
+        # Solve the equations of motion
         while i < i_end:
 
             # Drift
@@ -1352,18 +1429,44 @@ class StageHipace(Stage):
         # Recursive call from the downramp
         if stage_copy.downramp is not None:
             downramp = stage_copy.convert_PlasmaRamp(stage_copy.downramp)
+            stage_copy.downramp = downramp
             if self.external_focusing:
                 downramp.external_focusing_gradient = stage_copy.external_focusing_gradient
 
-            num_steps_downramp = int(downramp.length_flattop/ds)
+            #num_steps_downramp = int(downramp.length_flattop/ds)
+            num_steps_downramp = stage_copy.num_steps_downramp 
+
+            #print(downramp.is_downramp(), stage_copy.downramp.is_downramp(), num_steps_downramp ) # TODO: delete
 
             s_trajectory_downramp, x_trajectory_downramp, y_trajectory_downramp, px_trajectory_downramp, py_trajectory_downramp = downramp._estimate_beam_trajectory(prop_length, x, y, px, py, pz, q, num_steps_downramp, driver_x_trajectory, driver_y_trajectory)
+
+
 
             s_trajectory[-len(s_trajectory_downramp):] = s_trajectory_downramp
             x_trajectory[-len(x_trajectory_downramp):] = x_trajectory_downramp
             y_trajectory[-len(y_trajectory_downramp):] = y_trajectory_downramp
             px_trajectory[-len(px_trajectory_downramp):] = px_trajectory_downramp
             py_trajectory[-len(py_trajectory_downramp):] = py_trajectory_downramp
+
+            # TODO: delete
+
+            print('s_trajectory_downramp[-1]/stage_copy.length...', s_trajectory_downramp[-1]/stage_copy.length, 
+                  s_trajectory[-1]/stage_copy.length, '\n')
+            
+            #print('s_trajectory_downramp[0]/s_trajectory[stage_copy.idx_flat_end]', s_trajectory_downramp[0]/s_trajectory[stage_copy.idx_flat_end], '\n')
+            
+            print('(s_trajectory_downramp[-1]-s_trajectory_downramp[0])/stage_copy.downramp.length..', (s_trajectory_downramp[-1]-s_trajectory_downramp[0])/stage_copy.downramp.length,
+                  (s_trajectory_downramp[-1]-s_trajectory[-len(s_trajectory_downramp)])/stage_copy.downramp.length,
+                   '\n')
+            
+            print('s_trajectory[stage_copy.num_steps_upramp]/stage_copy.upramp.length', 
+                  s_trajectory[stage_copy.num_steps_upramp-1]/stage_copy.upramp.length, '\n')
+
+            print(s_trajectory[-len(s_trajectory_downramp)]/(stage_copy.length-stage_copy.downramp.length), 
+                  
+                  s_trajectory[-len(s_trajectory_downramp)]/(stage_copy.length_flattop+stage_copy.upramp.length)) #TODO: delete
+            
+
 
         return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory
     
