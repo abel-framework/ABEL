@@ -11,7 +11,7 @@ build:
     python: "3.12"
   jobs:
     pre_build:
-     - echo -e try:\\n import abel\\nexcept ValueError:\\n print\(\'Created.\'\) | python
+     - echo -e "try:\\n import abel\\nexcept ValueError:\\n print('Created.')" | python
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
