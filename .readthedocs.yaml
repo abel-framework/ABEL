@@ -23,3 +23,7 @@ sphinx:
 python:
    install:
    - requirements: docs/sphinx-source/requirements.txt
+   #Install ABEL from the current commit, not from pyPi
+   #before building the docs
+   - method: pip
+      path: .
