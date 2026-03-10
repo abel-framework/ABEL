@@ -1393,8 +1393,6 @@ class StageHipace(Stage):
             py_trajectory[:len(py_trajectory_upramp)] = py_trajectory_upramp
             pz0 = pz0 - q * stage_copy.upramp.nom_accel_gradient_flattop * prop_length/SI.c
 
-            #print('s_trajectory_upramp[-1]/stage_copy.upramp.length', s_trajectory_upramp[-1]/stage_copy.upramp.length)  # TODO: delete
-
             i = num_steps_upramp - 1
 
             if stage_copy.downramp is not None:
@@ -1415,23 +1413,6 @@ class StageHipace(Stage):
             i_end = num_steps - 1
 
             if self.is_downramp():
-
-                # #TODO: delete
-                # import matplotlib.pyplot as plt
-                # plt.figure()
-                # plt.plot(driver_s_trajectory, driver_y_trajectory*1e6)
-
-                # ss_driver = driver_s_trajectory[stage_copy.idx_flat_end:]
-                # plt.plot(ss_driver, driver_y_trajectory[stage_copy.idx_flat_end:]*1e6)
-
-                # print('len(driver_s_trajectory)', len(driver_s_trajectory), num_steps)
-                # print('driver_s_trajectory endpoint control', driver_s_trajectory[-1]/self.parent.length)
-                # print('driver downramp starting point', ss_driver[0], driver_s_trajectory[stage_copy.idx_flat_end])
-                # print((ss_driver[-1]-ss_driver[0]), self.length)
-                # print('(ss_driver[-1]-ss_driver[0])/ stage_copy.downramp.length',(ss_driver[-1]-ss_driver[0])/ self.length)
-
-                
-                
                 # Extract the part of drive beam trajectory for the downramp
                 driver_x_trajectory = driver_x_trajectory[stage_copy.idx_flat_end:]
                 driver_y_trajectory = driver_y_trajectory[stage_copy.idx_flat_end:]
@@ -1486,22 +1467,6 @@ class StageHipace(Stage):
             y_trajectory[-len(y_trajectory_downramp):] = y_trajectory_downramp
             px_trajectory[-len(px_trajectory_downramp):] = px_trajectory_downramp
             py_trajectory[-len(py_trajectory_downramp):] = py_trajectory_downramp
-
-            # TODO: delete
-            print('upramp length control    s_trajectory[stage_copy.num_steps_upramp]/stage_copy.upramp.length', 
-                  s_trajectory[stage_copy.num_steps_upramp-1]/stage_copy.upramp.length, '\n')
-            
-            print('flattop length control   ', (s_trajectory[stage_copy.idx_flat_end]-s_trajectory[stage_copy.num_steps_upramp-1])/ stage_copy.length_flattop, '\n')
-            
-            print('downramp starting point   s_trajectory_downramp[0]/s_trajectory[stage_copy.idx_flat_end]', s_trajectory_downramp[0]/s_trajectory[stage_copy.idx_flat_end], '\n')
-            
-            print('downramp length control   (s_trajectory_downramp[-1]-s_trajectory_downramp[0])/stage_copy.downramp.length..', (s_trajectory_downramp[-1]-s_trajectory_downramp[0])/stage_copy.downramp.length,
-                  (s_trajectory_downramp[-1]-s_trajectory[-len(s_trajectory_downramp)])/stage_copy.downramp.length,
-                   '\n')
-            
-            print('stage end point control   s_trajectory_downramp[-1]/stage_copy.length...', s_trajectory_downramp[-1]/stage_copy.length, 
-                  s_trajectory[-1]/stage_copy.length, '\n')
-            
 
         return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory
     
