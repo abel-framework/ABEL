@@ -1,11 +1,11 @@
 [build-system]
 # See https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
-requires = ["setuptools >= 61.0"]
+requires = ["setuptools >= 61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "abel"
-version = "1.0"
+name = "abel-framework"
+version = "2026.3.0"
 
 dependencies = [
    "numpy",
