@@ -26,7 +26,7 @@ class CONFIG:
                     print("Loading ABEL config from '"+p+"'")
                 configFile = p
         if configFile == None:
-            print("Copying a template config into '",cls._config_searchpath[0],"'")
+            print("Copying a template config into '" + cls._config_searchpath[0] + "'")
             import shutil
             shutil.copy2(cls._config_templatepath, cls._config_searchpath[0])
             print("Now you should check and maybe edit this file, and then import ABEL again.")
