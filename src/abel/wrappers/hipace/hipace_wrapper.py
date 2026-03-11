@@ -158,7 +158,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
 
     # gradient for external magnetic field
     if external_focusing_gradient is None:
-        external_focusing_gradient = 0.0
+        external_focusing_gradient = '#'
     if abs(external_focusing_gradient) > 0:
         external_focusing_comment = ''
     else:

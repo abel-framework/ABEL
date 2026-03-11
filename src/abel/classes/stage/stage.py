@@ -1472,6 +1472,16 @@ class Stage(Trackable, CostModeled):
         return length
     
 
+    # =============================================
+    @property
+    def external_focusing_gradient(self) -> float:
+        """
+        Return None by default for ``Stage`` subclasses not supporting external 
+        focusing fields.
+        """
+        return None
+    
+    
     # ==================================================
     def calc_flattop_num_beta_osc(self, num_beta_osc):
         """

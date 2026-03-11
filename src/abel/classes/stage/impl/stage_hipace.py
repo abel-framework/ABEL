@@ -343,7 +343,7 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-
+        
         if self.external_focusing and self.external_focusing_gradient is None:
             self.external_focusing_gradient = self.calc_external_focusing_gradient() # Set the gradient for external focusing fields if not already set.
 
