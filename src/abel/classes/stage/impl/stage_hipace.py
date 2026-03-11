@@ -1142,9 +1142,9 @@ class StageHipace(Stage):
         ds = L/(num_steps-1)  # [m], step size
 
         # Initialise arrays
-        s_trajectory = np.full(num_steps, None, dtype=object)
-        x_trajectory = np.full(num_steps, None, dtype=object)
-        y_trajectory = np.full(num_steps, None, dtype=object)
+        s_trajectory = np.full(num_steps, None, dtype=float)
+        x_trajectory = np.full(num_steps, None, dtype=float)
+        y_trajectory = np.full(num_steps, None, dtype=float)
 
         # Set initial parameters
         prop_length = 0
@@ -1374,11 +1374,11 @@ class StageHipace(Stage):
                 raise ValueError('The length of driver_x_trajectory and driver_y_trajectory must be the same as num_steps.')
 
         # Initialise arrays
-        s_trajectory = np.full(num_steps, None, dtype=object)
-        x_trajectory = np.full(num_steps, None, dtype=object)
-        y_trajectory = np.full(num_steps, None, dtype=object)
-        px_trajectory = np.full(num_steps, None, dtype=object)
-        py_trajectory = np.full(num_steps, None, dtype=object)
+        s_trajectory = np.full(num_steps, None, dtype=float)
+        x_trajectory = np.full(num_steps, None, dtype=float)
+        y_trajectory = np.full(num_steps, None, dtype=float)
+        px_trajectory = np.full(num_steps, None, dtype=float)
+        py_trajectory = np.full(num_steps, None, dtype=float)
 
         # Recursive call from the upramp
         if stage_copy.upramp is not None:
