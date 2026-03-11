@@ -1471,7 +1471,7 @@ class Stage(Trackable, CostModeled):
 
         return length
     
-
+    
     # ==================================================
     def calc_flattop_num_beta_osc(self, num_beta_osc):
         """
@@ -1726,7 +1726,9 @@ class Stage(Trackable, CostModeled):
         from abel.utilities.beam_physics import evolve_beta_function
         from abel.utilities.beam_physics import phase_advance
         
-        g_ion = SI.e*self.plasma_density/(2*SI.epsilon_0)
+        g = SI.e*self.plasma_density/(2*SI.epsilon_0)
+        if self.external_focusing_gradient is not None:
+            g = g + self.external_focusing_gradient * SI.c
         p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
         if beta0 is None:
             if self.is_upramp():
@@ -1737,7 +1739,7 @@ class Stage(Trackable, CostModeled):
                 beta0 = beta_matched(self.plasma_density, self.nom_energy)
 
         ls = np.array([self.length_flattop])
-        ks = np.array([g_ion*SI.e/SI.c/p0])
+        ks = np.array([g*SI.e/SI.c/p0])
         _, _, beta_evolution = evolve_beta_function(ls=ls, ks=ks, beta0=beta0, fast=False, plot=False)
         return phase_advance(beta_evolution[0,:], beta_evolution[1,:])
 
