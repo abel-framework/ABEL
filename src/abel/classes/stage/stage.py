@@ -515,8 +515,14 @@ class Stage(Trackable, CostModeled):
             ramp_beta_mag = self.ramp_beta_mag
         else:
             raise ValueError('No ramp_beta_mag defined.')
-        
-        ramp_length = beta_matched(self.plasma_density, ramp.nom_energy)*np.pi/(2*np.sqrt(1/ramp_beta_mag))
+
+        g = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+        if self.external_focusing_gradient is not None:  # Add contribution from external field
+            g = g + self.external_focusing_gradient
+
+        k_beta = np.sqrt(g*SI.c/ramp.nom_energy)  # [m^-1], betatron wavenumber.
+        ramp_length = 1/k_beta * np.pi/2 * np.sqrt(ramp_beta_mag)  # k_beta*ramp_length = pi/2 gives pi/2 phase advance.
+
         if ramp_length < 0.0:
             raise ValueError(f"ramp_length = {ramp_length} [m] < 0.0")
         return ramp_length
@@ -525,8 +531,8 @@ class Stage(Trackable, CostModeled):
      # ==================================================
     def get_ramp_length(self) -> float:
         """
-        Get the length of the ramps if the stage has ramps. Returns 0.0 
-        otherwise.
+        Get the length of the ramps if the stage has ramps already set up. 
+        Returns 0.0 otherwise.
         """
 
         if self.has_ramp():
