@@ -941,13 +941,12 @@ class StageHipace(Stage):
         # The function to be used for solving the equation for phase advance numerically
         def rhs(L):
             g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-            L_ramps = 0.0
 
             # Set up the ramps using the stage copy
             if ramps_not_set_up:
                 stage_copy.length_flattop = L[0]  # L is an ndarray with one element
                 stage_copy._prepare_ramps()
-                L_ramps = stage_copy.get_ramp_length()
+            L_ramps = stage_copy.get_ramp_length()
 
             if self.external_focusing:  # Add contribution from external field used for driver guiding
                 g_ext = stage_copy.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L+L_ramps)
@@ -1024,7 +1023,7 @@ class StageHipace(Stage):
             if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
                 raise ValueError('This method assumes uniform ramps.')
             if self.upramp.length_flattop is not None or self.downramp.length_flattop is not None:
-                raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam.')
+               raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam. The lengths for the ramps are already set. Setting a new length for the flattop will give wrong results.')
             num_beta_osc_flattop = num_beta_osc - 0.5  # The ramps are by default set up to give pi/2 phase advance for the main beam.
         else:
             num_beta_osc_flattop = num_beta_osc
@@ -1221,6 +1220,21 @@ class StageHipace(Stage):
         
         y_trajectory : [m] 1D float ndarray
             y-coordinate of the main beam trajectory.
+
+        px_trajectory : [kg m/s] 1D float ndarray
+            Mean x-component of the beam momentum along the trajectory.
+
+        py_trajectory : [kg m/s] 1D float ndarray
+            Mean y-component of the beam momentum along the trajectory.
+
+        pz_trajectory : [kg m/s] 1D float ndarray
+            Mean longitudinal of the beam momentum along the trajectory.
+
+        driver_x_trajectory : [m] 1D float ndarray, optional
+            The x-coordinate of trajectory of the drive beam.
+
+        driver_y_trajectory : [m] 1D float ndarray, optional
+            The y-coordinate of trajectory of the drive beam.
         """
 
         from abel.utilities.statistics import weighted_mean
@@ -1241,7 +1255,7 @@ class StageHipace(Stage):
             num_steps = int(L /(matched_beta/20))
 
         # Actual calculations
-        s_trajectory, x_trajectory, y_trajectory, _, _ = self._estimate_beam_trajectory(s0=0.0, 
+        s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory, pz_trajectory, driver_x_trajectory, driver_y_trajectory = self._estimate_beam_trajectory(s0=0.0, 
                                                         x0=x0, 
                                                         y0=y0, 
                                                         px0=px0, 
@@ -1252,7 +1266,7 @@ class StageHipace(Stage):
                                                         driver_x_trajectory=None, 
                                                         driver_y_trajectory=None)
 
-        return s_trajectory, x_trajectory, y_trajectory
+        return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory, pz_trajectory, driver_x_trajectory, driver_y_trajectory 
 
 
     # =============================================
@@ -1322,6 +1336,15 @@ class StageHipace(Stage):
 
         py_trajectory : [kg m/s] 1D float ndarray
             Mean y-component of the beam momentum along the trajectory.
+
+        pz_trajectory : [kg m/s] 1D float ndarray
+            Mean longitudinal of the beam momentum along the trajectory.
+
+        driver_x_trajectory : [m] 1D float ndarray, optional
+            The x-coordinate of trajectory of the drive beam.
+
+        driver_y_trajectory : [m] 1D float ndarray, optional
+            The y-coordinate of trajectory of the drive beam.
         """
         from abel.utilities.other import find_closest_value_in_arr
 
@@ -1358,7 +1381,7 @@ class StageHipace(Stage):
                 idx_upramp_end, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length)
                 num_steps_upramp = idx_upramp_end + 1  # Number of time steps for the upramp
                 idx_flat_end, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length+stage_copy.length_flattop)  # Index marking the end of the flattop.
-                num_steps_downramp = num_steps - idx_flat_end  # Number of time steps for the downramp
+                num_steps_downramp = num_steps - idx_flat_end - 1  # Number of time steps for the downramp
                 stage_copy.idx_flat_end = idx_flat_end
                 stage_copy.num_steps_upramp = num_steps_upramp
                 stage_copy.num_steps_downramp = num_steps_downramp
@@ -1379,6 +1402,7 @@ class StageHipace(Stage):
         y_trajectory = np.full(num_steps, None, dtype=float)
         px_trajectory = np.full(num_steps, None, dtype=float)
         py_trajectory = np.full(num_steps, None, dtype=float)
+        pz_trajectory = np.full(num_steps, None, dtype=float)
 
         # Recursive call from the upramp
         if stage_copy.upramp is not None:
@@ -1386,10 +1410,9 @@ class StageHipace(Stage):
             stage_copy.upramp = upramp
             if self.external_focusing:
                 upramp.external_focusing_gradient = stage_copy.external_focusing_gradient
-
             num_steps_upramp = stage_copy.num_steps_upramp 
 
-            s_trajectory_upramp, x_trajectory_upramp, y_trajectory_upramp, px_trajectory_upramp, py_trajectory_upramp = upramp._estimate_beam_trajectory(s0, x0, y0, px0, py0, pz0, q, num_steps_upramp, driver_x_trajectory, driver_y_trajectory)
+            s_trajectory_upramp, x_trajectory_upramp, y_trajectory_upramp, px_trajectory_upramp, py_trajectory_upramp, pz_trajectory_upramp, _, _ = upramp._estimate_beam_trajectory(s0, x0, y0, px0, py0, pz0, q, num_steps_upramp, driver_x_trajectory, driver_y_trajectory)
 
             # Initial parameters for the flattop
             prop_length = s_trajectory_upramp[-1]
@@ -1402,8 +1425,9 @@ class StageHipace(Stage):
             px_trajectory[:len(px_trajectory_upramp)] = px_trajectory_upramp
             py0 = py_trajectory_upramp[-1]
             py_trajectory[:len(py_trajectory_upramp)] = py_trajectory_upramp
-            pz0 = pz0 - q * stage_copy.upramp.nom_accel_gradient_flattop * prop_length/SI.c
-
+            pz0 = pz_trajectory_upramp[-1]
+            pz_trajectory[:len(pz_trajectory_upramp)] = pz_trajectory_upramp
+            
             i = num_steps_upramp - 1
 
             if stage_copy.downramp is not None:
@@ -1419,12 +1443,13 @@ class StageHipace(Stage):
             y_trajectory[0] = y0
             px_trajectory[0] = px0
             py_trajectory[0] = py0
+            pz_trajectory[0] = pz0
 
             i = 0
             i_end = num_steps - 1
 
             if self.is_downramp():
-                # Extract the part of drive beam trajectory for the downramp
+                # Extract the part of drive beam trajectory for the downramp. Note one element longer than num_steps_downramp.
                 driver_x_trajectory = driver_x_trajectory[stage_copy.idx_flat_end:]
                 driver_y_trajectory = driver_y_trajectory[stage_copy.idx_flat_end:]
 
@@ -1448,7 +1473,8 @@ class StageHipace(Stage):
             px = px + dpx
             dpy = q*g*y*ds - q*g0*driver_y_trajectory[i]*ds
             py = py + dpy
-            pz = pz0 - q * self.nom_accel_gradient_flattop * prop_length/SI.c
+            dpz = - q * self.nom_accel_gradient_flattop * ds/SI.c
+            pz = pz + dpz
 
             # Drift
             prop_length = prop_length + 1/2*ds
@@ -1461,6 +1487,7 @@ class StageHipace(Stage):
             y_trajectory[i] = y
             px_trajectory[i] = px
             py_trajectory[i] = py
+            pz_trajectory[i] = pz
 
         # Recursive call from the downramp
         if stage_copy.downramp is not None:
@@ -1471,15 +1498,16 @@ class StageHipace(Stage):
 
             num_steps_downramp = stage_copy.num_steps_downramp
 
-            s_trajectory_downramp, x_trajectory_downramp, y_trajectory_downramp, px_trajectory_downramp, py_trajectory_downramp = downramp._estimate_beam_trajectory(prop_length, x, y, px, py, pz, q, num_steps_downramp, driver_x_trajectory, driver_y_trajectory)
+            s_trajectory_downramp, x_trajectory_downramp, y_trajectory_downramp, px_trajectory_downramp, py_trajectory_downramp, pz_trajectory_downramp, _, _ = downramp._estimate_beam_trajectory(prop_length, x, y, px, py, pz, q, num_steps_downramp+1, driver_x_trajectory, driver_y_trajectory)
 
-            s_trajectory[-len(s_trajectory_downramp):] = s_trajectory_downramp
-            x_trajectory[-len(x_trajectory_downramp):] = x_trajectory_downramp
-            y_trajectory[-len(y_trajectory_downramp):] = y_trajectory_downramp
-            px_trajectory[-len(px_trajectory_downramp):] = px_trajectory_downramp
-            py_trajectory[-len(py_trajectory_downramp):] = py_trajectory_downramp
+            s_trajectory[-len(s_trajectory_downramp)+1:] = s_trajectory_downramp[1:] # Dsicarding the first element in s_trajectory_downramp
+            x_trajectory[-len(x_trajectory_downramp)+1:] = x_trajectory_downramp[1:]
+            y_trajectory[-len(y_trajectory_downramp)+1:] = y_trajectory_downramp[1:]
+            px_trajectory[-len(px_trajectory_downramp)+1:] = px_trajectory_downramp[1:]
+            py_trajectory[-len(py_trajectory_downramp)+1:] = py_trajectory_downramp[1:]
+            pz_trajectory[-len(pz_trajectory_downramp)+1:] = pz_trajectory_downramp[1:]
 
-        return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory
+        return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory, pz_trajectory, driver_x_trajectory, driver_y_trajectory 
     
 
     # ==================================================
