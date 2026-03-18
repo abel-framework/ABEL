@@ -517,8 +517,8 @@ class Stage(Trackable, CostModeled):
             raise ValueError('No ramp_beta_mag defined.')
 
         g = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-        if self.external_focusing_gradient is not None:  # Add contribution from external field
-            g = g + self.external_focusing_gradient
+        #if self.external_focusing_gradient is not None:  # Add contribution from external field
+        #    g = g + self.external_focusing_gradient  # external_focusing_gradient may itself depend on the total length, so this may cause an infinite loop.
 
         k_beta = np.sqrt(g*SI.c/ramp.nom_energy)  # [m^-1], betatron wavenumber.
         ramp_length = 1/k_beta * np.pi/2 * np.sqrt(ramp_beta_mag)  # k_beta*ramp_length = pi/2 gives pi/2 phase advance.
