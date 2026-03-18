@@ -930,13 +930,12 @@ class StageHipace(Stage):
         # The function to be used for solving the equation for phase advance numerically
         def rhs(L):
             g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-            L_ramps = 0.0
 
             # Set up the ramps using the stage copy
             if ramps_not_set_up:
                 stage_copy.length_flattop = L[0]  # L is an ndarray with one element
                 stage_copy._prepare_ramps()
-                L_ramps = stage_copy.get_ramp_length()
+            L_ramps = stage_copy.get_ramp_length()
 
             if self.external_focusing:  # Add contribution from external field used for driver guiding
                 g_ext = stage_copy.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L+L_ramps)
@@ -952,6 +951,129 @@ class StageHipace(Stage):
 
         return length
     
+
+    # ==================================================
+    # def calc_length_num_beta_osc(self, num_beta_osc, beam, driver=None, driver_half_oscillations=None):
+    #     """
+    #     Calculate the stage length that gives ``num_beta_osc`` betatron 
+    #     oscillations for a particle with given initial energy ``initial_energy`` 
+    #     in a uniform plasma stage (excluding ramps) with defined nominal 
+    #     acceleration gradient and plasma density ``plasma_density``.
+
+    #     Will take into account the contribution from an external linear magnetic 
+    #     field B=[g_ext*y, -g_ext*x, 0] if :attr:`self.external_focusing <abel.StageHipace.external_focusing>` 
+    #     is set to ``True``.
+
+    #     Parameters
+    #     ----------
+    #     num_beta_osc : float
+    #         Total number of design betatron oscillations that the electron 
+    #         should perform through the plasma stage excluding ramps. 
+
+    #     initial_energy : [eV] float, optional
+    #         The initial energy of the particle at the start of the plasma stage. 
+    #         Defaults to ``self.nom_energy``.
+
+    #     plasma_density : [m^-3] float, optional
+    #         The plasma density of the plasma stage. Defaults to 
+    #         ``self.plasma_density``.
+
+    #     driver_half_oscillations : float, optional
+    #         Number of half betatron oscillations that the drive beam is 
+    #         intended to perform. If ``None``, will use :attr:`StageHipace.driver_half_oscillations <abel.StageHipace.driver_half_oscillations>`.
+    #         Defaults to ``None``.
+
+    #     q : [C] float, optional
+    #         Particle charge. q * nom_accel_gradient must be positive. Defaults 
+    #         to elementary charge.
+
+            
+    #     Returns
+    #     -------
+    #     length : [m] float
+    #         Length of the plasma stage excluding ramps matched to the given 
+    #         number of betatron oscillations.
+    #     """
+
+    #     from scipy.optimize import fsolve
+
+    #     if num_beta_osc < 0:
+    #         raise ValueError('Number of input betatron oscillations must be positive.')
+        
+    #     if driver_half_oscillations is None:
+    #         driver_half_oscillations = self.driver_half_oscillations
+    #     if driver_half_oscillations < 0:
+    #         raise ValueError('Number of driver oscillations must be positive.')
+        
+    #     if driver is None:
+    #         driver = self.driver_source.track()
+
+    #     # Assess whether the ramps have been set up
+    #     ramps_not_set_up = (
+    #         (self.upramp is not None and self.upramp.length is None) or
+    #         (self.downramp is not None and self.downramp.length is None)
+    #     )
+
+    #     # Make a copy of the stage
+    #     stage_copy = copy.deepcopy(self)
+
+    #     #def pha
+
+    #     # The function for calculating the phase advance from beam trajectories
+    #     def phase_advance_from_trajectories(L):
+
+    #         L = L[0]  # L is an ndarray with one element
+    #         #g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+    #         L_ramps = 0.0
+
+    #         # Set up the ramps using the stage copy
+    #         if ramps_not_set_up:
+    #             stage_copy.length = L
+    #             stage_copy._prepare_ramps()
+    #             #L_ramps = stage_copy.get_ramp_length()
+
+    #         if self.external_focusing:  # Add contribution from external field used for driver guiding
+    #             g_ext = stage_copy.calc_external_focusing_gradient(num_half_oscillations=driver_half_oscillations, L=L)
+    #             print(g_ext)
+    #             stage_copy.external_focusing_gradient = g_ext
+
+    #             #g = g + g_ext
+
+    #         s_trajectory, x_trajectory, y_trajectory, driver_x_trajectory, driver_y_trajectory = stage_copy.estimate_beam_trajectory(beam, num_steps=None)
+
+    #         r_trajectory = np.sqrt(x_trajectory**2 + y_trajectory**2)
+    #         driver_r_trajectory = np.sqrt(driver_x_trajectory**2 + driver_y_trajectory**2)
+    #         straight_r_trajectory = r_trajectory - driver_r_trajectory
+
+    #         xp_trajectory = np.diff(x_trajectory)/np.diff(s_trajectory)
+    #         xp_trajectory = np.insert(xp_trajectory, 0, beam.x_angle())
+    #         yp_trajectory = np.diff(y_trajectory)/np.diff(s_trajectory)
+    #         yp_trajectory = np.insert(yp_trajectory, 0, beam.y_angle())
+    #         angle_trajectory = np.sqrt(xp_trajectory**2 + yp_trajectory**2)
+
+    #         driver_xp_trajectory = np.diff(driver_x_trajectory)/np.diff(s_trajectory)
+    #         driver_xp_trajectory = np.insert(driver_xp_trajectory, 0, driver.x_angle())
+    #         driver_yp_trajectory = np.diff(driver_y_trajectory)/np.diff(s_trajectory)
+    #         driver_yp_trajectory = np.insert(driver_yp_trajectory, 0, driver.y_angle())
+    #         driver_angle_trajectory = np.sqrt(driver_xp_trajectory**2 + driver_yp_trajectory**2)
+
+    #         straight_angle_trajectory = angle_trajectory - driver_angle_trajectory
+
+    #         # Some control that the phase space trajectory loops aroung the origin ...
+
+    #         phase = np.unwrap(np.arctan2(straight_angle_trajectory/np.max(np.abs(straight_angle_trajectory)), 
+    #                                     straight_r_trajectory/np.max(np.abs(straight_r_trajectory))))
+            
+    #         mu = np.abs((phase[-1] - phase[0]))
+
+    #         return mu
+        
+    #     # Find the length that gives num_beta_osc
+    #     solution = fsolve(lambda L: phase_advance_from_trajectories(L)/ (2*np.pi) - num_beta_osc, x0=1)
+    #     length = solution[0]
+
+    #     return length
+
 
     # ==================================================
     def match_length_2_num_beta_osc(self, num_beta_osc, driver_half_oscillations=None, set_consistent_params=True, q=SI.e):
@@ -1013,7 +1135,7 @@ class StageHipace(Stage):
             if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
                 raise ValueError('This method assumes uniform ramps.')
             if self.upramp.length_flattop is not None or self.downramp.length_flattop is not None:
-                raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam.')
+               raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam. The lengths for the ramps are already set. Setting a new length for the flattop will give wrong results.')
             num_beta_osc_flattop = num_beta_osc - 0.5  # The ramps are by default set up to give pi/2 phase advance for the main beam.
         else:
             num_beta_osc_flattop = num_beta_osc
