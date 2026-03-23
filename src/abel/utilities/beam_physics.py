@@ -1167,6 +1167,35 @@ def phase_advance(ss, betas):
 
 
 # =============================================
+def phase_advance_traj_data(pos, angles):
+    """
+    Compute the unwrapped betatron phase from transverse position and slope 
+    data. 
+    
+    Parameters
+    ----------
+    pos : [m] 1D float ndarray
+        Transverse position along the beamline.
+        
+    angles : 1D float ndarray
+        Transverse angle dpos/ds
+    
+    Returns
+    -------
+    phase_advance : float
+        Unwrapped phase angle in radians, representing the continuous betatron
+        phase advance at the end of the beamline
+    """
+    
+    # Compute the phase space angle by normalising coordinates to a unit circle 
+    # and taking the arctangent before unwrapping
+    phase = np.unwrap(np.arctan2(angles / np.max(np.abs(angles)), 
+                                 pos / np.max(np.abs(pos))))
+    
+    return np.abs(phase[-1] - phase[0]) 
+
+
+# =============================================
 def arc_lengths(s_trajectory, x_trajectory):
     """
     Docstring for arc_length
