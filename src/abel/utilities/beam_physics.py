@@ -1167,7 +1167,7 @@ def phase_advance(ss, betas):
 
 
 # =============================================
-def phase_advance_traj_data(pos, angles):
+def phase_advance_traj_data(pos, angles, orbit_pos=None, orbit_angles=None):
     """
     Compute the unwrapped betatron phase from transverse position and slope 
     data. 
@@ -1178,7 +1178,17 @@ def phase_advance_traj_data(pos, angles):
         Transverse position along the beamline.
         
     angles : 1D float ndarray
-        Transverse angle dpos/ds
+        Transverse angle dpos/ds.
+
+    orbit_pos : [m] 1D float ndarray, optional
+        Reference orbit transverse position (e.g., driver trajectory). If 
+        provided, these are subtracted before phase calculation. Defaults to 
+        `None`.
+
+    orbit_angles : 1D float ndarray, optional
+        Reference orbit transverse angles (e.g., driver trajectory angles). If 
+        provided, these are subtracted before phase calculation. Defaults to 
+        `None`.
     
     Returns
     -------
@@ -1186,6 +1196,11 @@ def phase_advance_traj_data(pos, angles):
         Unwrapped phase angle in radians, representing the continuous betatron
         phase advance at the end of the beamline
     """
+
+    if orbit_pos is not None:
+        pos = pos - orbit_pos
+    if orbit_angles is not None:
+        angles = angles - orbit_angles
     
     # Compute the phase space angle by normalising coordinates to a unit circle 
     # and taking the arctangent before unwrapping
