@@ -369,7 +369,7 @@ def run_single_step_wake_t(plasma_density, drive_beam, beam):
     wakeT_xy_res = 0.1*beam.bunch_length()
     wakeT_max_box_r = 4/k_p(plasma_density)
     wakeT_num_cell_xy = int(wakeT_max_box_r/wakeT_xy_res)
-    plasma_stage = plasma_stage_setup(plasma_density, drive_beam, beam, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy)
+    plasma_stage = plasma_stage_setup(plasma_density, drive_beam, beam, stage_length=None, dz_fields=None, num_cell_xy=wakeT_num_cell_xy, n_out=1)
 
     # Make temp folder
     if not os.path.exists(CONFIG.temp_path):
