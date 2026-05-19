@@ -679,17 +679,17 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
 
     # dispersion evolution up to fourth order (see https://en.wikipedia.org/wiki/Five-point_stencil)
     # here the dispersion is defined as x(delta) = x_0 + Dx*delta + DDx*delta^2 + DDDx*delta^3 + DDDDx*delta^4 + O(delta^5)
-    # this definition requires multiplying by the factorial of the order
+    # this definition requires dividing by the factorial of the order
     if not fast:
         evolution[0,:] = ss
         evolution[1,:] = (-xs[:,4] + 8*xs[:,3] - 8*xs[:,1] + xs[:,0])/(12*delta)  # First order
-        evolution[2,:] = 2*(-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2)  # Second order
-        evolution[3,:] = 3*2*(xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3)  # Third order
-        evolution[4,:] = 4*3*2*(xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4  # Fourth order
+        evolution[2,:] = (-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2) / 2  # Second order
+        evolution[3,:] = (xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3) / (3*2) # Third order
+        evolution[4,:] = (xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4 / (4*3*2)  # Fourth order
 
     # return dispersions
-    DDx = 2*(-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2)
-    DDpx = 2*(-xp[4] + 16*xp[3] - 30*xp[2] + 16*xp[1] - xp[0])/(12*delta**2) # Second order
+    DDx = (-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2) / 2
+    DDpx = (-xp[4] + 16*xp[3] - 30*xp[2] + 16*xp[1] - xp[0])/(12*delta**2) / 2 # Second order
     
     if plot:
         from matplotlib import pyplot as plt
