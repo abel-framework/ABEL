@@ -1155,7 +1155,7 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
 
 
 # =============================================
-def phase_advance(ss, betas):
+def phase_advance_integrate_betas(ss, betas):
     """
     Calculate the phase advance in one dimesion by using the composite Simpson’s 
     rule (:func:`scipy.integrate.simpson() <scipy.integrate.simpson>`) to 
