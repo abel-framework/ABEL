@@ -16,6 +16,7 @@ import copy, warnings
 import scipy.constants as SI
 from types import SimpleNamespace
 from abel.utilities.plasma_physics import beta_matched
+from abel.utilities.beam_physics import length2num_beta_osc
 from typing import Self
 
 class Stage(Trackable, CostModeled):
@@ -1359,12 +1360,12 @@ class Stage(Trackable, CostModeled):
 
 
     # ==================================================
-    def matched_beta_function(self, energy_incoming, match_entrance=True):
+    def matched_beta_function(self, energy_incoming, match_entrance=True, q=SI.e):
         '''
         Calculates the matched beta function of the stage. If there is an 
-        upramp, the beta function the beta function is magnified by default so 
-        that it shrinks to the correct size when it enters the main flattop 
-        plasma stage.
+        upramp, the beta function is magnified by default so that it shrinks to 
+        the correct size when it enters the main flattop plasma stage. Also 
+        takes into account external focusing field B=[g_ext*y, -g_ext*x, 0] if present. 
     
         
         Parameters
@@ -1376,21 +1377,32 @@ class Stage(Trackable, CostModeled):
             Matches the beta function to the upramp or the stage entrance if 
             ``True``. Otherwise, will match the beta function to the downramp. 
             Default set to ``True``.
+
+        q : [C] float, optional
+            Particle charge. Defaults to elementary charge.
             
         Returns
         -------
         beta_function : [m], float
             The matched beta function.
         '''
+        
+        energy_incoming = energy_incoming*SI.e  # [J]
+
+        g = SI.e*self.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+        if self.external_focusing_gradient is not None:  # Add contribution from external field
+            g = g + self.external_focusing_gradient
+
+        k_beta = np.sqrt(np.abs(q)*g*SI.c/energy_incoming)  # [m^-1], betatron wavenumber.
 
         if match_entrance:
             if self.upramp is not None and self.upramp.ramp_beta_mag is not None:
-                return beta_matched(self.plasma_density, energy_incoming)*self.upramp.ramp_beta_mag
+                return 1/k_beta * self.upramp.ramp_beta_mag
             else:
-                return beta_matched(self.plasma_density, energy_incoming)
+                return 1/k_beta
         else:
             if self.downramp.ramp_beta_mag is not None:
-                return beta_matched(self.plasma_density, energy_incoming)*self.downramp.ramp_beta_mag
+                return 1/k_beta * self.downramp.ramp_beta_mag
             else:
                 raise ValueError('Downramp ramp_beta_mag not defined.')
 
@@ -1476,84 +1488,6 @@ class Stage(Trackable, CostModeled):
         length = ((2*np.pi*num_beta_osc/gradient_prefactor + np.sqrt(initial_energy))**2 - initial_energy) / (q*nom_accel_gradient)
 
         return length
-    
-    
-    # ==================================================
-    def calc_flattop_num_beta_osc(self, num_beta_osc):
-        """
-        For a given total number of betatron oscillations ``num_beta_osc`` that 
-        an electron with energy ``self.nom_energy`` will undergo across the 
-        whole plasma stage including its uniform ramps, this function calculates 
-        the number of betatron oscillations that should be performed in the main 
-        flattop plasma stage by subtracting the contributions from the ramps.
-
-        The contributions from the ramps are calculated from the phase advances 
-        in the ramps as L_ramp/beta_matched_ramp.
-
-        - If the stage does have ramps that have not been fully set up, a 
-        deepcopy of the stage is created to set up its ramps using 
-        :func:`Stage._prepare_ramps() <abel.Stage._prepare_ramps>`. 
-
-        - If the stage does not have ramps, will simply return the input total 
-        number of betatron oscillations ``num_beta_osc``.
-
-        
-        Parameters
-        ----------
-        num_beta_osc : float
-            Total number of design betatron oscillations that the electron 
-            should perform through the whole plasma stage including ramps.
-
-            
-        Returns
-        -------
-        float
-            The number of betatron oscillations the electron should undergo in 
-            the flattop stage after the contributions from the ramps (if 
-            applicable) have been subtracted from ``num_beta_osc``.
-        """
-
-        if num_beta_osc < 0:
-            raise ValueError('Number of input betatron oscillations must be positive.')
-
-        if not self.has_ramp():
-            return num_beta_osc
-        
-        if self.upramp.ramp_shape != 'uniform' or self.downramp.ramp_shape != 'uniform':
-            raise ValueError('This method assumes uniform ramps.')
-
-        # Make a copy of the stage and set up its ramps if they are not set yp
-        ramps_not_set_up = (
-            (self.upramp is not None and self.upramp.length is None) or
-            (self.downramp is not None and self.downramp.length is None)
-        )
-        if ramps_not_set_up:
-            stage_copy = copy.deepcopy(self)
-            stage_copy._prepare_ramps()
-        else: 
-            stage_copy = self
-
-        # Calculate the upramp length and phase advance
-        if stage_copy.upramp is not None:
-            upramp_phase_advance = stage_copy.upramp.phase_advance_beta_evolution()
-        else:
-            upramp_phase_advance = 0.0
-        
-        # Calculate the downramp length and matched beta function
-        if stage_copy.nom_energy_gain_flattop is None:
-            raise ValueError('Stage.nom_energy_gain_flattop not set.')
-
-        # Calculate the downramp length and phase advance
-        if stage_copy.downramp is not None:
-            downramp_phase_advance = stage_copy.downramp.phase_advance_beta_evolution()
-        else:
-            downramp_phase_advance = 0.0
-
-        # Calculate the phase advance in the flattop stage
-        tot_phase_advance = num_beta_osc * 2*np.pi
-        flattop_phase_advance = tot_phase_advance - upramp_phase_advance - downramp_phase_advance
-
-        return flattop_phase_advance/(2*np.pi)
         
     
     # ==================================================
@@ -1597,8 +1531,6 @@ class Stage(Trackable, CostModeled):
             across the plasma stage.
         """
 
-        from abel.utilities.plasma_physics import k_p
-
         if length_flattop is None:
             if self.length_flattop is None:
                 raise ValueError('Stage.length_flattop not set.')
@@ -1614,25 +1546,14 @@ class Stage(Trackable, CostModeled):
                 raise ValueError('Stage.nom_accel_gradient_flattop not set.')
             nom_accel_gradient_flattop = self.nom_accel_gradient_flattop
 
-        if q * nom_accel_gradient_flattop < 0:
-            raise ValueError('q * nom_accel_gradient_flattop must be positive.')
-
         if plasma_density is None:
             plasma_density = self.plasma_density
 
-        if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
-            return self.phase_advance_beta_evolution()/(2*np.pi)
-        else:
-            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-            if self.external_focusing_gradient is not None:
-                g = g + self.external_focusing_gradient
+        g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+        if self.external_focusing_gradient is not None:
+            g = g + self.external_focusing_gradient
 
-            prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient_flattop)
-            energy_scaling = np.sqrt(initial_energy*SI.e + q*nom_accel_gradient_flattop*length_flattop) - np.sqrt(initial_energy*SI.e)
-
-            num_beta_osc = prefactor * energy_scaling / (2*np.pi)
-
-            return num_beta_osc
+        return length2num_beta_osc(length_flattop, initial_energy, nom_accel_gradient_flattop, g, q=SI.e)
         
 
     # ==================================================
@@ -1705,50 +1626,452 @@ class Stage(Trackable, CostModeled):
         return None
     
 
-    # ==================================================
-    def phase_advance_beta_evolution(self, beta0=None):
+    # =============================================
+    def driver_guiding_trajectory(self, num_steps=None, dacc_gradient=0.0):
         """
-        Calculate the phase advance in a stage by evolving the beta function 
-        through a single element lattice set up using the stage's focusing 
-        strength and length. The evolved beta function is then integrated along 
-        the stage.
+        Estimate the trajectory that the drive beam will follow when driver 
+        guiding with an external linear azimuthal magnetic field is applied to a 
+        drive beam with an initial angular offset. The calculations are done by 
+        integrating simplified equations of motion.
 
         Parameters
         ----------
-        beta0 : [m] float
-            The initial beta function at the start of the stage. If ``None``, 
-            will calculate the matched beta function for the flattop stage and 
-            scale it according the the ramp's ramp_beta_mag if ``self`` is a 
-            ramp.
+        num_steps : int, optional
+            Number of time steps. If ``None``, will calculate the number of time 
+            steps such that the step size is a small fraction of the matched 
+            beta function of the drive beam. Defaults to ``None``.
 
-            
+        dacc_gradient : [V/m] float, optional
+            The decceleration gradient. Drive beam charge * decceleration 
+            gradient must be negative. Defaults to 0.0.
+        
+
         Returns
         -------
-        float
-            The phase advance calculated by integrating the beta function 
-            evolution through the stage.
+        s_trajectory : [m] 1D float ndarray
+            Longitudinal coordinate of the drive beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] 1D float ndarray
+            x-coordinate of the drive beam trajectory.
+        
+        y_trajectory : [m] 1D float ndarray
+            y-coordinate of the drive beam trajectory.
         """
 
-        from abel.utilities.beam_physics import evolve_beta_function
-        from abel.utilities.beam_physics import phase_advance
+        from abel.utilities.relativity import energy2momentum
+        from abel.utilities.statistics import weighted_mean
+
+        driver = self.driver_source.track()
+
+        energy_thres = 10*driver.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
+        pz_thres = energy2momentum(energy_thres, unit='eV', m=driver.particle_mass)
+        pz0 = energy2momentum(driver.energy(), unit='eV', m=driver.particle_mass)
+
+        if pz0 < pz_thres:
+            raise ValueError('This estimate is only valid for a relativistic beam.')
         
-        g = SI.e*self.plasma_density/(2*SI.epsilon_0)
-        if self.external_focusing_gradient is not None:
-            g = g + self.external_focusing_gradient * SI.c
-        p0 = np.sqrt((self.nom_energy*SI.e)**2-(SI.m_e*SI.c**2)**2)/SI.c
-        if beta0 is None:
-            if self.is_upramp():
-                beta0 = self.matched_beta_function(self.nom_energy, match_entrance=True)
-            elif self.is_downramp():
-                beta0 = beta_matched(self.parent.plasma_density, self.nom_energy)
+        q = driver.particle_charge()  # [C], particle charge including charge sign.
+        if q * dacc_gradient > 0.0:
+            raise ValueError('Drive beam charge * decceleration gradient must be negative.')
+        
+        # Make a copy of the stage and set up its ramps if they are not set up
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+        
+        L = stage_copy.get_length()  # [m]
+        
+        if pz0 + q * dacc_gradient * L/SI.c < pz_thres:
+            raise ValueError('The energy depletion will be too severe. This estimate is only valid for a relativistic beam.')
+        
+        # Get the focusing field gradient
+        g = self.external_focusing_gradient  # [T/m]
+        if g is None:
+            g = 0.0
+
+        # Determine the step size
+        if num_steps is None:
+            matched_beta = self.matched_beta_function(driver.energy())
+            num_steps = int(L /(matched_beta/20))
+        
+        ds = L/(num_steps-1)  # [m], step size
+
+        # Initialise arrays
+        s_trajectory = np.full(num_steps, None, dtype=float)
+        x_trajectory = np.full(num_steps, None, dtype=float)
+        y_trajectory = np.full(num_steps, None, dtype=float)
+
+        # Set initial parameters
+        prop_length = 0
+        x0 = driver.x_offset()
+        x = x0
+        y0 = driver.y_offset()
+        y = y0
+        s_trajectory[0] = prop_length
+        x_trajectory[0] = x0
+        y_trajectory[0] = y0
+        px = weighted_mean(driver.pxs(), driver.weightings(), clean=False)
+        py = weighted_mean(driver.pys(), driver.weightings(), clean=False)
+        pz = pz0 # Can add option for deceleration using a gradient
+
+        # Solve the equation of motion
+        i = 0
+        while i < num_steps - 1:
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            # Kick
+            dpx = q*g*x*ds
+            px = px + dpx
+            dpy = q*g*y*ds
+            py = py + dpy
+            pz = pz0 + q * dacc_gradient * prop_length/SI.c # dacc_gradient > 0
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            i = i + 1
+            s_trajectory[i] = prop_length
+            x_trajectory[i] = x
+            y_trajectory[i] = y
+
+        return s_trajectory, x_trajectory, y_trajectory
+
+
+    # =============================================
+    def estimate_beam_trajectory(self, beam, num_steps=None):
+        """
+        Estimate the trajectory for the main beam following the trajectory of a 
+        drive beam generated by ``self.driver_source``.
+        
+        Effects such as driver guiding with an external linear azimuthal 
+        magnetic field, background ion focusing and uniform plasma density ramps 
+        are taken into account. The calculations are done by integrating 
+        simplified equations of motion.
+
+        Parameters
+        ----------
+        beam : ``Beam``
+            The main beam to be tracked.
+
+        num_steps : int, optional
+            Number of time steps. If ``None``, will calculate the number of time 
+            steps such that the step size is a small fraction of the matched 
+            beta function of the main beam. Defaults to ``None``.
+
+
+        Returns
+        -------
+        s_trajectory : [m] 1D float ndarray
+            Longitudinal coordinate of the main beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] 1D float ndarray
+            x-coordinate of the main beam trajectory.
+        
+        y_trajectory : [m] 1D float ndarray
+            y-coordinate of the main beam trajectory.
+
+        px_trajectory : [kg m/s] 1D float ndarray
+            Mean x-component of the beam momentum along the trajectory.
+
+        py_trajectory : [kg m/s] 1D float ndarray
+            Mean y-component of the beam momentum along the trajectory.
+
+        pz_trajectory : [kg m/s] 1D float ndarray
+            Mean longitudinal of the beam momentum along the trajectory.
+
+        driver_x_trajectory : [m] 1D float ndarray, optional
+            The x-coordinate of trajectory of the drive beam.
+
+        driver_y_trajectory : [m] 1D float ndarray, optional
+            The y-coordinate of trajectory of the drive beam.
+        """
+
+        from abel.utilities.statistics import weighted_mean
+        from abel.utilities.relativity import energy2momentum
+
+        # Prepare parameters
+        x0 = beam.x_offset()
+        y0 = beam.y_offset()
+        weights = beam.weightings()
+        px0 = weighted_mean(beam.pxs(), weights, clean=False)
+        py0 = weighted_mean(beam.pys(), weights, clean=False)
+        pz0 = energy2momentum(beam.energy(), unit='eV', m=beam.particle_mass)
+        q = beam.particle_charge()
+
+        L = self.get_length()  # [m], total length including any ramps.
+        if num_steps is None:
+            matched_beta = self.matched_beta_function(beam.energy())
+            num_steps = int(L /(matched_beta/20))
+
+        # Actual calculations
+        s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory, pz_trajectory, driver_x_trajectory, driver_y_trajectory = self._estimate_beam_trajectory(s0=0.0, 
+                                                        x0=x0, 
+                                                        y0=y0, 
+                                                        px0=px0, 
+                                                        py0=py0, 
+                                                        pz0=pz0, 
+                                                        q=q, 
+                                                        num_steps=num_steps, 
+                                                        driver_x_trajectory=None, 
+                                                        driver_y_trajectory=None)
+
+        return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory, pz_trajectory, driver_x_trajectory, driver_y_trajectory 
+
+
+    # =============================================
+    def _estimate_beam_trajectory(self, s0, x0, y0, px0, py0, pz0, q, num_steps, driver_x_trajectory=None, driver_y_trajectory=None):
+        """
+        Helper function for estimating the trajectory for the main beam 
+        following the trajectory of a drive beam defined by 
+        ``driver_x_trajectory`` and ``driver_y_trajectory``.
+        
+        Effects such as driver guiding with an external linear azimuthal 
+        magnetic field, background ion focusing and uniform plasma density ramps 
+        are taken into account. The calculations are done by integrating 
+        simplified equations of motion.
+         
+
+        Parameters
+        ----------
+        s0 : [m] float
+            The initial longitudinal coordinate of the main beam.
+
+        x0 : [m] float
+            The intial x-coordinate of the main beam.
+
+        y0 : [m] float
+            The intial y-coordinate of the main beam.
+
+        px0 : [kg m/s] float
+            The intial x-momentum of the main beam.
+
+        py0 : [kg m/s] float
+            The intial y-momentum of the main beam.
+
+        pz0 : [kg m/s] float
+            The intial z-momentum of the main beam.
+
+        q : [C] flloat
+            The particle charge of the main beam.
+
+        num_steps : int
+            Number of time steps.
+
+        driver_x_trajectory : [m] 1D float ndarray, optional
+            The x-coordinate of trajectory of the drive beam. The length of 
+            ``driver_x_trajectory`` must be the same as ``num_steps``. Is 
+            automatically calculated if ``None``. Defaults to ``None``.
+
+        driver_y_trajectory : [m] 1D float ndarray, optional
+            The y-coordinate of trajectory of the drive beam. The length of 
+            ``driver_y_trajectory`` must be the same as ``num_steps``. Is 
+            automatically calculated if ``None``. Defaults to ``None``.
+        
+
+        Returns
+        -------
+        s_trajectory : [m] 1D float ndarray
+            Longitudinal coordinate of the main beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] 1D float ndarray
+            x-coordinate of the main beam trajectory.
+        
+        y_trajectory : [m] 1D float ndarray
+            y-coordinate of the main beam trajectory.
+
+        px_trajectory : [kg m/s] 1D float ndarray
+            Mean x-component of the beam momentum along the trajectory.
+
+        py_trajectory : [kg m/s] 1D float ndarray
+            Mean y-component of the beam momentum along the trajectory.
+
+        pz_trajectory : [kg m/s] 1D float ndarray
+            Mean longitudinal of the beam momentum along the trajectory.
+
+        driver_x_trajectory : [m] 1D float ndarray, optional
+            The x-coordinate of trajectory of the drive beam.
+
+        driver_y_trajectory : [m] 1D float ndarray, optional
+            The y-coordinate of trajectory of the drive beam.
+        """
+        from abel.utilities.other import find_closest_value_in_arr
+
+        if q * self.nom_accel_gradient_flattop > 0.0:
+            raise ValueError('Beam charge * self.nom_accel_gradient_flattop  gradient must be negative.')
+        
+        # Make a copy of the stage and set up its ramps if they are not set up
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+        
+        # Calculate the focusing field gradient
+        g0 = SI.e*stage_copy.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        g = g0
+        if stage_copy.external_focusing_gradient is not None:
+            g = g0 + stage_copy.external_focusing_gradient
+
+        # Only calculate the time step size when calling estimate_beam_trajectory() from a flattop
+        if not stage_copy.is_upramp() and not stage_copy.is_downramp():
+
+            # Set the step size
+            L = stage_copy.get_length()  # [m], total length including any ramps.
+            stage_copy.ds = L / (num_steps-1) # [m], step size
+
+            if stage_copy.has_ramp():
+                # Set the number of time steps in the upramp and downramp
+                ss_helper = np.arange(num_steps) * stage_copy.ds
+                idx_upramp_end, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length)
+                num_steps_upramp = idx_upramp_end + 1  # Number of time steps for the upramp
+                idx_flat_end, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length+stage_copy.length_flattop)  # Index marking the end of the flattop.
+                num_steps_downramp = num_steps - idx_flat_end - 1  # Number of time steps for the downramp
+                stage_copy.idx_flat_end = idx_flat_end
+                stage_copy.num_steps_upramp = num_steps_upramp
+                stage_copy.num_steps_downramp = num_steps_downramp
+
+        ds = stage_copy.ds
+
+        # Calculate the drive beam trajectory
+        if driver_x_trajectory is None or driver_y_trajectory is None:
+            _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(num_steps=num_steps, dacc_gradient=0.0)
+        
+        if not stage_copy.is_upramp() and not stage_copy.is_downramp():
+            if len(driver_x_trajectory) != num_steps or len(driver_y_trajectory) != num_steps:
+                raise ValueError('The length of driver_x_trajectory and driver_y_trajectory must be the same as num_steps.')
+
+        # Initialise arrays
+        s_trajectory = np.full(num_steps, None, dtype=float)
+        x_trajectory = np.full(num_steps, None, dtype=float)
+        y_trajectory = np.full(num_steps, None, dtype=float)
+        px_trajectory = np.full(num_steps, None, dtype=float)
+        py_trajectory = np.full(num_steps, None, dtype=float)
+        pz_trajectory = np.full(num_steps, None, dtype=float)
+
+        # Recursive call from the upramp
+        if stage_copy.upramp is not None:
+            upramp = stage_copy.convert_PlasmaRamp(stage_copy.upramp)
+            stage_copy.upramp = upramp
+            if self.external_focusing:
+                upramp.external_focusing_gradient = stage_copy.external_focusing_gradient
+            num_steps_upramp = stage_copy.num_steps_upramp 
+
+            s_trajectory_upramp, x_trajectory_upramp, y_trajectory_upramp, px_trajectory_upramp, py_trajectory_upramp, pz_trajectory_upramp, _, _ = upramp._estimate_beam_trajectory(s0, x0, y0, px0, py0, pz0, q, num_steps_upramp, driver_x_trajectory, driver_y_trajectory)
+
+            # Initial parameters for the flattop
+            prop_length = s_trajectory_upramp[-1]
+            s_trajectory[:len(s_trajectory_upramp)] = s_trajectory_upramp
+            x0 = x_trajectory_upramp[-1]
+            x_trajectory[:len(x_trajectory_upramp)] = x_trajectory_upramp
+            y0 = y_trajectory_upramp[-1]
+            y_trajectory[:len(y_trajectory_upramp)] = y_trajectory_upramp
+            px0 = px_trajectory_upramp[-1]
+            px_trajectory[:len(px_trajectory_upramp)] = px_trajectory_upramp
+            py0 = py_trajectory_upramp[-1]
+            py_trajectory[:len(py_trajectory_upramp)] = py_trajectory_upramp
+            pz0 = pz_trajectory_upramp[-1]
+            pz_trajectory[:len(pz_trajectory_upramp)] = pz_trajectory_upramp
+            
+            i = num_steps_upramp - 1
+
+            if stage_copy.downramp is not None:
+                i_end = stage_copy.idx_flat_end
             else:
-                beta0 = beta_matched(self.plasma_density, self.nom_energy)
+                i_end = num_steps - 1
 
-        ls = np.array([self.length_flattop])
-        ks = np.array([g*SI.e/SI.c/p0])
-        _, _, beta_evolution = evolve_beta_function(ls=ls, ks=ks, beta0=beta0, fast=False, plot=False)
-        return phase_advance(beta_evolution[0,:], beta_evolution[1,:])
+        # No ramps
+        else:
+            prop_length = s0
+            s_trajectory[0] = prop_length
+            x_trajectory[0] = x0
+            y_trajectory[0] = y0
+            px_trajectory[0] = px0
+            py_trajectory[0] = py0
+            pz_trajectory[0] = pz0
 
+            i = 0
+            i_end = num_steps - 1
+
+            if self.is_downramp():
+                # Extract the part of drive beam trajectory for the downramp. Note one element longer than num_steps_downramp.
+                driver_x_trajectory = driver_x_trajectory[stage_copy.idx_flat_end:]
+                driver_y_trajectory = driver_y_trajectory[stage_copy.idx_flat_end:]
+
+        # Set the initial conditions
+        x = x0
+        y = y0
+        px = px0
+        py = py0
+        pz = pz0
+
+        # Solve the equations of motion
+        while i < i_end:
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            # Kick
+            dpx = q*g*x*ds - q*g0*driver_x_trajectory[i]*ds
+            px = px + dpx
+            dpy = q*g*y*ds - q*g0*driver_y_trajectory[i]*ds
+            py = py + dpy
+            dpz = - q * self.nom_accel_gradient_flattop * ds/SI.c
+            pz = pz + dpz
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            i = i + 1
+            s_trajectory[i] = prop_length
+            x_trajectory[i] = x
+            y_trajectory[i] = y
+            px_trajectory[i] = px
+            py_trajectory[i] = py
+            pz_trajectory[i] = pz
+
+        # Recursive call from the downramp
+        if stage_copy.downramp is not None:
+            downramp = stage_copy.convert_PlasmaRamp(stage_copy.downramp)
+            stage_copy.downramp = downramp
+            if self.external_focusing:
+                downramp.external_focusing_gradient = stage_copy.external_focusing_gradient
+
+            num_steps_downramp = stage_copy.num_steps_downramp
+
+            s_trajectory_downramp, x_trajectory_downramp, y_trajectory_downramp, px_trajectory_downramp, py_trajectory_downramp, pz_trajectory_downramp, _, _ = downramp._estimate_beam_trajectory(prop_length, x, y, px, py, pz, q, num_steps_downramp+1, driver_x_trajectory, driver_y_trajectory)
+
+            s_trajectory[-len(s_trajectory_downramp)+1:] = s_trajectory_downramp[1:] # Dsicarding the first element in s_trajectory_downramp
+            x_trajectory[-len(x_trajectory_downramp)+1:] = x_trajectory_downramp[1:]
+            y_trajectory[-len(y_trajectory_downramp)+1:] = y_trajectory_downramp[1:]
+            px_trajectory[-len(px_trajectory_downramp)+1:] = px_trajectory_downramp[1:]
+            py_trajectory[-len(py_trajectory_downramp)+1:] = py_trajectory_downramp[1:]
+            pz_trajectory[-len(pz_trajectory_downramp)+1:] = pz_trajectory_downramp[1:]
+
+        return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory, pz_trajectory, driver_x_trajectory, driver_y_trajectory 
+    
 
     # ==================================================
     def energy_usage(self):

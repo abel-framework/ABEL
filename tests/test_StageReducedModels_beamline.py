@@ -202,6 +202,10 @@ def test_baseline_linac():
     shutil.rmtree(linac.run_path())
 
 
+def no_accel_phase_advance(length, initial_energy, foc_gradient):
+    return np.sqrt(SI.e*SI.c*foc_gradient/(initial_energy*SI.e)) * length
+
+
 @pytest.mark.StageReducedModels_linac
 def test_ramped_linac():
     """
@@ -331,14 +335,28 @@ def test_ramped_linac():
     assert np.isclose(downramp2.length_flattop, downramp2_length, rtol=1e-10, atol=0.0)
 
     # Check phase advances in ramps and flattop stage
-    assert np.isclose(upramp1.phase_advance_beta_evolution(), np.pi/2, rtol=1e-3, atol=0.0)  # Calculate the phase advance by integrating the beta function.
+    g_upramp1 = SI.e*upramp1.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+    if upramp1.external_focusing_gradient is not None:
+        g_upramp1 = g_upramp1 + upramp1.external_focusing_gradient
+    assert np.isclose(no_accel_phase_advance(upramp1.length, upramp1.nom_energy, g_upramp1), np.pi/2, rtol=1e-3, atol=0.0)  # Calculate the phase advance by integrating the beta function.
     assert np.isclose(upramp1.length_flattop2num_beta_osc(), 1/4, rtol=1e-3, atol=0.0)  # Calculate the number of betatron oscillations a particle can undergo along the ramp.
-    assert np.isclose(downramp1.phase_advance_beta_evolution(), np.pi/2, rtol=1e-3, atol=0.0)
+
+    g_downramp1 = SI.e*downramp1.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+    if downramp1.external_focusing_gradient is not None:
+        g_downramp1 = g_downramp1 + downramp1.external_focusing_gradient
+    assert np.isclose(no_accel_phase_advance(downramp1.length, downramp1.nom_energy, g_downramp1), np.pi/2, rtol=1e-3, atol=0.0)
     assert np.isclose(downramp1.length_flattop2num_beta_osc(), 1/4, rtol=1e-3, atol=0.0)
 
-    assert np.isclose(upramp2.phase_advance_beta_evolution(), np.pi/2, rtol=1e-3, atol=0.0)  # Calculate the phase advance by integrating the beta function.
+    g_upramp2 = SI.e*upramp2.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+    if upramp2.external_focusing_gradient is not None:
+        g_upramp2 = g_upramp2 + upramp2.external_focusing_gradient
+    assert np.isclose(no_accel_phase_advance(upramp2.length, upramp2.nom_energy, g_upramp2), np.pi/2, rtol=1e-3, atol=0.0)  # Calculate the phase advance by integrating the beta function.
     assert np.isclose(upramp2.length_flattop2num_beta_osc(), 1/4, rtol=1e-3, atol=0.0)  # Calculate the number of betatron oscillations a particle can undergo along the ramp.
-    assert np.isclose(downramp2.phase_advance_beta_evolution(), np.pi/2, rtol=1e-3, atol=0.0)
+
+    g_downramp2 = SI.e*downramp2.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+    if downramp2.external_focusing_gradient is not None:
+        g_downramp2 = g_downramp2 + downramp2.external_focusing_gradient
+    assert np.isclose(no_accel_phase_advance(downramp2.length, downramp2.nom_energy, g_downramp2), np.pi/2, rtol=1e-3, atol=0.0)
     assert np.isclose(downramp2.length_flattop2num_beta_osc(), 1/4, rtol=1e-3, atol=0.0)
 
     assert np.isclose(stages[0].length_flattop2num_beta_osc(), 9.5, rtol=1e-3, atol=0.0)  # Calculate the number of betatron oscillations a particle can undergo along the stage.
