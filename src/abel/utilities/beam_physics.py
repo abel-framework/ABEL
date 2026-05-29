@@ -1212,25 +1212,6 @@ def phase_advance_traj_data(pos, angles, orbit_pos=None, orbit_angles=None):
 
 
 # =============================================
-def arc_lengths(s_trajectory, x_trajectory):
-    """
-    Docstring for arc_length
-    
-    :param s_trajectory: Description
-    :param x_trajectory: Description
-    """
-
-    ds = np.diff(s_trajectory)
-    dx = np.diff(x_trajectory)
-
-    length = np.cumsum(np.sqrt(ds**2 + dx**2))
-
-    length = np.insert(length, 0, 0.0)
-
-    return length
-
-
-# =============================================
 def length2num_beta_osc(length, initial_energy, accel_gradient, foc_gradient, q=SI.e):
         """
         Calculate the number of betatron oscillations a particle can undergo in 
@@ -1271,7 +1252,6 @@ def length2num_beta_osc(length, initial_energy, accel_gradient, foc_gradient, q=
             raise ValueError('q * accel_gradient must be positive.')
 
         if accel_gradient < 1e-15: # Need to treat very small gradients separately. Often the case for plasma density ramps.
-
             return np.sqrt(np.abs(q)*SI.c*foc_gradient/(initial_energy*SI.e)) * length/(2*np.pi)
         else:
 
