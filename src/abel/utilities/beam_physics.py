@@ -1170,8 +1170,9 @@ def phase_advance_integrate_betas(ss, betas):
 # =============================================
 def phase_advance_traj_data(pos, angles, orbit_pos=None, orbit_angles=None):
     """
-    Compute the unwrapped betatron phase from transverse position and slope 
-    data. 
+    Compute the unwrapped betatron phase advance from transverse position and 
+    angle data by mapping the phase-space trajectory onto a normalised unit 
+    circle and evaluating the continuous phase angle evolution.
     
     Parameters
     ----------
