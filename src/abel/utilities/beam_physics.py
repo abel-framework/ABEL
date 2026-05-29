@@ -5,6 +5,7 @@
 # License: GPL-3.0-or-later
 
 import numpy as np
+import scipy.constants as SI
 
 
 # =============================================
@@ -1227,3 +1228,57 @@ def arc_lengths(s_trajectory, x_trajectory):
     length = np.insert(length, 0, 0.0)
 
     return length
+
+
+# =============================================
+def length2num_beta_osc(length, initial_energy, accel_gradient, foc_gradient, q=SI.e):
+        """
+        Calculate the number of betatron oscillations a particle can undergo in 
+        the stage (excluding ramps).
+
+        Will take into account the contribution from an external linear magnetic 
+        field B=[gy,-gx,0] if :attr:`self.external_focusing_gradient <abel.Stage.external_focusing>`
+        is not ``None``.
+
+        Parameters
+        ----------
+        length : [m] float
+            Length of a plasma stage excluding ramps that the particle can 
+            perform betatron oscillations in. 
+
+        initial_energy : [eV] float
+            The initial energy of the particle at the start of the plasma stage. 
+
+        accel_gradient : [V/m] float
+            Nominal accelerating gradient of the plasma stage exclusing ramps. 
+
+        foc_gradient : [T/m] float
+            The gradient of the total transverse focusing field.
+
+        q : [C] float, optional
+            Particle charge. q * accel_gradient must be positive. 
+            Defaults to elementary charge.
+
+            
+        Returns
+        -------
+        num_beta_osc : float
+            Total number of betatron oscillations that the particle will perform
+            across the plasma stage.
+        """
+
+        if q * accel_gradient < 0:
+            raise ValueError('q * accel_gradient must be positive.')
+
+        if accel_gradient < 1e-15: # Need to treat very small gradients separately. Often the case for plasma density ramps.
+
+            return np.sqrt(np.abs(q)*SI.c*foc_gradient/(initial_energy*SI.e)) * length/(2*np.pi)
+        else:
+
+            prefactor = 2*np.sqrt(np.abs(q)*foc_gradient*SI.c) / (q*accel_gradient)
+            energy_scaling = np.sqrt(initial_energy*SI.e + q*accel_gradient*length) - np.sqrt(initial_energy*SI.e)
+
+            num_beta_osc = prefactor * energy_scaling / (2*np.pi)
+
+            return num_beta_osc
+

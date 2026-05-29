@@ -16,6 +16,7 @@ import copy, warnings
 import scipy.constants as SI
 from types import SimpleNamespace
 from abel.utilities.plasma_physics import beta_matched
+from abel.utilities.beam_physics import length2num_beta_osc
 from typing import Self
 
 class Stage(Trackable, CostModeled):
@@ -1519,8 +1520,6 @@ class Stage(Trackable, CostModeled):
             across the plasma stage.
         """
 
-        from abel.utilities.plasma_physics import k_p
-
         if length_flattop is None:
             if self.length_flattop is None:
                 raise ValueError('Stage.length_flattop not set.')
@@ -1536,25 +1535,14 @@ class Stage(Trackable, CostModeled):
                 raise ValueError('Stage.nom_accel_gradient_flattop not set.')
             nom_accel_gradient_flattop = self.nom_accel_gradient_flattop
 
-        if q * nom_accel_gradient_flattop < 0:
-            raise ValueError('q * nom_accel_gradient_flattop must be positive.')
-
         if plasma_density is None:
             plasma_density = self.plasma_density
 
-        if nom_accel_gradient_flattop < 1e-15: # Need to treat very small gradients separately. Often the case for ramps.
-            return self.phase_advance_beta_evolution()/(2*np.pi)
-        else:
-            g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
-            if self.external_focusing_gradient is not None:
-                g = g + self.external_focusing_gradient
+        g = SI.e*plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m], ion background focusing gradient
+        if self.external_focusing_gradient is not None:
+            g = g + self.external_focusing_gradient
 
-            prefactor = 2*np.sqrt(np.abs(q)*g*SI.c) / (q*nom_accel_gradient_flattop)
-            energy_scaling = np.sqrt(initial_energy*SI.e + q*nom_accel_gradient_flattop*length_flattop) - np.sqrt(initial_energy*SI.e)
-
-            num_beta_osc = prefactor * energy_scaling / (2*np.pi)
-
-            return num_beta_osc
+        return length2num_beta_osc(length_flattop, initial_energy, nom_accel_gradient_flattop, g, q=SI.e)
         
 
     # ==================================================
