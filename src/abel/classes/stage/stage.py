@@ -126,6 +126,7 @@ class Stage(Trackable, CostModeled):
         self.plasma_density = plasma_density
         self.driver_source = driver_source
         self.ramp_beta_mag = ramp_beta_mag
+        self.external_focusing = False
         
         self.stage_number = None
         
@@ -1497,7 +1498,7 @@ class Stage(Trackable, CostModeled):
         the stage (excluding ramps).
 
         Will take into account the contribution from an external linear magnetic 
-        field B=[gy,-gx,0] if :attr:`self.external_focusing_gradient <abel.Stage.external_focusing>`
+        field B=[gy,-gx,0] if :attr:`self.external_focusing_gradient <abel.Stage.external_focusing_gradient>`
         is not ``None``.
 
         Parameters
@@ -1568,9 +1569,6 @@ class Stage(Trackable, CostModeled):
         - Assumes that each of the (uniform) ramps are configured to give pi/2 
         phase advance for the main beam.
 
-        - The stage length calculation is performed using 
-        :meth:`Stage.calc_flattop_num_beta_osc() <abel.Stage.calc_flattop_num_beta_osc>`.
-
 
         Parameters
         ----------
@@ -1602,7 +1600,6 @@ class Stage(Trackable, CostModeled):
                 raise ValueError('This method assumes uniform ramps with length set to give pi/2 phase advance for the main beam.')
             
             num_beta_osc_flattop = num_beta_osc - 0.5  # The ramps are by default set up to give pi/2 phase advance for the main beam.
-            # num_beta_osc_flattop = self.calc_flattop_num_beta_osc(num_beta_osc)
         else:
             num_beta_osc_flattop = num_beta_osc
 
@@ -1624,6 +1621,9 @@ class Stage(Trackable, CostModeled):
         focusing fields.
         """
         return None
+    @external_focusing_gradient.setter
+    def external_focusing_gradient(self, g_ext : float | None):
+        self._external_focusing_gradient = None  # Driver guiding with external field is not implemented yet, so always set None.
     
 
     # =============================================
