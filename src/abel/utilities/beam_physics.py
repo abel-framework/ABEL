@@ -5,6 +5,7 @@
 # License: GPL-3.0-or-later
 
 import numpy as np
+import scipy.constants as SI
 
 
 # =============================================
@@ -1151,4 +1152,114 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
         ax.set_ylabel('W_x')
 
     return W, evolution
+
+
+# =============================================
+def phase_advance_integrate_betas(ss, betas):
+    """
+    Calculate the phase advance in one dimesion by using the composite Simpson’s 
+    rule (:func:`scipy.integrate.simpson() <scipy.integrate.simpson>`) to 
+    integrate two arrays containing the location and the beta function.
+    """
+    
+    from scipy import integrate
+    inv_betas = 1/betas
+    return integrate.simpson(y=inv_betas, x=ss)
+
+
+# =============================================
+def phase_advance_traj_data(pos, angles, orbit_pos=None, orbit_angles=None):
+    """
+    Compute the unwrapped betatron phase advance from transverse position and 
+    angle data by mapping the phase-space trajectory onto a normalised unit 
+    circle and evaluating the continuous phase angle evolution.
+    
+    Parameters
+    ----------
+    pos : [m] 1D float ndarray
+        Transverse position along the beamline.
+        
+    angles : 1D float ndarray
+        Transverse angle dpos/ds.
+
+    orbit_pos : [m] 1D float ndarray, optional
+        Reference orbit transverse position (e.g., driver trajectory). If 
+        provided, these are subtracted before phase calculation. Defaults to 
+        `None`.
+
+    orbit_angles : 1D float ndarray, optional
+        Reference orbit transverse angles (e.g., driver trajectory angles). If 
+        provided, these are subtracted before phase calculation. Defaults to 
+        `None`.
+    
+    Returns
+    -------
+    phase_advance : float
+        Unwrapped phase angle in radians, representing the continuous betatron
+        phase advance at the end of the beamline
+    """
+
+    if orbit_pos is not None:
+        pos = pos - orbit_pos
+    if orbit_angles is not None:
+        angles = angles - orbit_angles
+    
+    # Compute the phase space angle by normalising coordinates to a unit circle 
+    # and taking the arctangent before unwrapping
+    phase = np.unwrap(np.arctan2(angles / np.max(np.abs(angles)), 
+                                 pos / np.max(np.abs(pos))))
+    
+    return np.abs(phase[-1] - phase[0]) 
+
+
+# =============================================
+def length2num_beta_osc(length, initial_energy, accel_gradient, foc_gradient, q=SI.e):
+        """
+        Calculate the number of betatron oscillations a particle can undergo in 
+        the stage (excluding ramps).
+
+        Will take into account the contribution from an external linear magnetic 
+        field B=[gy,-gx,0] if :attr:`self.external_focusing_gradient <abel.Stage.external_focusing>`
+        is not ``None``.
+
+        Parameters
+        ----------
+        length : [m] float
+            Length of a plasma stage excluding ramps that the particle can 
+            perform betatron oscillations in. 
+
+        initial_energy : [eV] float
+            The initial energy of the particle at the start of the plasma stage. 
+
+        accel_gradient : [V/m] float
+            Nominal accelerating gradient of the plasma stage exclusing ramps. 
+
+        foc_gradient : [T/m] float
+            The gradient of the total transverse focusing field.
+
+        q : [C] float, optional
+            Particle charge. q * accel_gradient must be positive. 
+            Defaults to elementary charge.
+
+            
+        Returns
+        -------
+        num_beta_osc : float
+            Total number of betatron oscillations that the particle will perform
+            across the plasma stage.
+        """
+
+        if q * accel_gradient < 0:
+            raise ValueError('q * accel_gradient must be positive.')
+
+        if accel_gradient < 1e-15: # Need to treat very small gradients separately. Often the case for plasma density ramps.
+            return np.sqrt(np.abs(q)*SI.c*foc_gradient/(initial_energy*SI.e)) * length/(2*np.pi)
+        else:
+
+            prefactor = 2*np.sqrt(np.abs(q)*foc_gradient*SI.c) / (q*accel_gradient)
+            energy_scaling = np.sqrt(initial_energy*SI.e + q*accel_gradient*length) - np.sqrt(initial_energy*SI.e)
+
+            num_beta_osc = prefactor * energy_scaling / (2*np.pi)
+
+            return num_beta_osc
 
