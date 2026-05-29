@@ -925,9 +925,6 @@ class StageHipace(Stage):
         - Assumes that each of the (uniform) ramps are configured to give pi/2 
         phase advance for the main beam.
 
-        - The stage length calculation is performed using 
-        :meth:`StageHipace.calc_flattop_num_beta_osc() <abel.StageHipace.calc_flattop_num_beta_osc>`.
-
         - Also set :attr:`self._external_focusing_gradient <abel.Stage._external_focusing_gradient>`
         and :attr:`self.driver_num_half_beta_osc <abel.StageHipace.driver_num_half_beta_osc>`
         to be consistent with the calculated stage length
