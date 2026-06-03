@@ -73,9 +73,7 @@ class Source(Trackable, CostModeled):
 
     spin_polarization_direction : str
         Defines the orientation of the spin. Can be ``'x'``, ``'y'`` or ``'z'``.
-
-    is_polarized : bool
-        Whether the source produces polarized particles.
+        
     """
     #TODO: Why is accel_gradient needed??
     
@@ -113,9 +111,7 @@ class Source(Trackable, CostModeled):
 
         self.spin_polarization = 0
         self.spin_polarization_direction = 'z'
-
-        self.is_polarized = False #TODO shouldn't this rather be a function that checks whether spin_polarization > 0?
-    
+        
     
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -159,7 +155,8 @@ class Source(Trackable, CostModeled):
             beam.bunch_separation = self.bunch_separation
 
         # set spin polarization
-        beam.set_arbitrary_spin_polarization(self.spin_polarization, direction=self.spin_polarization_direction)
+        if abs(self.spin_polarization) > 0:
+            beam.set_arbitrary_spin_polarization(self.spin_polarization, direction=self.spin_polarization_direction)
 
         # rotate the beam according to its pointing angles
         do_beam_rotation = False
@@ -196,7 +193,7 @@ class Source(Trackable, CostModeled):
 
     
     def get_cost_breakdown(self):
-        if self.is_polarized:
+        if abs(self.spin_polarization) > 0:
             if self.charge < 0:
                 return ('Polarized electron source', CostModeled.cost_per_source_polarized_electrons)
             else:
