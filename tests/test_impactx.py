@@ -64,6 +64,7 @@ def test_interstage_plasma_lens_impactx():
     interstage_pl.field_dipole = 1.0
     interstage_pl.cancel_chromaticity = True
     interstage_pl.cancel_sec_order_dispersion = True
+    interstage_pl.use_apertures = False
 
     # track the particles
     beam0 = source.track()
