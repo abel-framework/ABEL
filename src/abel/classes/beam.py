@@ -1308,12 +1308,16 @@ class Beam():
     
     ## phase spaces
     
-    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None):
+    def phase_space_density(self, hfcn, vfcn, hbins=None, vbins=None, hlims=None, vlims=None):
         self.remove_nans()
         if hbins is None:
             hbins = round(np.sqrt(len(self))/2)
+            if hlims is not None:
+                hbins = np.linspace(np.min(hlims), np.max(hlims), hbins)
         if vbins is None:
             vbins = round(np.sqrt(len(self))/2)
+            if vlims is not None:
+                vbins = np.linspace(np.min(vlims), np.max(vlims), vbins)
         counts, hedges, vedges = np.histogram2d(hfcn(), vfcn(), weights=self.qs(), bins=(hbins, vbins))
         hctrs = (hedges[0:-1] + hedges[1:])/2
         vctrs = (vedges[0:-1] + vedges[1:])/2
@@ -1326,11 +1330,11 @@ class Beam():
         #print(np.sum(density*np.diff(vedges)*np.diff(hedges))/self.charge())
         return density, hctrs, vctrs
     
-    def density_lps(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.zs, self.Es, hbins=hbins, vbins=vbins)
+    def density_lps(self, zbins=None, Ebins=None, zlims=None, Elims=None):
+        return self.phase_space_density(self.zs, self.Es, hbins=zbins, vbins=Ebins, hlims=zlims, vlims=Elims)
     
-    def density_transverse(self, hbins=None, vbins=None):
-        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins)
+    def density_transverse(self, hbins=None, vbins=None, xlims=None, ylims=None):
+        return self.phase_space_density(self.xs, self.ys, hbins=hbins, vbins=vbins, hlims=xlims, vlims=ylims)
 
     
     # ==================================================
@@ -1704,8 +1708,8 @@ class Beam():
         cb = fig.colorbar(p)
         cb.ax.set_ylabel('Charge density (pC/um/mrad)')
 
-    def plot_transverse_profile(self):
-        dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys)
+    def plot_transverse_profile(self, xlims=None, ylims=None):
+        dQdxdy, xs, ys = self.phase_space_density(self.xs, self.ys, hlims=xlims, vlims=ylims)
 
         fig, ax = plt.subplots()
         fig.set_figwidth(8)

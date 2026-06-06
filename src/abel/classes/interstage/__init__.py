@@ -353,6 +353,7 @@ class Interstage(Trackable, CostModeled):
         from matplotlib import pyplot as plt
         from matplotlib import patches
         from copy import deepcopy
+        import string
         from abel.utilities.beam_physics import evolve_beta_function, evolve_dispersion, evolve_second_order_dispersion, evolve_R56, evolve_chromatic_amplitude
         
         # calculate evolution
@@ -368,7 +369,7 @@ class Interstage(Trackable, CostModeled):
             ss_beta = evol_beta_x[0]
             beta_xs = evol_beta_x[1]
             beta_ys = evol_beta_y[1]
-
+        
         if show_dispersion:
             _, _, evol_second_order_dispersion = evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False);
             ss_disp = evol_second_order_dispersion[0]
@@ -453,6 +454,7 @@ class Interstage(Trackable, CostModeled):
                 axs[n].legend(loc='best', reverse=True, fontsize='small')
             axs[n].set_ylabel(r'$\sqrt{\mathrm{Beta\hspace{0.3}function}}$ ($\sqrt{\mathrm{m}})$')
             axs[n].set_xlim(long_limits)
+            axs[n].text(0.01, 0.90, f'({string.ascii_lowercase[n-1]})', transform=axs[n].transAxes, size=13)
         
         # plot dispersion
         if show_dispersion:
@@ -464,7 +466,8 @@ class Interstage(Trackable, CostModeled):
             axs[n].plot(ss_disp, dispersion / 1e-3, '-', color=colx1, label=r'1$^{\mathrm{st}}$ order')
             axs[n].set_ylabel('Horizontal dispersion (mm)')
             axs[n].set_xlim(long_limits)
-            axs[n].legend(loc='best', reverse=True, fontsize='small')
+            axs[n].legend(loc='lower left', reverse=True, fontsize='small')
+            axs[n].text(0.01, 0.90, f'({string.ascii_lowercase[n-1]})', transform=axs[n].transAxes, size=13)
         
         # plot R56
         if show_R56:
@@ -473,6 +476,7 @@ class Interstage(Trackable, CostModeled):
             axs[n].plot(ss_R56, R56/1e-3, color=colz)
             axs[n].set_ylabel(r'Longitudinal dispersion, $R_{56}$ (mm)')
             axs[n].set_xlim(long_limits)
+            axs[n].text(0.01, 0.90, f'({string.ascii_lowercase[n-1]})', transform=axs[n].transAxes, size=13)
 
         # plot chromaticity
         if show_chromaticity:
@@ -481,7 +485,7 @@ class Interstage(Trackable, CostModeled):
                 if add_no_chrom_correction:
                     axs[n].plot(ss_W0, Wxs0, ':', color=coloff, label='Linear plasma lenses')
                     axs[n].plot(ss_W, Wxs, color=colx1, label='Nonlinear plasma lenses')
-                    axs[n].legend(loc='best', reverse=True, fontsize='small')
+                    axs[n].legend(loc='upper left', reverse=True, fontsize='small', bbox_to_anchor=[0.01,0.89])
                 else:
                     axs[n].plot(ss_W, Wxs, color=colx1)
 
@@ -496,6 +500,7 @@ class Interstage(Trackable, CostModeled):
                 axs[n].set_ylim(np.array([-0.01, 1.05])*max(max(Wys), max(Wxs)))
             axs[n].set_ylabel(r'Chromatic amplitude, $W$')
             axs[n].set_xlim(long_limits)
+            axs[n].text(0.01, 0.90, f'({string.ascii_lowercase[n-1]})', transform=axs[n].transAxes, size=13)
             
 
         # add horizontal axis label
@@ -506,7 +511,7 @@ class Interstage(Trackable, CostModeled):
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
 
     
-    def plot_layout(self, delta=0.25, axes_equal=False, use_second_order_dispersion=False, savefig=None, figsize=[12,2]):
+    def plot_layout(self, delta=0.25, axes_equal=False, use_second_order_dispersion=False, savefig=None, figsize=[12,2], add_drivers_eV=None):
         "Plot the layout with beam orbit and dispersion."
         
         from matplotlib import pyplot as plt
@@ -598,7 +603,7 @@ class Interstage(Trackable, CostModeled):
         lw_element=0.75
         if not axes_equal:
             width_dipole = max(abs(offset_disp))*2
-        width_lens = width_dipole*0.8
+        width_lens = width_dipole*0.75
         width_sextupole = width_dipole*0.75
         ssl = np.append([0.0], np.cumsum(ls))
         ssl = ssl[:-1]
@@ -640,6 +645,27 @@ class Interstage(Trackable, CostModeled):
         # invert axis to have positive values on the "right"
         ax.yaxis.set_inverted(True)
 
+        if add_drivers_eV is not None:
+            col_driver = 'tab:red'
+            
+            _, evol_orbit_driver_in = evolve_orbit(np.append(ls[:2], ssl[-1]/6), np.append(inv_rhos[:2], 0)*self.nom_energy/add_drivers_eV, theta0=-theta/2)
+            xs_driver_in = evol_orbit_driver_in[0,:]
+            ys_driver_in = evol_orbit_driver_in[1,:]
+            _, evol_orbit_driver_depl = evolve_orbit(np.append(ls[:2], ssl[-1]/24), np.append(inv_rhos[:2], 0)*self.nom_energy/add_drivers_eV*2, theta0=-theta/2)
+            xs_driver_depl = evol_orbit_driver_depl[0,:]
+            ys_driver_depl = evol_orbit_driver_depl[1,:]
+
+            ax.fill(np.concatenate([xs_driver_in, np.flip(xs_driver_depl)]), np.concatenate([ys_driver_in, np.flip(ys_driver_depl)]), col_driver, alpha=0.1, edgecolor='none', lw=lw_element, zorder=0)
+            
+            ax.plot(xs_driver_in, ys_driver_in, ':', lw=lw_dotted, c=col_driver)
+            ax.arrow(xs_driver_in[-1], ys_driver_in[-1], (xs_driver_in[-1]-xs_driver_in[-2])/100, (ys_driver_in[-1]-ys_driver_in[-2])/100, color=col_driver, width=0, head_length=width_dipole/5, head_width=width_dipole/5, zorder=100)
+
+            _, evol_orbit_driver_out = evolve_orbit(np.append(ls[:2], ssl[-1]/6), np.append(-inv_rhos[:2], 0)*self.nom_energy/add_drivers_eV, theta0=np.pi+theta/2)
+            xs_driver_out = xs[-1]+evol_orbit_driver_out[0,:]
+            ys_driver_out = ys[-1]+evol_orbit_driver_out[1,:]
+            ax.plot(xs_driver_out, ys_driver_out, ':', lw=lw_dotted, c=col_driver)
+            ax.arrow(xs_driver_out[0], ys_driver_out[0], -(xs_driver_out[2]-xs_driver_out[0])/1, -(ys_driver_out[2]-ys_driver_out[0])/1, color=col_driver, width=0, head_length=width_dipole/5, head_width=width_dipole/5, zorder=101)
+            
         # save figure to file
         if savefig is not None:
             fig.savefig(str(savefig), format="pdf", bbox_inches="tight")
