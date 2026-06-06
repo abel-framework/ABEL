@@ -113,6 +113,7 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
             sim.isr_order = 3
         else:
             sim.isr_order = 1
+    sim.spin = beam0.spin_check()
     
     # convert to ImpactX particle container
     _, sim = beam2particle_container(beam0, sim=sim, verbose=verbose, nom_energy=nom_energy)
@@ -128,7 +129,7 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
         eval('sim.track_particles()')
     
     # convert back to ABEL beam
-    beam = particle_container2beam(sim.particle_container())
+    beam = particle_container2beam(sim.particle_container(), extract_spins=beam0.spin_check())
 
     # clean shutdown
     sim.finalize()
@@ -226,7 +227,8 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     # reference particle
     ref = sim.particle_container().ref_particle()
     ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6) # TODO: what if nom_energy is None?
-
+    ref.set_species("electron")
+    
     # initialize the envelope
     sim.init_envelope(ref, distr, peak_current) # TODO: what if peak_current is None?
 
@@ -430,13 +432,17 @@ def extract_evolution(path=''):
     evol.charge = diags["charge_C"]
     evol.dispersion_x = diags["dispersion_x"]
     evol.dispersion_y = diags["dispersion_y"]
+    if {'mean_sx', 'mean_sy', 'mean_sz'}.issubset(diags.columns):
+        evol.spin_x = diags["mean_sx"]
+        evol.spin_y = diags["mean_sy"]
+        evol.spin_z = diags["mean_sz"]
     
     return evol
 
 
 # ==================================================    
 # convert from ImpactX particle container to ABEL beam
-def particle_container2beam(particle_container):
+def particle_container2beam(particle_container, extract_spins=False):
     """
     Convert from ImpactX particle container to an ABEL beam object.
 
@@ -444,6 +450,9 @@ def particle_container2beam(particle_container):
     ----------
     particle_container : ImpactX ``ParticleContainer``
         ImpactX ``ParticleContainer`` to be converted.
+    
+    extract_spins : bool, optional
+        Whether to extract the spins or not.
 
     Returns
     -------
@@ -467,8 +476,13 @@ def particle_container2beam(particle_container):
     beam.set_uys(ref.pz*(array[:,5])*SI.c)
     beam.set_uzs(ref.pz*(1-array[:,6])*SI.c)
     
-    q_particle = array[0,7]*(SI.m_e*SI.c**2/SI.e)*SI.e
-    beam.set_qs(array[:,8]*q_particle)
+    q_particle = array[0,-2]*(SI.m_e*SI.c**2/SI.e)*SI.e
+    beam.set_qs(array[:,-1]*q_particle)
+    
+    if extract_spins:
+        beam.set_spxs(array[:,7])
+        beam.set_spys(array[:,8])
+        beam.set_spzs(array[:,9])
     
     beam.location = ref.s
     
@@ -522,6 +536,7 @@ def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
         
     # reference particle
     ref = sim.particle_container().ref_particle()
+    ref.set_species("electron")
     ref.set_charge_qe(beam.charge_sign())
     ref.set_mass_MeV(0.510998950)
     ref.set_kin_energy_MeV(nom_energy/1e6)
@@ -537,6 +552,7 @@ def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
         dpx_podv = amr.PODVector_real_std()
         dpy_podv = amr.PODVector_real_std()
         dpt_podv = amr.PODVector_real_std()
+        dw_podv = amr.PODVector_real_std()
     else:  # initialize on device using arena/gpu-based PODVectors
         dx_podv = amr.PODVector_real_arena()
         dy_podv = amr.PODVector_real_arena()
@@ -544,6 +560,7 @@ def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
         dpx_podv = amr.PODVector_real_arena()
         dpy_podv = amr.PODVector_real_arena()
         dpt_podv = amr.PODVector_real_arena()
+        dw_podv = amr.PODVector_real_arena()
     
     for p_dx in dx:
         dx_podv.push_back(p_dx)
@@ -557,10 +574,41 @@ def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
         dpy_podv.push_back(p_dpy)
     for p_dpt in dpt:
         dpt_podv.push_back(p_dpt)
-
+    
+    for p_w in beam.weightings():
+        dw_podv.push_back(p_w)
+    
     particle_container = sim.particle_container()
     qm_eev = -1.0 / 0.510998950e6  # electron charge/mass in e / eV
-    particle_container.add_n_particles(dx_podv, dy_podv, dt_podv, dpx_podv, dpy_podv, dpt_podv, qm_eev, beam.abs_charge())
 
+    # add spins if these are tracked
+    if beam.spin_check():
+
+        # set up vectors
+        if not Config.have_gpu:
+            dsx_podv = amr.PODVector_real_std()
+            dsy_podv = amr.PODVector_real_std()
+            dsz_podv = amr.PODVector_real_std()
+        else:
+            dsx_podv = amr.PODVector_real_arena()
+            dsy_podv = amr.PODVector_real_arena()
+            dsz_podv = amr.PODVector_real_arena()
+
+        # populate with spins
+        for sx in beam.spxs():
+            dsx_podv.push_back(sx)
+        for sy in beam.spys():
+            dsy_podv.push_back(sy)
+        for sx in beam.spzs():
+            dsz_podv.push_back(sx)
+
+        # make particle container (with spins)
+        particle_container.add_n_particles(dx_podv, dy_podv, dt_podv, dpx_podv, dpy_podv, dpt_podv, qm_eev, beam.abs_charge(), None, dsx_podv, dsy_podv, dsz_podv)
+        
+    else:
+
+        # make particle container (no spins)
+        particle_container.add_n_particles(dx_podv, dy_podv, dt_podv, dpx_podv, dpy_podv, dpt_podv, qm_eev, beam.abs_charge())
+    
     return particle_container, sim
 

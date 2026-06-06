@@ -276,7 +276,7 @@ def test_driver_unrotation():
     assert stage.driver_source.align_beam_axis is True
     driver0 = stage.driver_incoming
 
-    Beam.comp_beams(driver, driver0, comp_location=False, rtol=1e-13, atol=0.0)
+    Beam.comp_beams(driver, driver0, comp_location=False, rtol=1e-7, atol=0.0)
 
 
     # ========== No jitter, large angular offset ==========

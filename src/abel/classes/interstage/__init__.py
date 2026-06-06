@@ -7,6 +7,7 @@
 from abc import abstractmethod
 from abel.classes.trackable import Trackable
 from abel.classes.cost_modeled import CostModeled
+from abel.CONFIG import CONFIG
 from types import SimpleNamespace
 import numpy as np
 import scipy.constants as SI
@@ -339,9 +340,46 @@ class Interstage(Trackable, CostModeled):
         axs[2,2].set_xlabel(long_label)
         axs[2,2].set_xlim(long_limits)
         
-        
         plt.show()
 
+
+    def plot_spin_evolution(self):
+        """
+        Plot the spin evolution inside the interstage.
+        """
+
+        from matplotlib import pyplot as plt
+        
+        evol = self.evolution
+
+        # stop if no evolution calculated
+        if not hasattr(evol, 'location'):
+            print('No evolution calculated.')
+            return
+        if not hasattr(evol, 'spin_x'):
+            print('No spin evolution calculated.')
+            return
+        
+        # preprate plot
+        fig, axs = plt.subplots(1,1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+        colx = "tab:blue"
+        coly = "tab:orange"
+        colz = "tab:green"
+        long_label = 'Location [m]'
+        long_limits = [min(evol.location), max(evol.location)]
+
+        # plot energy
+        axs.plot(evol.location, evol.spin_x, color=colx, label='x')
+        axs.plot(evol.location, evol.spin_y, color=coly, label='y')
+        axs.plot(evol.location, evol.spin_z, color=colz, label='z')
+        axs.set_ylabel('Spin polarization')
+        axs.set_xlabel(long_label)
+        axs.set_xlim(long_limits)
+        axs.set_ylim(-1.02, 1.02)
+        axs.legend()
+        
     
     ## PLOTTING OPTICS
 
