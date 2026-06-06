@@ -30,16 +30,27 @@ class Runnable(ABC):
             if verbose_exists:
                 print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
         else:
-
-            # clear the shot folder
-            self.clear_run_data(shot)
-
-            # run tracking
+            
+            # print info
             if self.num_shots > 1 and self.verbose:
                 print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
 
-            # if overwrite_from is None: # TODO
-            self.track(beam=None, savedepth=self.savedepth, runnable=self, verbose=self.verbose)
+            # set starting point and load beam if it exists
+            if (self.overwrite_from is None or self.overwrite_from == 0) or not os.path.exists(self.object_path(shot)):
+                self.clear_run_data(shot)
+                beam = None
+                start_from = 0
+            else:
+                num_outputs = self.num_outputs(shot=shot)
+                if self.overwrite_from < 0:
+                    index = num_outputs + self.overwrite_from -1
+                else:
+                    index = self.overwrite_from - 1
+                beam = self.get_beam(index, shot=shot)
+                start_from = index + 1
+            
+            # perform tracking
+            self.track(beam=beam, savedepth=self.savedepth, runnable=self, verbose=self.verbose, start_from=start_from)
 
             # save object to file
             self.save()
@@ -50,7 +61,7 @@ class Runnable(ABC):
         return self.scan_fcn is not None
       
     # scan function
-    def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16):
+    def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16, overwrite_from=None):
 
         from joblib import Parallel, delayed
         from joblib_progress import joblib_progress
@@ -62,10 +73,11 @@ class Runnable(ABC):
             self.run_name = run_name
         
         self.overwrite = overwrite
+        self.overwrite_from = overwrite_from
         self.verbose = verbose
         self.savedepth = savedepth
         
-        if self.overwrite:
+        if self.overwrite and self.overwrite_from is None:
             self.clear_run_data()
             self.overwrite = False
             
@@ -123,7 +135,7 @@ class Runnable(ABC):
 
     
     # run simulation
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16): 
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16, overwrite_from=None): 
         
         # define run name (generate if not given)
         if run_name is None:
@@ -132,7 +144,7 @@ class Runnable(ABC):
             self.run_name = run_name
         
         # perform a scan with only one step
-        self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores)
+        self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores, overwrite_from=overwrite_from)
     
     
 

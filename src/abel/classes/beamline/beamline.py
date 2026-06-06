@@ -42,14 +42,22 @@ class Beamline(Trackable, Runnable, CostModeled):
 
     
     # perform tracking
-    def track(self, beam=None, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam=None, savedepth=0, runnable=None, verbose=False, start_from=0):
         
         # assemble the trackables
         if self.trackables is None:
             self.assemble_trackables()
         
         # perform element-wise tracking
-        for trackable in self.trackables:
+        for i, trackable in enumerate(self.trackables):
+
+            # skip to the given trackable
+            if i < start_from:
+                continue
+            if start_from > 0 and start_from == i:
+                assert beam is not None
+
+            # track through the trackable
             beam = trackable.track(beam, savedepth-1, runnable, verbose)
         
         return beam
