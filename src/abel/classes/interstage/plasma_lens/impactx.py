@@ -48,7 +48,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
     # TODO: keep_data is not used.
     
     def __init__(self, nom_energy=None, beta0=None, length_dipole=None, field_dipole=None, R56=0, cancel_chromaticity=True, cancel_sec_order_dispersion=True,
-                       enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, enable_isr_on_ref_part=True, keep_data=False):
+                       enable_csr=True, enable_isr=True, enable_space_charge=False, num_slices=50, use_monitors=False, isr_on_ref_part=True, keep_data=False):
         
         super().__init__(nom_energy=nom_energy, beta0=beta0, length_dipole=length_dipole, field_dipole=field_dipole, R56=R56, 
                          cancel_chromaticity=cancel_chromaticity, cancel_sec_order_dispersion=cancel_sec_order_dispersion, 
@@ -57,7 +57,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         # simulation options
         self.num_slices = num_slices
         self.use_monitors = use_monitors
-        self.isr_on_ref_part = enable_isr_on_ref_part
+        self.isr_on_ref_part = isr_on_ref_part
 
 
     # ==================================================
@@ -132,12 +132,6 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         B_dip = self.field_dipole
         phi_dip = self.length_dipole*B_dip*SI.e/energy2momentum(self.nom_energy)
         dipole = elements.ExactSbend(ds=self.length_dipole, phi=np.rad2deg(phi_dip), B=B_dip, nslice=self.num_slices)
-
-        # add lens offset for ISR mitigation
-        if self.enable_isr and self.cancel_isr_kicks:
-            dx_isr = self.lens_offset_isr_kick_mitigation()
-        else:
-            dx_isr = 0
             
         # define plasma lens
         ds_pl = self.length_plasma_lens/(self.num_slices+1)
@@ -146,7 +140,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
         plasma_lens2 = [drift_slice_pl]
         kl_lens = self.strength_plasma_lens
         tau_lens = self.nonlinearity_plasma_lens
-        dxs = dx_isr*np.array([1, -1]) + np.array([self.lens1_offset_x, self.lens2_offset_x]) + np.random.normal(scale=self.jitter.lens_offset_x, size=2)
+        dxs = np.array([self.lens1_offset_x, self.lens2_offset_x]) + np.random.normal(scale=self.jitter.lens_offset_x, size=2)
         dxps = np.random.normal(scale=self.jitter.lens_angle_x, size=2)
         dys = np.array([self.lens1_offset_y, self.lens2_offset_y]) + np.random.normal(scale=self.jitter.lens_offset_y, size=2)
         dyps = np.random.normal(scale=self.jitter.lens_angle_y, size=2)
@@ -169,7 +163,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
             pl2 = [aperture]
             pl2.extend(plasma_lens2)
             pl2.append(aperture)
-            plasma_lens1 = pl2
+            plasma_lens2 = pl2
 
         # define first chicane dipole
         B_chic1 = self.field_chicane_dipole1
