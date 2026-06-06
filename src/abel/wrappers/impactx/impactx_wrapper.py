@@ -227,7 +227,8 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     # reference particle
     ref = sim.particle_container().ref_particle()
     ref.set_charge_qe(1.0).set_mass_MeV(SI.m_e*SI.c**2/SI.e/1e6).set_kin_energy_MeV(nom_energy/1e6) # TODO: what if nom_energy is None?
-
+    ref.set_species("electron")
+    
     # initialize the envelope
     sim.init_envelope(ref, distr, peak_current) # TODO: what if peak_current is None?
 
@@ -535,6 +536,7 @@ def beam2particle_container(beam, nom_energy=None, sim=None, verbose=False):
         
     # reference particle
     ref = sim.particle_container().ref_particle()
+    ref.set_species("electron")
     ref.set_charge_qe(beam.charge_sign())
     ref.set_mass_MeV(0.510998950)
     ref.set_kin_energy_MeV(nom_energy/1e6)
