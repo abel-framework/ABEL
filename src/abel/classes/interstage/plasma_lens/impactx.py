@@ -163,7 +163,7 @@ class InterstagePlasmaLensImpactX(InterstagePlasmaLens):
             pl2 = [aperture]
             pl2.extend(plasma_lens2)
             pl2.append(aperture)
-            plasma_lens1 = pl2
+            plasma_lens2 = pl2
 
         # define first chicane dipole
         B_chic1 = self.field_chicane_dipole1
