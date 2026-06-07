@@ -166,9 +166,7 @@ class Runnable(ABC):
         elif shot_filter is not None:
             shots_to_perform = shots_to_perform[np.isin(shots_to_perform, shot_filter)]
 
-        # TODO: add functionality where a common run starts it off (single run; if parallel run this part alone first), then do the scan after this.
-        #       The attribute could be named "common_run_until=None". Can use symlinks to shot 0 in the other shots to save space.
-        # TODO: FIX THIS
+        # perform shared run prior to the separate shots
         self.shared_run_until = shared_run_until
         if shared_run_until is not None:
             self.is_shared_run = True
