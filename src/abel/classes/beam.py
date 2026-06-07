@@ -2074,13 +2074,11 @@ class Beam():
         
     # load beam (from OpenPMD format)
     @classmethod
-    def load(_, filename0, beam_name='beam'):
+    def load(_, filename, beam_name='beam'):
 
         # resolve if alias
-        if os.path.islink(filename0):
-            filename = os.readlink(filename0)
-        else:
-            filename = filename0
+        if os.path.islink(filename):
+            filename = os.readlink(filename)
         
         # load file
         series = io.Series(filename, io.Access.read_only)
