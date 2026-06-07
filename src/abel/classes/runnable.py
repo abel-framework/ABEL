@@ -86,14 +86,14 @@ class Runnable(ABC):
         if self.shared_run_until is not None:
             if self.is_shared_run:
                 # shared run until this element
-                track_until = self.shared_run_until
+                track_until = self.shared_run_until-1
             else:
                 # continuing after the shared run (the other shots symlink to the first shot)
                 if shot > 0:
                     self.clear_run_data(shot)
                     shot_path = self.shot_path(shot)
                     for i, file in enumerate(self.run_data(shot=0)):
-                        if i > self.shared_run_until:
+                        if i > self.shared_run_until-1:
                             break
                         symlink = os.path.join(shot_path, os.path.basename(file))
                         if os.path.exists(symlink):
@@ -102,7 +102,7 @@ class Runnable(ABC):
                     print(f'    ... #0-{self.shared_run_until} symlinked to SHOT 1')
 
                 # set the starting point for continuing (and load the correct beam)
-                index = self.shared_run_until + 1
+                index = self.shared_run_until
                 track_from = index
                 beam = self.get_beam(index-1, shot=0)
 
