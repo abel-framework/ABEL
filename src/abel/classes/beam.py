@@ -6,7 +6,7 @@
 
 import numpy as np
 import openpmd_api as io
-import copy, warnings
+import copy, warnings, os
 import scipy.constants as SI
 import scipy.sparse as sp
 from scipy.spatial.transform import Rotation as Rot
@@ -2074,7 +2074,13 @@ class Beam():
         
     # load beam (from OpenPMD format)
     @classmethod
-    def load(_, filename, beam_name='beam'):
+    def load(_, filename0, beam_name='beam'):
+
+        # resolve if alias
+        if os.path.islink(filename0):
+            filename = os.readlink(filename0)
+        else:
+            filename = filename0
         
         # load file
         series = io.Series(filename, io.Access.read_only)
