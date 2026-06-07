@@ -24,36 +24,93 @@ class Runnable(ABC):
             vals_all = np.repeat(self.vals,self.num_shots_per_step)
             self.scan_fcn(self, vals_all[shot])
         
-        # check if object exists
-        if not self.overwrite and os.path.exists(self.object_path(shot)):
-            verbose_exists = self.verbose
-            if verbose_exists:
-                print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
-        else:
+        # if the run object does not exists, then clean and run normally
+        if not os.path.exists(self.object_path(shot)):
             
+            # delete incomplete run data
+            self.clear_run_data(shot)
+            
+            # start from the beginning
+            beam = None
+            track_from = 0
+
             # print info
             if self.num_shots > 1 and self.verbose:
                 print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
+        
+        else:
 
-            # set starting point and load beam if it exists
-            if (self.overwrite_from is None or self.overwrite_from == 0) or not os.path.exists(self.object_path(shot)):
-                self.clear_run_data(shot)
-                beam = None
-                start_from = 0
+            # if the run object exists but should not be overwritten, then stop
+            if not self.overwrite:
+                
+                if self.verbose:
+                    print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
+                return
+                
             else:
-                num_outputs = self.num_outputs(shot=shot)
-                if self.overwrite_from < 0:
-                    index = num_outputs + self.overwrite_from -1
-                else:
-                    index = self.overwrite_from - 1
-                beam = self.get_beam(index, shot=shot)
-                start_from = index + 1
-            
-            # perform tracking
-            self.track(beam=beam, savedepth=self.savedepth, runnable=self, verbose=self.verbose, start_from=start_from)
+                
+                # overwrite the existing shot from the start
+                if self.overwrite_from is None or self.overwrite_from == 0:
 
-            # save object to file
-            self.save()
+                    # delete incomplete run data (if not continuing a shared run)
+                    if not (self.shared_run_until is not None and not self.is_shared_run and shot == 0):
+                        self.clear_run_data(shot)
+                        
+                    # start from the beginning
+                    beam = None
+                    track_from = 0
+
+                    # print info
+                    if self.num_shots > 1 and self.verbose:
+                        print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots) + ' (overwriting)', flush=True)
+                    
+                else:
+
+                    # overwrite the existing shot from a given point
+                    if self.overwrite_from < 0:
+                        num_outputs = self.num_outputs(shot=shot)
+                        index = num_outputs + self.overwrite_from - 1
+                    else:
+                        index = self.overwrite_from - 1
+
+                    # load the beam from the given point
+                    beam = self.get_beam(index, shot=shot)
+                    track_from = index + 1
+                    
+                    # print info
+                    if self.num_shots > 1 and self.verbose:
+                        print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots) + ' (overwriting from element #'+ str(track_from) +')', flush=True)
+                
+        # setup shared runs (up to a certain element)
+        track_until = -1
+        if self.shared_run_until is not None:
+            if self.is_shared_run:
+                # shared run until this element
+                track_until = self.shared_run_until
+            else:
+                # continuing after the shared run (the other shots symlink to the first shot)
+                if shot > 0:
+                    self.clear_run_data(shot)
+                    shot_path = self.shot_path(shot)
+                    for i, file in enumerate(self.run_data(shot=0)):
+                        if i > self.shared_run_until:
+                            break
+                        symlink = os.path.join(shot_path, os.path.basename(file))
+                        if os.path.exists(symlink):
+                            os.remove(symlink)
+                        os.symlink(file, symlink)
+                    print(f'    ... #0-{self.shared_run_until} symlinked to SHOT 1')
+
+                # set the starting point for continuing (and load the correct beam)
+                index = self.shared_run_until + 1
+                track_from = index
+                beam = self.get_beam(index-1, shot=0)
+
+        # perform tracking
+        self.track(beam=beam, savedepth=self.savedepth, runnable=self, verbose=self.verbose, track_from=track_from, track_until=track_until)
+
+        # save object to file
+        self.save()
 
     ## SCAN FUNCTIONALITY
     
@@ -61,7 +118,7 @@ class Runnable(ABC):
         return self.scan_fcn is not None
       
     # scan function
-    def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16, overwrite_from=None):
+    def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16, overwrite_from=None, shared_run_until=None):
 
         from joblib import Parallel, delayed
         from joblib_progress import joblib_progress
@@ -76,11 +133,7 @@ class Runnable(ABC):
         self.overwrite_from = overwrite_from
         self.verbose = verbose
         self.savedepth = savedepth
-        
-        if self.overwrite and self.overwrite_from is None:
-            self.clear_run_data()
-            self.overwrite = False
-            
+           
         # default verbosity
         if self.verbose is None:
             self.verbose = not parallel
@@ -113,6 +166,15 @@ class Runnable(ABC):
         elif shot_filter is not None:
             shots_to_perform = shots_to_perform[np.isin(shots_to_perform, shot_filter)]
 
+        # TODO: add functionality where a common run starts it off (single run; if parallel run this part alone first), then do the scan after this.
+        #       The attribute could be named "common_run_until=None". Can use symlinks to shot 0 in the other shots to save space.
+        # TODO: FIX THIS
+        self.shared_run_until = shared_run_until
+        if shared_run_until is not None:
+            self.is_shared_run = True
+            self.perform_shot(shot=0)
+        self.is_shared_run = False
+        
         # perform shots (in parallel or series)
         if parallel:
             
@@ -135,7 +197,7 @@ class Runnable(ABC):
 
     
     # run simulation
-    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16, overwrite_from=None): 
+    def run(self, run_name=None, num_shots=1, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16, overwrite_from=None, shared_run_until=None): 
         
         # define run name (generate if not given)
         if run_name is None:
@@ -144,7 +206,7 @@ class Runnable(ABC):
             self.run_name = run_name
         
         # perform a scan with only one step
-        self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores, overwrite_from=overwrite_from)
+        self.scan(run_name=self.run_name, num_shots_per_step=num_shots, savedepth=savedepth, verbose=verbose, overwrite=overwrite, parallel=parallel, max_cores=max_cores, overwrite_from=overwrite_from, shared_run_until=shared_run_until)
     
     
 
@@ -193,7 +255,7 @@ class Runnable(ABC):
     def run_data(self, shot=None):
         shot_path = self.shot_path(shot)
         if os.path.exists(shot_path):
-            filenames = [shot_path + f for f in os.listdir(shot_path) if (os.path.isfile(os.path.join(shot_path, f)) and f.startswith('beam_') and not f.endswith('.obj'))]
+            filenames = [shot_path + f for f in os.listdir(shot_path) if ((os.path.isfile(os.path.join(shot_path, f)) or os.path.islink(os.path.join(shot_path, f))) and f.startswith('beam_') and not f.endswith('.obj'))]
             filenames.sort()
             return filenames
         else:
