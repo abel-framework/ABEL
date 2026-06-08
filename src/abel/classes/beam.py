@@ -1038,8 +1038,11 @@ class Beam():
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
 
-    def norm_amplitude_x(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
+    def norm_amplitude_x(self, beta0=None, plasma_density=None, clean=False):
+        if beta0 is not None:
+            beta_x = beta0
+            alpha_x = 0
+        elif plasma_density is not None:
             beta_x = beta_matched(plasma_density, self.energy())
             alpha_x = 0
         else:
@@ -1049,8 +1052,11 @@ class Beam():
             alpha_x = -covx[1,0]/emgx
         return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
         
-    def norm_amplitude_y(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
+    def norm_amplitude_y(self, beta0=None, plasma_density=None, clean=False):
+        if beta0 is not None:
+            beta_y = beta0
+            alpha_y = 0
+        elif plasma_density is not None:
             beta_y = beta_matched(plasma_density, self.energy())
             alpha_y = 0
         else:
