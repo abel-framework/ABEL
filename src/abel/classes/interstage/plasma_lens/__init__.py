@@ -9,6 +9,7 @@ from abel.classes.interstage import Interstage
 from types import SimpleNamespace
 import numpy as np
 import scipy.constants as SI
+from abel.utilities.relativity import energy2gamma
 
 class InterstagePlasmaLens(Interstage, ABC):
     """
@@ -548,4 +549,72 @@ class InterstagePlasmaLens(Interstage, ABC):
         print(f'         Total bend angle:           {np.rad2deg(self.total_bend_angle()):.2f} deg')
         print('------------------------------------------------')
 
-    
+
+
+    ## PRE-ALIGNMENT ROUTINE
+
+    def pre_align(self, beam0):
+        
+        # pre-run to find offsets with zero lens offsets
+        self.lens1_offset_x = 0
+        self.lens2_offset_x = 0
+        self.lens1_offset_y = 0
+        self.lens2_offset_y = 0
+        deltaE = self.nom_energy-beam0.energy()
+        beam0.accelerate(deltaE)
+        beam0.apply_betatron_damping(deltaE)
+        beam_before = self.track(beam0)
+        X_beam = np.array([beam_before.x_offset(), beam_before.x_angle()])
+
+        # calculate characteristic scale of offsets from normalized amplitude
+        A0 = beam_before.norm_amplitude_x(beta0=self.beta0)
+        offset_scale = np.sqrt(A0**2*self.beta0/energy2gamma(self.nom_energy))/2
+        
+        dxs_lens = np.array([-offset_scale, offset_scale])
+        x_1 = np.zeros_like(dxs_lens)
+        xp_1 = np.zeros_like(dxs_lens)
+        x_2 = np.zeros_like(dxs_lens)
+        xp_2 = np.zeros_like(dxs_lens)
+        print('Building response matrix by tracking beams in offset lenses...')
+        for i, dx_lens in enumerate(dxs_lens):
+
+            # offset first lens
+            self.lens1_offset_x = dx_lens
+            self.lens2_offset_x = 0
+            beam1 = self.track(beam0)
+            x_1[i] = beam1.x_offset()
+            xp_1[i] = beam1.x_angle()
+
+            # offset second lens
+            self.lens1_offset_x = 0
+            self.lens2_offset_x = dx_lens
+            beam2 = self.track(beam0)
+            x_2[i] = beam2.x_offset()
+            xp_2[i] = beam2.x_angle()
+
+        # build response matrix
+        response_matrix = np.eye(2)
+        response_matrix[0,0] = np.diff(x_1)/np.diff(dxs_lens)
+        response_matrix[0,1] = np.diff(x_2)/np.diff(dxs_lens)
+        response_matrix[1,0] = np.diff(xp_1)/np.diff(dxs_lens)
+        response_matrix[1,1] = np.diff(xp_2)/np.diff(dxs_lens)
+
+        # invert the response matrix to find the optimal lens offsets
+        inv_response_matrix = np.linalg.inv(response_matrix)
+        dx_lenses = np.matmul(inv_response_matrix, -X_beam)
+        
+        # pre-run to find offsets with zero lens offsets
+        self.lens1_offset_x = dx_lenses[0]
+        self.lens2_offset_x = dx_lenses[1]
+        beam_after = self.track(beam0)
+
+        print(beam_before.x_offset()*1e6, 'µm ->', beam_after.x_offset()*1e6, 'µm')
+        print(beam_before.x_angle()*1e3, 'mrad ->', beam_after.x_angle()*1e3, 'mrad')
+        print('Ideal offset, lens 1 =', dx_lenses[0], 'm')
+        print('              lens 2 =', dx_lenses[1], 'm')
+            
+
+
+
+
+        
