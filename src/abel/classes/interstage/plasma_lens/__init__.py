@@ -596,11 +596,9 @@ class InterstagePlasmaLens(Interstage, ABC):
             xp_2[i] = beam2.x_angle()
 
         # build response matrix
-        response_matrix = np.eye(2)
-        response_matrix[0,0] = np.diff(x_1)/np.diff(dxs_lens)
-        response_matrix[0,1] = np.diff(x_2)/np.diff(dxs_lens)
-        response_matrix[1,0] = np.diff(xp_1)/np.diff(dxs_lens)
-        response_matrix[1,1] = np.diff(xp_2)/np.diff(dxs_lens)
+        diff_dxs_lens = np.diff(dxs_lens)[0]
+        response_matrix = np.array([[np.diff(x_1)[0]/diff_dxs_lens, np.diff(x_2)[0]/diff_dxs_lens],
+                                    [np.diff(xp_1)[0]/diff_dxs_lens, np.diff(xp_2)[0]/diff_dxs_lens]])
 
         # invert the response matrix to find the optimal lens offsets
         inv_response_matrix = np.linalg.inv(response_matrix)
