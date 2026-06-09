@@ -152,6 +152,41 @@ def test_interstage_plasma_lens_impactx_spin_tracking():
     assert np.isclose(beam_pl_z.spin_polarization_y(), 0, atol=0.02)
     assert np.isclose(beam_pl_z.spin_polarization_z(), 0.42291824, atol=0.02)
     
+
+
+@pytest.mark.impactx
+def test_interstage_plasma_lens_prealign():
+    """Test the pre-alignment procedure of the plasma-lens-based interstage."""
     
+    # define electron source
+    source = make_source()
     
+    # define interstage (plasma-lens-based)
+    interstage_pl = InterstagePlasmaLensImpactX()
+    interstage_pl.nom_energy = source.energy
+    interstage_pl.R56 = 0.0
+    interstage_pl.beta0 = source.beta_x
+    interstage_pl.length_dipole = 1.0
+    interstage_pl.field_dipole = 1.0
+    interstage_pl.cancel_chromaticity = True
+    interstage_pl.cancel_sec_order_dispersion = True
+    interstage_pl.use_apertures = False
+
+    # make a beam
+    beam0 = source.track()
+    
+    # track through the pre-aligned interstage
+    beam_before = interstage_pl.track(beam0, verbose=False)
+
+    assert not np.isclose(abs(beam_before.x_offset()), 0.0, atol=1e-7)
+    assert not np.isclose(abs(beam_before.x_angle()), 0.0, atol=1e-6)
+    
+    # do the pre-alignment
+    interstage_pl.pre_align(beam0)
+
+    # track through the pre-aligned interstage
+    beam_after = interstage_pl.track(beam0, verbose=False)
+
+    assert np.isclose(abs(beam_after.x_offset()), 0.0, atol=1e-7)
+    assert np.isclose(abs(beam_after.x_angle()), 0.0, atol=1e-6)
     
