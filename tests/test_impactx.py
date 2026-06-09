@@ -171,22 +171,24 @@ def test_interstage_plasma_lens_prealign():
     interstage_pl.cancel_chromaticity = True
     interstage_pl.cancel_sec_order_dispersion = True
     interstage_pl.use_apertures = False
+    interstage_pl.enable_csr = True
+    interstage_pl.enable_isr = True
 
     # make a beam
     beam0 = source.track()
     
     # track through the pre-aligned interstage
     beam_before = interstage_pl.track(beam0, verbose=False)
-
-    assert not np.isclose(abs(beam_before.x_offset()), 0.0, atol=1e-7)
-    assert not np.isclose(abs(beam_before.x_angle()), 0.0, atol=1e-6)
+    
+    assert not np.isclose(abs(beam_before.x_offset()), 0.0, atol=1e-8)
+    assert not np.isclose(abs(beam_before.x_angle()), 0.0, atol=1e-7)
     
     # do the pre-alignment
     interstage_pl.pre_align(beam0)
 
     # track through the pre-aligned interstage
     beam_after = interstage_pl.track(beam0, verbose=False)
-
-    assert np.isclose(abs(beam_after.x_offset()), 0.0, atol=1e-7)
-    assert np.isclose(abs(beam_after.x_angle()), 0.0, atol=1e-6)
     
+    assert np.isclose(abs(beam_after.x_offset()), 0.0, atol=1e-8)
+    assert np.isclose(abs(beam_after.x_angle()), 0.0, atol=1e-7)
+
