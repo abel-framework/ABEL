@@ -553,7 +553,7 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     ## PRE-ALIGNMENT ROUTINE
 
-    def pre_align(self, beam0):
+    def pre_align(self, beam0, verbose=True):
         
         # pre-run to find offsets with zero lens offsets
         self.lens1_offset_x = 0
@@ -569,13 +569,16 @@ class InterstagePlasmaLens(Interstage, ABC):
         # calculate characteristic scale of offsets from normalized amplitude
         A0 = beam_before.norm_amplitude_x(beta0=self.beta0)
         offset_scale = np.sqrt(A0**2*self.beta0/energy2gamma(self.nom_energy))/2
-        
+
+        # print info
+        if verbose:
+            print('Interstage pre-alignment: building response matrix...')
+            
         dxs_lens = np.array([-offset_scale, offset_scale])
         x_1 = np.zeros_like(dxs_lens)
         xp_1 = np.zeros_like(dxs_lens)
         x_2 = np.zeros_like(dxs_lens)
         xp_2 = np.zeros_like(dxs_lens)
-        print('Building response matrix by tracking beams in offset lenses...')
         for i, dx_lens in enumerate(dxs_lens):
 
             # offset first lens
@@ -606,15 +609,14 @@ class InterstagePlasmaLens(Interstage, ABC):
         # pre-run to find offsets with zero lens offsets
         self.lens1_offset_x = dx_lenses[0]
         self.lens2_offset_x = dx_lenses[1]
-        beam_after = self.track(beam0)
+        
+        # print info
+        if verbose:
+            beam_after = self.track(beam0)
+            print(f'>> Before: x = {beam_before.x_offset()*1e6:.2f} µm, {beam_before.x_angle()*1e3:.2f} mrad  ->  After: x = {beam_after.x_offset()*1e6:.2f} µm, {beam_after.x_angle()*1e3:.2f} mrad')
+            print(f'>> Ideal offset: lens 1 = {dx_lenses[0]*1e6:.2f} µm, lens 2 = {dx_lenses[1]*1e6:.2f} µm')
 
-        print(beam_before.x_offset()*1e6, 'µm ->', beam_after.x_offset()*1e6, 'µm')
-        print(beam_before.x_angle()*1e3, 'mrad ->', beam_after.x_angle()*1e3, 'mrad')
-        print('Ideal offset, lens 1 =', dx_lenses[0], 'm')
-        print('              lens 2 =', dx_lenses[1], 'm')
-            
-
-
+        return dx_lenses
 
 
         
