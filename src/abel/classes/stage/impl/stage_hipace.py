@@ -214,8 +214,8 @@ class StageHipace(Stage):
         self.no_plasma = no_plasma
 
         # external focusing (APL-like) [T/m]
+        self.driver_half_oscillations = 1.0
         self.external_focusing = external_focusing
-        self._external_focusing_gradient = None
 
         # plasma profile
         self.plasma_profile = SimpleNamespace()
@@ -267,13 +267,6 @@ class StageHipace(Stage):
         # and flattop nominal energy if not already done
         self._prepare_ramps()
         self._make_ramp_profile(tmpfolder)
-        
-        # set external focusing
-        if self.external_focusing == False:
-            self._external_focusing_gradient = 0
-        if self.external_focusing == True and self._external_focusing_gradient is None:
-            num_half_oscillations = 1
-            self._external_focusing_gradient = self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/self.get_length())**2  # [T/m]
         
         beam0 = beam_incoming
         driver0 = driver_incoming
@@ -350,7 +343,11 @@ class StageHipace(Stage):
         # input file
         filename_input = 'input_file'
         path_input = tmpfolder + filename_input
-        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
+        
+        if self.external_focusing and self.external_focusing_gradient is None:
+            self.external_focusing_gradient = self.calc_external_focusing_gradient() # Set the gradient for external focusing fields if not already set.
+
+        hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self.external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
         
         ## RUN SIMULATION
@@ -689,8 +686,537 @@ class StageHipace(Stage):
             #ss = density_table[:,0]
             return ss.max()-ss.min()
         return super().get_length()
+    
+
+    # =============================================
+    @property
+    def external_focusing(self) -> bool:
+        "Flag for enabling driver guiding using an external magnetic field."
+        return self._external_focusing
+    @external_focusing.setter
+    def external_focusing(self, enable_external_focusing : bool | None):
+        self._external_focusing = bool(enable_external_focusing)
+    _external_focusing = False
+
+
+    # =============================================
+    @property
+    def external_focusing_gradient(self) -> float:
+        """
+        The focusing gradient g_ext [T/m] for an external azimuthal magnetic 
+        field B = [g_ext*y, -g_ext*x, 0].
+        """
+
+        if self.external_focusing is True and self._external_focusing_gradient is None:
+            # If external focusing is enabled, but the gradient of the external 
+            # focusing field is not yet set, try to calculate and set it:
+
+            # Check whether the ramps have been set up if they exist
+            ramps_not_set_up = (
+                (self.upramp is not None and self.upramp.length is None) or
+                (self.downramp is not None and self.downramp.length is None)
+            )
+
+            # Check if there is enough information to set up the ramps
+            can_set_up_ramps = (self.get_nom_energy_gain(ignore_ramps_if_undefined=True) is not None 
+                                and self.nom_energy is not None)
+
+            # Make a copy of the stage and set up its ramps if they are not set 
+            # up and can be set up
+            if ramps_not_set_up and can_set_up_ramps:
+                stage_copy = copy.deepcopy(self)
+                stage_copy._prepare_ramps()
+            else: 
+                stage_copy = self
+            
+            if stage_copy.get_length() is not None:
+                self._external_focusing_gradient = stage_copy.calc_external_focusing_gradient(num_half_oscillations=self.driver_half_oscillations)
+
+        return self._external_focusing_gradient
+    
+    @external_focusing_gradient.setter
+    def external_focusing_gradient(self, g_ext : float | None):
+        if g_ext is not None and not isinstance(g_ext, float):
+            raise ValueError("External focusing gradient must be a float or None.")
+        if self.external_focusing is False:
+            self._external_focusing_gradient = None
+            raise ValueError("Cannot set external focusing gradient when self.external_focusing is False.")
+        self._external_focusing_gradient = g_ext
+
+    _external_focusing_gradient = None
+
+
+    # =============================================
+    def calc_external_focusing_gradient(self, num_half_oscillations=None, L=None):
+        """
+        Calculate the external focusing gradient g_ext for an azimuthal magnetic 
+        field B = [g_ext*y, -g_ext*x, 0] that gives ``num_half_oscillations`` 
+        half oscillations for the drive beam over the length of the stage.
+
+        Parameters
+        ----------
+        num_half_oscillations : float, optional
+            Number of half betatron oscillations that the drive beam is 
+            intended to perform. If ``None``, will use ``self.driver_half_oscillations``.
+            Defaults to ``None``.
+
+        L : [m] float, optional
+            The length over which the driver will be guided. If ``None``, will 
+            extract the value using ``self.get_length()``. If the stage does 
+            have ramps that have not been fully set up, a deepcopy of the stage 
+            is created to set up its ramps using 
+            :func:`Stage._prepare_ramps() <abel.Stage._prepare_ramps>` so that 
+            the stage total length is defined.
+
+        Returns
+        -------
+        g_ext : [T/m] float
+            The gradient for the azimuthal magnetic field.
+        """
+        if L is None:
+
+            # Make a copy of the stage and set up its ramps if they are not set up
+            ramps_not_set_up = (
+                (self.upramp is not None and self.upramp.length is None) or
+                (self.downramp is not None and self.downramp.length is None)
+            )
+            if ramps_not_set_up:
+                stage_copy = copy.deepcopy(self)
+                stage_copy._prepare_ramps()
+                L = stage_copy.get_length()
+            else: 
+                stage_copy = self
+                L = stage_copy.get_length()
+                if L is None:
+                    L = stage_copy.length_flattop # If there are no ramps, can use either length or length_flattop.
+            
+            if L is None:
+                raise ValueError('Stage length is not set.')
+
+        if num_half_oscillations is None:
+            num_half_oscillations = self.driver_half_oscillations
+
+        return self.driver_source.energy/SI.c*(num_half_oscillations*np.pi/L)**2  # [T/m]
 
     
+    # =============================================
+    def driver_guiding_trajectory(self, num_steps=None, dacc_gradient=0.0):
+        """
+        Estimate the trajectory that the drive beam will follow when driver 
+        guiding with an external linear azimuthal magnetic field is applied to a 
+        drive beam with an initial angular offset. The calculations are done by 
+        integrating simplified equations of motion.
+
+        Parameters
+        ----------
+        num_steps : int, optional
+            Number of time steps. If ``None``, will calculate the number of time 
+            steps such that the step size is a small fraction of the matched 
+            beta function of the drive beam. Defaults to ``None``.
+
+        dacc_gradient : [V/m] float, optional
+            The decceleration gradient. Drive beam charge * decceleration 
+            gradient must be negative. Defaults to 0.0.
+        
+
+        Returns
+        -------
+        s_trajectory : [m] 1D float ndarray
+            Longitudinal coordinate of the drive beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] 1D float ndarray
+            x-coordinate of the drive beam trajectory.
+        
+        y_trajectory : [m] 1D float ndarray
+            y-coordinate of the drive beam trajectory.
+        """
+
+        from abel.utilities.relativity import energy2momentum
+        from abel.utilities.statistics import weighted_mean
+
+        driver = self.driver_source.track()
+
+        energy_thres = 10*driver.particle_mass*SI.c**2/SI.e  # [eV], 10 * particle rest energy. Gives beta=0.995.
+        pz_thres = energy2momentum(energy_thres, unit='eV', m=driver.particle_mass)
+        pz0 = energy2momentum(driver.energy(), unit='eV', m=driver.particle_mass)
+
+        if pz0 < pz_thres:
+            raise ValueError('This estimate is only valid for a relativistic beam.')
+        
+        q = driver.particle_charge()  # [C], particle charge including charge sign.
+        if q * dacc_gradient > 0.0:
+            raise ValueError('Drive beam charge * decceleration gradient must be negative.')
+        
+        # Make a copy of the stage and set up its ramps if they are not set up
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+        
+        L = stage_copy.get_length()  # [m]
+        
+        if pz0 + q * dacc_gradient * L/SI.c < pz_thres:
+            raise ValueError('The energy depletion will be too severe. This estimate is only valid for a relativistic beam.')
+        
+        # Get the focusing field gradient
+        g = self.external_focusing_gradient  # [T/m]
+        if g is None:
+            g = 0.0
+
+        # Determine the step size
+        if num_steps is None:
+            matched_beta = self.matched_beta_function(driver.energy())
+            num_steps = int(L /(matched_beta/20))
+        
+        ds = L/(num_steps-1)  # [m], step size
+
+        # Initialise arrays
+        s_trajectory = np.full(num_steps, None, dtype=float)
+        x_trajectory = np.full(num_steps, None, dtype=float)
+        y_trajectory = np.full(num_steps, None, dtype=float)
+
+        # Set initial parameters
+        prop_length = 0
+        x0 = driver.x_offset()
+        x = x0
+        y0 = driver.y_offset()
+        y = y0
+        s_trajectory[0] = prop_length
+        x_trajectory[0] = x0
+        y_trajectory[0] = y0
+        px = weighted_mean(driver.pxs(), driver.weightings(), clean=False)
+        py = weighted_mean(driver.pys(), driver.weightings(), clean=False)
+        pz = pz0 # Can add option for deceleration using a gradient
+
+        # Solve the equation of motion
+        i = 0
+        while i < num_steps - 1:
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            # Kick
+            dpx = q*g*x*ds
+            px = px + dpx
+            dpy = q*g*y*ds
+            py = py + dpy
+            pz = pz0 + q * dacc_gradient * prop_length/SI.c # dacc_gradient > 0
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            i = i + 1
+            s_trajectory[i] = prop_length
+            x_trajectory[i] = x
+            y_trajectory[i] = y
+
+        return s_trajectory, x_trajectory, y_trajectory
+
+
+    # =============================================
+    def estimate_beam_trajectory(self, beam, num_steps=None):
+        """
+        Estimate the trajectory for the main beam following the trajectory of a 
+        drive beam generated by ``self.driver_source``.
+        
+        Effects such as driver guiding with an external linear azimuthal 
+        magnetic field, background ion focusing and uniform plasma density ramps 
+        are taken into account. The calculations are done by integrating 
+        simplified equations of motion.
+
+        Parameters
+        ----------
+        beam : ``Beam``
+            The main beam to be tracked.
+
+        num_steps : int, optional
+            Number of time steps. If ``None``, will calculate the number of time 
+            steps such that the step size is a small fraction of the matched 
+            beta function of the main beam. Defaults to ``None``.
+
+
+        Returns
+        -------
+        s_trajectory : [m] 1D float ndarray
+            Longitudinal coordinate of the main beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] 1D float ndarray
+            x-coordinate of the main beam trajectory.
+        
+        y_trajectory : [m] 1D float ndarray
+            y-coordinate of the main beam trajectory.
+        """
+
+        from abel.utilities.statistics import weighted_mean
+        from abel.utilities.relativity import energy2momentum
+
+        # Prepare parameters
+        x0 = beam.x_offset()
+        y0 = beam.y_offset()
+        weights = beam.weightings()
+        px0 = weighted_mean(beam.pxs(), weights, clean=False)
+        py0 = weighted_mean(beam.pys(), weights, clean=False)
+        pz0 = energy2momentum(beam.energy(), unit='eV', m=beam.particle_mass)
+        q = beam.particle_charge()
+
+        L = self.get_length()  # [m], total length including any ramps.
+        if num_steps is None:
+            matched_beta = self.matched_beta_function(beam.energy())
+            num_steps = int(L /(matched_beta/20))
+
+        # Actual calculations
+        s_trajectory, x_trajectory, y_trajectory, _, _ = self._estimate_beam_trajectory(s0=0.0, 
+                                                        x0=x0, 
+                                                        y0=y0, 
+                                                        px0=px0, 
+                                                        py0=py0, 
+                                                        pz0=pz0, 
+                                                        q=q, 
+                                                        num_steps=num_steps, 
+                                                        driver_x_trajectory=None, 
+                                                        driver_y_trajectory=None)
+
+        return s_trajectory, x_trajectory, y_trajectory
+
+
+    # =============================================
+    def _estimate_beam_trajectory(self, s0, x0, y0, px0, py0, pz0, q, num_steps, driver_x_trajectory=None, driver_y_trajectory=None):
+        """
+        Helper function for estimating the trajectory for the main beam 
+        following the trajectory of a drive beam defined by 
+        ``driver_x_trajectory`` and ``driver_y_trajectory``.
+        
+        Effects such as driver guiding with an external linear azimuthal 
+        magnetic field, background ion focusing and uniform plasma density ramps 
+        are taken into account. The calculations are done by integrating 
+        simplified equations of motion.
+         
+
+        Parameters
+        ----------
+        s0 : [m] float
+            The initial longitudinal coordinate of the main beam.
+
+        x0 : [m] float
+            The intial x-coordinate of the main beam.
+
+        y0 : [m] float
+            The intial y-coordinate of the main beam.
+
+        px0 : [kg m/s] float
+            The intial x-momentum of the main beam.
+
+        py0 : [kg m/s] float
+            The intial y-momentum of the main beam.
+
+        pz0 : [kg m/s] float
+            The intial z-momentum of the main beam.
+
+        q : [C] flloat
+            The particle charge of the main beam.
+
+        num_steps : int
+            Number of time steps.
+
+        driver_x_trajectory : [m] 1D float ndarray, optional
+            The x-coordinate of trajectory of the drive beam. The length of 
+            ``driver_x_trajectory`` must be the same as ``num_steps``. Is 
+            automatically calculated if ``None``. Defaults to ``None``.
+
+        driver_y_trajectory : [m] 1D float ndarray, optional
+            The y-coordinate of trajectory of the drive beam. The length of 
+            ``driver_y_trajectory`` must be the same as ``num_steps``. Is 
+            automatically calculated if ``None``. Defaults to ``None``.
+        
+
+        Returns
+        -------
+        s_trajectory : [m] 1D float ndarray
+            Longitudinal coordinate of the main beam trajectory. Reference is 
+            set at the start of the plasma stage.
+
+        x_trajectory : [m] 1D float ndarray
+            x-coordinate of the main beam trajectory.
+        
+        y_trajectory : [m] 1D float ndarray
+            y-coordinate of the main beam trajectory.
+
+        px_trajectory : [kg m/s] 1D float ndarray
+            Mean x-component of the beam momentum along the trajectory.
+
+        py_trajectory : [kg m/s] 1D float ndarray
+            Mean y-component of the beam momentum along the trajectory.
+        """
+        from abel.utilities.other import find_closest_value_in_arr
+
+        if q * self.nom_accel_gradient_flattop > 0.0:
+            raise ValueError('Beam charge * self.nom_accel_gradient_flattop  gradient must be negative.')
+        
+        # Make a copy of the stage and set up its ramps if they are not set up
+        ramps_not_set_up = (
+            (self.upramp is not None and self.upramp.length is None) or
+            (self.downramp is not None and self.downramp.length is None)
+        )
+        if ramps_not_set_up:
+            stage_copy = copy.deepcopy(self)
+            stage_copy._prepare_ramps()
+        else: 
+            stage_copy = self
+        
+        # Calculate the focusing field gradient
+        g0 = SI.e*stage_copy.plasma_density/(2*SI.epsilon_0*SI.c)  # [T/m]
+        g = g0
+        if stage_copy.external_focusing_gradient is not None:
+            g = g0 + stage_copy.external_focusing_gradient
+
+        # Only calculate the time step size when calling estimate_beam_trajectory() from a flattop
+        if not stage_copy.is_upramp() and not stage_copy.is_downramp():
+
+            # Set the step size
+            L = stage_copy.get_length()  # [m], total length including any ramps.
+            stage_copy.ds = L / (num_steps-1) # [m], step size
+
+            if stage_copy.has_ramp():
+                # Set the number of time steps in the upramp and downramp
+                ss_helper = np.arange(num_steps) * stage_copy.ds
+                idx_upramp_end, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length)
+                num_steps_upramp = idx_upramp_end + 1  # Number of time steps for the upramp
+                idx_flat_end, _ = find_closest_value_in_arr(ss_helper, stage_copy.upramp.length+stage_copy.length_flattop)  # Index marking the end of the flattop.
+                num_steps_downramp = num_steps - idx_flat_end  # Number of time steps for the downramp
+                stage_copy.idx_flat_end = idx_flat_end
+                stage_copy.num_steps_upramp = num_steps_upramp
+                stage_copy.num_steps_downramp = num_steps_downramp
+
+        ds = stage_copy.ds
+
+        # Calculate the drive beam trajectory
+        if driver_x_trajectory is None or driver_y_trajectory is None:
+            _, driver_x_trajectory, driver_y_trajectory = self.driver_guiding_trajectory(num_steps=num_steps, dacc_gradient=0.0)
+        
+        if not stage_copy.is_upramp() and not stage_copy.is_downramp():
+            if len(driver_x_trajectory) != num_steps or len(driver_y_trajectory) != num_steps:
+                raise ValueError('The length of driver_x_trajectory and driver_y_trajectory must be the same as num_steps.')
+
+        # Initialise arrays
+        s_trajectory = np.full(num_steps, None, dtype=float)
+        x_trajectory = np.full(num_steps, None, dtype=float)
+        y_trajectory = np.full(num_steps, None, dtype=float)
+        px_trajectory = np.full(num_steps, None, dtype=float)
+        py_trajectory = np.full(num_steps, None, dtype=float)
+
+        # Recursive call from the upramp
+        if stage_copy.upramp is not None:
+            upramp = stage_copy.convert_PlasmaRamp(stage_copy.upramp)
+            stage_copy.upramp = upramp
+            if self.external_focusing:
+                upramp.external_focusing_gradient = stage_copy.external_focusing_gradient
+
+            num_steps_upramp = stage_copy.num_steps_upramp 
+
+            s_trajectory_upramp, x_trajectory_upramp, y_trajectory_upramp, px_trajectory_upramp, py_trajectory_upramp = upramp._estimate_beam_trajectory(s0, x0, y0, px0, py0, pz0, q, num_steps_upramp, driver_x_trajectory, driver_y_trajectory)
+
+            # Initial parameters for the flattop
+            prop_length = s_trajectory_upramp[-1]
+            s_trajectory[:len(s_trajectory_upramp)] = s_trajectory_upramp
+            x0 = x_trajectory_upramp[-1]
+            x_trajectory[:len(x_trajectory_upramp)] = x_trajectory_upramp
+            y0 = y_trajectory_upramp[-1]
+            y_trajectory[:len(y_trajectory_upramp)] = y_trajectory_upramp
+            px0 = px_trajectory_upramp[-1]
+            px_trajectory[:len(px_trajectory_upramp)] = px_trajectory_upramp
+            py0 = py_trajectory_upramp[-1]
+            py_trajectory[:len(py_trajectory_upramp)] = py_trajectory_upramp
+            pz0 = pz0 - q * stage_copy.upramp.nom_accel_gradient_flattop * prop_length/SI.c
+
+            i = num_steps_upramp - 1
+
+            if stage_copy.downramp is not None:
+                i_end = stage_copy.idx_flat_end
+            else:
+                i_end = num_steps - 1
+
+        # No ramps
+        else:
+            prop_length = s0
+            s_trajectory[0] = prop_length
+            x_trajectory[0] = x0
+            y_trajectory[0] = y0
+            px_trajectory[0] = px0
+            py_trajectory[0] = py0
+
+            i = 0
+            i_end = num_steps - 1
+
+            if self.is_downramp():
+                # Extract the part of drive beam trajectory for the downramp
+                driver_x_trajectory = driver_x_trajectory[stage_copy.idx_flat_end:]
+                driver_y_trajectory = driver_y_trajectory[stage_copy.idx_flat_end:]
+
+        # Set the initial conditions
+        x = x0
+        y = y0
+        px = px0
+        py = py0
+        pz = pz0
+
+        # Solve the equations of motion
+        while i < i_end:
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            # Kick
+            dpx = q*g*x*ds - q*g0*driver_x_trajectory[i]*ds
+            px = px + dpx
+            dpy = q*g*y*ds - q*g0*driver_y_trajectory[i]*ds
+            py = py + dpy
+            pz = pz0 - q * self.nom_accel_gradient_flattop * prop_length/SI.c
+
+            # Drift
+            prop_length = prop_length + 1/2*ds
+            x = x + px/pz*1/2*ds
+            y = y + py/pz*1/2*ds
+
+            i = i + 1
+            s_trajectory[i] = prop_length
+            x_trajectory[i] = x
+            y_trajectory[i] = y
+            px_trajectory[i] = px
+            py_trajectory[i] = py
+
+        # Recursive call from the downramp
+        if stage_copy.downramp is not None:
+            downramp = stage_copy.convert_PlasmaRamp(stage_copy.downramp)
+            stage_copy.downramp = downramp
+            if self.external_focusing:
+                downramp.external_focusing_gradient = stage_copy.external_focusing_gradient
+
+            num_steps_downramp = stage_copy.num_steps_downramp
+
+            s_trajectory_downramp, x_trajectory_downramp, y_trajectory_downramp, px_trajectory_downramp, py_trajectory_downramp = downramp._estimate_beam_trajectory(prop_length, x, y, px, py, pz, q, num_steps_downramp, driver_x_trajectory, driver_y_trajectory)
+
+            s_trajectory[-len(s_trajectory_downramp):] = s_trajectory_downramp
+            x_trajectory[-len(x_trajectory_downramp):] = x_trajectory_downramp
+            y_trajectory[-len(y_trajectory_downramp):] = y_trajectory_downramp
+            px_trajectory[-len(px_trajectory_downramp):] = px_trajectory_downramp
+            py_trajectory[-len(py_trajectory_downramp):] = py_trajectory_downramp
+
+        return s_trajectory, x_trajectory, y_trajectory, px_trajectory, py_trajectory
+
+
     # ==================================================
     # Apply waterfall function to all beam dump files
     def __waterfall_fcn(self, fcns, edges, data_dir, species='beam', remove_halo_nsigma=None, args=None):
