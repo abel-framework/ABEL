@@ -1449,7 +1449,10 @@ class Stage(Trackable, CostModeled):
         Etot0_driver = driver0.total_energy()
         Etot_driver = driver.total_energy()
         self.efficiency.driver_to_wake = (Etot0_driver-Etot_driver)/Etot0_driver
-        self.efficiency.wake_to_beam = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
+        if abs(Etot0_driver-Etot_driver) > 0:
+            self.efficiency.wake_to_beam = (Etot_beam-Etot0_beam)/(Etot0_driver-Etot_driver)
+        else:
+            self.efficiency.wake_to_beam = np.nan
         self.efficiency.driver_to_beam = self.efficiency.driver_to_wake*self.efficiency.wake_to_beam
         if self.get_rep_rate_average() is not None:
             self.efficiency.dumped_power = Etot_driver*self.get_rep_rate_average()
