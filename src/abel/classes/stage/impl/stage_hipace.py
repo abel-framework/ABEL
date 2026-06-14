@@ -348,7 +348,7 @@ class StageHipace(Stage):
             output_period = None
         
         # input file
-        filename_input = 'input_file'
+        filename_input = 'input_file_stage' + str(self.stage_number)
         path_input = tmpfolder + filename_input
         hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
@@ -398,10 +398,6 @@ class StageHipace(Stage):
         # extract insitu diagnostics and wakefield data
         self.__extract_evolution(tmpfolder, beam0, runnable)
         self.__extract_initial_and_final_step(tmpfolder, beam0, runnable)
-
-        # move the HiPACE++ input file to be stored
-        if self.run_path is not None:
-            shutil.move(path_input, self.run_path)
         
         # delete temp folder
         shutil.rmtree(tmpfolder)
