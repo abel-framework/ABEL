@@ -978,6 +978,7 @@ class PlasmaLinac(Linac):
             dQdxdpx, xs, pxs = beam.phase_space_density(beam.xs, beam.pxs, hbins=xs0, vbins=pxs_final)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(xs*1e6, pxs*1e-6*SI.c/SI.e, -dQdxdpx, cmap=CONFIG.default_cmap, shading='auto')
+            axs[1,0].set_ylim([-pxlim*1e-6*SI.c/SI.e, pxlim*1e-6*SI.c/SI.e])
             axs[1,0].set_ylabel("Momentum, $p_x$ [MeV/c]")
             axs[1,0].set_title('Horizontal phase space')
             
