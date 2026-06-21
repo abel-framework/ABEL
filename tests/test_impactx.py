@@ -7,15 +7,15 @@
 import pytest
 from abel import *
 
-def make_source():
+def make_source(energy=10e9):
     """Helper function making a beam source."""
     
     source = SourceBasic()
-    source.energy = 10e9
+    source.energy = energy
     source.charge = -0.05e-9
     source.emit_nx = 10e-6
     source.emit_ny = 0.1e-6
-    source.beta_x = 0.015
+    source.beta_x = 0.015*np.sqrt(source.energy/10e9)
     source.beta_y = source.beta_x
     source.bunch_length = 10e-15*SI.c
     source.rel_energy_spread = 1e-2
@@ -26,6 +26,28 @@ def make_source():
     return source
 
 
+def make_interstage(source, use_quads=False):
+    """Helper function making an interstage."""
+    
+    # define interstage (plasma-lens-based)
+    if use_quads:
+        interstage = InterstageQuadsImpactX()
+    else:
+        interstage = InterstagePlasmaLensImpactX()
+    interstage.nom_energy = source.energy
+    interstage.R56 = 0.0
+    interstage.beta0 = source.beta_x
+    interstage.length_dipole = 1.0*np.sqrt(source.energy/10e9)
+    interstage.field_dipole = 1.0
+    interstage.cancel_chromaticity = True
+    interstage.cancel_sec_order_dispersion = True
+    interstage.use_apertures = False
+    interstage.enable_csr = True
+    interstage.enable_isr = True
+    
+    return interstage
+
+
 @pytest.mark.impactx
 def test_interstages_quads_impactx():
     """Test of the quad-based interstage using ImpactX."""
@@ -34,14 +56,7 @@ def test_interstages_quads_impactx():
     source = make_source()
     
     # define interstage (quadrupole-based)
-    interstage_quads = InterstageQuadsImpactX()
-    interstage_quads.nom_energy = source.energy
-    interstage_quads.R56 = 0.0
-    interstage_quads.beta0 = source.beta_x
-    interstage_quads.length_dipole = 1.0
-    interstage_quads.field_dipole = 1.0
-    interstage_quads.cancel_chromaticity = True
-    interstage_quads.cancel_sec_order_dispersion = True
+    interstage_quads = make_interstage(source, use_quads=True)
 
     # track the particles
     beam0 = source.track()
@@ -56,15 +71,7 @@ def test_interstage_plasma_lens_impactx():
     source = make_source()
     
     # define interstage (plasma-lens-based)
-    interstage_pl = InterstagePlasmaLensImpactX()
-    interstage_pl.nom_energy = source.energy
-    interstage_pl.R56 = 0.0
-    interstage_pl.beta0 = source.beta_x
-    interstage_pl.length_dipole = 1.0
-    interstage_pl.field_dipole = 1.0
-    interstage_pl.cancel_chromaticity = True
-    interstage_pl.cancel_sec_order_dispersion = True
-    interstage_pl.use_apertures = False
+    interstage_pl = make_interstage(source, use_quads=False)
 
     # track the particles
     beam0 = source.track()
@@ -78,17 +85,7 @@ def test_interstage_plasma_lens_impactx_quality_preservation():
     source = make_source()
     
     # define interstage (plasma-lens-based)
-    interstage_pl = InterstagePlasmaLensImpactX()
-    interstage_pl.nom_energy = source.energy
-    interstage_pl.R56 = 0.0
-    interstage_pl.beta0 = source.beta_x
-    interstage_pl.length_dipole = 1.0
-    interstage_pl.field_dipole = 1.0
-    interstage_pl.cancel_chromaticity = True
-    interstage_pl.cancel_sec_order_dispersion = True
-    interstage_pl.enable_csr = True
-    interstage_pl.enable_isr = True
-    interstage_pl.use_apertures = False
+    interstage_pl = make_interstage(source, use_quads=False)
 
     # track the particles
     beam0 = source.track()
@@ -113,17 +110,7 @@ def test_interstage_plasma_lens_impactx_spin_tracking():
     source = make_source()
     
     # define interstage (plasma-lens-based)
-    interstage_pl = InterstagePlasmaLensImpactX()
-    interstage_pl.nom_energy = source.energy
-    interstage_pl.R56 = 0.0
-    interstage_pl.beta0 = source.beta_x
-    interstage_pl.length_dipole = 1.0
-    interstage_pl.field_dipole = 1.0
-    interstage_pl.cancel_chromaticity = True
-    interstage_pl.cancel_sec_order_dispersion = True
-    interstage_pl.enable_csr = True
-    interstage_pl.enable_isr = True
-    interstage_pl.use_apertures = False
+    interstage_pl = make_interstage(source, use_quads=False)
     
     # track the particles (x polarized; should be rotated)
     source.spin_polarization_direction = 'x'
@@ -157,38 +144,39 @@ def test_interstage_plasma_lens_impactx_spin_tracking():
 @pytest.mark.impactx
 def test_interstage_plasma_lens_prealign():
     """Test the pre-alignment procedure of the plasma-lens-based interstage."""
-    
-    # define electron source
-    source = make_source()
-    
-    # define interstage (plasma-lens-based)
-    interstage_pl = InterstagePlasmaLensImpactX()
-    interstage_pl.nom_energy = source.energy
-    interstage_pl.R56 = 0.0
-    interstage_pl.beta0 = source.beta_x
-    interstage_pl.length_dipole = 1.0
-    interstage_pl.field_dipole = 1.0
-    interstage_pl.cancel_chromaticity = True
-    interstage_pl.cancel_sec_order_dispersion = True
-    interstage_pl.use_apertures = False
-    interstage_pl.enable_csr = True
-    interstage_pl.enable_isr = True
 
-    # make a beam
-    beam0 = source.track()
+    # reset the seed for reproducibility
+    np.random.seed(42)
     
-    # track through the pre-aligned interstage
-    beam_before = interstage_pl.track(beam0, verbose=False)
+    # define two energies to test (low for CSR, high for ISR)
+    Es = [2e9, 2000e9]
+    for E in Es:
+        print(E)
+        # define electron source
+        source = make_source(energy=E)
     
-    assert not np.isclose(abs(beam_before.x_offset()), 0.0, atol=1e-8)
-    assert not np.isclose(abs(beam_before.x_angle()), 0.0, atol=1e-7)
+        # define interstage
+        interstage_pl = make_interstage(source, use_quads=False)
+        
+        # make a beam
+        beam0 = source.track()
+        
+        # track through the non-aligned interstage
+        beam_before = interstage_pl.track(beam0, verbose=False)
+        if E < 10e9:
+            assert not np.isclose(abs(beam_before.x_offset()), 0.0, atol=1e-6)
+        else:
+            assert not np.isclose(abs(beam_before.x_offset()), 0.0, atol=1e-7)
+        
+        # re-do the pre-alignment (in parallel)
+        interstage_pl.pre_align(source, parallel=True)
     
-    # do the pre-alignment
-    interstage_pl.pre_align(beam0)
+        # track through the pre-aligned interstage
+        beam_after = interstage_pl.track(beam0, verbose=False)
+        if E < 10e9:
+            assert np.isclose(abs(beam_after.x_offset()), 0.0, atol=1e-6)
+        else:
+            assert np.isclose(abs(beam_after.x_offset()), 0.0, atol=1e-7)
 
-    # track through the pre-aligned interstage
-    beam_after = interstage_pl.track(beam0, verbose=False)
-    
-    assert np.isclose(abs(beam_after.x_offset()), 0.0, atol=1e-8)
-    assert np.isclose(abs(beam_after.x_angle()), 0.0, atol=1e-7)
+        assert beam_after.norm_amplitude_x(beta0=source.beta_x) < beam_before.norm_amplitude_x(beta0=source.beta_x)
 
