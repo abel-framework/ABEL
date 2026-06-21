@@ -558,13 +558,12 @@ class InterstagePlasmaLens(Interstage, ABC):
         
         # copy and adjust the source
         source_copy = copy.deepcopy(source)
-        source_copy.num_particles = 5000
+        source_copy.num_particles = 10000
         source_copy.symmetrize = True
         source_copy.x_offset = 0
         source_copy.y_offset = 0
         source_copy.x_angle = 0
         source_copy.y_angle = 0
-        source_copy.rel_energy_spread = 1e-3
         source_copy.energy = self.nom_energy
         source_copy.beta_x = self.beta0
         source_copy.beta_y = self.beta0
