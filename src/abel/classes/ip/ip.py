@@ -104,7 +104,7 @@ class InteractionPoint(Runnable, CostModeled):
         # delete and remake folder
         if os.path.exists(clear_path):
             shutil.rmtree(clear_path)
-        os.makedirs(clear_path)
+    
         
     # generate track path
     def shot_path(self, shot1=None, shot2=None):
