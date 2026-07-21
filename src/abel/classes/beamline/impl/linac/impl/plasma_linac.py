@@ -186,7 +186,7 @@ class PlasmaLinac(Linac):
             assert(isinstance(self.bds, BeamDeliverySystem) or isinstance(self.bds, Interstage))
 
             # set the nominal energy and length
-            if self.bds.length is None or self.bds.length == 0:
+            if self.bds.get_length() is None or self.bds.get_length() == 0:
                 self.bds.length = None
                 self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in self.stages])
                 self.bds.length = self.bds.get_length()
