@@ -1387,6 +1387,16 @@ class Stage(Trackable, CostModeled):
         return beta_matched(self.plasma_density, energy)
     
 
+    # =============================================
+    @property
+    def external_focusing_gradient(self) -> float:
+        """
+        Return None by default for ``Stage`` subclasses not supporting external 
+        focusing fields.
+        """
+        return None
+    
+    
     # ==================================================
     def energy_usage(self):
         return self.driver_source.energy_usage()
