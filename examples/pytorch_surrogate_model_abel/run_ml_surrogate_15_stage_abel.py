@@ -159,20 +159,22 @@ def make_initial_beam(num_particles: int) -> Beam:
     lambda_x = 0.75e-6
     lambda_y = 0.75e-6
     lambda_z = 0.1e-6
-    lambda_xp = 1.33 / ENERGY_GAMMA
-    lambda_yp = 1.33 / ENERGY_GAMMA
-    lambda_delta = 1.0e-8
+    lambda_px = 1.33 / ENERGY_GAMMA
+    lambda_py = 1.33 / ENERGY_GAMMA
+    lambda_pt = 1.0e-8
 
     xs = np.random.normal(loc=0.0, scale=lambda_x, size=num_particles)
     ys = np.random.normal(loc=0.0, scale=lambda_y, size=num_particles)
     zs = np.random.normal(loc=0.0, scale=lambda_z, size=num_particles)
-    xps = np.random.normal(loc=0.0, scale=lambda_xp, size=num_particles)
-    yps = np.random.normal(loc=0.0, scale=lambda_yp, size=num_particles)
-    deltas = np.random.normal(loc=0.0, scale=lambda_delta, size=num_particles)
+    rel_pxs = np.random.normal(loc=0.0, scale=lambda_px, size=num_particles)
+    rel_pys = np.random.normal(loc=0.0, scale=lambda_py, size=num_particles)
+    rel_pts = np.random.normal(loc=0.0, scale=lambda_pt, size=num_particles)
 
-    uzs = REF_U * SI.c * (1.0 + deltas)
-    uxs = xps * uzs
-    uys = yps * uzs
+    ref_gamma = np.sqrt(1.0 + REF_U**2)
+    pxs = rel_pxs * REF_U
+    pys = rel_pys * REF_U
+    gammas = ref_gamma - rel_pts * REF_U
+    pzs = np.sqrt(gammas**2 - 1.0 - pxs**2 - pys**2)
 
     beam = Beam()
     beam.set_phase_space(
@@ -180,9 +182,9 @@ def make_initial_beam(num_particles: int) -> Beam:
         xs=xs,
         ys=ys,
         zs=zs,
-        uxs=uxs,
-        uys=uys,
-        uzs=uzs,
+        uxs=pxs * SI.c,
+        uys=pys * SI.c,
+        uzs=pzs * SI.c,
     )
     beam.location = 0.0
     beam.trackable_number = 0
@@ -194,13 +196,120 @@ def lens_eqn(k: float, lens_length: float, alpha: float, beta: float, gamma: flo
     return np.tan(k * lens_length) + 2.0 * alpha / (k * beta - gamma / k)
 
 
+def fixed_s_relative_from_beam(beam, ref_pz: float) -> tuple[np.ndarray, ...]:
+    px_abs = beam.uxs() / SI.c
+    py_abs = beam.uys() / SI.c
+    pz_abs = beam.uzs() / SI.c
+    gamma_abs = np.sqrt(1.0 + px_abs**2 + py_abs**2 + pz_abs**2)
+    ref_gamma = np.sqrt(1.0 + ref_pz**2)
+
+    return (
+        beam.xs().copy(),
+        beam.ys().copy(),
+        beam.zs().copy(),
+        px_abs / ref_pz,
+        py_abs / ref_pz,
+        (ref_gamma - gamma_abs) / ref_pz,
+    )
+
+
+def set_beam_from_fixed_s_relative(
+    beam,
+    xs: np.ndarray,
+    ys: np.ndarray,
+    ts: np.ndarray,
+    rel_pxs: np.ndarray,
+    rel_pys: np.ndarray,
+    rel_pts: np.ndarray,
+    ref_pz: float,
+) -> None:
+    ref_gamma = np.sqrt(1.0 + ref_pz**2)
+    px_abs = rel_pxs * ref_pz
+    py_abs = rel_pys * ref_pz
+    gamma_abs = ref_gamma - rel_pts * ref_pz
+    pz_abs = np.sqrt(gamma_abs**2 - 1.0 - px_abs**2 - py_abs**2)
+
+    beam.set_xs(xs)
+    beam.set_ys(ys)
+    beam.set_zs(ts)
+    beam.set_uxs(px_abs * SI.c)
+    beam.set_uys(py_abs * SI.c)
+    beam.set_uzs(pz_abs * SI.c)
+
+
+def twiss_from_phase_space(
+    positions: np.ndarray, momenta: np.ndarray
+) -> tuple[float, float, float]:
+    cov = np.cov(positions, momenta, ddof=0)
+    emittance = np.sqrt(np.linalg.det(cov))
+    beta = cov[0, 0] / emittance
+    alpha = -cov[1, 0] / emittance
+    gamma = cov[1, 1] / emittance
+    return alpha, beta, gamma
+
+
+def fixed_s_to_fixed_t(beam, ref_pz: float) -> np.ndarray:
+    ref_pt = -np.sqrt(1.0 + ref_pz**2)
+    x_s = beam.xs()
+    y_s = beam.ys()
+    t_s = beam.zs()
+    px_abs = beam.uxs() / SI.c
+    py_abs = beam.uys() / SI.c
+    pz_abs = beam.uzs() / SI.c
+    gamma_abs = np.sqrt(1.0 + px_abs**2 + py_abs**2 + pz_abs**2)
+    dpx_s = px_abs / ref_pz
+    dpy_s = py_abs / ref_pz
+    dpt_s = (np.sqrt(1.0 + ref_pz**2) - gamma_abs) / ref_pz
+    denominator = ref_pt + ref_pz * dpt_s
+
+    x_t = x_s + ref_pz * dpx_s * t_s / denominator
+    y_t = y_s + ref_pz * dpy_s * t_s / denominator
+    t_t = t_s * pz_abs / denominator
+
+    return np.stack([x_t, y_t, t_t, px_abs, py_abs, pz_abs], axis=1)
+
+
+def fixed_t_to_fixed_s(model_output: np.ndarray, ref_pz: float, ref_z_f: float) -> tuple:
+    x_t = model_output[:, 0]
+    y_t = model_output[:, 1]
+    t_t = model_output[:, 2] - ref_z_f
+    px_abs = model_output[:, 3]
+    py_abs = model_output[:, 4]
+    pz_abs = model_output[:, 5]
+    gamma_abs = np.sqrt(1.0 + px_abs**2 + py_abs**2 + pz_abs**2)
+
+    x_s = x_t - px_abs * t_t / pz_abs
+    y_s = y_t - py_abs * t_t / pz_abs
+    t_s = -gamma_abs * t_t / pz_abs
+
+    return x_s, y_s, t_s, px_abs, py_abs, pz_abs
+
+
 class ABELDrift(Trackable):
     def __init__(self, length: float, name: str | None = None):
         super().__init__(name=name)
         self.length = float(length)
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        beam.transport(self.length)
+        reference_beta_gamma = getattr(beam, "reference_beta_gamma", REF_U)
+        xs, ys, ts, rel_pxs, rel_pys, rel_pts = fixed_s_relative_from_beam(
+            beam, reference_beta_gamma
+        )
+
+        xs += self.length * rel_pxs
+        ys += self.length * rel_pys
+        ts += self.length * rel_pts / reference_beta_gamma**2
+
+        set_beam_from_fixed_s_relative(
+            beam,
+            xs,
+            ys,
+            ts,
+            rel_pxs,
+            rel_pys,
+            rel_pts,
+            reference_beta_gamma,
+        )
         return super().track(beam, savedepth, runnable, verbose)
 
     def get_length(self) -> float:
@@ -224,11 +333,18 @@ class RetunedConstFLens(Trackable):
         self.k_history: list[float] = []
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        alpha = beam.alpha_x(clean=True) if self.tune_axis == "x" else beam.alpha_y(clean=True)
-        beta = beam.beta_x(clean=True) if self.tune_axis == "x" else beam.beta_y(clean=True)
-        gamma = (1.0 + alpha**2) / beta
+        reference_beta_gamma = getattr(beam, "reference_beta_gamma", REF_U)
+        xs, ys, ts, rel_pxs, rel_pys, rel_pts = fixed_s_relative_from_beam(
+            beam, reference_beta_gamma
+        )
+        if self.tune_axis == "x":
+            alpha, beta, gamma = twiss_from_phase_space(xs, rel_pxs)
+        else:
+            alpha, beta, gamma = twiss_from_phase_space(ys, rel_pys)
 
-        sol = opt.root_scalar(lens_eqn, bracket=[100.0, 300.0], args=(self.length, alpha, beta, gamma))
+        sol = opt.root_scalar(
+            lens_eqn, bracket=[100.0, 300.0], args=(self.length, alpha, beta, gamma)
+        )
         self.k = float(sol.root)
         self.k_history.append(self.k)
 
@@ -236,15 +352,34 @@ class RetunedConstFLens(Trackable):
         cphase = np.cos(phase)
         sphase = np.sin(phase)
 
-        x0 = beam.xs().copy()
-        xp0 = beam.xps().copy()
-        y0 = beam.ys().copy()
-        yp0 = beam.yps().copy()
+        x0 = xs.copy()
+        px0 = rel_pxs.copy()
+        y0 = ys.copy()
+        py0 = rel_pys.copy()
+        t0 = ts.copy()
+        pt0 = rel_pts.copy()
 
-        beam.set_xs(cphase * x0 + sphase * xp0 / self.k)
-        beam.set_xps(-self.k * sphase * x0 + cphase * xp0)
-        beam.set_ys(cphase * y0 + sphase * yp0 / self.k)
-        beam.set_yps(-self.k * sphase * y0 + cphase * yp0)
+        xs = cphase * x0 + sphase * px0 / self.k
+        rel_pxs = -self.k * sphase * x0 + cphase * px0
+        ys = cphase * y0 + sphase * py0 / self.k
+        rel_pys = -self.k * sphase * y0 + cphase * py0
+
+        kt = 1.0e-11
+        cphase_t = np.cos(kt * self.length)
+        sphase_t = np.sin(kt * self.length)
+        ts = cphase_t * t0 + sphase_t * pt0 / kt / reference_beta_gamma**2
+        rel_pts = -kt * reference_beta_gamma**2 * sphase_t * t0 + cphase_t * pt0
+
+        set_beam_from_fixed_s_relative(
+            beam,
+            xs,
+            ys,
+            ts,
+            rel_pxs,
+            rel_pys,
+            rel_pts,
+            reference_beta_gamma,
+        )
 
         return super().track(beam, savedepth, runnable, verbose)
 
@@ -285,8 +420,6 @@ class LPASurrogateStage(Trackable):
         return torch.cat(outputs, dim=0)
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        # ABEL stores proper velocities in m/s. The surrogate models use the
-        # dimensionless beta-gamma momenta used by ImpactX, so divide/multiply by c.
         reference_beta_gamma = getattr(beam, "reference_beta_gamma", REF_U)
         reference_input = np.array(
             [[0.0, 0.0, EBEAM_LPA_Z0, 0.0, 0.0, reference_beta_gamma]]
@@ -294,27 +427,21 @@ class LPASurrogateStage(Trackable):
         reference_output = self._run_model(self._tensor(reference_input)).detach().cpu().numpy()
         reference_beta_gamma_final = float(reference_output[0, 5])
 
-        data = np.stack(
-            [
-                beam.xs(),
-                beam.ys(),
-                beam.zs() + EBEAM_LPA_Z0,
-                beam.uxs() / SI.c,
-                beam.uys() / SI.c,
-                beam.uzs() / SI.c,
-            ],
-            axis=1,
-        )
+        data = fixed_s_to_fixed_t(beam, reference_beta_gamma)
+        data[:, 2] += EBEAM_LPA_Z0
 
         model_input = self._tensor(data)
         model_output = self._run_model(model_input).detach().cpu().numpy()
 
-        beam.set_xs(model_output[:, 0])
-        beam.set_ys(model_output[:, 1])
-        beam.set_zs(model_output[:, 2] - (EBEAM_LPA_Z0 + self.length))
-        beam.set_uxs(model_output[:, 3] * SI.c)
-        beam.set_uys(model_output[:, 4] * SI.c)
-        beam.set_uzs(model_output[:, 5] * SI.c)
+        x_s, y_s, t_s, px_abs, py_abs, pz_abs = fixed_t_to_fixed_s(
+            model_output, reference_beta_gamma_final, EBEAM_LPA_Z0 + self.length
+        )
+        beam.set_xs(x_s)
+        beam.set_ys(y_s)
+        beam.set_zs(t_s)
+        beam.set_uxs(px_abs * SI.c)
+        beam.set_uys(py_abs * SI.c)
+        beam.set_uzs(pz_abs * SI.c)
         beam.reference_beta_gamma = reference_beta_gamma_final
 
         return super().track(beam, savedepth, runnable, verbose)
@@ -357,7 +484,12 @@ class H5SnapshotRecorder:
         reference_beta_gamma = getattr(beam, "reference_beta_gamma", REF_U)
         rel_px = (beam.uxs() / SI.c) / reference_beta_gamma
         rel_py = (beam.uys() / SI.c) / reference_beta_gamma
-        rel_pt = (beam.uzs() / SI.c - reference_beta_gamma) / reference_beta_gamma
+        px_abs = beam.uxs() / SI.c
+        py_abs = beam.uys() / SI.c
+        pz_abs = beam.uzs() / SI.c
+        gamma_abs = np.sqrt(1.0 + px_abs**2 + py_abs**2 + pz_abs**2)
+        reference_gamma = np.sqrt(1.0 + reference_beta_gamma**2)
+        rel_pt = (reference_gamma - gamma_abs) / reference_beta_gamma
         n_particles = len(beam)
 
         def write_component(record_name, component_name, values):
@@ -400,7 +532,7 @@ class H5SnapshotRecorder:
         particles.set_attribute("abel_location_m", beam.location)
         particles.set_attribute("abel_trackable_number", beam.trackable_number)
         particles.set_attribute("abel_reference_beta_gamma", reference_beta_gamma)
-        particles.set_attribute("abel_coordinate_convention", "impactx_relative")
+        particles.set_attribute("abel_coordinate_convention", "impactx_fixed_s_relative")
         self.series.flush()
 
         self.names.append(beam_name)

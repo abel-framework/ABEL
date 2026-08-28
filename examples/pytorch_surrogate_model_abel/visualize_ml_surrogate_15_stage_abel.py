@@ -62,6 +62,21 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="optional maximum particles to scatter per phase-space plot",
     )
+    parser.add_argument(
+        "--impactx-reference-file",
+        type=Path,
+        default=Path(__file__).resolve().parent / "monitor.h5",
+        help="ImpactX monitor.h5 file used to match final phase-space axis ranges",
+    )
+    parser.add_argument(
+        "--final-axis-reference",
+        choices=("impactx", "union"),
+        default="impactx",
+        help=(
+            "axis limits for the final phase-space plot: 'impactx' matches the "
+            "ImpactX reference monitor, 'union' expands limits to include ABEL outliers"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -75,10 +90,11 @@ def load_beam_dataframe(series: io.Series, particles) -> pd.DataFrame:
         pt = particles["momentum"]["t"].load_chunk()
         reference_beta_gamma = particles.get_attribute("abel_reference_beta_gamma")
         series.flush()
+        reference_gamma = np.sqrt(1.0 + reference_beta_gamma**2)
         beta_gamma_x = px * reference_beta_gamma
         beta_gamma_y = py * reference_beta_gamma
-        beta_gamma_z = (1.0 + pt) * reference_beta_gamma
-        gamma = np.sqrt(1.0 + beta_gamma_x**2 + beta_gamma_y**2 + beta_gamma_z**2)
+        gamma = reference_gamma - pt * reference_beta_gamma
+        beta_gamma_z = np.sqrt(gamma**2 - 1.0 - beta_gamma_x**2 - beta_gamma_y**2)
         xprime = beta_gamma_x / beta_gamma_z
         yprime = beta_gamma_y / beta_gamma_z
     else:
@@ -263,6 +279,7 @@ def plot_beam_df(
     t_offset=0.0,
     label=None,
     z_ticks=None,
+    axis_limits=None,
 ):
     ax = axT[0][0]
     ax.scatter(
@@ -389,11 +406,18 @@ def plot_beam_df(
     ax.axes.ticklabel_format(axis="y", style="sci", scilimits=(-2, 2))
     if z_ticks is not None:
         ax.set_xticks(z_ticks)
+    if axis_limits is not None:
+        for ax, (xlim, ylim) in zip(axT.ravel(), axis_limits):
+            ax.set_xlim(*xlim)
+            ax.set_ylim(*ylim)
     plt.tight_layout()
 
 
-def to_t_global(beam: pd.DataFrame, ref_pz: float, ref_z: float) -> None:
-    ref_pt = -np.sqrt(1.0 + ref_pz**2)
+def to_t_global(
+    beam: pd.DataFrame, ref_pz: float, ref_z: float, ref_pt: float | None = None
+) -> None:
+    if ref_pt is None:
+        ref_pt = -np.sqrt(1.0 + ref_pz**2)
     dx = beam["position_x"].to_numpy(copy=True)
     dy = beam["position_y"].to_numpy(copy=True)
     dt = beam["position_t"].to_numpy(copy=True)
@@ -414,6 +438,123 @@ def to_t_global(beam: pd.DataFrame, ref_pz: float, ref_z: float) -> None:
     beam["momentum_t"] = pz
 
 
+def impactx_stage_end_step(stage_i: int) -> int:
+    return 1 if stage_i == 0 else 3 + 9 * (stage_i - 1)
+
+
+def load_impactx_monitor_beam_and_reference(
+    path: Path, stage_i: int
+) -> tuple[pd.DataFrame, float, float, float, float]:
+    series = io.Series(str(path), io.Access.read_only)
+    step = impactx_stage_end_step(stage_i)
+    if step not in series.iterations:
+        series.close()
+        raise KeyError(f"ImpactX monitor file does not contain iteration {step}.")
+
+    iteration = series.iterations[step]
+    particles = iteration.particles["beam"]
+    beam = particles.to_df()
+    ref_pz = float(particles.get_attribute("beta_gamma_ref"))
+    ref_pt = -float(particles.get_attribute("gamma_ref"))
+    ref_t = float(iteration.time * iteration.time_unit_SI)
+    ref_z = ref_t + EBEAM_LPA_Z0
+    series.close()
+    return beam, ref_pz, ref_pt, ref_z, ref_t
+
+
+def beam_plot_variables(beam: pd.DataFrame, t_offset_um: float) -> dict[str, np.ndarray]:
+    return {
+        "x": beam["position_x"].to_numpy() * 1e6,
+        "y": beam["position_y"].to_numpy() * 1e6,
+        "xi": beam["position_t"].to_numpy() * 1e6 - t_offset_um,
+        "px": beam["momentum_x"].to_numpy(),
+        "py": beam["momentum_y"].to_numpy(),
+        "pt": beam["momentum_t"].to_numpy(),
+    }
+
+
+def padded_limit(values: np.ndarray, padding_fraction: float = 0.05) -> tuple[float, float]:
+    finite_values = values[np.isfinite(values)]
+    if len(finite_values) == 0:
+        raise ValueError("Cannot derive plot limits from an empty or non-finite array.")
+
+    low = float(np.min(finite_values))
+    high = float(np.max(finite_values))
+    if np.isclose(low, high):
+        padding = max(abs(low) * padding_fraction, 1.0)
+    else:
+        padding = (high - low) * padding_fraction
+    return low - padding, high + padding
+
+
+def axis_limits_from_variable_limits(
+    limits: dict[str, tuple[float, float]],
+) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    return [
+        (limits["x"], limits["y"]),
+        (limits["xi"], limits["x"]),
+        (limits["xi"], limits["y"]),
+        (limits["px"], limits["py"]),
+        (limits["pt"], limits["px"]),
+        (limits["pt"], limits["py"]),
+        (limits["x"], limits["px"]),
+        (limits["y"], limits["py"]),
+        (limits["xi"], limits["pt"]),
+    ]
+
+
+def final_phase_space_axis_limits(
+    path: Path,
+    stage_i: int,
+    abel_beam: pd.DataFrame,
+    reference_ct: float,
+    axis_reference: str,
+):
+    transformed_beams = []
+
+    path = Path(path)
+    if path.exists():
+        (
+            impactx_plot_beam,
+            impactx_ref_pz,
+            impactx_ref_pt,
+            impactx_ref_z,
+            impactx_ref_t,
+        ) = load_impactx_monitor_beam_and_reference(path, stage_i)
+        to_t_global(
+            impactx_plot_beam,
+            ref_pz=impactx_ref_pz,
+            ref_z=impactx_ref_z,
+            ref_pt=impactx_ref_pt,
+        )
+        transformed_beams.append(
+            beam_plot_variables(impactx_plot_beam, impactx_ref_t * 1e6)
+        )
+
+    if axis_reference == "union" or not transformed_beams:
+        reference_beta_gamma = abel_beam.attrs["reference_beta_gamma"]
+        abel_plot_beam = abel_beam.copy()
+        to_t_global(
+            abel_plot_beam,
+            ref_pz=reference_beta_gamma,
+            ref_z=reference_ct + EBEAM_LPA_Z0,
+        )
+        transformed_beams.append(
+            beam_plot_variables(abel_plot_beam, reference_ct * 1e6)
+        )
+
+    variable_limits = {}
+    for name in ("x", "y", "xi", "px", "py", "pt"):
+        variable_values = np.concatenate([beam[name] for beam in transformed_beams])
+        variable_limits[name] = padded_limit(variable_values)
+
+    variable_limits["xi"] = (
+        min(variable_limits["xi"][0], -107.3),
+        max(variable_limits["xi"][1], -106.6),
+    )
+    return axis_limits_from_variable_limits(variable_limits)
+
+
 def plot_phase_space(
     beam: pd.DataFrame,
     title: str,
@@ -421,6 +562,7 @@ def plot_phase_space(
     save_png: bool,
     max_particles: int | None,
     reference_ct: float,
+    axis_limits=None,
 ) -> None:
     beam_to_plot = beam.copy()
     ref_pz = beam_to_plot.attrs["reference_beta_gamma"]
@@ -438,6 +580,7 @@ def plot_phase_space(
         unit_z_label=r"$\xi$ ($\mu$m)",
         t_offset=t_offset,
         z_ticks=[-107.3, -106.6],
+        axis_limits=axis_limits,
     )
     if save_png:
         plt.savefig(output_name)
@@ -469,8 +612,17 @@ def main() -> None:
             if stage_i < 1 or stage_i > args.num_stages:
                 raise ValueError(
                     f"Stage {stage_i} is outside the available range 1..{args.num_stages}."
-                )
+            )
             name = f"beam_{stage_i:03d}_stage_{stage_i}"
+            axis_limits = None
+            if stage_i == args.num_stages:
+                axis_limits = final_phase_space_axis_limits(
+                    args.impactx_reference_file,
+                    stage_i,
+                    beams[name],
+                    locations[name],
+                    args.final_axis_reference,
+                )
             plot_phase_space(
                 beams[name],
                 f"stage {stage_i}, ct={locations[name]:.2f} m",
@@ -478,6 +630,7 @@ def main() -> None:
                 args.save_png,
                 args.max_particles,
                 locations[name],
+                axis_limits=axis_limits,
             )
 
 
