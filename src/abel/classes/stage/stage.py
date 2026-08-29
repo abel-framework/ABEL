@@ -1378,8 +1378,10 @@ class Stage(Trackable, CostModeled):
             Default set to ``True``.
 
         q : [C] float, optional
-            Particle charge. Defaults to elementary charge.
-            
+            Particle charge. The sign of the charge is irrelevant, as only 
+            `abs(q)` is used in the calculation. Defaults to the elementary 
+            charge.
+
         Returns
         -------
         beta_function : [m], float
