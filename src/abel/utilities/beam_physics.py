@@ -1216,12 +1216,8 @@ def phase_advance_traj_data(pos, angles, orbit_pos=None, orbit_angles=None):
 def length2num_beta_osc(length, initial_energy, accel_gradient, foc_gradient, q=SI.e):
         """
         Calculate the number of betatron oscillations a particle can undergo in 
-        the stage (excluding ramps).
-
-        Will take into account the contribution from an external linear magnetic 
-        field B=[gy,-gx,0] if :attr:`self.external_focusing_gradient <abel.Stage.external_focusing>`
-        is not ``None``.
-
+        a plasma acceleration stage (excluding ramps).
+        
         Parameters
         ----------
         length : [m] float
