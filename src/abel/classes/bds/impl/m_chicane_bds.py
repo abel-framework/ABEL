@@ -303,12 +303,11 @@ class DriverDelaySystem_M(BeamDeliverySystem):
 
 
     def get_dipole_lengths(self):
-        """
-        Sets the lengths of the dipoles such that the delay is achieved
-        """
+
         L = (self.length_stage + SI.c*self.delay_per_stage - self.l_gap/2 - self.l_kick/2 - self.l_diag)/4
 
         return L
+    
     def get_quad_counts(self):
         N = sum(1 for element in self.lattice if element.name=='quad') - self.get_n_dobble_quads()
         return N
@@ -359,7 +358,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             The optimized values
 
         NOTE: must implement ks_to_match list in self.set_ks() as well.
-                ALSO: Not implemented for amtching dipoles yet
+                ALSO: Not implemented for matching dipoles yet
 
         """
         p = self.E_nom/SI.c

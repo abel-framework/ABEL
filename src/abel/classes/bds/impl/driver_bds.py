@@ -1,5 +1,5 @@
 import numpy as np
-from abel.classes.bds.bds import BeamDeliverySystem
+from src.abel.classes.bds.bds import BeamDeliverySystem
 import scipy.constants as SI
 from scipy.optimize import minimize
 
@@ -93,8 +93,6 @@ class DriverDelaySystem(BeamDeliverySystem):
         import impactx
         lattice=[]
         if self.use_monitors:
-            from abel.apis.impactx.impactx_api import initialize_amrex
-            initialize_amrex()
             monitor = [impactx.elements.BeamMonitor(name='monitor', backend='h5', encoding='g')]
         else:
             monitor=[]

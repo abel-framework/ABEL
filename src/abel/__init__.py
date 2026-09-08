@@ -73,6 +73,9 @@ from .classes.turnaround.impl.turnaround_basic import TurnaroundBasic
 from .classes.transfer_line.impl.transfer_line_basic import TransferLineBasic
 from .classes.bds.impl.bds_basic import BeamDeliverySystemBasic
 from .classes.bds.impl.bds_fbt import BeamDeliverySystemFlatBeamTransformer
+from .classes.bds.impl.driver_bds import DriverDelaySystem
+from .classes.bds.impl.m_chicane_bds import DriverDelaySystem_M
+
 from .classes.bds.impl.plasma_lens.basic import BeamDeliverySystemPlasmaLensBasic
 from .classes.bds.impl.plasma_lens.impactx import BeamDeliverySystemPlasmaLensImpactX
 from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
