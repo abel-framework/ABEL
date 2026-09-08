@@ -1,7 +1,8 @@
 Introduction
 =============
+The ABEL simulation framework is a particle-tracking framework for multi-element particle accelerators (such as plasma-accelerator linacs, colliders, experimental test facilities, etc.), implemented at varying levels of complexity, for fast investigations or optimizations. As a systems code, it can be used for physics simulations as well as generating (and optimizing for) cost estimates.
 
-This manual describes ABEL blablah
+**Documentation is being written and being continuously updated!**
 
 Python modules
 ===============
