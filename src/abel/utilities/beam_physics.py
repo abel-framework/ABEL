@@ -282,68 +282,112 @@ def Rmat(l, k=0, plasmalens=True):
     """
     General focusing transfer matrix (quadrupole and drift)
     """
-    import warnings
-    warnings.filterwarnings("ignore")
-    
     if k == 0:
-        return np.matrix([[1,l,0,0],
-                          [0,1,0,0],
-                          [0,0,1,l],
-                          [0,0,0,1]])
-    elif plasmalens:
-        if k > 0:
-            return np.matrix([[np.cos(np.sqrt(k)*l),np.sin(np.sqrt(k)*l)/np.sqrt(k),0,0],
-                          [-np.sin(np.sqrt(k)*l)*np.sqrt(k),np.cos(np.sqrt(k)*l),0,0],
-                          [0,0,np.cos(np.sqrt(k)*l),np.sin(np.sqrt(k)*l)/np.sqrt(k)],
-                          [0,0,-np.sin(np.sqrt(k)*l)*np.sqrt(k),np.cos(np.sqrt(k)*l)]])
-        elif k < 0:
-            return np.matrix([[np.cosh(np.sqrt(-k)*l),np.sinh(np.sqrt(-k)*l)/np.sqrt(-k),0,0],
-                          [np.sinh(np.sqrt(-k)*l)*np.sqrt(-k),np.cosh(np.sqrt(-k)*l),0,0],
-                          [0,0,np.cosh(np.sqrt(-k)*l),np.sinh(np.sqrt(-k)*l)/np.sqrt(-k)],
-                          [0,0,np.sinh(np.sqrt(-k)*l)*np.sqrt(-k),np.cosh(np.sqrt(-k)*l)]])
-    elif not plasmalens:
-        if k > 0:
-            return np.matrix([[np.cos(np.sqrt(k)*l),np.sin(np.sqrt(k)*l)/np.sqrt(k),0,0],
-                          [-np.sin(np.sqrt(k)*l)*np.sqrt(k),np.cos(np.sqrt(k)*l),0,0],
-                          [0,0,np.cosh(np.sqrt(k)*l),np.sinh(np.sqrt(k)*l)/np.sqrt(k)],
-                          [0,0,np.sinh(np.sqrt(k)*l)*np.sqrt(k),np.cosh(np.sqrt(k)*l)]])
-        elif k < 0:
-            return np.matrix([[np.cosh(np.sqrt(-k)*l),np.sinh(np.sqrt(-k)*l)/np.sqrt(-k),0,0],
-                          [np.sinh(np.sqrt(-k)*l)*np.sqrt(-k),np.cosh(np.sqrt(-k)*l),0,0],
-                          [0,0,np.cos(np.sqrt(-k)*l),np.sin(np.sqrt(-k)*l)/np.sqrt(-k)],
-                          [0,0,-np.sin(np.sqrt(-k)*l)*np.sqrt(-k),np.cos(np.sqrt(-k)*l)]])
+        return np.array([
+            [1, l, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 1, l],
+            [0, 0, 0, 1]
+        ])
+        
+    # Pre-calculate constants to avoid redundant computation
+    sqrt_k = np.sqrt(abs(k))
+    kl = sqrt_k * l
+    
+    # Focusing elements
+    C = np.cos(kl)
+    S = np.sin(kl) / sqrt_k
+    Sp = -np.sin(kl) * sqrt_k
+    
+    # Defocusing elements
+    Ch = np.cosh(kl)
+    Sh = np.sinh(kl) / sqrt_k
+    Sph = np.sinh(kl) * sqrt_k
 
+    if plasmalens:
+        if k > 0:
+            # Focusing in both planes
+            return np.array([
+                [C,  S,  0, 0],
+                [Sp, C,  0, 0],
+                [0,  0,  C, S],
+                [0,  0, Sp, C]
+            ])
+        else: # k < 0
+            # Defocusing in both planes
+            return np.array([
+                [Ch,  Sh,  0,  0],
+                [Sph, Ch,  0,  0],
+                [0,   0,   Ch, Sh],
+                [0,   0,  Sph, Ch]
+            ])
+    else: # purely magnetic quadrupole
+        if k > 0:
+            # Focusing in x, Defocusing in y
+            return np.array([
+                [C,   S,   0,   0],
+                [Sp,  C,   0,   0],
+                [0,   0,   Ch,  Sh],
+                [0,   0,  Sph,  Ch]
+            ])
+        else: # k < 0
+            # Defocusing in x, Focusing in y
+            return np.array([
+                [Ch,  Sh,  0, 0],
+                [Sph, Ch,  0, 0],
+                [0,   0,   C, S],
+                [0,   0,  Sp, C]
+            ])
 
 # =============================================
 def Dmat(l, inv_rho=0, k=0):
     """
-    General dispersion transfer matrix (dipole, quadrupole and drift)
+    General dispersion transfer matrix (sector dipole, quadrupole and drift)
+    Includes weak focusing 1/rho^2 in the bending plane.
     """
-    R = Rmat(l,k)
+    R = Rmat(l, k)
+
     if inv_rho == 0:
-        return np.matrix([[R[0,0], R[0,1], 0],
-                          [R[1,0], R[1,1], 0],
-                          [0, 0, 1]])
+        return np.array([
+            [R[0,0], R[0,1], 0],
+            [R[1,0], R[1,1], 0],
+            [0,      0,      1]
+        ])
+
+    # Sector dipole: weak focusing adds 1/rho^2 to k in the bending plane
+    k_eff = k + inv_rho**2
+
+    # Compute bending-plane R matrix elements with k_eff
+    if k_eff == 0:
+        R00, R01 = 1.0, l
+        R10, R11 = 0.0, 1.0
     else:
-        # DEFOCUSING (If k is strong and negative, overpowering the geometric focusing)
-        # Uses hyperbolic functions
-        ch = np.cosh(l * sqrt_K)
-        sh = np.sinh(l * sqrt_K)
-        
-        r11 = ch
-        r12 = sh / sqrt_K
-        r21 = sh * sqrt_K
-        r22 = ch
-        
-        d_term  = (inv_rho / abs(K_total)) * (ch - 1)
-        dp_term = (inv_rho / sqrt_K) * sh
+        sqrt_keff = np.sqrt(abs(k_eff))
+        kl = sqrt_keff * l
+        if k_eff > 0:
+            R00 = np.cos(kl)
+            R01 = np.sin(kl) / sqrt_keff
+            R10 = -np.sin(kl) * sqrt_keff
+            R11 = np.cos(kl)
+        else:
+            R00 = np.cosh(kl)
+            R01 = np.sinh(kl) / sqrt_keff
+            R10 = np.sinh(kl) * sqrt_keff
+            R11 = np.cosh(kl)
+
+    # Dispersion terms
+    dp_term = inv_rho * R01
+    if k_eff == 0:
+        d_term = inv_rho * (l**2) / 2.0
+    else:
+        d_term = inv_rho * (1 - R00) / k_eff
 
     return np.array([
-        [r11, r12, d_term],
-        [r21, r22, dp_term],
+        [R00, R01, d_term],
+        [R10, R11, dp_term],
         [0,   0,   1]
     ])
-    
+
     
 
 def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plot=False, plane='x', return_fig=False):
@@ -459,7 +503,7 @@ def evolve_beta_function(ls, ks, beta0, alpha0=0, inv_rhos=None, fast=False, plo
     if return_fig and plot:
         return beta, alpha, evolution, fig
         
-    return beta, alpha, evolution, None
+    return beta, alpha, evolution
 
 
 def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False, return_fig=False):
@@ -556,7 +600,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
     if return_fig and plot:
         return Dx, Dpx, evolution, fig
         
-    return Dx, Dpx, evolution, None
+    return Dx, Dpx, evolution
 
 
 def evolve_second_order_dispersion(ls, inv_rhos, ks, ms=None, taus=None, fast=False, plot=False):
@@ -746,7 +790,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, 
        
     # get the dispersion evolution
     if evolution_disp is None:
-        _, _, evolution_disp, _ = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=high_res)
+        _, _, evolution_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=high_res)
     ss = evolution_disp[0]
     Dxs = evolution_disp[1]
     R56s = np.empty_like(ss)
@@ -801,7 +845,7 @@ def evolve_R56(ls, inv_rhos, ks, Dx0=0, Dpx0=0, R560=0, fast=False, plot=False, 
     if return_fig and plot:
         return R56, evolution, fig
 
-    return R56, evolution, None
+    return R56, evolution
 
 
 # =============================================

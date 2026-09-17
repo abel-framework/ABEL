@@ -10,7 +10,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
     def __init__(self, E_nom=2, delay_per_stage=1, length_stage=12, num_stages=2, ks=[], B_dipole=1, \
                  keep_data=False, enable_space_charge=False, enable_csr=False, enable_isr=False, layoutnr = 1,\
                  l_diag = 2, use_monitors=False, x0=10, lattice=[], ns=100, beta0_x=1, beta0_y=1,\
-                    alpha0_x=0, alpha0_y=0, Dx0=0, Dpx0=0, R560=0, k_bound=10):
+                    alpha0_x=0, alpha0_y=0, Dx0=0, Dpx0=0, R560=0, k_bound=15):
         # E_nom in eV, delay in ns
         super().__init__()
         self._E_nom = E_nom #backing variable 
@@ -37,7 +37,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         self.k_bound = k_bound
 
         # Lattice-elements lengths
-        self.l_quads = 0.2
+        self.l_quads = 1
         self.l_kick = 1.5
         self.l_gap = 1
         self.l_diag = l_diag
@@ -445,9 +445,9 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                     case 'R56':
                         S += ((R56-value)*1e2)**2
                     case 'beta_x':
-                        S += ((betax-value))**2
+                        S += ((betax-value*beta_x0))**2
                     case 'beta_y':
-                        S += ((betay-value))**2
+                        S += ((betay-value*beta_y0))**2
                     case 'alpha_x':
                         S += ((alphax-value))**2
                     case 'alpha_y':
@@ -518,7 +518,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
         if match_betas:
             x0.extend([self.beta0_x, self.beta0_y])
         ## Run the optimization                
-        opt = minimize(fun=optimizer, x0=x0, bounds=bounds, method=method, options={'gtol':1e-4})
+        opt = minimize(fun=optimizer, x0=x0, bounds=bounds, method=method, options={'gtol':1e-4, 'maxiter':5e3})
         print() # <--- Move to a fresh line after optimization is done
         print("Optimization finished!")
         print(opt)
@@ -683,6 +683,107 @@ class DriverDelaySystem_M(BeamDeliverySystem):
             ms = [element.k_normal[2] if hasattr(element, 'k_normal') and element.name=='sextupole' else 0 for element in self.lattice]
             yield ms
 
+    def scale_lattice_energy_length(self, s_L, s_E, thick_quads=True, exact_delay=True):
+        """
+        Scale lattice: length by s_L, energy by s_E, keeping delay constant.
+
+        Provides a good starting point; re-optimize quads afterward with
+        match_lattice() for exact matching.
+
+        Parameters:
+            s_L  : length scaling factor (>1 = longer)
+            s_E  : energy scaling factor (>1 = higher energy)
+            thick_quads : True  → k /= s_L² (exact for thick quads)
+                        False → k /= s_L   (thin lens approximation)
+            exact_delay : True  → root-find B to match delay exactly
+                        False → use approximate B ~ s_E·B_old / s_L^{3/2}
+
+        Returns:
+            B_new : dipole field [T] that achieves the target delay
+        """
+        from scipy.optimize import root_scalar
+
+        # --- Record originals ---
+        delay_target = self.get_delay() # ns
+        old_B = self.B_dipole
+        old_E = self._E_nom
+
+        # --- 1. Scale all element lengths ---
+        for element in self.lattice:
+            element.ds *= s_L
+        self.l_quads *= s_L
+        self.l_dipole *= s_L
+
+        # --- 2. Scale quad strengths (similarity scaling for length) ---
+        for i in self.indices_quads:
+            if thick_quads:
+                self.lattice[i].k /= s_L**2
+            else:
+                self.lattice[i].k /= s_L
+
+        # --- 3. Scale sextupole strengths (approximate similarity) ---
+        for i in self.indices_sextupoles:
+            if hasattr(self.lattice[i], 'k_normal') and len(self.lattice[i].k_normal) > 2:
+                self.lattice[i].k_normal[2] /= s_L**2
+
+        # --- 4. Update energy ---
+        self.E_nom = old_E * s_E
+
+        # --- 5. Find B that preserves the delay ---
+        # Approximate: delay ~ θ²·L, with L→s_L·L need θ→θ/√s_L
+        # θ = l·B/p  →  B_new ≈ s_E·B_old / s_L^{3/2}
+        B_approx = old_B * s_E / s_L**1.5
+
+        if not exact_delay:
+            self.set_B_field(B_approx)
+            self.B_dipole = B_approx
+            return B_approx
+
+        def delay_residual(B):
+            self.set_B_field(B)
+            return self.get_delay() - delay_target
+
+        # Build a valid bracket around the approximate value
+        B_low  = B_approx * 0.2
+        B_high = B_approx * 5.0
+        f_low  = delay_residual(B_low)
+        f_high = delay_residual(B_high)
+
+        # Expand downward
+        tries = 0
+        while f_low * f_high > 0 and B_low > 1e-8 and tries < 50:
+            B_low *= 0.5
+            f_low = delay_residual(B_low)
+            tries += 1
+
+        # Expand upward
+        tries = 0
+        while f_low * f_high > 0 and B_high < 1e6 and tries < 50:
+            B_high *= 2
+            f_high = delay_residual(B_high)
+            tries += 1
+
+        if f_low * f_high > 0:
+            print("Warning: could not bracket delay root; using approximate B")
+            self.set_B_field(B_approx)
+            self.B_dipole = B_approx
+            return B_approx
+
+        result = root_scalar(delay_residual, bracket=[B_low, B_high], method='brentq')
+        B_new = result.root
+
+        self.set_B_field(B_new)
+        self.B_dipole = B_new
+
+        print(f"Scaled lattice: s_L={s_L}, s_E={s_E}")
+        print(f"  B     : {old_B:.4f} → {B_new:.4f} T")
+        print(f"  E     : {old_E:.4e} → {self.E_nom:.4e} eV")
+        print(f"  Delay : {delay_target:.4f} ns (target) → {self.get_delay():.4f} ns (actual)")
+        print(f"  Quads : k scaled by 1/s_L{'²' if thick_quads else ''} = 1/{s_L**2 if thick_quads else s_L:.4f}")
+        print(f"  Re-optimize with match_lattice() for exact matching.")
+
+        return B_new
+
     
     def track(self, beam0, savedepth=0, runnable=None, verbose=False, plot=False):
 
@@ -766,6 +867,7 @@ class DriverDelaySystem_M(BeamDeliverySystem):
                     name='dipole',
                     ds=element.ds,
                     phi=np.rad2deg(element.phi), # impactx constructor takes degrees, but attribute is in rads
+                    B=element.B,
                     nslice=element.nslice
                 )
             elif isinstance(element, impactx.elements.ExactQuad):
