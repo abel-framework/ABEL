@@ -553,17 +553,33 @@ class InterstagePlasmaLens(Interstage, ABC):
 
     ## PRE-ALIGNMENT ROUTINE
 
-    def pre_align(self, beam0, verbose=True):
-        
+    def pre_align(self, beam0=None, source=None, verbose=True):
+
+        if source is not None:
+            source0 = copy.deepcopy(source)
+            source0.num_particles = 5000
+            source0.y_offset = 0
+            source0.y_angle = 0
+            source0.x_offset = 0
+            source0.x_angle = 0
+            source0.symmetrize = True
+            source0.z = 0
+            source0.energy = self.nom.energy
+            beam_before = source.track()
+
+        elif beam0 is not None:
+
+            deltaE = self.nom_energy-beam0.energy()
+            beam0.accelerate(deltaE)
+            beam0.apply_betatron_damping(deltaE)
+            beam_before = self.track(beam0)
+            
         # pre-run to find offsets with zero lens offsets
         self.lens1_offset_x = 0
         self.lens2_offset_x = 0
         self.lens1_offset_y = 0
         self.lens2_offset_y = 0
-        deltaE = self.nom_energy-beam0.energy()
-        beam0.accelerate(deltaE)
-        beam0.apply_betatron_damping(deltaE)
-        beam_before = self.track(beam0)
+        
         X_beam = np.array([beam_before.x_offset(), beam_before.x_angle()])
 
         # calculate characteristic scale of offsets from normalized amplitude
