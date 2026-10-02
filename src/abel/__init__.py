@@ -79,6 +79,11 @@ from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasi
 from .classes.ip.impl.ip_basic import InteractionPointBasic
 from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
 
+from .classes.target import Target
+from .classes.target.sfqed import TargetSFQED
+from .classes.target.sfqed.basic import TargetSFQEDBasic
+from .classes.target.sfqed.ptarmigan import TargetSFQEDPtarmigan
+
 from abel.classes.collider.preset.halhf_v1 import HALHFv1
 from abel.classes.collider.preset.halhf_v2 import HALHFv2
 from abel.classes.collider.preset.halhf_gg import HALHFgg

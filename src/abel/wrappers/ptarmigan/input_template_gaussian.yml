@@ -1,0 +1,34 @@
+---
+# Ptarmigan input file generated using ABEL
+
+control:
+  dt_multiplier: $dt_multiplier
+  radiation_reaction: $radiation_reaction
+  pair_creation: $pair_creation
+  rng_seed: 0
+  increase_pair_rate_by: $increase_pair_rate_by
+
+laser:
+  a0: $laser_a0
+  wavelength: $laser_wavelength_um * micro
+  fwhm_duration: $laser_duration_fs * femto
+  waist: $laser_waist_size_um * micro
+  polarization: $laser_polarization
+
+beam:
+  n: $num_particles
+  species: electron
+  charge: $bunch_population * e
+  gamma: $gamma
+  sigma: $rel_energy_spread * $gamma
+  radius: [$beam_size_um * micro, normally_distributed]
+  length: $bunch_length_um * micro
+  collision_angle: $collision_angle_deg * degree
+  rms_divergence: $divergence_urad * micro
+
+output:
+  ident: auto
+  dump_all_particles: hdf5
+  discard_background_e: true
+  coordinate_system: beam
+  units: hep
