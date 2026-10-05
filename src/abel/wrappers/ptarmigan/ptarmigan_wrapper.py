@@ -1,6 +1,7 @@
 import numpy as np
 import os, subprocess
 from string import Template
+from abel.CONFIG import CONFIG
 
 def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by):
 
@@ -36,12 +37,9 @@ def ptarmigan_run(filename_input, runfolder=None, quiet=False):
     # extract runfolder from job script name
     if runfolder == None:
         runfolder = os.path.dirname(filename_input)
-
-    # executable
-    ptarmigan_binary_loc = '/Users/carlal/UiO/Code/software/ptarmigan/target/release/' # TODO: make this configurable
-
+    
     # run system command
-    cmd = ptarmigan_binary_loc + 'ptarmigan ' + filename_input
+    cmd = CONFIG.ptarmigan_binary + ' ' + filename_input
     if not quiet:
         stdout = subprocess.DEVNULL
     else:
