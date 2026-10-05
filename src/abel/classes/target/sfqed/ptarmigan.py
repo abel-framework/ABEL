@@ -65,24 +65,89 @@ class TargetSFQEDPtarmigan(TargetSFQED):
         else:
             return None
 
-    
-    def plot_beam_spectrum(self):
+    def mean_chi(self):
         if self.output is not None:
-            
+            return sum(self.output.photon.parent_chi*self.output.photon.weights)/sum(self.output.photon.weights)
+        else:
+            return None
+
+    def charge_noninteracting(self):
+        if self.output is not None:
             beam_mask = self.output.electron.ids < self.output.beam.num_particles
-            
+            n_gamma_mask = self.output.electron.n_gamma == 0
+            both_mask = np.logical_and(beam_mask, n_gamma_mask)
+            Q_non = sum(self.output.electron.weights[both_mask]) * SI.e
+            return Q_non
+        else:
+            return None
+
+    def interaction_fraction(self):
+        if self.output is not None:
+            beam_mask = self.output.electron.ids < self.output.beam.num_particles
+            Q_tot = sum(self.output.electron.weights[beam_mask]) * SI.e
+            Q_non = self.charge_noninteracting()
+            return (Q_tot-Q_non)/Q_tot
+        else:
+            return None
+
+    
+    def plot_beam_spectrum(self, show_num_photons=True, log_plot=True):
+        if self.output is not None:
+
+            # mask to select only the beam electrons
+            beam_mask = self.output.electron.ids < self.output.beam.num_particles
+
+            # number of bins in the histogram
             num_bins = round(np.sqrt(self.output.beam.num_particles))
-            bins = np.linspace(0, max(self.output.electron.pz)/1e9, num_bins)
+            Ebins = np.linspace(0, max(self.output.electron.pz), num_bins)
             
+            # set up figure
             fig, ax = plt.subplots(1, 1)
             fig.set_figwidth(CONFIG.plot_width_default*0.8)
             fig.set_figheight(CONFIG.plot_width_default*0.5)
             
-            ax.hist(self.output.electron.pz[beam_mask]/1e9, weights=self.output.electron.weights[beam_mask], bins=bins)
+            if show_num_photons:
+
+                import matplotlib.colors as mcolors
+                tab_colors = list(mcolors.TABLEAU_COLORS)
+
+                hf = []
+                hw = []
+                labels = []
+                cols = []
+                n = 0
+                nmax = round(max(self.output.electron.n_gamma))
+                for i in reversed(range(nmax)):
+                    n_gamma_mask = self.output.electron.n_gamma == i
+                    both_mask = np.logical_and(beam_mask, n_gamma_mask)
+                    if sum(both_mask) == 0:
+                        continue
+                    hf = hf + [self.output.electron.pz[both_mask]/1e9]
+                    hw = hw + [self.output.electron.weights[both_mask]]
+                    if i == 1:
+                        labels = labels + [f"{i} photon"]
+                    else:
+                        labels = labels + [f"{i} photons"]
+                    cols = cols + [tab_colors[nmax-n-1]]
+                    n = n + 1
+                
+                ax.hist(hf, weights=hw, bins=Ebins/1e9, stacked=True, histtype='bar', fill=True, label=labels, color=cols)
+                ax.legend(reverse=True)
+                
+            else:
+
+                Es = self.output.electron.pz[beam_mask]
+                weights = self.output.electron.weights[beam_mask]
+                ax.hist(Es/1e9, weights=weights, bins=Ebins/1e9)
+
             ax.set_xlabel('Energy (GeV)')
             ax.set_ylabel('Spectral density (a.u.)')
             ax.set_title('Beam electron spectrum')
             
+            # make log scale
+            if log_plot:
+                ax.set_yscale('log')
+                
         else:
             raise Exception('No output data (simulation not run)')
 
