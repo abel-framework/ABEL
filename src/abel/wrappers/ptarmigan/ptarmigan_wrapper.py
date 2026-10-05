@@ -2,13 +2,13 @@ import numpy as np
 import os, subprocess
 from string import Template
 
-def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg):
+def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by):
 
     # define inputs
     inputs = {'dt_multiplier': float(0.5), 
               'radiation_reaction': 'true', 
               'pair_creation': 'true',
-              'increase_pair_rate_by': 1.0e4,
+              'increase_pair_rate_by': increase_pair_rate_by,
               'laser_a0': float(laser_a0),
               'laser_wavelength_um': laser_wavelength*1e6,
               'laser_duration_fs': laser_duration*1e15,
@@ -38,7 +38,7 @@ def ptarmigan_run(filename_input, runfolder=None, quiet=False):
         runfolder = os.path.dirname(filename_input)
 
     # executable
-    ptarmigan_binary_loc = '/Users/carlal/UiO/Code/software/ptarmigan/target/release/'
+    ptarmigan_binary_loc = '/Users/carlal/UiO/Code/software/ptarmigan/target/release/' # TODO: make this configurable
 
     # run system command
     cmd = ptarmigan_binary_loc + 'ptarmigan ' + filename_input
@@ -47,10 +47,88 @@ def ptarmigan_run(filename_input, runfolder=None, quiet=False):
     else:
         stdout = None
     subprocess.call(cmd, shell=True, stdout=stdout)
-    
-    # run process
-    #process = subprocess.Popen([ptarmigan_binary, filename_input], cwd=runfolder, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True, bufsize=1, universal_newlines=True)
-    # process.stdout.close()
 
+
+def ptarmigan_extract_outputs(filename_output):
+
+    from types import SimpleNamespace
+    import h5py
     
 
+    # declare the output structure
+    output = SimpleNamespace()
+    
+    with h5py.File(filename_output, 'r') as f:
+
+        # extract configuration info
+        config = f['config']
+
+        # find the units
+        unit_pos = config['unit/position'][()].decode('utf-8')
+        if str(unit_pos) == 'mm':
+            scale_pos = 1e-3 # convert to [m]
+        else:
+            raise Exception('Unknown position unit')
+        
+        unit_mom = config['unit/momentum'][()].decode('utf-8')
+        if str(unit_mom) == 'GeV/c':
+            scale_mom = 1e9 # convert to [eV/m]
+        else:
+            raise Exception('Unknown momentum unit')
+
+        # get the initial beam particle number (for sorting)
+        num_particles_input = config['beam/n'][()]
+        
+        # get the final-state dataset (all particles)
+        dataset = f['final-state']
+        
+        # get the electron data
+        output.electron = SimpleNamespace()
+        output.electron.x = dataset['electron/position'][()][:,1]*scale_pos
+        output.electron.y = dataset['electron/position'][()][:,2]*scale_pos
+        output.electron.z = dataset['electron/position'][()][:,0]*scale_pos
+        output.electron.px = dataset['electron/momentum'][()][:,1]*scale_mom
+        output.electron.py = dataset['electron/momentum'][()][:,2]*scale_mom
+        output.electron.pz = dataset['electron/momentum'][()][:,0]*scale_mom
+        output.electron.weights = dataset['electron/weight'][()]
+        output.electron.n_gamma = dataset['electron/n_gamma'][()]
+        output.electron.ids = dataset['electron/id'][()]
+        output.electron.parent_ids = dataset['electron/parent_id'][()]
+        output.electron.input_beam_mask = output.electron.ids < num_particles_input
+
+        # get the positron data
+        output.positron = SimpleNamespace()
+        output.positron.x = dataset['positron/position'][()][:,1]*scale_pos
+        output.positron.y = dataset['positron/position'][()][:,2]*scale_pos
+        output.positron.z = dataset['positron/position'][()][:,0]*scale_pos
+        output.positron.px = dataset['positron/momentum'][()][:,1]*scale_mom
+        output.positron.py = dataset['positron/momentum'][()][:,2]*scale_mom
+        output.positron.pz = dataset['positron/momentum'][()][:,0]*scale_mom
+        output.positron.weights = dataset['positron/weight'][()]
+        output.positron.n_gamma = dataset['positron/n_gamma'][()]
+        output.positron.ids = dataset['positron/id'][()]
+        output.positron.parent_ids = dataset['positron/parent_id'][()]
+        output.positron.input_beam_mask = output.positron.ids < num_particles_input
+
+        # get the laser data
+        output.laser = SimpleNamespace()
+        output.laser.a0 = config['laser/a0'][()]
+        output.laser.fwhm_duration = config['laser/fwhm_duration'][()]
+        output.laser.waist = config['laser/waist'][()]
+        output.laser.polarization = config['laser/polarization'][()]
+        output.laser.wavelength = config['laser/wavelength'][()]
+        output.laser.absorption = dataset['laser/absorption'][()]
+        output.laser.energy = dataset['laser/energy'][()]
+
+        # get the beam data
+        output.beam = SimpleNamespace()
+        output.beam.num_particles = config['beam/n'][()]
+
+        # get the photon data
+        output.photon = SimpleNamespace()
+        output.photon.a0_at_creation = dataset['photon/a0_at_creation'][()]
+        output.photon.parent_chi = dataset['photon/parent_chi'][()]
+        output.photon.weights = dataset['photon/weight'][()]
+
+    return output
+    

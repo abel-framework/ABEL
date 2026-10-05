@@ -5,19 +5,27 @@
 # License: GPL-3.0-or-later
 
 from abel.classes.target.sfqed import TargetSFQED
-import os, uuid
+import os, uuid, shutil
 from abel.CONFIG import CONFIG
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy.constants as SI
 
 class TargetSFQEDPtarmigan(TargetSFQED):
     
-    def __init__(self, laser_a0=None, laser_waist_size=None, laser_duration=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0):
+    def __init__(self, laser_a0=None, laser_waist_size=None, laser_duration=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, increase_pair_rate_by=1e4):
         
         super().__init__(laser_a0=laser_a0, laser_waist_size=laser_waist_size, laser_duration=laser_duration, laser_wavelength=laser_wavelength, laser_polarization=laser_polarization, collision_angle_deg=collision_angle_deg)
 
+        # simulation flags
+        self.increase_pair_rate_by = increase_pair_rate_by
+
+        # output
+        self.output = None
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
 
-        from abel.wrappers.ptarmigan.ptarmigan_wrapper import ptarmigan_write_inputs, ptarmigan_run
+        from abel.wrappers.ptarmigan.ptarmigan_wrapper import ptarmigan_write_inputs, ptarmigan_run, ptarmigan_extract_outputs
 
         ## PREPARE TEMPORARY FOLDER
         
@@ -35,15 +43,92 @@ class TargetSFQEDPtarmigan(TargetSFQED):
         path_input = os.path.join(tmpfolder, filename_input)
         
         # make input file
-        ptarmigan_write_inputs(path_input, beam, self.laser_a0, self.laser_wavelength, self.laser_duration, self.laser_waist_size, self.laser_polarization, self.collision_angle_deg)
+        ptarmigan_write_inputs(path_input, beam, self.laser_a0, self.laser_wavelength, self.laser_duration, self.laser_waist_size, self.laser_polarization, self.collision_angle_deg, self.increase_pair_rate_by)
 
         # perform ptarmigan simulation
         ptarmigan_run(path_input)
 
-        # TODO: extract the information from the H5 file
+        # extract the information from the H5 file
+        filename_output = 'ptarmigan_particles.h5'
+        path_output = os.path.join(tmpfolder, filename_output)
+        self.output = ptarmigan_extract_outputs(path_output)
+
+        # delete the simulation folder
+        shutil.rmtree(tmpfolder)
         
         return super().track(beam, savedepth, runnable, verbose)
 
     
     def peak_chi(self):
-        return None
+        if self.output is not None:
+            return max(self.output.photon.parent_chi)
+        else:
+            return None
+
+    
+    def plot_beam_spectrum(self):
+        if self.output is not None:
+            
+            beam_mask = self.output.electron.ids < self.output.beam.num_particles
+            
+            num_bins = round(np.sqrt(self.output.beam.num_particles))
+            bins = np.linspace(0, max(self.output.electron.pz)/1e9, num_bins)
+            
+            fig, ax = plt.subplots(1, 1)
+            fig.set_figwidth(CONFIG.plot_width_default*0.8)
+            fig.set_figheight(CONFIG.plot_width_default*0.5)
+            
+            ax.hist(self.output.electron.pz[beam_mask]/1e9, weights=self.output.electron.weights[beam_mask], bins=bins)
+            ax.set_xlabel('Energy (GeV)')
+            ax.set_ylabel('Spectral density (a.u.)')
+            ax.set_title('Beam electron spectrum')
+            
+        else:
+            raise Exception('No output data (simulation not run)')
+
+    
+    def plot_pair_spectrum(self):
+        if self.output is not None:
+            
+            num_bins = round(np.sqrt(self.output.beam.num_particles))
+            bins = np.linspace(0, max(self.output.electron.pz)/1e9, num_bins)
+
+            pair_mask = self.output.electron.ids > self.output.beam.num_particles
+            weights_e = self.output.electron.weights[pair_mask]
+            weights_p = self.output.positron.weights
+            
+            fig, ax = plt.subplots(1, 1)
+            fig.set_figwidth(CONFIG.plot_width_default*0.8)
+            fig.set_figheight(CONFIG.plot_width_default*0.5)
+
+            charge_e = sum(weights_e)*SI.e
+            charge_p = sum(weights_p)*SI.e
+            
+            ax.hist(self.output.electron.pz[pair_mask]/1e9, weights=weights_e, bins=bins, color='tab:blue', label=f'Pair electrons ({charge_e/1e-9:.1e} pC)')
+            ax.hist(self.output.positron.pz/1e9, weights=weights_p, bins=bins, color='tab:orange', label=f'Pair positrons ({charge_p/1e-9:.1e} pC)')
+            ax.set_ylabel('Spectral density (a.u.)')
+            ax.set_xlabel('Energy (GeV)')
+            ax.legend()
+            ax.set_title('Electron—positron pair spectrum')
+            
+        else:
+            raise Exception('No output data (simulation not run)')
+
+    
+    def plot_photon_chis(self):
+        if self.output is not None:
+            
+            num_bins = round(np.sqrt(len(self.output.photon.parent_chi)))
+
+            fig, ax = plt.subplots(1, 1)
+            fig.set_figwidth(CONFIG.plot_width_default*0.8)
+            fig.set_figheight(CONFIG.plot_width_default*0.5)
+            
+            ax.hist(self.output.photon.parent_chi, weights=self.output.photon.weights, bins=num_bins, color='tab:green')
+            ax.set_xlabel('χ at production')
+            ax.set_ylabel('Frequency (per bin)')
+            ax.set_title('Photon production')
+            
+        else:
+            raise Exception('No output data (simulation not run)')
+    
