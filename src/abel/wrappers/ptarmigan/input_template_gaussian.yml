@@ -29,6 +29,6 @@ beam:
 output:
   ident: auto
   dump_all_particles: hdf5
-  discard_background_e: true
+  discard_background_e: false
   coordinate_system: beam
   units: hep
