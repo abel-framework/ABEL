@@ -5,39 +5,28 @@
 # License: GPL-3.0-or-later
 
 from abel.classes.target.sfqed import TargetSFQED
-import numpy as np
-from scipy import constants as SI
 
 class TargetSFQEDBasic(TargetSFQED):
     
-    def __init__(self, laser_a0=None, laser_waist_size=None, laser_duration=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0):
+    def __init__(self, laser_a0=None, laser_waist_size=None, laser_duration=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, nom_energy=None):
         
-        super().__init__(laser_a0=laser_a0, laser_waist_size=laser_waist_size, laser_duration=laser_duration, laser_wavelength=laser_wavelength, laser_polarization=laser_polarization, collision_angle_deg=collision_angle_deg)
+        super().__init__(laser_a0=laser_a0, laser_waist_size=laser_waist_size, laser_duration=laser_duration, laser_wavelength=laser_wavelength, laser_polarization=laser_polarization, collision_angle_deg=collision_angle_deg, nom_energy=nom_energy)
 
         self.__peak_chi = None
         
     
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
-        
-        # collision angle in radians
-        theta = self.collision_angle_deg*np.pi/180
-        
-        # laser angular frequency in [rad/s]
-        omega_laser = 2*np.pi*SI.c/ self.laser_wavelength
-        
-        # energy parameter
-        eta = beam.gamma() * SI.hbar * omega_laser * (1 + np.cos(theta)) / (SI.m_e * SI.c**2)
-        
-        # quantum parameter
-        chi = self.laser_a0 * eta
-        
-        self.__peak_chi = chi
 
+        # if not externally set, set the nominal energy
+        if self.nom_energy is None:
+            self.nom_energy = beam.energy()
+            
         # calculate peak chi based on beam and laser parameters
+        self.__peak_chi = self.peak_chi_ideal(beam)
         
         return super().track(beam, savedepth, runnable, verbose)
 
     
     def peak_chi(self):
-        if self.__peak_chi is not None:
-            return self.__peak_chi
+        return self.__peak_chi
+    

@@ -6,11 +6,13 @@
 
 from abel.classes.target import Target
 from abc import abstractmethod
+import numpy as np
+from scipy import constants as SI
 
 class TargetSFQED(Target):
 
     @abstractmethod
-    def __init__(self, laser_a0, laser_waist_size, laser_duration, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0):
+    def __init__(self, laser_a0, laser_waist_size, laser_duration, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, nom_energy=None):
         """
         Abstract base class for SFQED targets.
 
@@ -45,6 +47,7 @@ class TargetSFQED(Target):
         self.laser_wavelength = laser_wavelength
         self.laser_polarization = laser_polarization
         self.collision_angle_deg = collision_angle_deg
+        self.nom_energy = nom_energy
         
     
     @abstractmethod
@@ -55,6 +58,30 @@ class TargetSFQED(Target):
     def peak_chi(self):
         pass
 
+    
+    def peak_chi_ideal(self):
+
+        if self.nom_energy is not None:
+            
+            # collision angle in radians
+            theta = self.collision_angle_deg*np.pi/180
+            
+            # laser angular frequency in [rad/s]
+            omega_laser = 2*np.pi*SI.c/ self.laser_wavelength
+            
+            # energy parameter (using the beam's mean energy)
+            from abel.utilities.relativity import energy2gamma
+            eta = energy2gamma(self.nom_energy) * SI.hbar * omega_laser * (1 + np.cos(theta)) / (SI.m_e * SI.c**2)
+            
+            # quantum parameter
+            chi = self.laser_a0 * eta
+            return chi
+            
+        else:
+            
+            return None
+    
+            
     def get_length(self):
         return 0.0
         
