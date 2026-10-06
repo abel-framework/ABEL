@@ -16,15 +16,11 @@ laser:
   polarization: $laser_polarization
 
 beam:
-  n: $num_particles
-  species: electron
-  charge: $bunch_population * e
-  gamma: $gamma
-  sigma: $rel_energy_spread * $gamma
-  radius: [$beam_size_um * micro, normally_distributed]
-  length: $bunch_length_um * micro
   collision_angle: $collision_angle_deg * degree
-  rms_divergence: $divergence_urad * micro
+  from_hdf5:
+    file: $beam_file
+    distance_bt_ips: 0.0
+  
 
 output:
   ident: auto
