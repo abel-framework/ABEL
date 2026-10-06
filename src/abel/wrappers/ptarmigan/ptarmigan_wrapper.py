@@ -3,7 +3,7 @@ import os, subprocess
 from string import Template
 from abel.CONFIG import CONFIG
 
-def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by, enable_radiation_reaction=True, enable_pair_creation=True, enable_lcfa=None):
+def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by=None, enable_radiation_reaction=True, enable_pair_creation=True, enable_polarization_resolved=True, enable_lcfa=None, enable_classical=False, dt_multiplier=1.0):
 
     # write beam to file
     filename_beam = 'beam.h5'
@@ -13,13 +13,21 @@ def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, las
     # by default, use LCFA (instead of LMA) when the laser a0 is very high
     if enable_lcfa is None:
         enable_lcfa = laser_a0 > 20.0
+
+    if increase_pair_rate_by is None:
+        increase_pair_rate_by_text = 'auto'
+    else:
+        increase_pair_rate_by_text = increase_pair_rate_by
     
     # define inputs
-    inputs = {'dt_multiplier': float(0.5), 
+    inputs = {'dt_multiplier': float(dt_multiplier), 
+              'rng_seed': int(0),
               'radiation_reaction': ptarmigan_true_false(enable_radiation_reaction), 
               'pair_creation': ptarmigan_true_false(enable_pair_creation),
+              'pol_resolved': ptarmigan_true_false(enable_polarization_resolved),
               'lcfa': ptarmigan_true_false(enable_lcfa),
-              'increase_pair_rate_by': increase_pair_rate_by,
+              'classical': ptarmigan_true_false(enable_classical), # can also be set to 'gaunt_factor_corrected' (semi-classical)
+              'increase_pair_rate_by': increase_pair_rate_by_text,
               'laser_a0': float(laser_a0),
               'laser_wavelength_um': laser_wavelength*1e6,
               'laser_duration_fs': laser_duration*1e15,

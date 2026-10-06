@@ -5,8 +5,10 @@ control:
   dt_multiplier: $dt_multiplier
   radiation_reaction: $radiation_reaction
   pair_creation: $pair_creation
-  rng_seed: 0
+  pol_resolved: $pol_resolved
+  rng_seed: $rng_seed
   lcfa: $lcfa
+  classical: $classical
   increase_pair_rate_by: $increase_pair_rate_by
 
 laser:
