@@ -6,6 +6,7 @@ control:
   radiation_reaction: $radiation_reaction
   pair_creation: $pair_creation
   rng_seed: 0
+  lcfa: $lcfa
   increase_pair_rate_by: $increase_pair_rate_by
 
 laser:

@@ -3,17 +3,22 @@ import os, subprocess
 from string import Template
 from abel.CONFIG import CONFIG
 
-def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by):
+def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by, enable_radiation_reaction=True, enable_pair_creation=True, enable_lcfa=None):
 
     # write beam to file
     filename_beam = 'beam.h5'
     filepath_beam = os.path.join(os.path.dirname(filename_input), 'beam.h5')
     beam2ptarmigan_h5(beam, filepath_beam)
+
+    # by default, use LCFA (instead of LMA) when the laser a0 is very high
+    if enable_lcfa is None:
+        enable_lcfa = laser_a0 > 20.0
     
     # define inputs
     inputs = {'dt_multiplier': float(0.5), 
-              'radiation_reaction': 'true', 
-              'pair_creation': 'true',
+              'radiation_reaction': ptarmigan_true_false(enable_radiation_reaction), 
+              'pair_creation': ptarmigan_true_false(enable_pair_creation),
+              'lcfa': ptarmigan_true_false(enable_lcfa),
               'increase_pair_rate_by': increase_pair_rate_by,
               'laser_a0': float(laser_a0),
               'laser_wavelength_um': laser_wavelength*1e6,
@@ -29,6 +34,13 @@ def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, las
     with open(filename_input_template, 'r') as fin, open(filename_input, 'w') as fout:
         results = Template(fin.read()).substitute(inputs)
         fout.write(results)
+
+
+def ptarmigan_true_false(value):
+    if value:
+        return 'true'
+    else:
+        return 'false'
 
 
 def ptarmigan_run(filename_input, runfolder=None, quiet=False):
