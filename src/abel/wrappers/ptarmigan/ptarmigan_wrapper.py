@@ -53,17 +53,53 @@ def ptarmigan_true_false(value):
 
 def ptarmigan_run(filename_input, runfolder=None, quiet=False):
 
+    import time
+    from tqdm import tqdm
+    import sys
+
     # extract runfolder from job script name
-    if runfolder == None:
+    if runfolder is None:
         runfolder = os.path.dirname(filename_input)
     
     # run system command
     cmd = CONFIG.ptarmigan_binary + ' ' + filename_input
-    if not quiet:
-        stdout = subprocess.DEVNULL
-    else:
-        stdout = None
-    subprocess.call(cmd, shell=True, stdout=stdout)
+    output_file = os.path.join(runfolder, 'output.txt')
+    with open(output_file, 'w') as f:
+
+        # start parallel process
+        process = subprocess.Popen(cmd, stdout=f, shell=True)
+
+        # progress bar
+        with tqdm(total=100, unit='%', desc='Running Ptarmigan', leave=True, colour='green', file=sys.stdout) as pbar:
+
+            # set initial value
+            pbar.update(0)
+
+            # update the progress bar continuously
+            while process.poll() is None:
+                with open(output_file, 'r') as f2:
+                    last_line = None
+                    for line in f2:
+                        last_line = line
+                    if last_line is None:
+                        continue
+                    split_line = last_line.split(' ')
+                    cleaned_line = [s for s in split_line if s.strip()]
+                    if cleaned_line[0] == 'Done':
+                        num_done = int(cleaned_line[1])
+                        num_tot = int(cleaned_line[3])
+                        progress = round(num_done/num_tot*100)
+                        pbar.update(progress - pbar.n)
+                
+                # wait for some time
+                wait_time = 1 # [s]
+                time.sleep(wait_time)
+
+            # finalize the value
+            pbar.update(100 - pbar.n)
+            pbar.set_description('Finished Ptarmigan')
+            pbar.close()
+                
 
 
 def ptarmigan_extract_outputs(filename_output):
