@@ -178,8 +178,8 @@ class TargetSFQEDPtarmigan(TargetSFQED):
             charge_e = sum(weights_e)*SI.e
             charge_p = sum(weights_p)*SI.e
             
-            ax.hist(self.output.electron.pz[pair_mask]/1e9, weights=weights_e, bins=bins, color='tab:blue', label=f'Pair electrons ({charge_e/1e-9:.1e} pC)')
-            ax.hist(self.output.positron.pz/1e9, weights=weights_p, bins=bins, color='tab:orange', label=f'Pair positrons ({charge_p/1e-9:.1e} pC)')
+            ax.hist(self.output.electron.pz[pair_mask]/1e9, weights=weights_e, bins=bins, color='tab:blue', label=f'Pair electrons ({charge_e/1e-12:.1e} pC)')
+            ax.hist(self.output.positron.pz/1e9, weights=weights_p, bins=bins, color='tab:orange', label=f'Pair positrons ({charge_p/1e-12:.1e} pC)')
             ylims = ax.get_ylim()
             ax.plot(self.nom_energy*np.ones(2)/1e9, ax.get_ylim(), 'k:', label='Nominal energy')
             ax.set_ylim(ylims)
