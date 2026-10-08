@@ -67,7 +67,7 @@ class TargetSFQEDPtarmigan(TargetSFQED):
         mask = self.output.electron.input_beam_mask
         beam_out.set_xs(self.output.electron.x[mask])
         beam_out.set_ys(self.output.electron.y[mask])
-        beam_out.set_zs(self.output.electron.z[mask]) # TODO: fix this parameter
+        beam_out.set_zs(self.output.electron.z[mask])
         beam_out.set_uxs(self.output.electron.px[mask]/SI.m_e*SI.e/SI.c)
         beam_out.set_uys(self.output.electron.py[mask]/SI.m_e*SI.e/SI.c)
         beam_out.set_uzs(self.output.electron.pz[mask]/SI.m_e*SI.e/SI.c)
