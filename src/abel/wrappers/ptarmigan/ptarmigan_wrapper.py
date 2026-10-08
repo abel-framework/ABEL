@@ -52,8 +52,6 @@ def ptarmigan_true_false(value):
     """
     Convert a boolean (or string) to the expected YAML input format.
     """
-    if isinstance(value, tuple):
-        value = value[0]
     if isinstance(value, bool):
         if value:
             return 'true'
