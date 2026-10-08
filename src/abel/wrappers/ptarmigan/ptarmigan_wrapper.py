@@ -2,20 +2,24 @@ import numpy as np
 import os, subprocess
 from string import Template
 from abel.CONFIG import CONFIG
+from scipy import constants as SI
 
-def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by=None, enable_radiation_reaction=True, enable_pair_creation=True, enable_polarization_resolved=True, enable_lcfa=None, enable_classical=False, dt_multiplier=1.0):
-
+def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration_fwhm, laser_waist_radius, laser_polarization, collision_angle_deg, increase_pair_rate_by=None, enable_radiation_reaction=True, enable_pair_creation=True, enable_polarization_resolved=True, use_lcfa=False, use_classical=False, dt_multiplier=1.0):
+    """
+    Write the Ptarmigan simulation deck file based on inputs.
+    """
+    
     # write beam to file
     filename_beam = 'beam.h5'
     filepath_beam = os.path.join(os.path.dirname(filename_input), 'beam.h5')
     beam2ptarmigan_h5(beam, filepath_beam)
 
     # by default, use LCFA (instead of LMA) when the laser a0 is very high
-    if enable_lcfa is None:
-        enable_lcfa = laser_a0 > 20.0
+    if laser_a0 > 20.0:
+        use_lcfa = True
 
     if increase_pair_rate_by is None:
-        increase_pair_rate_by_text = 'auto'
+        increase_pair_rate_by_text = 1e4 # 'auto' # TODO: make automatic
     else:
         increase_pair_rate_by_text = increase_pair_rate_by
     
@@ -25,13 +29,13 @@ def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, las
               'radiation_reaction': ptarmigan_true_false(enable_radiation_reaction), 
               'pair_creation': ptarmigan_true_false(enable_pair_creation),
               'pol_resolved': ptarmigan_true_false(enable_polarization_resolved),
-              'lcfa': ptarmigan_true_false(enable_lcfa),
-              'classical': ptarmigan_true_false(enable_classical), # can also be set to 'gaunt_factor_corrected' (semi-classical)
+              'lcfa': ptarmigan_true_false(use_lcfa),
+              'classical': ptarmigan_true_false(use_classical), # can also be set to 'gaunt_factor_corrected' (semi-classical)
               'increase_pair_rate_by': increase_pair_rate_by_text,
               'laser_a0': float(laser_a0),
               'laser_wavelength_um': laser_wavelength*1e6,
-              'laser_duration_fs': laser_duration*1e15,
-              'laser_waist_size_um': laser_waist_size*1e6,
+              'laser_duration_fs': laser_duration_fwhm*1e15,
+              'laser_waist_size_um': laser_waist_radius*1e6,
               'laser_polarization': laser_polarization,
               'beam_file': filename_beam,
               'collision_angle_deg': collision_angle_deg}
@@ -45,14 +49,22 @@ def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, las
 
 
 def ptarmigan_true_false(value):
-    if value:
-        return 'true'
+    """
+    Convert a boolean (or string) to the expected YAML input format.
+    """
+    if isinstance(value, bool):
+        if value:
+            return 'true'
+        else:
+            return 'false'
     else:
-        return 'false'
+        return value
 
 
-def ptarmigan_run(filename_input, runfolder=None, quiet=False):
-
+def ptarmigan_run(filename_input, runfolder=None, quiet=False, num_particles=None, verbose=True):
+    """
+    Run Ptarmigan
+    """
     import time
     from tqdm import tqdm
     import sys
@@ -66,44 +78,55 @@ def ptarmigan_run(filename_input, runfolder=None, quiet=False):
     output_file = os.path.join(runfolder, 'output.txt')
     with open(output_file, 'w') as f:
 
-        # start parallel process
-        process = subprocess.Popen(cmd, stdout=f, shell=True)
-
-        # progress bar
-        with tqdm(total=100, unit='%', desc='Running Ptarmigan', leave=True, colour='green', file=sys.stdout) as pbar:
-
-            # set initial value
-            pbar.update(0)
-
-            # update the progress bar continuously
-            while process.poll() is None:
-                with open(output_file, 'r') as f2:
-                    last_line = None
-                    for line in f2:
-                        last_line = line
-                    if last_line is None:
-                        continue
-                    split_line = last_line.split(' ')
-                    cleaned_line = [s for s in split_line if s.strip()]
-                    if cleaned_line[0] == 'Done':
-                        num_done = int(cleaned_line[1])
-                        num_tot = int(cleaned_line[3])
-                        progress = round(num_done/num_tot*100)
-                        pbar.update(progress - pbar.n)
+        if verbose:
                 
-                # wait for some time
-                wait_time = 1 # [s]
-                time.sleep(wait_time)
-
-            # finalize the value
-            pbar.update(100 - pbar.n)
-            pbar.set_description('Finished Ptarmigan')
-            pbar.close()
-                
+            # start parallel process
+            process = subprocess.Popen(cmd, stdout=f, shell=True)
+            
+            # progress bar
+            if num_particles is None:
+                num_particles = 1
+    
+            with tqdm(total=num_particles, unit=' particles', desc='Running Ptarmigan', leave=True, colour='green', file=sys.stdout) as pbar:
+    
+                # set initial value
+                pbar.update(0)
+    
+                # update the progress bar continuously
+                while process.poll() is None:
+                    with open(output_file, 'r') as f2:
+                        last_line = None
+                        for line in f2:
+                            last_line = line
+                        if last_line is None:
+                            continue
+                        split_line = last_line.split(' ')
+                        cleaned_line = [s for s in split_line if s.strip()]
+                        if cleaned_line[0] == 'Done':
+                            num_done = int(cleaned_line[1])
+                            num_particles = int(cleaned_line[3])
+                            pbar.total = num_particles
+                            pbar.n = num_done
+                            pbar.update(num_done - pbar.n)
+                    
+                    # wait for some time
+                    wait_time = 1 # [s]
+                    time.sleep(wait_time)
+    
+                # finalize the value
+                pbar.update(num_particles - pbar.n)
+                pbar.set_description('Finished Ptarmigan')
+                pbar.close()
+        
+        else:
+            subprocess.run(cmd, stdout=f, shell=True)
 
 
 def ptarmigan_extract_outputs(filename_output):
-
+    """
+    Extract the Ptarmigan simulation outputs from file.
+    """
+    
     from types import SimpleNamespace
     import h5py
 
@@ -138,10 +161,10 @@ def ptarmigan_extract_outputs(filename_output):
         output.electron = SimpleNamespace()
         output.electron.x = dataset['electron/position'][()][:,1]*scale_pos
         output.electron.y = dataset['electron/position'][()][:,2]*scale_pos
-        output.electron.z = dataset['electron/position'][()][:,0]*scale_pos
+        output.electron.z = (dataset['electron/position'][()][:,0]-dataset['electron/position'][()][:,3])*scale_pos
         output.electron.px = dataset['electron/momentum'][()][:,1]*scale_mom
         output.electron.py = dataset['electron/momentum'][()][:,2]*scale_mom
-        output.electron.pz = dataset['electron/momentum'][()][:,0]*scale_mom
+        output.electron.pz = dataset['electron/momentum'][()][:,3]*scale_mom
         output.electron.weights = dataset['electron/weight'][()]
         output.electron.n_gamma = dataset['electron/n_gamma'][()]
         output.electron.ids = dataset['electron/id'][()]
@@ -152,10 +175,10 @@ def ptarmigan_extract_outputs(filename_output):
         output.positron = SimpleNamespace()
         output.positron.x = dataset['positron/position'][()][:,1]*scale_pos
         output.positron.y = dataset['positron/position'][()][:,2]*scale_pos
-        output.positron.z = dataset['positron/position'][()][:,0]*scale_pos
+        output.positron.z = (dataset['positron/position'][()][:,0]-dataset['positron/position'][()][:,3])*scale_pos
         output.positron.px = dataset['positron/momentum'][()][:,1]*scale_mom
         output.positron.py = dataset['positron/momentum'][()][:,2]*scale_mom
-        output.positron.pz = dataset['positron/momentum'][()][:,0]*scale_mom
+        output.positron.pz = dataset['positron/momentum'][()][:,3]*scale_mom
         output.positron.weights = dataset['positron/weight'][()]
         output.positron.n_gamma = dataset['positron/n_gamma'][()]
         output.positron.ids = dataset['positron/id'][()]
@@ -222,10 +245,10 @@ def beam2ptarmigan_h5(beam, filename):
         momentum[:, 3] = beam.pzs()/scale_p
 
         # fill the position array
-        position[:, 0] = beam.zs()/scale_pos
+        position[:, 0] = np.zeros_like(beam.zs())
         position[:, 1] = beam.xs()/scale_pos
         position[:, 2] = beam.ys()/scale_pos
-        position[:, 3] = beam.zs()/scale_pos
+        position[:, 3] = -beam.zs()/scale_pos
 
         # fill the weight array
         weight[:] = beam.weightings()
@@ -244,7 +267,5 @@ def beam2ptarmigan_h5(beam, filename):
         particle_group.create_dataset('momentum', data=momentum)
         particle_group.create_dataset('position', data=position)
         particle_group.create_dataset('polarization', data=polarization)
-
     
-
     

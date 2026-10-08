@@ -12,7 +12,7 @@ from scipy import constants as SI
 class TargetSFQED(Target):
 
     @abstractmethod
-    def __init__(self, laser_a0, laser_waist_size, laser_duration, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, nom_energy=None):
+    def __init__(self, laser_a0, laser_waist_radius, laser_duration_fwhm, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, nom_energy=None):
         """
         Abstract base class for SFQED targets.
 
@@ -42,8 +42,8 @@ class TargetSFQED(Target):
         
         # common variables
         self.laser_a0 = laser_a0
-        self.laser_waist_size = laser_waist_size
-        self.laser_duration = laser_duration
+        self.laser_waist_radius = laser_waist_radius
+        self.laser_duration_fwhm = laser_duration_fwhm
         self.laser_wavelength = laser_wavelength
         self.laser_polarization = laser_polarization
         self.collision_angle_deg = collision_angle_deg
@@ -58,6 +58,18 @@ class TargetSFQED(Target):
     def peak_chi(self):
         pass
 
+
+    def laser_intensity(self):
+        K = 2*np.pi**2*(SI.epsilon_0*SI.m_e**2*SI.c**5/SI.e**2)
+        return K * (self.laser_a0 / self.laser_wavelength)**2
+
+    def laser_peak_power(self):
+        return (np.pi/2) * self.laser_waist_radius**2 * self.laser_intensity()
+        
+    def laser_energy(self):
+        return self.laser_peak_power() * self.laser_duration_fwhm * (2.35/2)
+        
+        
     
     def peak_chi_ideal(self):
 
@@ -80,7 +92,17 @@ class TargetSFQED(Target):
         else:
             
             return None
-    
+
+    def print_laser_parameters(self):
+        print('Laser parameters:')
+        print(f'> Wavelength:   {self.laser_wavelength*1e9:.0f} nm')
+        print(f'> a0:           {self.laser_a0:.1f}')
+        print(f'> Duration:     {self.laser_duration_fwhm*1e15:.0f} fs FWHM')
+        print(f'> Waist radius: {self.laser_waist_radius*1e6:.1f} µm')
+        print('------------------------------')
+        print(f'> Intensity:    {self.laser_intensity()/1e4:.2g} W/cm^2')
+        print(f'> Peak power:   {self.laser_peak_power()/1e15:.2f} PW')
+        print(f'> Energy:       {self.laser_energy():.2f} J')
             
     def get_length(self):
         return 0.0
