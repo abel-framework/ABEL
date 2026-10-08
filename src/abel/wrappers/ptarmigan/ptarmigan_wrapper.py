@@ -2,6 +2,7 @@ import numpy as np
 import os, subprocess
 from string import Template
 from abel.CONFIG import CONFIG
+from scipy import constants as SI
 
 def ptarmigan_write_inputs(filename_input, beam, laser_a0, laser_wavelength, laser_duration, laser_waist_size, laser_polarization, collision_angle_deg, increase_pair_rate_by=None, enable_radiation_reaction=True, enable_pair_creation=True, enable_polarization_resolved=True, enable_lcfa=None, enable_classical=False, dt_multiplier=1.0):
 
@@ -138,10 +139,10 @@ def ptarmigan_extract_outputs(filename_output):
         output.electron = SimpleNamespace()
         output.electron.x = dataset['electron/position'][()][:,1]*scale_pos
         output.electron.y = dataset['electron/position'][()][:,2]*scale_pos
-        output.electron.z = dataset['electron/position'][()][:,0]*scale_pos
+        output.electron.z = (dataset['electron/position'][()][:,0]-dataset['electron/position'][()][:,3])*scale_pos
         output.electron.px = dataset['electron/momentum'][()][:,1]*scale_mom
         output.electron.py = dataset['electron/momentum'][()][:,2]*scale_mom
-        output.electron.pz = dataset['electron/momentum'][()][:,0]*scale_mom
+        output.electron.pz = dataset['electron/momentum'][()][:,3]*scale_mom
         output.electron.weights = dataset['electron/weight'][()]
         output.electron.n_gamma = dataset['electron/n_gamma'][()]
         output.electron.ids = dataset['electron/id'][()]
@@ -152,10 +153,10 @@ def ptarmigan_extract_outputs(filename_output):
         output.positron = SimpleNamespace()
         output.positron.x = dataset['positron/position'][()][:,1]*scale_pos
         output.positron.y = dataset['positron/position'][()][:,2]*scale_pos
-        output.positron.z = dataset['positron/position'][()][:,0]*scale_pos
+        output.positron.z = (dataset['positron/position'][()][:,0]-dataset['positron/position'][()][:,3])*scale_pos
         output.positron.px = dataset['positron/momentum'][()][:,1]*scale_mom
         output.positron.py = dataset['positron/momentum'][()][:,2]*scale_mom
-        output.positron.pz = dataset['positron/momentum'][()][:,0]*scale_mom
+        output.positron.pz = dataset['positron/momentum'][()][:,3]*scale_mom
         output.positron.weights = dataset['positron/weight'][()]
         output.positron.n_gamma = dataset['positron/n_gamma'][()]
         output.positron.ids = dataset['positron/id'][()]
@@ -222,10 +223,10 @@ def beam2ptarmigan_h5(beam, filename):
         momentum[:, 3] = beam.pzs()/scale_p
 
         # fill the position array
-        position[:, 0] = beam.zs()/scale_pos
+        position[:, 0] = np.zeros_like(beam.zs())
         position[:, 1] = beam.xs()/scale_pos
         position[:, 2] = beam.ys()/scale_pos
-        position[:, 3] = beam.zs()/scale_pos
+        position[:, 3] = -beam.zs()/scale_pos
 
         # fill the weight array
         weight[:] = beam.weightings()
