@@ -8,9 +8,9 @@ from abel.classes.target.sfqed import TargetSFQED
 
 class TargetSFQEDBasic(TargetSFQED):
     
-    def __init__(self, laser_a0=None, laser_waist_size=None, laser_duration=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, nom_energy=None):
+    def __init__(self, laser_a0=None, laser_waist_radius=None, laser_duration_fwhm=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, nom_energy=None):
         
-        super().__init__(laser_a0=laser_a0, laser_waist_size=laser_waist_size, laser_duration=laser_duration, laser_wavelength=laser_wavelength, laser_polarization=laser_polarization, collision_angle_deg=collision_angle_deg, nom_energy=nom_energy)
+        super().__init__(laser_a0=laser_a0, laser_waist_radius=laser_waist_radius, laser_duration_fwhm=laser_duration_fwhm, laser_wavelength=laser_wavelength, laser_polarization=laser_polarization, collision_angle_deg=collision_angle_deg, nom_energy=nom_energy)
 
         self.__peak_chi = None
         

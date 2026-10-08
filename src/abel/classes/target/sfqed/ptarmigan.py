@@ -5,7 +5,7 @@
 # License: GPL-3.0-or-later
 
 from abel.classes.target.sfqed import TargetSFQED
-import os, uuid, shutil
+import os, uuid, shutil, copy
 from abel.CONFIG import CONFIG
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,9 +13,9 @@ import scipy.constants as SI
 
 class TargetSFQEDPtarmigan(TargetSFQED):
     
-    def __init__(self, laser_a0=None, laser_waist_size=None, laser_duration=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, increase_pair_rate_by=1e4, nom_energy=None):
+    def __init__(self, laser_a0=None, laser_waist_radius=None, laser_duration_fwhm=None, laser_wavelength=800e-9, laser_polarization='circular', collision_angle_deg=0.0, increase_pair_rate_by=1e4, nom_energy=None):
         
-        super().__init__(laser_a0=laser_a0, laser_waist_size=laser_waist_size, laser_duration=laser_duration, laser_wavelength=laser_wavelength, laser_polarization=laser_polarization, collision_angle_deg=collision_angle_deg, nom_energy=nom_energy)
+        super().__init__(laser_a0=laser_a0, laser_waist_radius=laser_waist_radius, laser_duration_fwhm=laser_duration_fwhm, laser_wavelength=laser_wavelength, laser_polarization=laser_polarization, collision_angle_deg=collision_angle_deg, nom_energy=nom_energy)
 
         # simulation flags
         self.increase_pair_rate_by = increase_pair_rate_by
@@ -49,7 +49,7 @@ class TargetSFQEDPtarmigan(TargetSFQED):
         # TODO: perform validity checks (based on https://github.com/tgblackburn/ptarmigan/blob/9e7caf793645b3fc6bef34ddd8808e367c7f7439/docs/physics.md)
         
         # make input file
-        ptarmigan_write_inputs(path_input, beam, self.laser_a0, self.laser_wavelength, self.laser_duration, self.laser_waist_size, self.laser_polarization, self.collision_angle_deg, self.increase_pair_rate_by)
+        ptarmigan_write_inputs(path_input, beam, self.laser_a0, self.laser_wavelength, self.laser_duration_fwhm, self.laser_waist_radius, self.laser_polarization, self.collision_angle_deg, self.increase_pair_rate_by)
 
         # perform ptarmigan simulation
         ptarmigan_run(path_input)
@@ -61,8 +61,18 @@ class TargetSFQEDPtarmigan(TargetSFQED):
 
         # delete the simulation folder
         shutil.rmtree(tmpfolder)
+
+        # update the output beam
+        beam_out = copy.deepcopy(beam)
+        mask = self.output.electron.input_beam_mask
+        beam_out.set_xs(self.output.electron.x[mask])
+        beam_out.set_ys(self.output.electron.y[mask])
+        beam_out.set_zs(self.output.electron.z[mask]) # TODO: fix this parameter
+        beam_out.set_uxs(self.output.electron.px[mask]/SI.m_e*SI.e/SI.c)
+        beam_out.set_uys(self.output.electron.py[mask]/SI.m_e*SI.e/SI.c)
+        beam_out.set_uzs(self.output.electron.pz[mask]/SI.m_e*SI.e/SI.c)
         
-        return super().track(beam, savedepth, runnable, verbose)
+        return super().track(beam_out, savedepth, runnable, verbose)
 
     
     def peak_chi(self):
