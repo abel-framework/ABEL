@@ -62,6 +62,7 @@ from .classes.interstage.plasma_lens.impactx import InterstagePlasmaLensImpactX
 from .classes.interstage.quads.basic import InterstageQuadsBasic
 from .classes.interstage.quads.impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
+from .classes.plasma_lens.impl.plasma_lens_impactx import PlasmaLensImpactX
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thick import PlasmaLensNonlinearThick
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
