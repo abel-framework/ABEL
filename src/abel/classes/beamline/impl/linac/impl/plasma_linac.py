@@ -10,6 +10,7 @@ from abel.classes.source.source import Source
 from abel.classes.stage.stage import Stage
 from abel.classes.interstage import Interstage
 from abel.classes.bds.bds import BeamDeliverySystem
+from abel.classes.target import Target
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.beamline.impl.driver_complex import DriverComplex
@@ -23,7 +24,7 @@ from matplotlib import pyplot as plt
 
 class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=True, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, target=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=True, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -33,6 +34,7 @@ class PlasmaLinac(Linac):
         self.stage = stage
         self.interstage = interstage
         self.bds = bds
+        self.target = target
         self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self._last_interstage = last_interstage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
@@ -193,6 +195,19 @@ class PlasmaLinac(Linac):
 
             # add to trackables
             self.trackables.append(self.bds)
+
+        # add target
+        if self.target is not None:
+            
+            # check type
+            assert(isinstance(self.target, Target))
+
+            # set the nominal energy
+            if self.target.nom_energy is None:
+                self.target.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in self.stages])
+
+            # add to trackables
+            self.trackables.append(self.target)
 
         # optimize the driver energy
         if self.optimize_driver_energy:
