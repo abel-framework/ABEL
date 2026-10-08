@@ -72,7 +72,7 @@ class PlasmaLensImpactX(PlasmaLens):
 
         # run ImpactX
         from abel.wrappers.impactx.impactx_wrapper import run_impactx
-        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=beam0.energy(), verbose=verbose, runnable=runnable)
+        beam, self.evolution = run_impactx(lattice, beam0, nom_energy=beam0.energy(), verbose=False, runnable=runnable)
 
         return super().track(beam, savedepth, runnable, verbose)
 
