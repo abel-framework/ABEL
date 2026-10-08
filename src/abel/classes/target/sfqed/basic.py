@@ -22,7 +22,7 @@ class TargetSFQEDBasic(TargetSFQED):
             self.nom_energy = beam.energy()
             
         # calculate peak chi based on beam and laser parameters
-        self.__peak_chi = self.peak_chi_ideal(beam)
+        self.__peak_chi = self.peak_chi_ideal()
         
         return super().track(beam, savedepth, runnable, verbose)
 
