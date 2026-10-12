@@ -14,15 +14,17 @@ class PlasmaLensFromFile(PlasmaLens):
     # interpolator objects are not always safe to serialize directly.
     def __getstate__(self):
         state = self.__dict__.copy()
-        state.pop('Bx_interpolator', None)
-        state.pop('By_interpolator', None)
+        state.pop('interpolator_Bx', None)
+        state.pop('interpolator_By', None)
         return state
 
     def __setstate__(self, state):
-        """Restore the field map and rebuild its interpolators after loading it."""
+        """Restore the field map and rebuild interpolators after loading."""
         self.__dict__.update(state)
-        self.set_discharge_time(self.selected_time)
 
+        if hasattr(self, 'data_Bx') and hasattr(self, 'selected_time'):
+            self.set_discharge_time(self.selected_time)
+        
     def __init__(self, filename_Bx=None, filename_By=None, discharge_time=None,
                  length=None, num_slice=None, offset_x=None, offset_y=None,
                  external_magnetic_field_x=None, external_magnetic_field_y=None,
@@ -82,11 +84,11 @@ class PlasmaLensFromFile(PlasmaLens):
             return self
         except Exception as exc:
             # Keep the original exception type and traceback, adding load context.
-            exc.add_note('PlasmaLensFromFile_edit.load() failed while configuring or loading the field map.')
+            exc.add_note('PlasmaLensFromFile.load() failed while configuring or loading the field map.')
             raise
 
     def _require_loaded(self):
-        if not hasattr(self, 'Bx_interpolator'):
+        if not hasattr(self, 'interpolator_Bx'):
             raise RuntimeError('Field maps are not loaded. Call load() first.')
 
     @staticmethod
@@ -118,33 +120,33 @@ class PlasmaLensFromFile(PlasmaLens):
         return data
 
     def _load_field_map(self):
-        self.bx_data = self._read_data(self.filename_Bx)
-        self.by_data = self._read_data(self.filename_By)
-        if self.bx_data.shape != self.by_data.shape:
-            raise ValueError(f'Bx and By files have different shapes: Bx={self.bx_data.shape}, By={self.by_data.shape}')
+        self.data_Bx = self._read_data(self.filename_Bx)
+        self.data_By = self._read_data(self.filename_By)
+        if self.data_Bx.shape != self.data_By.shape:
+            raise ValueError(f'Bx and By files have different shapes: Bx={self.data_Bx.shape}, By={self.data_By.shape}')
 
-        bx_times_raw = self._read_time_values(self.filename_Bx)
-        by_times_raw = self._read_time_values(self.filename_By)
-        if len(bx_times_raw) != len(by_times_raw):
+        data_Bx_time_values = self._read_time_values(self.filename_Bx)
+        data_By_time_values = self._read_time_values(self.filename_By)
+        if len(data_Bx_time_values) != len(data_By_time_values):
             raise ValueError('Bx and By contain different numbers of discharge times.')
-        if not np.allclose(bx_times_raw, by_times_raw, rtol=0.0, atol=1e-12):
+        if not np.allclose(data_Bx_time_values, data_By_time_values, rtol=0.0, atol=1e-12):
             raise ValueError('Bx and By contain different discharge times.')
 
-        self.available_times_raw = bx_times_raw.copy()
-        self.available_times = bx_times_raw * self.time_scale
-        self.x_all, self.y_all, self.z_all = self.bx_data[:, 0], self.bx_data[:, 1], self.bx_data[:, 2]
+        self.data_available_time_values = data_Bx_time_values.copy()
+        self.available_times = data_Bx_time_values * self.time_scale
+        self.x_all, self.y_all, self.z_all = self.data_Bx[:, 0], self.data_Bx[:, 1], self.data_Bx[:, 2]
         for axis, values in zip('xyz', (self.x_all, self.y_all, self.z_all)):
-            if not np.allclose(values, self.by_data[:, 'xyz'.index(axis)], rtol=0.0, atol=1e-15):
+            if not np.allclose(values, self.data_By[:, 'xyz'.index(axis)], rtol=0.0, atol=1e-15):
                 raise ValueError(f'Bx and By {axis} coordinates do not match.')
         expected_columns = 3 + len(self.available_times)
-        if self.bx_data.shape[1] != expected_columns:
+        if self.data_Bx.shape[1] != expected_columns:
             raise ValueError(
                 f'Unexpected number of columns in field map: expected {expected_columns}, '
-                f'found {self.bx_data.shape[1]}.')
+                f'found {self.data_Bx.shape[1]}.')
 
     def _calculate_map_radius(self):
-        valid_field = (np.any(np.isfinite(self.bx_data[:, 3:]), axis=1)
-                       | np.any(np.isfinite(self.by_data[:, 3:]), axis=1))
+        valid_field = (np.any(np.isfinite(self.data_Bx[:, 3:]), axis=1)
+                       | np.any(np.isfinite(self.data_By[:, 3:]), axis=1))
         if not np.any(valid_field):
             raise ValueError('No finite magnetic-field points were found in the imported map.')
         self.map_radius = float(np.max(np.hypot(self.x_all[valid_field], self.y_all[valid_field])))
@@ -152,25 +154,25 @@ class PlasmaLensFromFile(PlasmaLens):
             raise ValueError('Could not determine a positive radius from the imported field map.')
 
     def set_discharge_time(self, discharge_time):
-        if not hasattr(self, 'bx_data'):
+        if not hasattr(self, 'data_Bx'):
             raise RuntimeError('Field maps are not loaded. Call load() first.')
         discharge_time = float(discharge_time)
         self.time_index = int(np.argmin(np.abs(self.available_times - discharge_time)))
         self.discharge_time = discharge_time
         self.selected_time = float(self.available_times[self.time_index])
-        self.selected_time_raw = float(self.available_times_raw[self.time_index])
+        self.selected_time_raw = float(self.data_available_time_values[self.time_index])
         column = 3 + self.time_index
-        bx, by = self.bx_data[:, column], self.by_data[:, column]
-        valid = np.isfinite(self.x_all) & np.isfinite(self.y_all) & np.isfinite(bx) & np.isfinite(by)
+        Bx, By = self.data_Bx[:, column], self.data_By[:, column]
+        valid = np.isfinite(self.x_all) & np.isfinite(self.y_all) & np.isfinite(Bx) & np.isfinite(By)
         self.valid_mask = valid
-        self.x_map, self.y_map = self.x_all[valid], self.y_all[valid]
-        self.Bx_map, self.By_map = bx[valid], by[valid]
-        if len(self.x_map) < 3:
+        self.map_x, self.map_y = self.x_all[valid], self.y_all[valid]
+        self.map_Bx, self.map_By = Bx[valid], By[valid]
+        if len(self.map_x) < 3:
             raise ValueError(f'Fewer than three valid Bx/By points for discharge time {discharge_time}.')
-        points = np.column_stack((self.x_map, self.y_map))
+        points = np.column_stack((self.map_x, self.map_y))
         try:
-            self.Bx_interpolator = LinearNDInterpolator(points, self.Bx_map, fill_value=0.0)
-            self.By_interpolator = LinearNDInterpolator(points, self.By_map, fill_value=0.0)
+            self.interpolator_Bx = LinearNDInterpolator(points, self.map_Bx, fill_value=0.0)
+            self.interpolator_By = LinearNDInterpolator(points, self.map_By, fill_value=0.0)
         except Exception as exc:
             raise ValueError('Could not construct field interpolators; check for duplicate or degenerate map coordinates.') from exc
         return self.selected_time
@@ -184,15 +186,15 @@ class PlasmaLensFromFile(PlasmaLens):
 
     def get_discharge_times_raw(self):
         self._require_loaded()
-        return self.available_times_raw.copy()
+        return self.data_available_time_values.copy()
 
     def get_field(self, discharge_time=None, x=0.0, y=0.0):
         self._require_loaded()
         selected_time = self.set_discharge_time(discharge_time) if discharge_time is not None else self.selected_time
         x_local = -(np.asarray(x) - self.offset_x)
         y_local = np.asarray(y) - self.offset_y
-        Bx = np.nan_to_num(self.Bx_interpolator(x_local, y_local), nan=0.0)
-        By = np.nan_to_num(self.By_interpolator(x_local, y_local), nan=0.0)
+        Bx = np.nan_to_num(self.interpolator_Bx(x_local, y_local), nan=0.0)
+        By = np.nan_to_num(self.interpolator_By(x_local, y_local), nan=0.0)
         Bx = self.imported_magnetic_field_polarity * Bx + self.external_magnetic_field_x
         By = By + self.external_magnetic_field_y
         return selected_time, Bx, By
@@ -201,22 +203,22 @@ class PlasmaLensFromFile(PlasmaLens):
         self._require_loaded()
         if discharge_time is not None:
             self.set_discharge_time(discharge_time)
-        return (self.imported_magnetic_field_polarity * self.x_map.copy(), self.y_map.copy(),
-                self.imported_magnetic_field_polarity * self.Bx_map.copy() + self.external_magnetic_field_x,
-                self.By_map.copy() + self.external_magnetic_field_y, self.selected_time)
+        return (self.imported_magnetic_field_polarity * self.map_x.copy(), self.map_y.copy(),
+                self.imported_magnetic_field_polarity * self.map_Bx.copy() + self.external_magnetic_field_x,
+                self.map_By.copy() + self.external_magnetic_field_y, self.selected_time)
 
     def plot_field_map(self, figsize=(15, 9), marker_size=8, cmap='coolwarm'):
         import matplotlib.pyplot as plt
-        x_map, y_map, Bx_total, By_total, selected_time = self.get_field_map()
-        Bx_imported = Bx_total - self.external_magnetic_field_x
-        By_imported = By_total - self.external_magnetic_field_y
-        fields = [(Bx_imported, 'Imported $B_x$ [T]'), (By_imported, 'Imported $B_y$ [T]'),
-                  (np.hypot(Bx_imported, By_imported), 'Imported $|B|$ [T]'),
-                  (Bx_total, 'Total $B_x$ [T]'), (By_total, 'Total $B_y$ [T]'),
-                  (np.hypot(Bx_total, By_total), 'Total $|B|$ [T]')]
+        map_x, map_y, total_map_Bx, total_map_By, selected_time = self.get_field_map()
+        imported_map_Bx = total_map_Bx - self.external_magnetic_field_x
+        imported_map_By= total_map_By - self.external_magnetic_field_y
+        fields = [(imported_map_Bx, 'Imported $B_x$ [T]'), (imported_map_By, 'Imported $B_y$ [T]'),
+                  (np.hypot(imported_map_Bx, imported_map_By), 'Imported $|B|$ [T]'),
+                  (total_map_Bx, 'Total $B_x$ [T]'), (total_map_By, 'Total $B_y$ [T]'),
+                  (np.hypot(total_map_Bx, total_map_By), 'Total $|B|$ [T]')]
         fig, axes = plt.subplots(2, 3, figsize=figsize, constrained_layout=True)
         for ax, (values, title) in zip(axes.flat, fields):
-            points = ax.scatter(x_map * 1e6, y_map * 1e6, c=values, s=marker_size, cmap=cmap)
+            points = ax.scatter(map_x * 1e6, map_y * 1e6, c=values, s=marker_size, cmap=cmap)
             ax.set_title(title)
             ax.set_xlabel('x [µm]')
             ax.set_ylabel('y [µm]')
@@ -240,7 +242,7 @@ class PlasmaLensFromFile(PlasmaLens):
 
     def get_focusing_gradient(self):
         self._require_loaded()
-        extent = max(np.ptp(self.x_map), np.ptp(self.y_map))
+        extent = max(np.ptp(self.map_x), np.ptp(self.map_y))
         if extent <= 0:
             return 0.0
         dx = min(1e-6, 0.001 * extent)
@@ -255,10 +257,10 @@ class PlasmaLensFromFile(PlasmaLens):
         self._require_loaded()
         if discharge_time is not None:
             self.set_discharge_time(discharge_time)
-        x = self.imported_magnetic_field_polarity * self.x_map
-        y = self.y_map
-        Bx = self.imported_magnetic_field_polarity * self.Bx_map + self.external_magnetic_field_x
-        By = self.By_map + self.external_magnetic_field_y
+        x = self.imported_magnetic_field_polarity * self.map_x
+        y = self.map_y
+        Bx = self.imported_magnetic_field_polarity * self.map_Bx + self.external_magnetic_field_x
+        By = self.map_By + self.external_magnetic_field_y
         r = np.hypot(x, y)
         mask = r > 1e-12
         if not np.any(mask):
@@ -270,24 +272,24 @@ class PlasmaLensFromFile(PlasmaLens):
     def field_info(self):
         """Return field-map diagnostics without printing to the console."""
         self._require_loaded()
-        Bx_total = self.imported_magnetic_field_polarity * self.Bx_map + self.external_magnetic_field_x
-        By_total = self.By_map + self.external_magnetic_field_y
+        total_map_Bx = self.imported_magnetic_field_polarity * self.map_Bx + self.external_magnetic_field_x
+        total_map_By = self.map_By + self.external_magnetic_field_y
         return {
             'selected_time': self.selected_time,
             'raw_selected_time': self.selected_time_raw,
             'time_index': self.time_index,
-            'number_of_points': len(self.x_map),
+            'number_of_points': len(self.map_x),
             'map_radius': self.map_radius,
             'tracking_radius': self.radius,
             'length': self.length,
             'num_slice': self.num_slice,
-            'x_range': (float(self.x_map.min()), float(self.x_map.max())),
-            'y_range': (float(self.y_map.min()), float(self.y_map.max())),
+            'x_range': (float(self.map_x.min()), float(self.map_x.max())),
+            'y_range': (float(self.map_y.min()), float(self.map_y.max())),
             'imported_magnetic_field_polarity': self.imported_magnetic_field_polarity,
             'external_magnetic_field_x': self.external_magnetic_field_x,
             'external_magnetic_field_y': self.external_magnetic_field_y,
-            'Bx_range': (float(Bx_total.min()), float(Bx_total.max())),
-            'By_range': (float(By_total.min()), float(By_total.max())),
+            'Bx_range': (float(total_map_Bx.min()), float(total_map_Bx.max())),
+            'By_range': (float(total_map_By.min()), float(total_map_By.max())),
             'focusing_gradient': self.get_focusing_gradient(),
             'field_nonlinearity': self.get_relativistic_nonlinearity(),
         }
@@ -312,8 +314,8 @@ class PlasmaLensFromFile(PlasmaLens):
 
             x = -(beam.xs() - self.offset_x)
             y = beam.ys() - self.offset_y
-            Bx = np.nan_to_num(self.Bx_interpolator(x, y), nan=0.0)
-            By = np.nan_to_num(self.By_interpolator(x, y), nan=0.0)
+            Bx = np.nan_to_num(self.interpolator_Bx(x, y), nan=0.0)
+            By = np.nan_to_num(self.interpolator_By(x, y), nan=0.0)
             Bx = self.imported_magnetic_field_polarity * Bx + self.external_magnetic_field_x
             By = By + self.external_magnetic_field_y
             delta_xp = slice_length * By * beam.charge_sign() * SI.c / beam.Es()
