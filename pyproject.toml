@@ -1,18 +1,18 @@
 [build-system]
 # See https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
-requires = ["setuptools >= 61.0"]
+requires = ["setuptools >= 61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "abel"
-version = "1.0"
+name = "abel-framework"
+version = "2026.3.0"
 
 dependencies = [
    "numpy",
    "scipy",
    "numba",
    "tqdm",
-   "openpmd-api",
+   "openpmd-api >=0.16.1, <0.17",  # Newer versions break Beam.load(). See PR #196.
    "openpmd-viewer",
    "joblib",
    "joblib-progress",
@@ -20,11 +20,12 @@ dependencies = [
    "matplotlib",
    "PyQt6",
    "pyqtgraph",
-   "Wake-T",
-   "ax-platform",
+   "pytz",
+   "Wake-T == 0.8.0",
+   "ax-platform == 1.1.2",
    "CLICopti >= 2.2",
-   "RF-Track",
-   "impactx-noacc >= 25.6",
+   "RF-Track == 2.5.3",
+   "impactx-noacc >=26.5",
    "toml"
 ]
 requires-python = ">=3,<3.13"
@@ -67,4 +68,5 @@ markers = [
   "StageWakeT: Tests for the StageWakeT class",
   "presets: Tests for collider presets",
   "impactx: Tests for ImpactX",
+  "bds: Tests for BDS",
 ]

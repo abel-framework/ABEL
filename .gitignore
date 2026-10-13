@@ -69,10 +69,10 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+docs/sphinx-build/
 
 # PyBuilder
-target/
+# target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
