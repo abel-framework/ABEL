@@ -2,7 +2,7 @@
 import re
 import numpy as np
 import scipy.constants as SI
-from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import LinearNDInterpolator, interp1d
 from abel import PlasmaLens
 
 class PlasmaLensFromFile(PlasmaLens):
@@ -86,17 +86,24 @@ class PlasmaLensFromFile(PlasmaLens):
             # Keep the original exception type and traceback, adding load context.
             exc.add_note('PlasmaLensFromFile.load() failed while configuring or loading the field map.')
             raise
-
+        
     def _require_loaded(self):
-        if not hasattr(self, 'interpolator_Bx'):
-            raise RuntimeError('Field maps are not loaded. Call load() first.')
-
+        if not hasattr(self, 'interpolator_Bx') or not hasattr(self, 'interpolator_By'):
+            try:
+                self.load()
+            except Exception as exc:
+                raise RuntimeError(
+                    'Field maps could not be loaded automatically. '
+                    'Check the file paths and configuration.'
+                ) from exc 
+                
     @staticmethod
     def _read_time_values(filename):
         try:
             with open(filename, 'r') as file:
                 header_line = next(
-                    (line.strip() for line in file if line.strip().startswith('% x')), None)
+                    (line.strip() for line in file
+                     if line.strip().startswith('%') and '@ t' in line), None)
         except OSError as exc:
             raise OSError(f'Could not open field-map file: {filename}') from exc
         if header_line is None:
@@ -106,6 +113,21 @@ class PlasmaLensFromFile(PlasmaLens):
         if not matches:
             raise ValueError(f'No discharge times found in:\n{filename}')
         return np.asarray([float(value) for value in matches], dtype=float)
+
+    @staticmethod
+    def _coordinate_count(filename):
+        """Return the number of leading coordinate columns (2 or 3)."""
+        with open(filename, 'r') as file:
+            header = next((line.strip() for line in file
+                           if line.strip().startswith('%') and '@ t' in line), None)
+        if header is None:
+            raise ValueError(f'Could not find COMSOL header in:\n{filename}')
+        columns = header[1:].split()
+        if columns[:3] == ['x', 'y', 'z']:
+            return 3
+        if columns[:2] in (['x', 'y'], ['cpl1x', 'cpl1y']):
+            return 2
+        raise ValueError(f'Expected x/y or x/y/z coordinates in:\n{filename}')
 
     @staticmethod
     def _read_data(filename):
@@ -134,11 +156,16 @@ class PlasmaLensFromFile(PlasmaLens):
 
         self.data_available_time_values = data_Bx_time_values.copy()
         self.available_times = data_Bx_time_values * self.time_scale
-        self.x_all, self.y_all, self.z_all = self.data_Bx[:, 0], self.data_Bx[:, 1], self.data_Bx[:, 2]
-        for axis, values in zip('xyz', (self.x_all, self.y_all, self.z_all)):
-            if not np.allclose(values, self.data_By[:, 'xyz'.index(axis)], rtol=0.0, atol=1e-15):
+        self.coordinate_count = self._coordinate_count(self.filename_Bx)
+        if self.coordinate_count != self._coordinate_count(self.filename_By):
+            raise ValueError('Bx and By use different coordinate layouts.')
+        self.x_all, self.y_all = self.data_Bx[:, 0], self.data_Bx[:, 1]
+        self.z_all = self.data_Bx[:, 2] if self.coordinate_count == 3 else None
+        for index, axis in enumerate(('x', 'y', 'z')[:self.coordinate_count]):
+            values = self.data_Bx[:, index]
+            if not np.allclose(values, self.data_By[:, index], rtol=0.0, atol=1e-15):
                 raise ValueError(f'Bx and By {axis} coordinates do not match.')
-        expected_columns = 3 + len(self.available_times)
+        expected_columns = self.coordinate_count + len(self.available_times)
         if self.data_Bx.shape[1] != expected_columns:
             raise ValueError(
                 f'Unexpected number of columns in field map: expected {expected_columns}, '
@@ -161,7 +188,7 @@ class PlasmaLensFromFile(PlasmaLens):
         self.discharge_time = discharge_time
         self.selected_time = float(self.available_times[self.time_index])
         self.selected_time_raw = float(self.data_available_time_values[self.time_index])
-        column = 3 + self.time_index
+        column = self.coordinate_count + self.time_index
         Bx, By = self.data_Bx[:, column], self.data_By[:, column]
         valid = np.isfinite(self.x_all) & np.isfinite(self.y_all) & np.isfinite(Bx) & np.isfinite(By)
         self.valid_mask = valid
@@ -171,8 +198,25 @@ class PlasmaLensFromFile(PlasmaLens):
             raise ValueError(f'Fewer than three valid Bx/By points for discharge time {discharge_time}.')
         points = np.column_stack((self.map_x, self.map_y))
         try:
-            self.interpolator_Bx = LinearNDInterpolator(points, self.map_Bx, fill_value=0.0)
-            self.interpolator_By = LinearNDInterpolator(points, self.map_By, fill_value=0.0)
+            if np.ptp(self.map_x) > 1e-15 and np.ptp(self.map_y) > 1e-15:
+                self.interpolator_Bx = LinearNDInterpolator(points, self.map_Bx, fill_value=0.0)
+                self.interpolator_By = LinearNDInterpolator(points, self.map_By, fill_value=0.0)
+            else:
+                # Some COMSOL exports contain a 1D line (one transverse
+                # coordinate is constant), which cannot be triangulated in 2D.
+                axis = self.map_x if np.ptp(self.map_x) > 1e-15 else self.map_y
+                order = np.argsort(axis)
+                axis = axis[order]
+                bx, by = self.map_Bx[order], self.map_By[order]
+                if np.any(np.diff(axis) <= 0):
+                    raise ValueError('1D field-map coordinates must be unique.')
+                bx_interp = interp1d(axis, bx, bounds_error=False, fill_value=0.0)
+                by_interp = interp1d(axis, by, bounds_error=False, fill_value=0.0)
+                coordinate = 0 if np.ptp(self.map_x) > 1e-15 else 1
+                def line_interpolator(interp):
+                    return lambda x, y: interp(x if coordinate == 0 else y)
+                self.interpolator_Bx = line_interpolator(bx_interp)
+                self.interpolator_By = line_interpolator(by_interp)
         except Exception as exc:
             raise ValueError('Could not construct field interpolators; check for duplicate or degenerate map coordinates.') from exc
         return self.selected_time
