@@ -1847,7 +1847,7 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=False):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=False, spin_tracking=False):
         """
         Evolve the beam by solving Hill's equation in the x- and y direction 
         separately.
@@ -1871,6 +1871,9 @@ class Beam():
         
         probe_evolution : bool
             Flag for recording the beam parameter evolution. 
+
+        spin_tracking : bool
+            Flag for performing spin tracking.
 
 
         Returns
@@ -1946,6 +1949,26 @@ class Beam():
         # calculate final positions and angles after betatron motion
         if radiation_reaction:
             xs, uxs, ys, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.uxs(), self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+        elif spin_tracking:
+            
+            # transverse motion evolution using Hill's equation (to get particle orbits and energy evolution)
+            from abel.physics_models.spin_tracking import evolve_hills_equation_analytic_evolution
+            xs_all, uxs_all, gammas_all, ss = evolve_hills_equation_analytic_evolution(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
+            ys_all, uys_all, _, _ = evolve_hills_equation_analytic_evolution(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+            
+            # track spins
+            from abel.physics_models.spin_tracking import TBMT_spin_evolution
+            spxs, spys, spzs = TBMT_spin_evolution(self.spxs(), self.spys(), self.spzs(), k_p(n0), ss, xs_all, ys_all, uxs_all, uys_all, gammas_all)
+            self.set_spxs(spxs)
+            self.set_spys(spys)
+            self.set_spzs(spzs)
+            
+            # extract the final beam parameters
+            xs = xs_all[:,-1]
+            ys = ys_all[:,-1]
+            uxs = uxs_all[:,-1]
+            uys = uys_all[:,-1]
+            
         else:
             xs, uxs = evolve_hills_equation_analytic(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
             ys, uys = evolve_hills_equation_analytic(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
