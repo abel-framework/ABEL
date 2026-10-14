@@ -240,21 +240,24 @@ class PlasmaLensFromFile(PlasmaLens):
                 self.imported_magnetic_field_polarity * self.map_Bx.copy() + self.external_magnetic_field_x,
                 self.map_By.copy() + self.external_magnetic_field_y, self.selected_time)
 
-    def plot_field_map(self, figsize=(15, 9), marker_size=8, cmap='coolwarm'):
+    def plot_field_map(self, marker_size=8):
         import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
         map_x, map_y, total_map_Bx, total_map_By, selected_time = self.get_field_map()
         imported_map_Bx = total_map_Bx - self.external_magnetic_field_x
         imported_map_By= total_map_By - self.external_magnetic_field_y
-        fields = [(imported_map_Bx, 'Imported $B_x$ [T]'), (imported_map_By, 'Imported $B_y$ [T]'),
-                  (np.hypot(imported_map_Bx, imported_map_By), 'Imported $|B|$ [T]'),
-                  (total_map_Bx, 'Total $B_x$ [T]'), (total_map_By, 'Total $B_y$ [T]'),
-                  (np.hypot(total_map_Bx, total_map_By), 'Total $|B|$ [T]')]
+        fields = [(imported_map_Bx, 'Imported $B_x$ (T)'), (imported_map_By, 'Imported $B_y$ (T)'),
+                  (np.hypot(imported_map_Bx, imported_map_By), 'Imported $|B|$ (T)'),
+                  (total_map_Bx, 'Total $B_x$ (T)'), (total_map_By, 'Total $B_y$ (T)'),
+                  (np.hypot(total_map_Bx, total_map_By), 'Total $|B|$ (T)')]
+        figsize=(15, 9)
         fig, axes = plt.subplots(2, 3, figsize=figsize, constrained_layout=True)
         for ax, (values, title) in zip(axes.flat, fields):
-            points = ax.scatter(map_x * 1e6, map_y * 1e6, c=values, s=marker_size, cmap=cmap)
+            vmax = max(-min(values),max(values))
+            points = ax.scatter(map_x * 1e6, map_y * 1e6, c=values, s=marker_size, cmap='RdBu_r', norm=mcolors.TwoSlopeNorm(vmin=-vmax, vcenter=0, vmax=vmax))
             ax.set_title(title)
-            ax.set_xlabel('x [µm]')
-            ax.set_ylabel('y [µm]')
+            ax.set_xlabel('x (µm)')
+            ax.set_ylabel('y (µm)')
             ax.set_aspect('equal')
             fig.colorbar(points, ax=ax)
         fig.suptitle(f'Field map at t = {selected_time * 1e9:g} ns')
