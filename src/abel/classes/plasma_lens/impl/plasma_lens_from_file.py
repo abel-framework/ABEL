@@ -7,29 +7,14 @@ from abel import PlasmaLens
 
 class PlasmaLensFromFile(PlasmaLens):
     # This class uses a transverse magnetic-field map from file instead of
-    # an analytic plasma-lens field. The selected 2D map is used along the
+    # an analytic plasmalens field. The selected 2D map is used along the
     # full lens length, which is divided into num_slice tracking steps.
 
-    # Interpolators are rebuilt when an object is unpickled because scipy's
-    # interpolator objects are not always safe to serialize directly.
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        state.pop('interpolator_Bx', None)
-        state.pop('interpolator_By', None)
-        return state
-
-    def __setstate__(self, state):
-        """Restore the field map and rebuild interpolators after loading."""
-        self.__dict__.update(state)
-
-        if hasattr(self, 'data_Bx') and hasattr(self, 'selected_time'):
-            self.set_discharge_time(self.selected_time)
-        
     def __init__(self, filename_Bx=None, filename_By=None, discharge_time=None,
                  length=None, num_slice=None, offset_x=None, offset_y=None,
                  external_magnetic_field_x=None, external_magnetic_field_y=None,
                  imported_magnetic_field_polarity=None):
-        # Configuration is checked and maps are loaded only when load() is called.
+        # Configuration is validated in load(); maps also load lazily on first use.
         super().__init__(length=length, radius=None, current=None,
                          offset_x=offset_x, offset_y=offset_y)
         self.filename_Bx = filename_Bx
@@ -43,14 +28,14 @@ class PlasmaLensFromFile(PlasmaLens):
         self.imported_magnetic_field_polarity = imported_magnetic_field_polarity
     
 
-    def load(self, filename_Bx=None, filename_By=None, time_scale=None):
-        """Validate settings, load both field maps, and build interpolators."""
+    def load(self, filename_Bx=None, filename_By=None, time_scale=1e-9):
+        """Validate settings, load both field maps, and select the active map."""
         try:
             if filename_Bx is not None:
                 self.filename_Bx = filename_Bx
             if filename_By is not None:
                 self.filename_By = filename_By
-            self.time_scale = 1.0 if time_scale is None else float(time_scale)
+            self.time_scale = 1e-9 if time_scale is None else float(time_scale)
 
             if not np.isfinite(self.time_scale) or self.time_scale <= 0:
                 raise ValueError('time_scale must be a finite value greater than 0.')
@@ -87,8 +72,14 @@ class PlasmaLensFromFile(PlasmaLens):
             exc.add_note('PlasmaLensFromFile.load() failed while configuring or loading the field map.')
             raise
         
+    def _copy_arrays_to_owned_memory(self):
+        """Detach any joblib memmap arrays before the runnable is saved."""
+        for key, value in tuple(self.__dict__.items()):
+            if isinstance(value, np.ndarray):
+                self.__dict__[key] = np.array(value, copy=True, subok=False)
+
     def _require_loaded(self):
-        if not hasattr(self, 'interpolator_Bx') or not hasattr(self, 'interpolator_By'):
+        if not hasattr(self, 'map_Bx') or not hasattr(self, 'map_By'):
             try:
                 self.load()
             except Exception as exc:
@@ -196,11 +187,15 @@ class PlasmaLensFromFile(PlasmaLens):
         self.map_Bx, self.map_By = Bx[valid], By[valid]
         if len(self.map_x) < 3:
             raise ValueError(f'Fewer than three valid Bx/By points for discharge time {discharge_time}.')
+        return self.selected_time
+
+    def _build_interpolators(self):
+        """Build temporary interpolators for the currently selected map."""
         points = np.column_stack((self.map_x, self.map_y))
         try:
             if np.ptp(self.map_x) > 1e-15 and np.ptp(self.map_y) > 1e-15:
-                self.interpolator_Bx = LinearNDInterpolator(points, self.map_Bx, fill_value=0.0)
-                self.interpolator_By = LinearNDInterpolator(points, self.map_By, fill_value=0.0)
+                interpolator_Bx = LinearNDInterpolator(points, self.map_Bx, fill_value=0.0)
+                interpolator_By = LinearNDInterpolator(points, self.map_By, fill_value=0.0)
             else:
                 # Some COMSOL exports contain a 1D line (one transverse
                 # coordinate is constant), which cannot be triangulated in 2D.
@@ -215,30 +210,24 @@ class PlasmaLensFromFile(PlasmaLens):
                 coordinate = 0 if np.ptp(self.map_x) > 1e-15 else 1
                 def line_interpolator(interp):
                     return lambda x, y: interp(x if coordinate == 0 else y)
-                self.interpolator_Bx = line_interpolator(bx_interp)
-                self.interpolator_By = line_interpolator(by_interp)
+                interpolator_Bx = line_interpolator(bx_interp)
+                interpolator_By = line_interpolator(by_interp)
+            return interpolator_Bx, interpolator_By
         except Exception as exc:
             raise ValueError('Could not construct field interpolators; check for duplicate or degenerate map coordinates.') from exc
-        return self.selected_time
-
-    def select_timestep(self, discharge_time):
-        return self.set_discharge_time(discharge_time)
 
     def get_discharge_times(self):
         self._require_loaded()
         return self.available_times.copy()
-
-    def get_discharge_times_raw(self):
-        self._require_loaded()
-        return self.data_available_time_values.copy()
 
     def get_field(self, discharge_time=None, x=0.0, y=0.0):
         self._require_loaded()
         selected_time = self.set_discharge_time(discharge_time) if discharge_time is not None else self.selected_time
         x_local = -(np.asarray(x) - self.offset_x)
         y_local = np.asarray(y) - self.offset_y
-        Bx = np.nan_to_num(self.interpolator_Bx(x_local, y_local), nan=0.0)
-        By = np.nan_to_num(self.interpolator_By(x_local, y_local), nan=0.0)
+        interpolator_Bx, interpolator_By = self._build_interpolators()
+        Bx = np.nan_to_num(interpolator_Bx(x_local, y_local), nan=0.0)
+        By = np.nan_to_num(interpolator_By(x_local, y_local), nan=0.0)
         Bx = self.imported_magnetic_field_polarity * Bx + self.external_magnetic_field_x
         By = By + self.external_magnetic_field_y
         return selected_time, Bx, By
@@ -270,7 +259,6 @@ class PlasmaLensFromFile(PlasmaLens):
             fig.colorbar(points, ax=ax)
         fig.suptitle(f'Field map at t = {selected_time * 1e9:g} ns')
         plt.show()
-        return fig, axes
 
     def get_map_radius(self):
         self._require_loaded()
@@ -297,7 +285,7 @@ class PlasmaLensFromFile(PlasmaLens):
         dBx_dy = (float(np.asarray(bxy)) - float(np.asarray(bx0))) / dx
         return float(0.5 * (abs(dBy_dx) + abs(dBx_dy)))
 
-    def get_relativistic_nonlinearity(self, discharge_time=None):
+    def get_relative_nonlinearity(self, discharge_time=None):
         self._require_loaded()
         if discharge_time is not None:
             self.set_discharge_time(discharge_time)
@@ -335,11 +323,13 @@ class PlasmaLensFromFile(PlasmaLens):
             'Bx_range': (float(total_map_Bx.min()), float(total_map_Bx.max())),
             'By_range': (float(total_map_By.min()), float(total_map_By.max())),
             'focusing_gradient': self.get_focusing_gradient(),
-            'field_nonlinearity': self.get_relativistic_nonlinearity(),
+            'field_nonlinearity': self.get_relative_nonlinearity(),
         }
 
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
         self._require_loaded()
+        self._copy_arrays_to_owned_memory()
+        interpolator_Bx, interpolator_By = self._build_interpolators()
         slice_length = self.length / self.num_slice
         half_slice = slice_length / 2.0
 
@@ -358,8 +348,8 @@ class PlasmaLensFromFile(PlasmaLens):
 
             x = -(beam.xs() - self.offset_x)
             y = beam.ys() - self.offset_y
-            Bx = np.nan_to_num(self.interpolator_Bx(x, y), nan=0.0)
-            By = np.nan_to_num(self.interpolator_By(x, y), nan=0.0)
+            Bx = np.nan_to_num(interpolator_Bx(x, y), nan=0.0)
+            By = np.nan_to_num(interpolator_By(x, y), nan=0.0)
             Bx = self.imported_magnetic_field_polarity * Bx + self.external_magnetic_field_x
             By = By + self.external_magnetic_field_y
             delta_xp = slice_length * By * beam.charge_sign() * SI.c / beam.Es()
