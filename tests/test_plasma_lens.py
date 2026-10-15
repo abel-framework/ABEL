@@ -141,7 +141,6 @@ def test_PlasmaLensNonlinearThick():
 
 
 @pytest.mark.plasma_lens
-<<<<<<< HEAD
 def test_PlasmaLensFromFile():
     """  
     Check that the plasma lens from file works as intended.
@@ -210,7 +209,8 @@ def test_PlasmaLensFromFile():
         scan_beams.append(scan_beam)
 
     assert len(scan_beams) == 2
-=======
+
+
 @pytest.mark.impactx
 def test_PlasmaLensImpactX():
     """
@@ -309,4 +309,3 @@ def test_PlasmaLensImpactX_apertures():
     # charge outside the capillary has been removed
     assert beam.abs_charge() < beam0.abs_charge()
     assert np.all(np.sqrt(beam.xs()**2 + beam.ys()**2) <= R_pl*(1 + 1e-9))
->>>>>>> main
