@@ -146,7 +146,7 @@ def test_PlasmaLensFromFile():
     Check that the plasma lens from file works as intended.
     
     """
-    input_files = Path(__file__).resolve().parent / 'data' / 'Input_files'
+    input_files = Path(__file__).resolve().parent / 'data' / 'test_plasma_lens'
     bx_file = input_files / 'Bx.txt'
     by_file = input_files / 'By.txt'
 
