@@ -10,7 +10,8 @@ ABEL : plasma lens tests
 
 import pytest
 from abel import *
-import os, copy
+import copy
+from pathlib import Path
 import scipy.constants as SI
 import numpy as np
 
@@ -140,6 +141,76 @@ def test_PlasmaLensNonlinearThick():
 
 
 @pytest.mark.plasma_lens
+def test_PlasmaLensFromFile():
+    """  
+    Check that the plasma lens from file works as intended.
+    
+    """
+    input_files = Path(__file__).resolve().parent.parent / 'examples' / 'input_files'
+    bx_file = input_files / 'Bx.txt'
+    by_file = input_files / 'By.txt'
+
+    plasma_lens = PlasmaLensFromFile()
+    plasma_lens.length = 0.02
+    plasma_lens.discharge_time = 135e-9
+    plasma_lens.num_slice = 4
+    plasma_lens.external_magnetic_field_x = 0.2
+    plasma_lens.external_magnetic_field_y = 0.3
+    plasma_lens.imported_magnetic_field_polarity = -1
+    plasma_lens.filename_Bx = str(bx_file)
+    plasma_lens.filename_By = str(by_file)
+
+    # Accessing map information triggers lazy loading, as in the notebook.
+    times = plasma_lens.get_discharge_times()
+    time_135ns_index = int(np.argmin(np.abs(times - 135e-9)))
+    assert times[time_135ns_index] == pytest.approx(135e-9, rel=1e-12, abs=1e-15)
+    np.testing.assert_allclose(times[[0, time_135ns_index]], [0.0, 135e-9])
+
+    selected_time, Bx, By = plasma_lens.get_field(x=0.0, y=0.0)
+    assert selected_time == pytest.approx(135e-9)
+    assert float(Bx) == pytest.approx(0.2, abs=1e-6)
+    assert float(By) == pytest.approx(0.29390466502253626)
+
+    # Make a beam, copy it, and track it through the lens directly, following
+    # the same pattern as the other plasma lens tests.
+    np.random.seed(42)
+    source = SourceBasic()
+    source.length=3.0
+    source.num_particles=128
+    source.energy=50e6
+    source.charge=-100e-12
+    source.rel_energy_spread=0.01
+    source.bunch_length=400e-6
+    source.emit_nx=5e-6
+    source.emit_ny=5e-6
+    source.beta_x=10.0
+    source.beta_y=10.0
+    
+    beam0 = source.track()
+    beam = copy.deepcopy(beam0)
+
+    beam.transport(plasma_lens.length)
+    beam = plasma_lens.track(beam)
+    beam.transport(plasma_lens.length)
+
+    assert np.isclose(beam.charge(), beam0.charge(), rtol=1e-15)
+    assert np.all(np.isfinite(beam.xps()))
+    assert np.all(np.isfinite(beam.yps()))
+
+    # Scan lens offset directly on independent copies, keeping this focused
+    scan_beams = []
+    for offset_x in (-0.2e-3, 0.2e-3):
+        plasma_lens.offset_x = offset_x
+        scan_beam = copy.deepcopy(beam0)
+        scan_beam.transport(plasma_lens.length)
+        scan_beam = plasma_lens.track(scan_beam)
+        scan_beam.transport(plasma_lens.length)
+        assert np.all(np.isfinite(scan_beam.yps()))
+        scan_beams.append(scan_beam)
+
+    assert len(scan_beams) == 2
+
+
 @pytest.mark.impactx
 def test_PlasmaLensImpactX():
     """
