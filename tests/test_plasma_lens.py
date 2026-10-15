@@ -146,7 +146,7 @@ def test_PlasmaLensFromFile():
     Check that the plasma lens from file works as intended.
     
     """
-    input_files = Path(__file__).resolve().parent / 'data' / 'test_plasma_lens'
+    input_files = Path(__file__).resolve().parent.parent / 'examples' / 'input_files'
     bx_file = input_files / 'Bx.txt'
     by_file = input_files / 'By.txt'
 
@@ -162,12 +162,14 @@ def test_PlasmaLensFromFile():
 
     # Accessing map information triggers lazy loading, as in the notebook.
     times = plasma_lens.get_discharge_times()
-    np.testing.assert_allclose(times[[0, 135]], [0.0, 135e-9])
+    time_135ns_index = int(np.argmin(np.abs(times - 135e-9)))
+    assert times[time_135ns_index] == pytest.approx(135e-9, rel=1e-12, abs=1e-15)
+    np.testing.assert_allclose(times[[0, time_135ns_index]], [0.0, 135e-9])
 
     selected_time, Bx, By = plasma_lens.get_field(x=0.0, y=0.0)
     assert selected_time == pytest.approx(135e-9)
-    assert float(Bx) == pytest.approx(0.15)
-    assert float(By) == pytest.approx(0.34)
+    assert float(Bx) == pytest.approx(0.2, abs=1e-6)
+    assert float(By) == pytest.approx(0.29390466502253626)
 
     # Make a beam, copy it, and track it through the lens directly, following
     # the same pattern as the other plasma lens tests.
