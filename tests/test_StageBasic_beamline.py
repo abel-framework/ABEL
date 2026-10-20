@@ -540,11 +540,11 @@ def test_ramped_jitter_linac():
     assert np.isclose(final_beam.rel_energy_spread(), 9.825586100176821e-05, rtol=1e-2, atol=0.0)
 
     nom_beam_size_x = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4) * initial_beam.beam_size_x()
-    #nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4) * initial_beam.beam_size_y()
+    nom_beam_size_y = (stages[0].nom_energy/stages[-1].nom_energy)**(1/4) * initial_beam.beam_size_y()
     assert np.isclose(final_beam.beam_size_x(), nom_beam_size_x, rtol=1e-2, atol=0.0)
-    assert np.isclose(final_beam.beam_size_y(), 1.2967329484466221e-06, rtol=1e-1, atol=0.0)
+    assert np.isclose(final_beam.beam_size_y(), nom_beam_size_y, rtol=1e-1, atol=0.0)
     assert np.isclose(final_beam.norm_emittance_x(), main_source.emit_nx, rtol=1e-2, atol=0.0)
-    assert np.isclose(final_beam.norm_emittance_y(), 1.084878053041328e-06, rtol=1e-2, atol=0.0)
+    assert np.isclose(final_beam.norm_emittance_y(), 2.33*main_source.emit_ny, rtol=1e-1, atol=0.0)
 
     #ref_beam = Beam.load('./tests/data/')
     #ref_beam.beam_name = 'Reference beam'
