@@ -329,6 +329,104 @@ class Beamline(Trackable, Runnable, CostModeled):
         
         plt.show()
         
+    
+    def plot_spin_evolution_recursive(self, shot=None, save_path=None):
+
+        """
+        Plot the full spin evolution.
+        """
+
+        from matplotlib import pyplot as plt
+        from types import SimpleNamespace
+
+        # select the shots
+        if shot is None:
+            shots = range(self.num_shots)
+        else:
+            shots = [shot]
+
+        # set up evolution data structure
+        evol = SimpleNamespace()
+        evol.location = np.array([])
+
+        # first calculate the locations
+        for trackable in self[shots[0]].trackables:
+            if hasattr(trackable, 'evolution'):
+                if hasattr(trackable.evolution, 'location'):
+                    evol_trackable = trackable.evolution
+                elif hasattr(trackable.evolution, 'beam') and hasattr(trackable.evolution.beam, 'location'):
+                    evol_trackable = trackable.evolution.beam
+                else:
+                    continue
+
+                if evol.location.size == 0:
+                    loc_start = 0
+                else:
+                    loc_start = evol.location[-1]
+                evol.location = np.append(evol.location, loc_start + evol_trackable.location - evol_trackable.location[0])
+
+        # declare the data structure to contain all the data
+        vals = np.zeros((8,len(shots),len(evol.location)))
+
+        # extract all the data
+        for i, shot in enumerate(shots):
+            ind0 = 0
+            for trackable in self[shot].trackables:
+                if hasattr(trackable, 'evolution'):
+                    if hasattr(trackable.evolution, 'spin_x'):
+                        evol_trackable = trackable.evolution
+                    elif hasattr(trackable.evolution, 'beam') and hasattr(trackable.evolution.beam, 'spin_x'):
+                        evol_trackable = trackable.evolution.beam
+                    else:
+                        continue
+                    inds = range(ind0, ind0+len(np.array(evol_trackable.location)))
+                    ind0 = max(inds)+1
+                    vals[0,i,inds] = np.array(evol_trackable.spin_x)
+                    vals[1,i,inds] = np.array(evol_trackable.spin_y)
+                    vals[2,i,inds] = np.array(evol_trackable.spin_z)
+
+        
+        # get the mean
+        val_mean = np.mean(vals, axis=1)
+        evol.spin_x = val_mean[0,:]
+        evol.spin_y = val_mean[1,:]
+        evol.spin_z = val_mean[2,:]
+        
+        # get the standard deviation
+        val_std = np.std(vals, axis=1)
+        evol_std = SimpleNamespace()
+        evol_std.spin_x = val_std[0,:]
+        evol_std.spin_y = val_std[1,:]
+        evol_std.spin_z = val_std[2,:]
+        
+        # prepare plot
+        fig, axs = plt.subplots(1,1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+        colx = "tab:blue"
+        coly = "tab:orange"
+        colz = "tab:green"
+        af = 0.15
+        long_label = 'Location [m]'
+        long_limits = [min(evol.location), max(evol.location)]
+        
+        # plot spins
+        axs.fill_between(evol.location, (evol.spin_x + evol_std.spin_x)/1e2, (evol.spin_x-evol_std.spin_x)/1e2, color=colx, alpha=af, ec=None)
+        axs.fill_between(evol.location, (evol.spin_y + evol_std.spin_y)/1e2, (evol.spin_y-evol_std.spin_y)/1e2, color=coly, alpha=af, ec=None)
+        axs.fill_between(evol.location, (evol.spin_z + evol_std.spin_z)/1e2, (evol.spin_z-evol_std.spin_z)/1e2, color=colz, alpha=af, ec=None)
+        axs.plot(evol.location, evol.spin_x, color=colx, label='x')
+        axs.plot(evol.location, evol.spin_y, color=coly, label='y')
+        axs.plot(evol.location, evol.spin_z, color=colz, label='z')
+        axs.set_ylabel('Spin polarization (%)')
+        axs.set_xlabel(long_label)
+        axs.set_xlim(long_limits)
+        axs.set_ylim(-1.02, 1.02)
+        axs.legend()
+        
+        plt.show()
+        if save_path is not None:
+            fig.savefig(save_path, format='pdf', dpi=600, bbox_inches='tight', transparent=False)
+
 
 class NotAssembledError(Exception):
     "Exception class for ``Beamline`` to throw if ``self.trackables`` have not been assembled."
