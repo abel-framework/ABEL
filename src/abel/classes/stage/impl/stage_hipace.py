@@ -560,7 +560,7 @@ class StageHipace(Stage):
         Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=max(ts.iterations))
         self.final.plasma.wakefield.onaxis.zs = metadata.z
         self.final.plasma.wakefield.onaxis.Ezs = Ez
-        print(ts.iterations)
+        
         # extract middle field information if there are more than two steps
         if len(ts.iterations) > 2:
             # Get step closest to middle
@@ -583,7 +583,7 @@ class StageHipace(Stage):
 
             # Extract step 
             self.middle.n_step = middle_step
-            print(self.middle.n_step)
+            
         # extract initial plasma density
         rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
         self.initial.plasma.density.extent = metadata0_plasma.imshow_extent[[2,3,0,1]]
