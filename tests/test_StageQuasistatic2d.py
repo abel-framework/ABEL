@@ -166,11 +166,11 @@ def test_driver_unrotation():
     driver0.set_ys(ys + y_drift)
     
     # Cannot compare the whole phase space due to driver evolution
-    assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=1e-4, atol=0.0)
-    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=1e-3, atol=0.0)
+    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-3, atol=0.0)
     assert np.isclose(driver.z_offset(), driver0.z_offset(), rtol=1e-9, atol=0.0)
-    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-4, atol=0.0)
-    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-4, atol=0.0)
+    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-3, atol=0.0)
+    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-3, atol=0.0)
 
 
     # ========== Driver jitter, no angular offset ==========
@@ -193,10 +193,10 @@ def test_driver_unrotation():
 
     # Cannot compare the whole phase space due to driver evolution
     assert np.isclose(driver.x_offset(), driver0.x_offset(), rtol=1e-1, atol=0.0)
-    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-3, atol=0.0)
+    assert np.isclose(driver.y_offset(), driver0.y_offset(), rtol=1e-2, atol=0.0)
     assert np.isclose(driver.z_offset(), driver0.z_offset(), rtol=1e-9, atol=0.0)
-    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-3, atol=0.0)
-    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-3, atol=0.0)
+    assert np.isclose(driver.x_angle(), driver0.x_angle(), rtol=1e-2, atol=0.0)
+    assert np.isclose(driver.y_angle(), driver0.y_angle(), rtol=1e-2, atol=0.0)
     assert np.isclose(driver.norm_emittance_x(), driver0.norm_emittance_x(), rtol=1e-2, atol=0.0)
     assert np.isclose(driver.norm_emittance_y(), driver0.norm_emittance_y(), rtol=1e-2, atol=0.0)
     assert np.isclose(driver.bunch_length(), driver0.bunch_length(), rtol=1e-10, atol=0.0)

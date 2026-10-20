@@ -10,14 +10,15 @@ from numpy.lib import recfunctions as rfn
 import glob
 import json
 from scipy import constants
+from concurrent.futures import ThreadPoolExecutor
 
-def get_buffer(file):
+def get_buffer(file, decoder):
     with open(file, "rb") as f:
         bytes = f.read()
-        datatype_obj = json.JSONDecoder().raw_decode(bytes.decode(errors="replace"))
+        datatype_obj = decoder.raw_decode(bytes.decode(errors="replace"))
     return {"buffer" : bytes, "dtype" : np.dtype(datatype_obj[0]), "offset" : datatype_obj[1]}
 
-def read_file(filenames):
+def read_file(filenames, max_workers=16):
     """
     Extract insitu diagnostics into a NumPy structured array
 
@@ -36,9 +37,23 @@ def read_file(filenames):
     For these weighted averages and totals over slices are also available.
     Use .dtype or .dtype.names to get a list of available components
     """
-    return np.sort(rfn.stack_arrays([
-        np.frombuffer(**get_buffer(file)) for file in glob.iglob(filenames)
-    ], usemask=False, asrecarray=False, autoconvert=True), order="time")
+    
+    decoder = json.JSONDecoder()
+    files = list(glob.iglob(filenames))
+    
+    def read_one(file):
+        return np.frombuffer(**get_buffer(file, decoder))
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        arrays = list(ex.map(read_one, files))
+    
+    arr = np.concatenate(arrays, axis=0)
+    arr.sort(order="time")
+    return arr
+    
+    #return np.sort(rfn.stack_arrays([
+    #    np.frombuffer(**get_buffer(file)) for file in glob.iglob(filenames)
+    #], usemask=False, asrecarray=False, autoconvert=True), order="time")
 
 def emittance_x(all_data):
     """

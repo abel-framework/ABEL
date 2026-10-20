@@ -25,7 +25,7 @@ dependencies = [
    "ax-platform == 1.1.2",
    "CLICopti >= 2.2",
    "RF-Track == 2.5.3",
-   "impactx-noacc >=25.11, <=25.12",
+   "impactx-noacc >=26.5",
    "toml"
 ]
 requires-python = ">=3,<3.13"
@@ -68,4 +68,5 @@ markers = [
   "StageWakeT: Tests for the StageWakeT class",
   "presets: Tests for collider presets",
   "impactx: Tests for ImpactX",
+  "bds: Tests for BDS",
 ]

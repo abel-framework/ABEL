@@ -111,8 +111,6 @@ class InterstageQuadsImpactX(InterstageQuads):
         
         # add monitor (before and after gaps, and in the middle)
         if self.use_monitors:
-            from abel.wrappers.impactx.impactx_wrapper import initialize_amrex
-            initialize_amrex()
             monitor = elements.BeamMonitor(name='monitor', backend='h5', encoding='g')
         else:
             monitor = []
