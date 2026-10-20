@@ -68,4 +68,5 @@ markers = [
   "StageWakeT: Tests for the StageWakeT class",
   "presets: Tests for collider presets",
   "impactx: Tests for ImpactX",
+  "bds: Tests for BDS",
 ]

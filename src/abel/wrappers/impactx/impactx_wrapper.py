@@ -90,10 +90,10 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     
     # create a new directory
     original_folder = os.getcwd()
-    if runnable is not None:
-        runfolder = CONFIG.temp_path + str(uuid.uuid4())
-    else:
-        runfolder = 'impactx_sims'
+    #if runnable is not None:
+    runfolder = os.path.join(CONFIG.temp_path, str(uuid.uuid4()))
+    #else:
+    #    runfolder = 'impactx_sims'
     if not os.path.exists(runfolder):
         os.makedirs(runfolder)
     os.chdir(runfolder)
@@ -135,7 +135,7 @@ def run_impactx(lattice, beam0, nom_energy=None, runnable=None, keep_data=False,
     sim.finalize()
 
     # extract evolution
-    evol = extract_evolution();
+    evol = extract_evolution()
 
     # copy meta data from input beam (will be iterated by super)
     beam.trackable_number = beam0.trackable_number
@@ -210,10 +210,11 @@ def run_envelope_impactx(lattice, distr, nom_energy=None, peak_current=None, spa
     
     # create a new directory
     original_folder = os.getcwd()
-    if runnable is not None:
-        runfolder = CONFIG.temp_path + str(uuid.uuid4())
-    else:
-        runfolder = 'impactx_sims'
+    #if runnable is not None:
+    runfolder = os.path.join(CONFIG.temp_path, str(uuid.uuid4()))
+    print(runfolder)
+    #else:
+    #    runfolder = 'impactx_sims'
     if not os.path.exists(runfolder):
         os.makedirs(runfolder)
     os.chdir(runfolder)
@@ -322,10 +323,7 @@ def extract_beams(path='', runnable=None, beam0=None):
     
     from abel.classes.beam import Beam
     import openpmd_api as io
-
-    if runnable is not None:
-        path = os.path.join(runnable.shot_path(), 'impactx_sims') # TODO: even if path is provided, this will overwrite it.
-        
+    
     # load OpenPMD series
     series = io.Series(os.path.join(path,'diags/openPMD/monitor.h5'), io.Access.read_only)
     steps = list(series.iterations)
@@ -408,11 +406,11 @@ def extract_evolution(path=''):
 
     # read CSV file
     try:
-        ref = pd.read_csv(path+"diags/ref_particle.0.0", delimiter=r"\s+")
-        diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0.0", delimiter=r"\s+")
+        ref = pd.read_csv(os.path.join(path, 'diags/ref_particle.0.0'), delimiter=r"\s+")
+        diags = pd.read_csv(os.path.join(path, 'diags/reduced_beam_characteristics.0.0'), delimiter=r"\s+")
     except:
-        ref = pd.read_csv(path+"diags/ref_particle.0", delimiter=r"\s+")
-        diags = pd.read_csv(path+"diags/reduced_beam_characteristics.0", delimiter=r"\s+")
+        ref = pd.read_csv(os.path.join(path, 'diags/ref_particle.0'), delimiter=r"\s+")
+        diags = pd.read_csv(os.path.join(path, 'diags/reduced_beam_characteristics.0'), delimiter=r"\s+")
 
     # extract numbers
     evol = SimpleNamespace()

@@ -193,6 +193,143 @@ class Beamline(Trackable, Runnable, CostModeled):
             fig.savefig(filename, format='png', dpi=600, bbox_inches='tight', transparent=False)
 
 
+    def plot_evolution_recursive(self, shot=None):
+
+        """
+        Plot the full evolution of various beam parameters.
+        """
+
+        from matplotlib import pyplot as plt
+        from types import SimpleNamespace
+
+        # select the shots
+        if shot is None:
+            shots = range(self.num_shots)
+        else:
+            shots = [shot]
+
+        # set up evolution data structure
+        evol = SimpleNamespace()
+        evol.location = np.array([])
+
+        # first calculate the locations
+        for trackable in self[shots[0]].trackables:
+            if hasattr(trackable, 'evolution') and hasattr(trackable.evolution, 'location'):
+                evol.location = np.append(evol.location, trackable.evolution.location)
+
+        # declare the data structure to contain all the data
+        vals = np.zeros((8,len(shots),len(evol.location)))
+
+        # extract all the data
+        for i, shot in enumerate(shots):
+            ind0 = 0
+            for trackable in self[shot].trackables:
+                if hasattr(trackable, 'evolution') and hasattr(trackable.evolution, 'location'):
+                    inds = range(ind0, ind0+len(np.array(trackable.evolution.location)))
+                    ind0 = max(inds)+1
+                    vals[0,i,inds] = np.array(trackable.evolution.energy)
+                    vals[1,i,inds] = np.array(trackable.evolution.charge)
+                    vals[2,i,inds] = np.array(trackable.evolution.emit_nx)
+                    vals[3,i,inds] = np.array(trackable.evolution.emit_ny)
+                    vals[4,i,inds] = np.array(trackable.evolution.rel_energy_spread)
+                    vals[5,i,inds] = np.array(trackable.evolution.bunch_length)
+                    vals[6,i,inds] = np.array(trackable.evolution.beam_size_x)
+                    vals[7,i,inds] = np.array(trackable.evolution.beam_size_y)
+
+        # get the mean
+        val_mean = np.mean(vals, axis=1)
+        evol.energy = val_mean[0,:]
+        evol.charge = val_mean[1,:]
+        evol.emit_nx = val_mean[2,:]
+        evol.emit_ny = val_mean[3,:]
+        evol.rel_energy_spread = val_mean[4,:]
+        evol.bunch_length = val_mean[5,:]
+        evol.beam_size_x = val_mean[6,:]
+        evol.beam_size_y = val_mean[7,:]
+        
+        # get the standard deviation
+        val_std = np.std(vals, axis=1)
+        evol_std = SimpleNamespace()
+        evol_std.energy = val_std[0,:]
+        evol_std.charge = val_std[1,:]
+        evol_std.emit_nx = val_std[2,:]
+        evol_std.emit_ny = val_std[3,:]
+        evol_std.rel_energy_spread = val_std[4,:]
+        evol_std.bunch_length = val_std[5,:]
+        evol_std.beam_size_x = val_std[6,:]
+        evol_std.beam_size_y = val_std[7,:]
+        
+        # prepare plot
+        fig = plt.figure(figsize=(16, 11))
+        col0 = "tab:gray"
+        col1 = "tab:blue"
+        col2 = "tab:orange"
+        af = 0.2
+        long_label = 'Location [m]'
+        long_limits = [min(evol.location), max(evol.location)]
+        
+        # define a 4x2 grid layout
+        gs = fig.add_gridspec(nrows=4, ncols=2)
+        
+        # plot energy
+        ax = fig.add_subplot(gs[0, 0])
+        ax.fill_between(evol.location, (evol.energy + evol_std.energy)/1e9, (evol.energy-evol_std.energy)/1e9, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, evol.energy / 1e9, color=col1)
+        ax.set_ylabel('Energy [GeV]')
+        ax.set_xlim(long_limits)
+        
+        # plot charge
+        ax = fig.add_subplot(gs[0, 1])
+        ax.plot(evol.location, abs(evol.charge[0]) * np.ones(evol.location.shape) * 1e9, ':', color=col0)
+        ax.fill_between(evol.location, (evol.charge + evol_std.charge)*1e9, (evol.charge-evol_std.charge)*1e9, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, abs(evol.charge) * 1e9, color=col1)
+        ax.set_ylabel('Charge [nC]')
+        ax.set_xlim(long_limits)
+        ax.set_ylim(0, abs(evol.charge[0]) * 1.1 * 1e9)
+        
+        # plot energy spread
+        ax = fig.add_subplot(gs[1, 0])
+        ax.fill_between(evol.location, (evol.rel_energy_spread + evol_std.rel_energy_spread)*1e2, (evol.rel_energy_spread-evol_std.rel_energy_spread)*1e2, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, evol.rel_energy_spread*1e2, color=col1)
+        ax.set_ylabel('Energy spread, rms [%]')
+        ax.set_xlim(long_limits)
+        ax.set_yscale('log')
+        
+        # plot bunch length
+        ax = fig.add_subplot(gs[1, 1])
+        ax.fill_between(evol.location, (evol.bunch_length + evol_std.bunch_length)*1e6, (evol.bunch_length-evol_std.bunch_length)*1e6, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, evol.bunch_length*1e6, color=col1)
+        ax.set_xlim(long_limits)
+        ax.set_ylabel(r'Bunch length [$\mathrm{\mu}$m]')
+        
+        # plot beam size
+        ax = fig.add_subplot(gs[2, :])
+        ax.fill_between(evol.location, (evol.beam_size_x + evol_std.beam_size_x)*1e6, (evol.beam_size_x-evol_std.beam_size_x)*1e6, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, evol.beam_size_x*1e6, color=col1, label=r'$\sigma_x$')
+        ax.fill_between(evol.location, (evol.beam_size_y + evol_std.beam_size_y)*1e6, (evol.beam_size_y-evol_std.beam_size_y)*1e6, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, evol.beam_size_y*1e6, color=col2, label=r'$\sigma_y$')
+        ax.set_xlim(long_limits)
+        ax.set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
+        ax.set_yscale('log')
+        ax.legend(ncols=2)
+        
+        # plot normalized emittance
+        ax = fig.add_subplot(gs[3, :])
+        ax.plot(evol.location, abs(evol.emit_ny[0]) * np.ones(evol.location.shape) * 1e6, ':', color=col2)
+        ax.plot(evol.location, abs(evol.emit_nx[0]) * np.ones(evol.location.shape) * 1e6, ':', color=col1)
+        ax.fill_between(evol.location, (evol.emit_ny + evol_std.emit_ny)*1e6, (evol.emit_ny-evol_std.emit_ny)*1e6, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, evol.emit_ny*1e6, color=col2, label=r'$\epsilon_y$')
+        ax.fill_between(evol.location, (evol.emit_nx + evol_std.emit_nx)*1e6, (evol.emit_nx-evol_std.emit_nx)*1e6, color=col1, alpha=af, ec=None)
+        ax.plot(evol.location, evol.emit_nx*1e6, color=col1, label=r'$\epsilon_x$')
+        ax.set_ylabel('Emittance, rms [mm mrad]')
+        ax.set_xlim(long_limits)
+        ax.set_yscale('log')
+        ax.set_xlabel(long_label)
+        ax.legend(ncols=2)
+        
+        plt.show()
+        
+
 class NotAssembledError(Exception):
     "Exception class for ``Beamline`` to throw if ``self.trackables`` have not been assembled."
     pass
