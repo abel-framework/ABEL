@@ -62,8 +62,10 @@ from .classes.interstage.plasma_lens.impactx import InterstagePlasmaLensImpactX
 from .classes.interstage.quads.basic import InterstageQuadsBasic
 from .classes.interstage.quads.impactx import InterstageQuadsImpactX
 from .classes.plasma_lens.impl.plasma_lens_basic import PlasmaLensBasic
+from .classes.plasma_lens.impl.plasma_lens_impactx import PlasmaLensImpactX
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thin import PlasmaLensNonlinearThin
 from .classes.plasma_lens.impl.plasma_lens_nonlinear_thick import PlasmaLensNonlinearThick
+from .classes.plasma_lens.impl.plasma_lens_from_file import PlasmaLensFromFile
 from .classes.rf_accelerator.impl.rf_accelerator_basic import RFAcceleratorBasic
 from .classes.rf_accelerator.impl.scrf_accelerator_basic import SCRFAcceleratorBasic
 from .classes.rf_accelerator.impl.rf_accelerator_clicopti import RFAcceleratorCLICopti
@@ -78,6 +80,11 @@ from .classes.bds.impl.plasma_lens.impactx import BeamDeliverySystemPlasmaLensIm
 from .classes.spectrometer.impl.spectrometer_basic_clear import SpectrometerBasicCLEAR
 from .classes.ip.impl.ip_basic import InteractionPointBasic
 from .classes.ip.impl.ip_guineapig import InteractionPointGuineaPig
+
+from .classes.target import Target
+from .classes.target.sfqed import TargetSFQED
+from .classes.target.sfqed.basic import TargetSFQEDBasic
+from .classes.target.sfqed.ptarmigan import TargetSFQEDPtarmigan
 
 from abel.classes.collider.preset.halhf_v1 import HALHFv1
 from abel.classes.collider.preset.halhf_v2 import HALHFv2

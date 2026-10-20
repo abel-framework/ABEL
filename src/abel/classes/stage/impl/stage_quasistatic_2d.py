@@ -44,12 +44,13 @@ class StageQuasistatic2d(Stage):
         Keeps track of which stage it is in the beamline.
     """
     
-    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_radiation_reaction=False, probe_evolution=False, store_beams_for_tests=False):
+    def __init__(self, nom_accel_gradient=None, nom_energy_gain=None, plasma_density=None, driver_source=None, ramp_beta_mag=None, enable_radiation_reaction=False, spin_tracking=False, probe_evolution=False, store_beams_for_tests=False):
         
         super().__init__(nom_accel_gradient, nom_energy_gain, plasma_density, driver_source, ramp_beta_mag)
         
         # physics flags
         self.enable_radiation_reaction = enable_radiation_reaction
+        self.spin_tracking = spin_tracking
 
         # simulation flags
         self.probe_evolution = probe_evolution
@@ -233,7 +234,7 @@ class StageQuasistatic2d(Stage):
         delta_Es = self.length_flattop*(beam_waket.Es() - beam.Es())/dz
 
         # find driver offset (to shift the beam relative) and apply betatron motion
-        output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, probe_evolution=self.probe_evolution)
+        output = beam.apply_betatron_motion(self.length_flattop, self.plasma_density, delta_Es, x0_driver=driver0.x_offset(), y0_driver=driver0.y_offset(), radiation_reaction=self.enable_radiation_reaction, probe_evolution=self.probe_evolution, spin_tracking=self.spin_tracking)
         if self.probe_evolution:
             Es_final, self.evolution.beam = output
         else:
