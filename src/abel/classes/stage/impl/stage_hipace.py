@@ -341,7 +341,7 @@ class StageHipace(Stage):
             output_period = None
         
         # input file
-        filename_input = 'input_file'
+        filename_input = 'input_file_stage' + str(self.stage_number)
         path_input = tmpfolder + filename_input
         
         if self.external_focusing and self.external_focusing_gradient is None:
@@ -395,10 +395,6 @@ class StageHipace(Stage):
         # extract insitu diagnostics and wakefield data
         self.__extract_evolution(tmpfolder, beam0, runnable)
         self.__extract_initial_and_final_step(tmpfolder, beam0, runnable)
-
-        # move the HiPACE++ input file to be stored
-        if self.run_path is not None:
-            shutil.move(path_input, self.run_path)
         
         # delete temp folder
         shutil.rmtree(tmpfolder)

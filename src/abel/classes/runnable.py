@@ -26,8 +26,9 @@ class Runnable(ABC):
         
         # check if object exists
         if not self.overwrite and os.path.exists(self.object_path(shot)):
-            print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
-            
+            verbose_exists = self.verbose
+            if verbose_exists:
+                print('>> SHOT ' + str(shot+1) + ' already exists and will not be overwritten.', flush=True)
         else:
 
             # clear the shot folder
@@ -371,28 +372,44 @@ class Runnable(ABC):
         return val_mean, val_std
             
 
-    def extract_function(self, fcn, clean=False):
+    def extract_function(self, fcn, clean=False, parallel=True, max_cores=16):
 
         import inspect
 
         # Prepare the arrays
         val_mean = np.empty(self.num_steps)
         val_std = np.empty(self.num_steps)
-
+        
         # Extract values
         if self.is_scan():
             for step in range(self.num_steps):
                 
                 # Get values for this step
                 val_output = np.empty(self.num_shots_per_step)
-                for shot_in_step in range(self.num_shots_per_step):
-                    
+                
+                def runfcn(shot):
                     input_list = inspect.signature(fcn).parameters
                     if 'clean' in input_list:  # Check if the input list contains clean.
-                        val_output[shot_in_step] = fcn(self[step, shot_in_step], clean=clean)
+                        return fcn(self[step, shot], clean=clean)
                     else:
-                        val_output[shot_in_step] = fcn(self[step, shot_in_step])
+                        return fcn(self[step, shot])
                     
+                if parallel:
+                    
+                    from joblib import Parallel, delayed
+                    
+                    # recalculate number of cores used
+                    num_cores = min(max_cores, self.num_shots_per_step)
+                    
+                    # perform parallel tracking
+                    output_generator = Parallel(n_jobs=num_cores)(delayed(runfcn)(shot_in_step) for shot_in_step in range(self.num_shots_per_step))
+                    val_output = list(output_generator)
+                    
+                else:   
+                    
+                    for shot_in_step in range(self.num_shots_per_step):
+                        val_output[shot_in_step] = runfcn(shot_in_step)
+                        
                 # Get step mean and error
                 val_mean[step] = np.mean(val_output)
                 val_std[step] = np.std(val_output)

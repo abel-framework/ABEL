@@ -85,3 +85,7 @@ Please cite the following when referring to ABEL or using ABEL simulations for p
 
 ## Acknowledgements
 This work was supported by the European Research Council (project [SPARTA](https://www.mn.uio.no/fysikk/english/research/projects/staging-of-plasma-accelerators-for-timely-applications/), Grant No. [101116161](https://doi.org/10.3030/101116161)) and the Research Council of Norway (Grant No. [313770](https://prosjektbanken.forskningsradet.no/project/FORISS/313770) and [353317](https://prosjektbanken.forskningsradet.no/project/FORISS/353317)).
+
+
+## Mailing list
+[Subscribe](https://sympa.uio.no/fys.uio.no/info/abel-framework) to the mailing list abel-framework@fys.uio.no for updates.

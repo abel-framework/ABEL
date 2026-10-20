@@ -158,3 +158,54 @@ def test_spin_polarization(beam):
     "Test the overall spin polarization."
     beam.set_spin_polarized_x()
     assert np.isclose(beam.spin_polarization(),1)
+
+@pytest.mark.spin
+def test_spin_tracking_StageQuasistatic2d(): 
+    "Test the simple beam spin tracking in StageQuasistatic2d"
+    
+    # define driver
+    driver = SourceBasic()
+    driver.charge = -2.7e10 * SI.e # [C]
+    driver.energy = 31.25e9 # [eV]
+    driver.rel_energy_spread = 0.01
+    driver.bunch_length = 42e-6 # [m]
+    driver.z_offset = 300e-6 # [m]
+    driver.emit_nx, driver.emit_ny = 80e-6, 80e-6 # [m rad]
+    driver.beta_x, driver.beta_y = 0.2, 0.2 # [m]
+    driver.num_particles = 10000
+    
+    # define stage
+    stage = StageQuasistatic2d()
+    stage.driver_source = driver
+    stage.nom_energy_gain = 0.1*31.9e9 # [eV]
+    stage.nom_accel_gradient = 6.4e9 # [GV/m]
+    stage.plasma_density = 7e21 # [m^-3]
+    stage.spin_tracking = True
+    
+    # define beam
+    source = SourceBasic()
+    source.charge = -1e10 * SI.e # [C]
+    source.energy = 5e9 # [eV]
+    source.rel_energy_spread = 0.01
+    source.bunch_length = 18e-6 # [m]
+    source.z_offset = -36e-6 # [m]
+    source.emit_nx, source.emit_ny = 160e-6, 0.56e-6 # [m rad]
+    source.beta_x = stage.matched_beta_function(source.energy)
+    source.beta_y = source.beta_x
+    source.num_particles = 1000
+    source.spin_polarization = 1
+    source.spin_polarization_direction = 'x'
+
+    # define linac
+    linac = PlasmaLinac()
+    linac.source = source
+    linac.stage = stage
+    linac.num_stages = 1
+    
+    # perform tracking
+    beam0 = source.track()
+    beam = linac.track()
+
+    # check initial and final spin polarization (should depolarize a bit)
+    assert beam0.spin_polarization_x() == 1.0
+    assert beam.spin_polarization_x() < 1.0

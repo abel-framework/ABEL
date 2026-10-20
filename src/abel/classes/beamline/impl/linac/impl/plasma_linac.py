@@ -10,6 +10,7 @@ from abel.classes.source.source import Source
 from abel.classes.stage.stage import Stage
 from abel.classes.interstage import Interstage
 from abel.classes.bds.bds import BeamDeliverySystem
+from abel.classes.target import Target
 from abel.classes.rf_accelerator.rf_accelerator import RFAccelerator
 from abel.classes.beamline.impl.linac.linac import Linac
 from abel.classes.beamline.impl.driver_complex import DriverComplex
@@ -23,7 +24,7 @@ from matplotlib import pyplot as plt
 
 class PlasmaLinac(Linac):
     
-    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=True, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_injector=None, driver_complex=None, stage=None, interstage=None, bds=None, target=None, num_stages=None, nom_energy=None, first_stage=None, last_stage=None, last_interstage=None, alternate_interstage_polarity=True, bunch_separation=None, num_bunches_in_train=None, rep_rate_trains=None):
         
         super().__init__(source=source, nom_energy=nom_energy, num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -33,6 +34,7 @@ class PlasmaLinac(Linac):
         self.stage = stage
         self.interstage = interstage
         self.bds = bds
+        self.target = target
         self._first_stage = first_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self._last_stage = last_stage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
         self._last_interstage = last_interstage  # Only used for assembling PlasmaLinac. Not accessed after executing PlasmaLinac.assemble_trackables().
@@ -186,13 +188,26 @@ class PlasmaLinac(Linac):
             assert(isinstance(self.bds, BeamDeliverySystem) or isinstance(self.bds, Interstage))
 
             # set the nominal energy and length
-            if self.bds.length is None or self.bds.length == 0:
+            if self.bds.get_length() is None or self.bds.get_length() == 0:
                 self.bds.length = None
                 self.bds.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in self.stages])
                 self.bds.length = self.bds.get_length()
 
             # add to trackables
             self.trackables.append(self.bds)
+
+        # add target
+        if self.target is not None:
+            
+            # check type
+            assert(isinstance(self.target, Target))
+
+            # set the nominal energy
+            if self.target.nom_energy is None:
+                self.target.nom_energy = self.source.get_energy() + np.sum([stg.get_nom_energy_gain(ignore_ramps_if_undefined=True) for stg in self.stages])
+
+            # add to trackables
+            self.trackables.append(self.target)
 
         # optimize the driver energy
         if self.optimize_driver_energy:
@@ -978,6 +993,7 @@ class PlasmaLinac(Linac):
             dQdxdpx, xs, pxs = beam.phase_space_density(beam.xs, beam.pxs, hbins=xs0, vbins=pxs_final)
             axs[1,0].cla()
             cax = axs[1,0].pcolor(xs*1e6, pxs*1e-6*SI.c/SI.e, -dQdxdpx, cmap=CONFIG.default_cmap, shading='auto')
+            axs[1,0].set_ylim([-pxlim*1e-6*SI.c/SI.e, pxlim*1e-6*SI.c/SI.e])
             axs[1,0].set_ylabel("Momentum, $p_x$ [MeV/c]")
             axs[1,0].set_title('Horizontal phase space')
             

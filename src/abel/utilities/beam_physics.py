@@ -511,7 +511,7 @@ def evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, h
             for j in range(len(ss_l)):
                 D_l = Dmat(ss_l[j]-s0, inv_rhos[i], ks[i]) @ Dtot
                 evolution[0,i_last+j] = ss_l[j]
-                evolution[1,i_last+j] = Dx0*D_l[0,0] + Dpx0*D_l[1,2] + D_l[0,2]
+                evolution[1,i_last+j] = Dx0*D_l[0,0] + Dpx0*D_l[0,1] + D_l[0,2]
                 evolution[2,i_last+j] = Dx0*D_l[1,0] + Dpx0*D_l[1,1] + D_l[1,2]
             i_last = i_last + Nres
             
@@ -679,17 +679,17 @@ def evolve_second_order_dispersion(ls, inv_rhos, ks, ms, taus, fast=False, plot=
 
     # dispersion evolution up to fourth order (see https://en.wikipedia.org/wiki/Five-point_stencil)
     # here the dispersion is defined as x(delta) = x_0 + Dx*delta + DDx*delta^2 + DDDx*delta^3 + DDDDx*delta^4 + O(delta^5)
-    # this definition requires multiplying by the factorial of the order
+    # this definition requires dividing by the factorial of the order
     if not fast:
         evolution[0,:] = ss
         evolution[1,:] = (-xs[:,4] + 8*xs[:,3] - 8*xs[:,1] + xs[:,0])/(12*delta)  # First order
-        evolution[2,:] = 2*(-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2)  # Second order
-        evolution[3,:] = 3*2*(xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3)  # Third order
-        evolution[4,:] = 4*3*2*(xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4  # Fourth order
+        evolution[2,:] = (-xs[:,4] + 16*xs[:,3] - 30*xs[:,2] + 16*xs[:,1] - xs[:,0])/(12*delta**2) / 2  # Second order
+        evolution[3,:] = (xs[:,4] - 2*xs[:,3] + 2*xs[:,1] - xs[:,0])/(2*delta**3) / (3*2) # Third order
+        evolution[4,:] = (xs[:,4] - 4*xs[:,3] + 6*xs[:,2] - 4*xs[:,1] + xs[:,0])/delta**4 / (4*3*2)  # Fourth order
 
     # return dispersions
-    DDx = 2*(-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2)
-    DDpx = 2*(-xp[4] + 16*xp[3] - 30*xp[2] + 16*xp[1] - xp[0])/(12*delta**2) # Second order
+    DDx = (-x[4] + 16*x[3] - 30*x[2] + 16*x[1] - x[0])/(12*delta**2) / 2
+    DDpx = (-xp[4] + 16*xp[3] - 30*xp[2] + 16*xp[1] - xp[0])/(12*delta**2) / 2 # Second order
     
     if plot:
         from matplotlib import pyplot as plt
@@ -1066,7 +1066,7 @@ def evolve_chromatic_amplitude(ls, inv_rhos, ks, ms, taus, beta0, alpha0=0, Dx0=
     deltas = delta0 * np.arange(-2,3)
 
     # get the dispersion for calculation of effect of chromaticity correction)
-    _, _, evol_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=0, Dpx0=0, fast=False, plot=False, high_res=False)
+    _, _, evol_disp = evolve_dispersion(ls, inv_rhos, ks, Dx0=Dx0, Dpx0=Dpx0, fast=False, plot=False, high_res=False)
     ss_disp = evol_disp[0]
     Dxs = evol_disp[1]
     
