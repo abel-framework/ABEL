@@ -154,7 +154,7 @@ class Runnable(ABC):
             pickle.dump(self, savefile)
             
     # load object from file
-    def load(self, shot=None, obj_path=None):
+    def load(self=None, shot=None, obj_path=None):
         import dill as pickle
         if obj_path is None:
             obj_path = self.object_path(shot)
