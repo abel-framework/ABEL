@@ -10,7 +10,8 @@ ABEL : plasma lens tests
 
 import pytest
 from abel import *
-import os, copy
+import copy
+from pathlib import Path
 import scipy.constants as SI
 import numpy as np
 
@@ -139,3 +140,172 @@ def test_PlasmaLensNonlinearThick():
 
 
 
+@pytest.mark.plasma_lens
+def test_PlasmaLensFromFile():
+    """  
+    Check that the plasma lens from file works as intended.
+    
+    """
+    input_files = Path(__file__).resolve().parent.parent / 'examples' / 'input_files'
+    bx_file = input_files / 'Bx.txt'
+    by_file = input_files / 'By.txt'
+
+    plasma_lens = PlasmaLensFromFile()
+    plasma_lens.length = 0.02
+    plasma_lens.discharge_time = 135e-9
+    plasma_lens.num_slice = 4
+    plasma_lens.external_magnetic_field_x = 0.2
+    plasma_lens.external_magnetic_field_y = 0.3
+    plasma_lens.imported_magnetic_field_polarity = -1
+    plasma_lens.filename_Bx = str(bx_file)
+    plasma_lens.filename_By = str(by_file)
+
+    # Accessing map information triggers lazy loading, as in the notebook.
+    times = plasma_lens.get_discharge_times()
+    time_135ns_index = int(np.argmin(np.abs(times - 135e-9)))
+    assert times[time_135ns_index] == pytest.approx(135e-9, rel=1e-12, abs=1e-15)
+    np.testing.assert_allclose(times[[0, time_135ns_index]], [0.0, 135e-9])
+
+    selected_time, Bx, By = plasma_lens.get_field(x=0.0, y=0.0)
+    assert selected_time == pytest.approx(135e-9)
+    assert float(Bx) == pytest.approx(0.2, abs=1e-6)
+    assert float(By) == pytest.approx(0.29390466502253626)
+
+    # Make a beam, copy it, and track it through the lens directly, following
+    # the same pattern as the other plasma lens tests.
+    np.random.seed(42)
+    source = SourceBasic()
+    source.length=3.0
+    source.num_particles=128
+    source.energy=50e6
+    source.charge=-100e-12
+    source.rel_energy_spread=0.01
+    source.bunch_length=400e-6
+    source.emit_nx=5e-6
+    source.emit_ny=5e-6
+    source.beta_x=10.0
+    source.beta_y=10.0
+    
+    beam0 = source.track()
+    beam = copy.deepcopy(beam0)
+
+    beam.transport(plasma_lens.length)
+    beam = plasma_lens.track(beam)
+    beam.transport(plasma_lens.length)
+
+    assert np.isclose(beam.charge(), beam0.charge(), rtol=1e-15)
+    assert np.all(np.isfinite(beam.xps()))
+    assert np.all(np.isfinite(beam.yps()))
+
+    # Scan lens offset directly on independent copies, keeping this focused
+    scan_beams = []
+    for offset_x in (-0.2e-3, 0.2e-3):
+        plasma_lens.offset_x = offset_x
+        scan_beam = copy.deepcopy(beam0)
+        scan_beam.transport(plasma_lens.length)
+        scan_beam = plasma_lens.track(scan_beam)
+        scan_beam.transport(plasma_lens.length)
+        assert np.all(np.isfinite(scan_beam.yps()))
+        scan_beams.append(scan_beam)
+
+    assert len(scan_beams) == 2
+
+
+@pytest.mark.impactx
+def test_PlasmaLensImpactX():
+    """
+    Check that the ImpactX plasma lens agrees with the thick nonlinear lens.
+
+    Both model the same drift-kick sequence, so they should agree to well
+    within the difference between their slicing schemes.
+    """
+
+    np.random.seed(42)
+
+    # set up beam
+    source = SourceBasic()
+    source.bunch_length = 100e-6 # [m]
+    source.num_particles = 20000
+    source.charge = -SI.e * 1.0e10 # [C]
+    source.energy = 1e9 # [eV]
+    source.rel_energy_spread = 1e-5
+    source.emit_nx, source.emit_ny = 1e-6, 1e-6 # [m rad]
+    source.beta_x = 0.01 # [m]
+    source.beta_y = source.beta_x
+
+    # drift distance
+    L_drift = 1.0 # [m]
+
+    # lens length and radius
+    L_pl = 0.01
+    R_pl = 500e-6
+
+    # calculate strength required to refocus in distance L
+    f = (L_drift+L_pl/2)/2
+    k = 1/(L_pl*f)
+    g = k*source.energy/SI.c
+    I = g*(2*np.pi*R_pl**2)/SI.mu_0
+
+    beam0 = source.track()
+
+    def track(plasma_lens):
+        plasma_lens.length = L_pl
+        plasma_lens.radius = R_pl
+        plasma_lens.current = I
+        plasma_lens.rel_nonlinearity = 0.5
+        plasma_lens.offset_x = -R_pl/4
+        plasma_lens.offset_y = R_pl/8
+        beam = copy.deepcopy(beam0)
+        beam.transport(L_pl)
+        beam = plasma_lens.track(beam)
+        beam.transport(L_pl)
+        return beam
+
+    beam_thick = track(PlasmaLensNonlinearThick(num_slice=30))
+    beam_impactx = track(PlasmaLensImpactX(num_slices=30))
+
+    # charge is conserved (no apertures by default)
+    assert np.isclose(beam_impactx.charge(), beam0.charge(), rtol=1e-15)
+    assert np.isclose(beam_impactx.energy(), beam0.energy(), rtol=1e-6)
+
+    # the two implementations agree
+    assert np.isclose(beam_impactx.beam_size_x(), beam_thick.beam_size_x(), rtol=1e-3)
+    assert np.isclose(beam_impactx.beam_size_y(), beam_thick.beam_size_y(), rtol=1e-3)
+    assert np.isclose(beam_impactx.norm_emittance_x(), beam_thick.norm_emittance_x(), rtol=1e-3)
+    assert np.isclose(beam_impactx.norm_emittance_y(), beam_thick.norm_emittance_y(), rtol=1e-3)
+
+    # the transverse offsets deflect the beam by the expected amount
+    assert np.isclose(beam_impactx.x_angle(), beam_thick.x_angle(), rtol=5e-3)
+    assert np.isclose(beam_impactx.y_angle(), beam_thick.y_angle(), rtol=5e-3)
+
+
+@pytest.mark.plasma_lens
+@pytest.mark.impactx
+def test_PlasmaLensImpactX_apertures():
+    """
+    Check that the ImpactX plasma lens clips charge outside the capillary
+    when apertures are enabled.
+    """
+
+    np.random.seed(42)
+
+    source = SourceBasic()
+    source.bunch_length = 100e-6 # [m]
+    source.num_particles = 10000
+    source.charge = -SI.e * 1.0e10 # [C]
+    source.energy = 1e9 # [eV]
+    source.rel_energy_spread = 1e-5
+    source.emit_nx, source.emit_ny = 1e-6, 1e-6 # [m rad]
+    source.beta_x = 120.0 # [m] large beta => beam wider than the capillary
+    source.beta_y = source.beta_x
+
+    R_pl = 500e-6 # [m] roughly two beam sigmas
+
+    plasma_lens = PlasmaLensImpactX(length=0.01, radius=R_pl, current=1e3, use_apertures=True)
+
+    beam0 = source.track()
+    beam = plasma_lens.track(copy.deepcopy(beam0))
+
+    # charge outside the capillary has been removed
+    assert beam.abs_charge() < beam0.abs_charge()
+    assert np.all(np.sqrt(beam.xs()**2 + beam.ys()**2) <= R_pl*(1 + 1e-9))
