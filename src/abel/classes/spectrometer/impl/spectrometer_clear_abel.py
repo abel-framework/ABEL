@@ -150,7 +150,9 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
         return checked
     def _quad_strengths(self, kinetic_energy_ev):
         """Convert downstream CLEAR quadrupole currents to ImpactX k1."""
-        energy_gev = kinetic_energy_ev / SI.e / 1e9
+        # Beam.energy() is in eV. Convert directly to GeV; dividing by the
+        # elementary charge here would incorrectly treat eV as joules.
+        energy_gev = kinetic_energy_ev / 1e9
         mass_gev = SI.m_e * SI.c**2 / SI.e / 1e9
         momentum_gev = np.sqrt(energy_gev * (energy_gev + 2 * mass_gev))
         brho = momentum_gev / 0.299792458
@@ -181,6 +183,8 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
         lens.ref_particle = lambda refpart: self._push_lens_reference(
             self.plasma_lens, refpart, lens.ds / lens.nslice)
         items.append((lens_length / 2, lens_length, 2, lambda: lens))
+        items.append((lens_length, 0.0, 0, lambda: elements.BeamMonitor(
+            name="PlasmaLensExit", backend="h5", encoding="g")))
         def add_monitor(name, center):
             length = _BPM_LENGTH if name.startswith("BPM") else 0.0
             def make_monitor():
@@ -278,7 +282,7 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
         ``spectrometer_on`` selects BTV930 or the straight BTV910 branch.
         """
         screen = "BTV930" if spectrometer_on else "BTV910"
-        target_names = {"BTV0810", "BPM0820", "BPM0890", "BPM0920", screen}
+        target_names = {"PlasmaLensExit", "BTV0810", "BPM0820", "BPM0890", "BPM0920", screen}
         lattice = self.get_impactx_lattice_to_screen(
             beam.energy(), screen)
         targets = [
@@ -294,6 +298,8 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
             monitor_beam, _ = self._run_lattice(
                 lattice_to_monitor, beam, runnable, verbose, save_beams=False)
             label = "BTV810" if monitor_name == "BTV0810" else monitor_name
+            if monitor_name == "PlasmaLensExit":
+                label = "Plasma lens exit"
             if monitor_name == screen:
                 label = f"{screen} (spectrometer {'ON' if spectrometer_on else 'OFF'})"
             beams[label] = monitor_beam
