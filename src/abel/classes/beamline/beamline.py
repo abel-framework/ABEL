@@ -211,11 +211,18 @@ class Beamline(Trackable, Runnable, CostModeled):
         # set up evolution data structure
         evol = SimpleNamespace()
         evol.location = np.array([])
+        location0 = 0.0
 
         # first calculate the locations
         for trackable in self[shots[0]].trackables:
-            if hasattr(trackable, 'evolution') and hasattr(trackable.evolution, 'location'):
-                evol.location = np.append(evol.location, trackable.evolution.location)
+            if hasattr(trackable, 'evolution'):
+                if hasattr(trackable.evolution, 'beam'):
+                    track_evol = trackable.evolution.beam
+                else:
+                    track_evol = trackable.evolution
+                if hasattr(track_evol, 'location'):
+                    evol.location = np.append(evol.location, track_evol.location - min(track_evol.location) + location0)
+                location0 = location0 + trackable.get_length()
 
         # declare the data structure to contain all the data
         vals = np.zeros((8,len(shots),len(evol.location)))
@@ -224,17 +231,23 @@ class Beamline(Trackable, Runnable, CostModeled):
         for i, shot in enumerate(shots):
             ind0 = 0
             for trackable in self[shot].trackables:
-                if hasattr(trackable, 'evolution') and hasattr(trackable.evolution, 'location'):
-                    inds = range(ind0, ind0+len(np.array(trackable.evolution.location)))
+                if hasattr(trackable, 'evolution'):
+                    if hasattr(trackable.evolution, 'beam'):
+                        track_evol = trackable.evolution.beam
+                    else:
+                        track_evol = trackable.evolution
+                    if not hasattr(track_evol, 'location'):
+                        continue
+                    inds = range(ind0, ind0+len(np.array(track_evol.location)))
                     ind0 = max(inds)+1
-                    vals[0,i,inds] = np.array(trackable.evolution.energy)
-                    vals[1,i,inds] = np.array(trackable.evolution.charge)
-                    vals[2,i,inds] = np.array(trackable.evolution.emit_nx)
-                    vals[3,i,inds] = np.array(trackable.evolution.emit_ny)
-                    vals[4,i,inds] = np.array(trackable.evolution.rel_energy_spread)
-                    vals[5,i,inds] = np.array(trackable.evolution.bunch_length)
-                    vals[6,i,inds] = np.array(trackable.evolution.beam_size_x)
-                    vals[7,i,inds] = np.array(trackable.evolution.beam_size_y)
+                    vals[0,i,inds] = np.array(track_evol.energy)
+                    vals[1,i,inds] = np.array(track_evol.charge)
+                    vals[2,i,inds] = np.array(track_evol.emit_nx)
+                    vals[3,i,inds] = np.array(track_evol.emit_ny)
+                    vals[4,i,inds] = np.array(track_evol.rel_energy_spread)
+                    vals[5,i,inds] = np.array(track_evol.bunch_length)
+                    vals[6,i,inds] = np.array(track_evol.beam_size_x)
+                    vals[7,i,inds] = np.array(track_evol.beam_size_y)
 
         # get the mean
         val_mean = np.mean(vals, axis=1)
