@@ -122,3 +122,41 @@ def evolve_hills_equation_analytic(x0, ux0, L, gamma0, dgamma_ds, kp):
     ux = xp * gamma2proper_velocity(gamma)
     
     return x, ux
+
+
+def evolve_hills_equation_analytic_evolution(x0, ux0, L, gamma0, dgamma_ds, kp, num_steps=None):
+
+    import scipy.special as scispec
+    from abel.utilities.relativity import gamma2proper_velocity
+    
+    # find number of steps
+    if num_steps is None:
+        beta_mat = np.sqrt(2*np.mean(gamma0))/kp
+        num_steps = round(L/beta_mat*10)
+
+    # define propagation axis
+    s = np.linspace(0, L, num_steps).T
+
+    # find initial angles
+    xp0 = ux0 / gamma2proper_velocity(gamma0)
+
+    # calculate energy evolution
+    gamma = np.outer(gamma0, np.ones_like(s)) + np.outer(dgamma_ds, s)
+
+    # calculate x evolution
+    C = np.sqrt(2) * kp / dgamma_ds
+    A0 = C * np.sqrt(gamma0)
+    Di = (kp**2 * x0 * scispec.iv(1, A0 * 1j) + A0 * 1j * dgamma_ds * xp0 * scispec.iv(0, A0 * 1j))
+    Dk = (kp**2 * x0 * scispec.kv(1, A0 * 1j) - A0 * 1j * dgamma_ds * xp0 * scispec.kv(0, A0 * 1j))
+    E = kp**2 * (scispec.iv(1, A0 * 1j) * scispec.kv(0, A0 * 1j) +
+                 scispec.iv(0, A0 * 1j) * scispec.kv(1, A0 * 1j)) * 1j
+    A = np.outer(C, np.ones_like(s)) * np.sqrt(gamma)
+    x = np.real(1j * (np.outer(Di,np.ones_like(s)) * scispec.kv(0, A * 1j) + np.outer(Dk,np.ones_like(s)) * scispec.iv(0, A * 1j)) / np.outer(E,np.ones_like(s)))
+
+    # calculate momentum evolution
+    K = dgamma_ds * C**2 / (2 * E)
+    xp = -np.real( np.outer(K,np.ones_like(s)) / A *
+                  (np.outer(Dk,np.ones_like(s)) * scispec.iv(1, A * 1j) - np.outer(Di,np.ones_like(s)) * scispec.kv(1, A * 1j)))
+    ux = xp * gamma2proper_velocity(gamma)
+    
+    return x, ux, gamma, s
