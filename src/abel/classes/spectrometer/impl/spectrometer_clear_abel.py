@@ -195,10 +195,19 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
                         elements.Drift(ds=length / 2, nslice=ns)]
             items.append((center, length, 1, make_monitor))
         for name, center in (("QDD0870", q870), ("QFD0880", q880)):
+            entrance = center - _QUAD_LENGTH / 2
+            exit = center + _QUAD_LENGTH / 2
+            items.append((entrance, 0.0, 0, lambda name=name: elements.BeamMonitor(
+                name=f"{name}Entrance", backend="h5", encoding="g")))
             items.append((center, _QUAD_LENGTH, 2,
                           lambda name=name: elements.ChrQuad(
                               name=name, ds=_QUAD_LENGTH, k=strengths[name], nslice=ns)))
+            items.append((exit, 0.0, 0, lambda name=name: elements.BeamMonitor(
+                name=f"{name}Exit", backend="h5", encoding="g")))
         hkick, vkick = self.corrector_currents["DHJ0840"]
+        corrector_entrance = corrector840 - _CORRECTOR_LENGTH / 2
+        items.append((corrector_entrance, 0.0, 0, lambda: elements.BeamMonitor(
+            name="DHJ0840Entrance", backend="h5", encoding="g")))
         items.append((corrector840, _CORRECTOR_LENGTH, 2, lambda: [
             elements.Drift(ds=_CORRECTOR_LENGTH / 2, nslice=ns),
             elements.Kicker(name="DHJ0840", xkick=float(hkick) * _KJ_INTEGRATED_FIELD_T_M_PER_A / brho,
@@ -282,7 +291,10 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
         ``spectrometer_on`` selects BTV930 or the straight BTV910 branch.
         """
         screen = "BTV930" if spectrometer_on else "BTV910"
-        target_names = {"PlasmaLensExit", "BTV0810", "BPM0820", "BPM0890", "BPM0920", screen}
+        target_names = {"PlasmaLensExit", "BTV0810", "BPM0820", "DHJ0840Entrance",
+                        "QDD0870Entrance", "QDD0870Exit",
+                        "QFD0880Entrance", "QFD0880Exit",
+                        "BPM0890", "BPM0920", screen}
         lattice = self.get_impactx_lattice_to_screen(
             beam.energy(), screen)
         targets = [
@@ -300,6 +312,12 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
             label = "BTV810" if monitor_name == "BTV0810" else monitor_name
             if monitor_name == "PlasmaLensExit":
                 label = "Plasma lens exit"
+            if monitor_name == "DHJ0840Entrance":
+                label = "DHJ0840 entrance"
+            if monitor_name.endswith("Entrance") and monitor_name.startswith("Q"):
+                label = f"{monitor_name[:-8]} entrance"
+            if monitor_name.endswith("Exit") and monitor_name.startswith("Q"):
+                label = f"{monitor_name[:-4]} exit"
             if monitor_name == screen:
                 label = f"{screen} (spectrometer {'ON' if spectrometer_on else 'OFF'})"
             beams[label] = monitor_beam
