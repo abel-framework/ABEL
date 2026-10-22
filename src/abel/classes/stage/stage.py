@@ -201,7 +201,23 @@ class Stage(Trackable, CostModeled):
         self._driver_source = source
     _driver_source = None
 
+    
+    def track_driver_source(self):
+        """
+        Tracks the driver source, supplying the stage number 
+        if it exists and the source is a DriverComplex.
+        
+        Returns
+        -------
+        driver : ``Beam``
+        """
+        if isinstance(self.driver_source, DriverComplex):
+            driver = self.driver_source.track(stage_number=self.stage_number)
+        else:
+            driver = self.driver_source.track()
+        return driver
 
+    
     def get_actual_driver_source(self):
         """
         Return the driver source of the stage or the driver source of the 
