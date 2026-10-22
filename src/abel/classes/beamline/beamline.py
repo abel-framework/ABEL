@@ -243,14 +243,16 @@ class Beamline(Trackable, Runnable, CostModeled):
                         continue
                     inds = range(ind0, ind0 + round(loc_lengths[j]))
                     ind0 = max(inds)+1
-                    vals[0,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.energy)
-                    vals[1,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.charge)
-                    vals[2,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.emit_nx)
-                    vals[3,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.emit_ny)
-                    vals[4,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.rel_energy_spread)
-                    vals[5,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.bunch_length)
-                    vals[6,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.beam_size_x)
-                    vals[7,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.beam_size_y)
+                    ss = evol.location[inds]-min(evol.location[inds])
+                    ss_track_evol = track_evol.location-min(track_evol.location)
+                    vals[0,i,inds] = np.interp(ss, ss_track_evol, track_evol.energy)
+                    vals[1,i,inds] = np.interp(ss, ss_track_evol, track_evol.charge)
+                    vals[2,i,inds] = np.interp(ss, ss_track_evol, track_evol.emit_nx)
+                    vals[3,i,inds] = np.interp(ss, ss_track_evol, track_evol.emit_ny)
+                    vals[4,i,inds] = np.interp(ss, ss_track_evol, track_evol.rel_energy_spread)
+                    vals[5,i,inds] = np.interp(ss, ss_track_evol, track_evol.bunch_length)
+                    vals[6,i,inds] = np.interp(ss, ss_track_evol, track_evol.beam_size_x)
+                    vals[7,i,inds] = np.interp(ss, ss_track_evol, track_evol.beam_size_y)
 
         # get the mean
         val_mean = np.mean(vals, axis=1)
