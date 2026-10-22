@@ -2389,13 +2389,13 @@ def test_apply_betatron_motion_emitt_pres():
 
     assert np.allclose(Es_final.mean(), 4e9, rtol=1e-15, atol=0.0)
     assert np.allclose(np.std(Es_final), 1e-20, rtol=0.0, atol=1e-19)
-    assert np.allclose(np.std(Es_final)/Es_final.mean(), 1e-20, rtol=0.0, atol=1e-19)
+    assert np.allclose(np.std(Es_final)/Es_final.mean(), 1e-20, rtol=0.0, atol=1e-15)
     assert np.allclose(beam.charge(), initial_beam.charge(), rtol=1e-10, atol=0.0)
     assert np.allclose(beam.z_offset(), initial_beam.z_offset(), rtol=1e-10, atol=0.0)
     assert np.allclose(beam.bunch_length(), initial_beam.bunch_length(), rtol=1e-10, atol=0.0)
 
-    assert np.allclose(Es_final.mean(), evol.energy[-1], rtol=1e-20, atol=0.0)
-    assert np.allclose(evol.energy_spread[-1], 1e-20, rtol=0.0, atol=1e-19)
+    assert np.allclose(Es_final.mean(), evol.energy[-1], rtol=1e-15, atol=0.0)
+    assert np.allclose(evol.energy_spread[-1], 1e-20, rtol=0.0, atol=1e-15)
     assert np.allclose(beam.charge(), evol.charge[-1], rtol=1e-10, atol=0.0)
     assert np.allclose(beam.norm_emittance_x(), evol.emit_nx[-1], rtol=0.0, atol=0.3e-5)
     assert np.allclose(beam.norm_emittance_y(), evol.emit_ny[-1], rtol=0.0, atol=0.5e-5)

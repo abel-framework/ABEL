@@ -114,6 +114,8 @@ class Source(Trackable, CostModeled):
         self.spin_polarization = spin_polarization
         self.spin_polarization_direction = spin_polarization_direction
 
+        self.evolution = SimpleNamespace()
+
     
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -174,11 +176,22 @@ class Source(Trackable, CostModeled):
 
         if do_beam_rotation:
             beam.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
-
-            # if not np.isclose(beam.x_angle(), beam.x_tilt_angle(), rtol=1e-2, atol=0.0) or not np.isclose(beam.y_angle(), beam.y_tilt_angle(), rtol=1e-2, atol=0.0):
-            #     pointing_error_string = 'The beam may not have been accurately aligned to its propagation direction.\n' + 'beam x_angle: ' + str(beam.x_angle()) + '\nbeam x_tilt_angle: ' + str(beam.x_tilt_angle()) + '\nbeam y_angle: ' + str(beam.y_angle()) + '\nbeam y_tilt_angle: ' + str(beam.y_tilt_angle())
-            #     warnings.warn(pointing_error_string)
-
+        
+        # save evolution (output)
+        self.evolution.location = np.array([self.get_length()])
+        self.evolution.x, self.evolution.ux = np.array([beam.x_offset()]), np.array([np.mean(beam.uxs())])
+        self.evolution.y, self.evolution.uy = np.array([beam.y_offset()]), np.array([np.mean(beam.uys())])
+        self.evolution.energy, self.evolution.energy_spread = np.array([beam.energy()]), np.array([beam.energy_spread()])
+        self.evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
+        self.evolution.beam_size_x, self.evolution.beam_size_y = np.array([beam.beam_size_x()]), np.array([beam.beam_size_y()])
+        self.evolution.emit_nx = np.array([beam.norm_emittance_x()])
+        self.evolution.emit_ny = np.array([beam.norm_emittance_y()])
+        self.evolution.beta_x = np.array([beam.beta_x()])
+        self.evolution.beta_y = np.array([beam.beta_y()])
+        self.evolution.z = np.array([beam.z_offset()])
+        self.evolution.charge = np.array([beam.charge()])
+        self.evolution.bunch_length = np.array([beam.bunch_length()])
+        
         # set metadata
         beam.location = 0
         beam.stage_number = 0
