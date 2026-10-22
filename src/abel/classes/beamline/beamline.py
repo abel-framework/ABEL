@@ -212,7 +212,8 @@ class Beamline(Trackable, Runnable, CostModeled):
         evol = SimpleNamespace()
         evol.location = np.array([])
         location0 = 0.0
-
+        loc_lengths = np.array([])
+        
         # first calculate the locations
         for trackable in self[shots[0]].trackables:
             if hasattr(trackable, 'evolution'):
@@ -221,16 +222,18 @@ class Beamline(Trackable, Runnable, CostModeled):
                 else:
                     track_evol = trackable.evolution
                 if hasattr(track_evol, 'location'):
+                    loc_lengths = np.append(loc_lengths, [len(track_evol.location)])
                     evol.location = np.append(evol.location, track_evol.location - min(track_evol.location) + location0)
                 location0 = location0 + trackable.get_length()
-
+        
         # declare the data structure to contain all the data
-        vals = np.zeros((8,len(shots),len(evol.location)))
-
+        vals = np.empty((8,len(shots),len(evol.location)))
+        vals.fill(np.nan)
+        
         # extract all the data
         for i, shot in enumerate(shots):
             ind0 = 0
-            for trackable in self[shot].trackables:
+            for j, trackable in enumerate(self[shot].trackables):
                 if hasattr(trackable, 'evolution'):
                     if hasattr(trackable.evolution, 'beam'):
                         track_evol = trackable.evolution.beam
@@ -238,16 +241,16 @@ class Beamline(Trackable, Runnable, CostModeled):
                         track_evol = trackable.evolution
                     if not hasattr(track_evol, 'location'):
                         continue
-                    inds = range(ind0, ind0+len(np.array(track_evol.location)))
+                    inds = range(ind0, ind0 + round(loc_lengths[j]))
                     ind0 = max(inds)+1
-                    vals[0,i,inds] = np.array(track_evol.energy)
-                    vals[1,i,inds] = np.array(track_evol.charge)
-                    vals[2,i,inds] = np.array(track_evol.emit_nx)
-                    vals[3,i,inds] = np.array(track_evol.emit_ny)
-                    vals[4,i,inds] = np.array(track_evol.rel_energy_spread)
-                    vals[5,i,inds] = np.array(track_evol.bunch_length)
-                    vals[6,i,inds] = np.array(track_evol.beam_size_x)
-                    vals[7,i,inds] = np.array(track_evol.beam_size_y)
+                    vals[0,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.energy)
+                    vals[1,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.charge)
+                    vals[2,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.emit_nx)
+                    vals[3,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.emit_ny)
+                    vals[4,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.rel_energy_spread)
+                    vals[5,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.bunch_length)
+                    vals[6,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.beam_size_x)
+                    vals[7,i,inds] = np.interp(evol.location[inds], track_evol.location, track_evol.beam_size_y)
 
         # get the mean
         val_mean = np.mean(vals, axis=1)
@@ -319,7 +322,7 @@ class Beamline(Trackable, Runnable, CostModeled):
         ax = fig.add_subplot(gs[2, :])
         ax.fill_between(evol.location, (evol.beam_size_x + evol_std.beam_size_x)*1e6, (evol.beam_size_x-evol_std.beam_size_x)*1e6, color=col1, alpha=af, ec=None)
         ax.plot(evol.location, evol.beam_size_x*1e6, color=col1, label=r'$\sigma_x$')
-        ax.fill_between(evol.location, (evol.beam_size_y + evol_std.beam_size_y)*1e6, (evol.beam_size_y-evol_std.beam_size_y)*1e6, color=col1, alpha=af, ec=None)
+        ax.fill_between(evol.location, (evol.beam_size_y + evol_std.beam_size_y)*1e6, (evol.beam_size_y-evol_std.beam_size_y)*1e6, color=col2, alpha=af, ec=None)
         ax.plot(evol.location, evol.beam_size_y*1e6, color=col2, label=r'$\sigma_y$')
         ax.set_xlim(long_limits)
         ax.set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
@@ -330,7 +333,7 @@ class Beamline(Trackable, Runnable, CostModeled):
         ax = fig.add_subplot(gs[3, :])
         ax.plot(evol.location, abs(evol.emit_ny[0]) * np.ones(evol.location.shape) * 1e6, ':', color=col2)
         ax.plot(evol.location, abs(evol.emit_nx[0]) * np.ones(evol.location.shape) * 1e6, ':', color=col1)
-        ax.fill_between(evol.location, (evol.emit_ny + evol_std.emit_ny)*1e6, (evol.emit_ny-evol_std.emit_ny)*1e6, color=col1, alpha=af, ec=None)
+        ax.fill_between(evol.location, (evol.emit_ny + evol_std.emit_ny)*1e6, (evol.emit_ny-evol_std.emit_ny)*1e6, color=col2, alpha=af, ec=None)
         ax.plot(evol.location, evol.emit_ny*1e6, color=col2, label=r'$\epsilon_y$')
         ax.fill_between(evol.location, (evol.emit_nx + evol_std.emit_nx)*1e6, (evol.emit_nx-evol_std.emit_nx)*1e6, color=col1, alpha=af, ec=None)
         ax.plot(evol.location, evol.emit_nx*1e6, color=col1, label=r'$\epsilon_x$')
