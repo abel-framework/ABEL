@@ -67,7 +67,7 @@ class StageQuasistatic2d(Stage):
         self.stage_number = beam_incoming.stage_number
         
         # make driver
-        driver_incoming = self.driver_source.track()
+        driver_incoming = self.track_driver_source()
         original_driver = copy.deepcopy(driver_incoming)
 
 

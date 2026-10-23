@@ -261,7 +261,7 @@ class StageHipace(Stage):
             os.mkdir(tmpfolder)
         
         # generate driver
-        driver_incoming = self.driver_source.track()
+        driver_incoming = self.track_driver_source()
 
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
