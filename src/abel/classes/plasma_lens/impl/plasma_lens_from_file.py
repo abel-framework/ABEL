@@ -223,7 +223,9 @@ class PlasmaLensFromFile(PlasmaLens):
     def get_field(self, discharge_time=None, x=0.0, y=0.0):
         self._require_loaded()
         selected_time = self.set_discharge_time(discharge_time) if discharge_time is not None else self.selected_time
-        x_local = -(np.asarray(x) - self.offset_x)
+        # Polarity selects the horizontal map orientation, consistently with
+        # get_field_map(): +1 uses original x, -1 reflects x and imported Bx.
+        x_local = self.imported_magnetic_field_polarity * (np.asarray(x) - self.offset_x)
         y_local = np.asarray(y) - self.offset_y
         interpolator_Bx, interpolator_By = self._build_interpolators()
         Bx = np.nan_to_num(interpolator_Bx(x_local, y_local), nan=0.0)
@@ -349,7 +351,7 @@ class PlasmaLensFromFile(PlasmaLens):
             if len(beam) == 0:
                 return super().track(beam, savedepth, runnable, verbose)
 
-            x = -(beam.xs() - self.offset_x)
+            x = self.imported_magnetic_field_polarity * (beam.xs() - self.offset_x)
             y = beam.ys() - self.offset_y
             Bx = np.nan_to_num(interpolator_Bx(x, y), nan=0.0)
             By = np.nan_to_num(interpolator_By(x, y), nan=0.0)
