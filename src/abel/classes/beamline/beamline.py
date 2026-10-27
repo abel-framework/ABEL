@@ -40,16 +40,40 @@ class Beamline(Trackable, Runnable, CostModeled):
                 assert self.trackables[i].rep_rate_trains is None or self.trackables[i].rep_rate_trains==self.rep_rate_trains, 'Mismatched train rep rate'
                 self.trackables[i].rep_rate_trains = self.rep_rate_trains
 
+        # flatten the list all the way down (important for proper ordering of elements)
+        flat_trackable = []
+        for trackable in self.trackables:
+            if hasattr(trackable, 'trackables'):
+                if trackable.trackables is None:
+                    trackable.assemble_trackables()
+                flat_trackable.extend(trackable.trackables)
+            else:
+                flat_trackable.append(trackable)
+        self.trackables = flat_trackable
+
     
     # perform tracking
-    def track(self, beam=None, savedepth=0, runnable=None, verbose=False):
+    def track(self, beam=None, savedepth=0, runnable=None, verbose=False, track_from=0, track_until=-1):
         
         # assemble the trackables
         if self.trackables is None:
             self.assemble_trackables()
         
         # perform element-wise tracking
-        for trackable in self.trackables:
+        for i, trackable in enumerate(self.trackables):
+
+            # skip to the given trackable
+            if i < track_from:
+                continue
+            if track_from > 0 and track_from == i:
+                assert beam is not None
+            if track_until < 0:
+                if i > len(self.trackables) + track_until:
+                    break
+            elif i > track_until:
+                break
+            
+            # track through the trackable
             beam = trackable.track(beam, savedepth-1, runnable, verbose)
         
         return beam
