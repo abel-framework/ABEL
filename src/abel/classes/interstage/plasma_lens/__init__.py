@@ -9,6 +9,8 @@ from abel.classes.interstage import Interstage
 from types import SimpleNamespace
 import numpy as np
 import scipy.constants as SI
+import copy
+from abel.utilities.relativity import energy2gamma
 
 class InterstagePlasmaLens(Interstage, ABC):
     """
@@ -393,7 +395,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         
         # match the beta function
         from scipy.optimize import minimize
-        result_beta = minimize(minfun_beta, k_lens0, tol=1e-16, options={'maxiter': 200})
+        result_beta = minimize(minfun_beta, k_lens0, tol=1e-16, options={'maxiter': 1000})
         self._strength_plasma_lens = result_beta.x[0]*self.length_plasma_lens
 
     
@@ -435,7 +437,7 @@ class InterstagePlasmaLens(Interstage, ABC):
         
         # match the beta function
         from scipy.optimize import minimize
-        result_dispersion_R56 = minimize(minfun_dispersion_R56, [B_chic1_guess, B_chic2_guess], tol=1e-8, options={'maxiter': 50})
+        result_dispersion_R56 = minimize(minfun_dispersion_R56, [B_chic1_guess, B_chic2_guess], tol=1e-16, options={'maxiter': 500})
         self._field_ratio_chicane_dipole1 = result_dispersion_R56.x[0]/self.field_dipole
         self._field_ratio_chicane_dipole2 = result_dispersion_R56.x[1]/self.field_dipole
     
@@ -476,7 +478,7 @@ class InterstagePlasmaLens(Interstage, ABC):
             
         # match the beta function
         from scipy.optimize import minimize
-        result_W = minimize(minfun_W, tau_lens0, tol=1e-16, options={'maxiter': 100})
+        result_W = minimize(minfun_W, tau_lens0, tol=1e-16, options={'maxiter': 1000})
         self._nonlinearity_plasma_lens = result_W.x[0]
     
         
@@ -513,7 +515,7 @@ class InterstagePlasmaLens(Interstage, ABC):
     
         # match the beta function
         from scipy.optimize import minimize
-        result_dispersion = minimize(minfun_second_order_dispersion, m_sext0, method='Nelder-Mead', tol=1e-20, options={'maxiter': 50})
+        result_dispersion = minimize(minfun_second_order_dispersion, m_sext0, method='Nelder-Mead', tol=1e-16, options={'maxiter': 500})
         self._strength_sextupole = result_dispersion.x[0]*self.length_central_gap_or_sextupole
         
     
@@ -548,4 +550,90 @@ class InterstagePlasmaLens(Interstage, ABC):
         print(f'         Total bend angle:           {np.rad2deg(self.total_bend_angle()):.2f} deg')
         print('------------------------------------------------')
 
+
+
+    ## PRE-ALIGNMENT ROUTINE
+
+    def pre_align(self, source=None, dx=None, verbose=False, parallel=True):
+        
+        # copy and adjust the source
+        source_copy = copy.deepcopy(source)
+        source_copy.num_particles = 10000
+        source_copy.symmetrize = True
+        source_copy.x_offset = 0
+        source_copy.y_offset = 0
+        source_copy.x_angle = 0
+        source_copy.y_angle = 0
+        source_copy.energy = self.nom_energy
+        source_copy.beta_x = self.beta0
+        source_copy.beta_y = self.beta0
+
+        # make the beam from the source
+        beam0 = source_copy.track()
     
+        # pre-run to find offsets with zero lens offsets
+        self.lens1_offset_x = 0
+        self.lens2_offset_x = 0
+        self.lens1_offset_y = 0
+        self.lens2_offset_y = 0
+        
+        # print info
+        if verbose:
+            print('Interstage pre-alignment: building response matrix...')
+
+        # pre-calculate the optical setup
+        self.matrix_lattice()
+        
+        # calculate characteristic scale of offsets from normalized amplitude
+        if dx is None:
+            beam_before = self.track(beam0)
+            A0 = beam_before.norm_amplitude_x(beta0=self.beta0)
+            dx = np.sqrt(A0**2*self.beta0/energy2gamma(self.nom_energy))/2
+
+        # define offsets to be simulated
+        dxs_lens = [[-dx, 0], [dx, 0], [0, -dx], [0, dx], [0, 0]]
+
+        # define offset simulation function
+        def offset_simulation(dx_lens):
+            self_copy = copy.deepcopy(self)
+            self_copy.lens1_offset_x = dx_lens[0]
+            self_copy.lens2_offset_x = dx_lens[1]
+            beam = self_copy.track(beam0)
+            return np.array([beam.x_offset(), beam.x_angle()])
+
+        # perform simulation in parallel or not
+        if parallel:
+            from joblib import Parallel, delayed
+            Xs = np.array(Parallel(n_jobs=5)(delayed(offset_simulation)(dx_lens) for dx_lens in dxs_lens))
+
+        else:
+            Xs = np.zeros_like(dxs_lens)
+            for i, dx_lens in enumerate(dxs_lens):
+                Xs[i,:] = offset_simulation(dx_lens)
+        
+        # extract the zero-offset beam
+        X_beam = np.array([Xs[4,0], Xs[4,1]])
+        
+        # build response matrix
+        diff_dx = 2*dx
+        response_matrix = np.array([[Xs[1,0]-Xs[0,0], Xs[3,0]-Xs[2,0]],
+                                    [Xs[1,1]-Xs[0,1], Xs[3,1]-Xs[2,1]]])/(2*dx)
+
+        # invert the response matrix to find the optimal lens offsets
+        inv_response_matrix = np.linalg.inv(response_matrix)
+        dx_lenses = np.matmul(inv_response_matrix, -X_beam)
+        
+        # pre-run to find offsets with zero lens offsets
+        self.lens1_offset_x = dx_lenses[0]
+        self.lens2_offset_x = dx_lenses[1]
+        
+        # print info
+        if verbose:
+            beam_after = self.track(beam0)
+            print(f'>> Before: x = {X_beam[0]*1e6:.2f} µm, {X_beam[1]*1e6:.2f} µrad  ->  After: x = {beam_after.x_offset()*1e6:.2f} µm, {beam_after.x_angle()*1e6:.2f} µrad')
+            print(f'>> Ideal offset: lens 1 = {dx_lenses[0]*1e6:.2f} µm, lens 2 = {dx_lenses[1]*1e6:.2f} µm')
+
+        return dx_lenses
+
+
+        

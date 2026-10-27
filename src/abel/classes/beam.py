@@ -1038,8 +1038,11 @@ class Beam():
     def eigen_emittance_min(self):
         return np.sqrt(self.norm_emittance_x()*self.norm_emittance_y()) - self.angular_momentum()
 
-    def norm_amplitude_x(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
+    def norm_amplitude_x(self, beta0=None, plasma_density=None, clean=False):
+        if beta0 is not None:
+            beta_x = beta0
+            alpha_x = 0
+        elif plasma_density is not None:
             beta_x = beta_matched(plasma_density, self.energy())
             alpha_x = 0
         else:
@@ -1049,8 +1052,11 @@ class Beam():
             alpha_x = -covx[1,0]/emgx
         return np.sqrt(self.gamma()/beta_x)*np.sqrt(self.x_offset()**2 + (self.x_offset()*alpha_x + self.x_angle()*beta_x)**2)
         
-    def norm_amplitude_y(self, plasma_density=None, clean=False):
-        if plasma_density is not None:
+    def norm_amplitude_y(self, beta0=None, plasma_density=None, clean=False):
+        if beta0 is not None:
+            beta_y = beta0
+            alpha_y = 0
+        elif plasma_density is not None:
             beta_y = beta_matched(plasma_density, self.energy())
             alpha_y = 0
         else:
@@ -1841,7 +1847,7 @@ class Beam():
             self.set_ys(-self.ys())
 
         
-    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=False):
+    def apply_betatron_motion(self, L, n0, deltaEs, x0_driver=0, y0_driver=0, radiation_reaction=False, probe_evolution=False, spin_tracking=False):
         """
         Evolve the beam by solving Hill's equation in the x- and y direction 
         separately.
@@ -1865,6 +1871,9 @@ class Beam():
         
         probe_evolution : bool
             Flag for recording the beam parameter evolution. 
+
+        spin_tracking : bool
+            Flag for performing spin tracking.
 
 
         Returns
@@ -1894,52 +1903,72 @@ class Beam():
         gammas = energy2gamma(Es_final)
         dgamma_ds = (gammas-gamma0s)/L
         
-        if probe_evolution:  # TODO: This seems to be very clumsy. Consider re-writing.
+        if probe_evolution:
                 
             # calculate evolution
-            num_evol_steps = max(20, min(400, round(2*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
+            num_evol_steps = max(20, min(500, round(3*L/(beta_matched(n0, self.energy()+min(0,np.mean(deltaEs)))))))
             evol = SimpleNamespace()
-            evol.location = np.linspace(0, L, num_evol_steps)
-            evol.x, evol.ux, evol.ux, evol.y, evol.uy, evol.energy, evol.energy_spread, evol.rel_energy_spread, evol.beam_size_x, evol.beam_size_y, evol.emit_nx, evol.emit_ny, evol.beta_x, evol.beta_y = (np.empty(evol.location.shape) for _ in range(14))
 
             # select a given subset of the particles (for faster calculation)
-            sample_fraction = round(2*np.sqrt(len(self))) #
-            inds_sample = np.arange(0, len(self), sample_fraction, dtype=int) # not random, to be consistent across ramps and stages
-            xs_sample, uxs_sample = self.xs()[inds_sample], self.uxs()[inds_sample]
-            ys_sample, uys_sample = self.ys()[inds_sample], self.uys()[inds_sample]
-            gamma0s_sample, dgamma_ds_sample = gamma0s[inds_sample], dgamma_ds[inds_sample]
-            Es_sample, deltaEs_sample = self.Es()[inds_sample], deltaEs[inds_sample]
+            sample_fraction = round(4*np.sqrt(len(self))) #
+            inds_samp = np.arange(0, len(self), sample_fraction, dtype=int) # not random, to be consistent across ramps and stages
+            xs_samp, uxs_samp = self.xs()[inds_samp], self.uxs()[inds_samp]
+            ys_samp, uys_samp = self.ys()[inds_samp], self.uys()[inds_samp]
+            gamma0s_samp, dgamma_ds_samp = gamma0s[inds_samp], dgamma_ds[inds_samp]
+            Es_samp, deltaEs_samp = self.Es()[inds_samp], deltaEs[inds_samp]
+            
+            # simulate evolution
+            from abel.physics_models.hills_equation import evolve_hills_equation_analytic_evolution
+            xs_all, uxs_all, gammas_all, ss = evolve_hills_equation_analytic_evolution(xs_samp-x0_driver, uxs_samp, L, gamma0s_samp, dgamma_ds_samp, k_p(n0), num_steps=num_evol_steps)
+            ys_all, uys_all, _, _ = evolve_hills_equation_analytic_evolution(ys_samp-y0_driver, uys_samp, L, gamma0s_samp, dgamma_ds_samp, k_p(n0), num_steps=num_evol_steps)
+            Es_all = gammas_all/(SI.e/(SI.m_e*SI.c**2))
+            uzs_all = energy2proper_velocity(Es_all)
 
-            # go through steps
-            for i in range(num_evol_steps):
-                
-                # evolve the beam (no radiation reaction)
-                xs_i, uxs_i = evolve_hills_equation_analytic(xs_sample-x0_driver, uxs_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
-                ys_i, uys_i = evolve_hills_equation_analytic(ys_sample-y0_driver, uys_sample, evol.location[i], gamma0s_sample, dgamma_ds_sample, k_p(n0))
-                Es_i = Es_sample+deltaEs_sample*i/(num_evol_steps-1)
-                uzs_i = energy2proper_velocity(Es_i)
-                
-                # save the parameters
-                evol.x[i], evol.ux[i] = np.mean(xs_i), np.mean(uxs_i)
-                evol.y[i], evol.uy[i] = np.mean(ys_i), np.mean(uys_i)
-                evol.energy[i], evol.energy_spread[i] = np.mean(Es_i), np.std(Es_i)
-                evol.beam_size_x[i], evol.beam_size_y[i] = np.std(xs_i), np.std(ys_i)
-                evol.emit_nx[i] = np.sqrt(np.linalg.det(np.cov(xs_i, uxs_i/SI.c))) # only works for equal weight particles
-                evol.emit_ny[i] = np.sqrt(np.linalg.det(np.cov(ys_i, uys_i/SI.c))) # only works for equal weight particles
-                covx, covy = np.cov(xs_i, uxs_i/uzs_i), np.cov(ys_i, uys_i/uzs_i)
+            # extract evolution
+            evol.location = ss
+            evol.x, evol.ux = np.mean(xs_all, axis=0), np.mean(uxs_all, axis=0)
+            evol.y, evol.uy = np.mean(ys_all, axis=0), np.mean(uys_all, axis=0)
+            evol.energy, evol.energy_spread = np.mean(Es_all, axis=0), np.std(Es_all, axis=0)
+            evol.rel_energy_spread = evol.energy_spread/evol.energy
+            evol.beam_size_x, evol.beam_size_y = np.std(xs_all, axis=0), np.std(ys_all, axis=0)
+            
+            evol.emit_nx, evol.emit_ny, evol.beta_x, evol.beta_y = np.zeros_like(ss), np.zeros_like(ss), np.zeros_like(ss), np.zeros_like(ss)
+            for i in range(len(ss)):
+                evol.emit_nx[i] = np.sqrt(np.linalg.det(np.cov(xs_all[:,i], uxs_all[:,i]/SI.c))) # only works for equal weight particles
+                evol.emit_ny[i] = np.sqrt(np.linalg.det(np.cov(ys_all[:,i], uys_all[:,i]/SI.c))) # only works for equal weight particles
+                covx, covy = np.cov(xs_all[:,i], uxs_all[:,i]/uzs_all[:,i]), np.cov(ys_all[:,i], uys_all[:,i]/uzs_all[:,i])
                 evol.beta_x[i] = covx[0,0]/np.sqrt(np.linalg.det(covx))
                 evol.beta_y[i] = covy[0,0]/np.sqrt(np.linalg.det(covy))
-
-            evol.rel_energy_spread = evol.energy_spread/evol.energy
-            evol.charge = self.charge()*np.ones(evol.location.shape)
-            evol.z = self.z_offset()*np.ones(evol.location.shape)
-            evol.bunch_length = self.bunch_length()*np.ones(evol.location.shape)
-            evol.plasma_density = n0*np.ones(evol.location.shape)
+      
+            evol.z = self.z_offset()*np.ones_like(ss)
+            evol.charge = self.charge()*np.ones_like(ss)
+            evol.bunch_length = self.bunch_length()*np.ones_like(ss)
+            evol.plasma_density = n0*np.ones_like(ss)
             
             
         # calculate final positions and angles after betatron motion
         if radiation_reaction:
             xs, uxs, ys, uys, Es_final = evolve_betatron_motion(self.xs()-x0_driver, self.uxs(), self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+        elif spin_tracking:
+            
+            # transverse motion evolution using Hill's equation (to get particle orbits and energy evolution)
+            from abel.physics_models.hills_equation import evolve_hills_equation_analytic_evolution
+            xs_all, uxs_all, gammas_all, ss = evolve_hills_equation_analytic_evolution(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
+            ys_all, uys_all, _, _ = evolve_hills_equation_analytic_evolution(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))
+            
+            # track spins
+            from abel.physics_models.spin_tracking import TBMT_spin_evolution
+            spxs, spys, spzs = TBMT_spin_evolution(self.spxs(), self.spys(), self.spzs(), k_p(n0), ss, xs_all, ys_all, uxs_all, uys_all, gammas_all)
+            self.set_spxs(spxs)
+            self.set_spys(spys)
+            self.set_spzs(spzs)
+            
+            # extract the final beam parameters
+            xs = xs_all[:,-1]
+            ys = ys_all[:,-1]
+            uxs = uxs_all[:,-1]
+            uys = uys_all[:,-1]
+            
         else:
             xs, uxs = evolve_hills_equation_analytic(self.xs()-x0_driver, self.uxs(), L, gamma0s, dgamma_ds, k_p(n0))
             ys, uys = evolve_hills_equation_analytic(self.ys()-y0_driver, self.uys(), L, gamma0s, dgamma_ds, k_p(n0))

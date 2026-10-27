@@ -261,7 +261,7 @@ class StageHipace(Stage):
             os.mkdir(tmpfolder)
         
         # generate driver
-        driver_incoming = self.driver_source.track()
+        driver_incoming = self.track_driver_source()
 
         # Set ramp lengths, nominal energies, nominal energy gains
         # and flattop nominal energy if not already done
@@ -329,7 +329,9 @@ class StageHipace(Stage):
         dz = beta_matched/20
         
         # convert to number of steps (and re-adjust timestep to be divisible)
-        self.num_steps = np.ceil(self.length_flattop/dz)
+        self.num_steps = int(np.ceil(self.length_flattop / dz))
+        # Adds 1 to make it even if odd
+        self.num_steps += self.num_steps % 2  # make it even (add 1 if odd)
         
         if self.output is not None:
             remainder = self.num_steps % self.output
@@ -348,7 +350,7 @@ class StageHipace(Stage):
             output_period = None
         
         # input file
-        filename_input = 'input_file'
+        filename_input = 'input_file_stage' + str(self.stage_number)
         path_input = tmpfolder + filename_input
         hipace_write_inputs(path_input, filename_beam, filename_driver, self.plasma_density, self.num_steps, time_step, box_range_z, box_size_xy, ion_motion=self.ion_motion, ion_species=self.ion_species, beam_ionization=self.beam_ionization, radiation_reaction=self.radiation_reaction, output_period=output_period, num_cell_xy=self.num_cell_xy, num_cell_z=num_cell_z, driver_only=self.driver_only, density_table_file=density_table_file, no_plasma=self.no_plasma, external_focusing_gradient=self._external_focusing_gradient, mesh_refinement=self.mesh_refinement, do_spin_tracking=self.do_spin_tracking)
         
@@ -397,11 +399,7 @@ class StageHipace(Stage):
 
         # extract insitu diagnostics and wakefield data
         self.__extract_evolution(tmpfolder, beam0, runnable)
-        self.__extract_initial_and_final_step(tmpfolder, beam0, runnable)
-
-        # move the HiPACE++ input file to be stored
-        if self.run_path is not None:
-            shutil.move(path_input, self.run_path)
+        self.__extract_initial_middle_and_final_step(tmpfolder, beam0, runnable)
         
         # delete temp folder
         shutil.rmtree(tmpfolder)
@@ -545,7 +543,7 @@ class StageHipace(Stage):
             shutil.move(insitu_path, destination_path)
         
         
-    def __extract_initial_and_final_step(self, tmpfolder, beam0, runnable):
+    def __extract_initial_middle_and_final_step(self, tmpfolder, beam0, runnable):
 
         from openpmd_viewer import OpenPMDTimeSeries
         
@@ -563,17 +561,40 @@ class StageHipace(Stage):
         self.final.plasma.wakefield.onaxis.zs = metadata.z
         self.final.plasma.wakefield.onaxis.Ezs = Ez
         
+        # extract middle field information if there are more than two steps
+        if len(ts.iterations) > 2:
+            # Get step closest to middle
+            middle_step = ts.iterations[np.argmin(abs(ts.iterations - int(max(ts.iterations)/2)))]
+            
+            # extract middle on-axis wakefield
+            Ez, metadata = ts.get_field(field='Ez', slice_across=['x'], iteration=middle_step)
+            self.middle.plasma.wakefield.onaxis.zs = metadata.z
+            self.middle.plasma.wakefield.onaxis.Ezs = Ez
+    
+            # extract middle beam density
+            jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=middle_step)
+            self.middle.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
+            self.middle.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
+    
+            # extract middle plasma density
+            rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=middle_step)
+            self.middle.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
+            self.middle.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)
+
+            # Extract step 
+            self.middle.n_step = middle_step
+            
         # extract initial plasma density
         rho0_plasma, metadata0_plasma = ts.get_field(field='rho', iteration=min(ts.iterations))
         self.initial.plasma.density.extent = metadata0_plasma.imshow_extent[[2,3,0,1]]
         self.initial.plasma.density.rho = -(rho0_plasma.T/SI.e-self.plasma_density)
  
-        # extract final beam density
+        # extract initial beam density
         jz0_beam, metadata0_beam = ts.get_field(field='jz_beam', iteration=min(ts.iterations))
         self.initial.beam.density.extent = metadata0_beam.imshow_extent[[2,3,0,1]]
         self.initial.beam.density.rho = -jz0_beam.T/(SI.c*SI.e)
 
-        # extract initial plasma density
+        # extract final plasma density
         rho_plasma, metadata_plasma = ts.get_field(field='rho', iteration=max(ts.iterations))
         self.final.plasma.density.extent = metadata_plasma.imshow_extent[[2,3,0,1]]
         self.final.plasma.density.rho = -(rho_plasma.T/SI.e-self.plasma_density)
@@ -592,8 +613,18 @@ class StageHipace(Stage):
     def _make_ramp_profile(self, tmpfolder):
         """Prepare the ramps (local to HiPACE)."""
         
-        # check that there is not already a plasma density profile set
-        assert self.plasma_density_from_file is None
+        # If there is already a density file open and make the plasma profile
+        if self.plasma_density_from_file is not None:
+            try:
+                data = np.loadtxt(self.plasma_density_from_file, comments='#')
+                ss, ns = data[:, 0], data[:, 1]
+                self.plasma_profile.ss = ss
+                self.plasma_profile.ns = ns
+                return
+            except OSError:
+                raise FileNotFoundError(f"Plasma profile file '{self.plasma_density_from_file}' cannot be located or opened using given path.") from None # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
+            except ValueError:
+                raise ValueError(f"Plasma profile file '{self.plasma_density_from_file}' must contain two numeric values (SI units) in the order <longitudinal position> <plasma density> per line.") from None # Suppress inner traceback; without this Jupyter jumps to unrelated lines.
 
         # make the plasma ramp profile
         if self.has_ramp():
@@ -612,7 +643,6 @@ class StageHipace(Stage):
             ss = np.concatenate((ss_upramp, ss_flattop, ss_downramp), axis=0)
             ns = np.concatenate((ns_upramp, ns_flattop, ns_downramp), axis=0)
 
-            # save to file
             self.plasma_profile.ss = ss
             self.plasma_profile.ns = ns
             
