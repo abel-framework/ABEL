@@ -14,18 +14,33 @@ from abel.classes.transfer_line.transfer_line import TransferLine
 
 class DriverComplex(Beamline):
     
-    def __init__(self, source=None, rf_accelerator=None, combiner_ring=None, turnaround=None, transfer_line=None, nom_energy=None, num_drivers=None, num_bunches_in_train=None, bunch_separation=None, rep_rate_trains=None):
+    def __init__(self, source=None, rf_accelerator=None, combiner_ring=None, turnaround=None, transfer_line=None, nom_energy=None, num_drivers=None, num_bunches_in_train=None, bunch_separation=None, rep_rate_trains=None, z_shifts=None):
 
         super().__init__(num_bunches_in_train, bunch_separation, rep_rate_trains)
         
         self.num_drivers = num_drivers
         self.nom_energy = None
+        self.z_shifts = z_shifts
         
         self.source = source
         self.rf_accelerator = rf_accelerator
         self.combiner_ring = combiner_ring
         self.transfer_line = transfer_line
         self.turnaround = turnaround
+
+    def track(self, beam=None, savedepth=0, runnable=None, verbose=False, stage_number=None):
+
+        # shift the driver timing (from the source)
+        if stage_number is not None:
+            if self.z_shifts is not None:
+                if stage_number < len(self.z_shifts):
+                    self.source.z_offset = self.source.z_offset + self.z_shifts[stage_number]
+
+        # assemble trackables if not already done
+        if not self.trackables:
+            self.assemble_trackables()
+        
+        return super().track(beam, savedepth, runnable, verbose)
         
     
     # assemble the trackables

@@ -67,7 +67,7 @@ class StageQuasistatic2d(Stage):
         self.stage_number = beam_incoming.stage_number
         
         # make driver
-        driver_incoming = self.driver_source.track()
+        driver_incoming = self.track_driver_source()
         original_driver = copy.deepcopy(driver_incoming)
 
 
@@ -218,9 +218,9 @@ class StageQuasistatic2d(Stage):
         driver_waket = wake_t_bunch2beam(bunches[0][-1])
         
         # save evolution of the beam and driver
-        if self.probe_evolution:
-            self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
-            self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
+        #if self.probe_evolution:
+        #    self._driver_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[0])
+        #    self._beam_evolution = wake_t.diagnostics.analyze_bunch_list(bunches[1])
 
         # Store wakefield and beam quantities
         self.__save_initial_step(tmpfolder)

@@ -381,7 +381,7 @@ class StageReducedModels(Stage):
 
         
         # ========== Get the drive beam ==========
-        driver_incoming = self.driver_source.track()  # Generate a drive beam with jitter.
+        driver_incoming = self.track_driver_source()  # Generate a drive beam with jitter.
         
         original_driver = copy.deepcopy(driver_incoming)
         original_beam = copy.deepcopy(beam_incoming)
@@ -1305,7 +1305,7 @@ class StageReducedModels(Stage):
 
         # Mask based on peaks
         if self.estm_R_blowout is None:
-            drive_beam = self.driver_source.track()
+            drive_beam = self.track_driver_source()
             R_blowout = blowout_radius(self.plasma_density, drive_beam.peak_current())
         else:
             R_blowout = self.estm_R_blowout
