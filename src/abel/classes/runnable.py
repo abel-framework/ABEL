@@ -36,7 +36,11 @@ class Runnable(ABC):
 
             # print info
             if self.num_shots > 1 and self.verbose:
-                print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
+                #print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
+                if self.is_shared_run:
+                    print('>> SHARED RUN (SHOT '+str(shot+1)+') until element #' + str(self.shared_run_until-1), flush=True)
+                else:
+                    print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots), flush=True)
         
         else:
 
@@ -55,14 +59,17 @@ class Runnable(ABC):
                     # delete incomplete run data (if not continuing a shared run)
                     if not (self.shared_run_until is not None and not self.is_shared_run and shot == 0):
                         self.clear_run_data(shot)
-                        
+                    
                     # start from the beginning
                     beam = None
                     track_from = 0
 
                     # print info
                     if self.num_shots > 1 and self.verbose:
-                        print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots) + ' (overwriting)', flush=True)
+                        if self.is_shared_run:
+                            print('>> SHARED RUN (SHOT '+str(shot+1)+') until element #' + str(self.shared_run_until-1) + ' (overwriting)', flush=True)
+                        else:
+                            print('>> SHOT ' + str(shot+1) + '/' + str(self.num_shots) + ' (overwriting)', flush=True)
                     
                 else:
 
@@ -99,7 +106,7 @@ class Runnable(ABC):
                         if os.path.exists(symlink):
                             os.remove(symlink)
                         os.symlink(file, symlink)
-                    print(f'    ... #0-{self.shared_run_until} symlinked to SHOT 1')
+                    print(f'    ... #0-{self.shared_run_until-1} symlinked to SHOT 1')
 
                 # set the starting point for continuing (and load the correct beam)
                 index = self.shared_run_until
