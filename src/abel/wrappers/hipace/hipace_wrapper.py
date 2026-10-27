@@ -156,7 +156,9 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         print('>> HiPACE++: Changing from', num_cell_xy, 'to', new_num_cell_xy, ' (i.e., 2^n-1) for better performance.')
         num_cell_xy = new_num_cell_xy
 
-    # plasma-density profile from file
+    # gradient for external magnetic field
+    if external_focusing_gradient is None:
+        external_focusing_gradient = '#'
     if abs(external_focusing_gradient) > 0:
         external_focusing_comment = ''
     else:
