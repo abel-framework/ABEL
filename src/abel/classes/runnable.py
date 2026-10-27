@@ -115,7 +115,10 @@ class Runnable(ABC):
     ## SCAN FUNCTIONALITY
     
     def is_scan(self):
-        return self.scan_fcn is not None
+        if hasattr(self, 'scan_fcn'):
+            return self.scan_fcn is not None
+        else:
+            return False
       
     # scan function
     def scan(self, run_name=None, fcn=None, vals=[None], label=None, scale=1, num_shots_per_step=1, step_filter=None, shot_filter=None, savedepth=2, verbose=None, overwrite=False, parallel=False, max_cores=16, overwrite_from=None, shared_run_until=None):
