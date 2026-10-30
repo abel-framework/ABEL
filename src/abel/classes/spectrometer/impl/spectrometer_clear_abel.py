@@ -124,17 +124,36 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
         refpart.s += 0.5 * ds
     @staticmethod
     def _push_lens_particles(field_map, lens, pti, refpart):
+        import amrex.space3d as amr
+
         soa = pti.soa().to_xp()
         x, y = soa.real["position_x"], soa.real["position_y"]
         px, py = soa.real["momentum_x"], soa.real["momentum_y"]
+        # The capillary moves with the lens, independently of the optional
+        # beamline aperture. Match PlasmaLensFromFile.track's radial losses.
+        idcpu = soa.idcpu
+        valid_bits = np.uint64(amr.make_invalid(np.iinfo(np.uint64).max))
+
+        def clip_to_lens():
+            outside = ((x - field_map.offset_x)**2
+                       + (y - field_map.offset_y)**2 > field_map.radius**2)
+            # Clearing AMReX's validity bit lets ImpactX collect lost particles.
+            # Preserve IDs and CPU ownership for its loss diagnostics.
+            idcpu[outside] &= valid_bits
+
         ds = lens.ds / lens.nslice
+        clip_to_lens()
         x[:] += 0.5 * ds * px
         y[:] += 0.5 * ds * py
+        clip_to_lens()
         _, bx, by = field_map.get_field(x=x, y=y)
-        px[:] -= np.asarray(by) * ds / refpart.rigidity_Tm
-        py[:] += np.asarray(bx) * ds / refpart.rigidity_Tm
+        # ImpactX rigidity includes the charge sign (negative for electrons).
+        # q(v × B) gives +By horizontally and -Bx vertically over signed Bρ.
+        px[:] += np.asarray(by) * ds / refpart.rigidity_Tm
+        py[:] -= np.asarray(bx) * ds / refpart.rigidity_Tm
         x[:] += 0.5 * ds * px
         y[:] += 0.5 * ds * py
+        clip_to_lens()
     def _add_radial_aperture_checks(self, lattice):
         """Add a circular aperture check before and after each lattice element."""
         if self.aperture_diameter is None:
@@ -322,7 +341,8 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
                 label = f"{screen} (spectrometer {'ON' if spectrometer_on else 'OFF'})"
             beams[label] = monitor_beam
         return beams
-    def plot_lattice_survey(self, kinetic_energy_ev):
+    def plot_lattice_survey(self, kinetic_energy_ev, label_fontsize=12,
+                            legend_fontsize=12, figsize=(20, 10)):
         """Plot the common line and both screen branches with CLEAR element colors."""
         import matplotlib.pyplot as plt
         from matplotlib.lines import Line2D
@@ -332,14 +352,16 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
             length = float(getattr(element, "ds", 0.0))
             name = getattr(element, "name", "") or ""
             center = common_end + length / 2
-            if name.startswith(("Q", "DHJ")):
+            # Entrance/exit diagnostics share the magnet prefix, but are not
+            # magnets. Drawing them here duplicated labels around DHJ/quads.
+            if name in ("QDD0870", "QFD0880", "DHJ0840"):
                 items.append(("magnet", name, center))
             elif name.startswith(("BTV", "BPM")):
                 items.append(("screen", name, center))
             elif name.startswith("PlasmaLens"):
                 items.append(("lens", name, center, length))
             common_end += length
-        fig, ax = plt.subplots(figsize=(17, 8), layout="constrained")
+        fig, ax = plt.subplots(figsize=figsize, layout="constrained")
         ax.plot([0, common_end], [0, 0], color="black", lw=2.2,
                 label="Common line from BTV805")
         lens = next((item for item in items if item[0] == "lens"), None)
@@ -348,7 +370,7 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
             ax.plot([center - length / 2, center + length / 2], [0, 0],
                     color="tab:cyan", lw=7, solid_capstyle="butt", zorder=3)
             ax.annotate("Plasma lens", (center, 0), xytext=(0, 7),
-                        textcoords="offset points", ha="center", color="teal", fontsize=8)
+                        textcoords="offset points", ha="center", color="teal", fontsize=label_fontsize)
         magnets = [(name, pos) for kind, name, pos, *rest in items if kind == "magnet"]
         for i, (name, pos) in enumerate(magnets):
             quad = name.startswith("Q")
@@ -356,8 +378,14 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
             ax.scatter(pos, 0, color=color, marker=marker, s=36, zorder=4)
             height = 0.12 + 0.035 * (i % 3)
             ax.vlines(pos, 0.015, height, color=color, lw=0.8)
-            ax.annotate(name, (pos, height), xytext=(0, 2), textcoords="offset points",
-                        rotation=55, ha="left", va="bottom", fontsize=7, color=color)
+            if name == "DHJ0840":
+                ax.annotate(name, (pos, height), xytext=(-12, 18),
+                            textcoords="offset points", ha="right", va="bottom",
+                            fontsize=label_fontsize, color=color,
+                            arrowprops=dict(arrowstyle="-", color=color, lw=0.8))
+            else:
+                ax.annotate(name, (pos, height), xytext=(0, 2), textcoords="offset points",
+                            rotation=55, ha="left", va="bottom", fontsize=label_fontsize, color=color)
         screens = [(name, pos) for kind, name, pos, *rest in items if kind == "screen"]
         for i, (name, pos) in enumerate(screens):
             bpm = name.startswith("BPM")
@@ -367,13 +395,13 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
             ax.vlines(pos, -0.015, height, color=color, lw=0.7)
             label = f"{name}\ns={pos:.2f} m" if bpm else name
             ax.annotate(label, (pos, height), xytext=(0, -2), textcoords="offset points",
-                        rotation=55, ha="right", va="top", fontsize=7, color=color)
+                        rotation=55, ha="right", va="top", fontsize=label_fontsize, color=color)
         dump_end = common_end + _DUMP_BRANCH_LENGTH
         ax.plot([common_end, dump_end], [0, 0], color="tab:green", lw=2,
                 label="CA.INAIR branch")
         ax.scatter(dump_end, 0, marker="s", color="tab:red", s=28, zorder=5)
         ax.annotate("BTV910", (dump_end, 0), xytext=(0, -18),
-                    textcoords="offset points", ha="center", fontsize=8)
+                    textcoords="offset points", ha="center", fontsize=label_fontsize)
         theta = np.deg2rad(_SPECTROMETER_DIPOLE_ANGLE_DEG)
         dipole_length = _SPECTROMETER_DIPOLE_LENGTH
         arc_length = theta * (0.5 * dipole_length) / np.sin(theta / 2)
@@ -391,17 +419,17 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
                 label="CA.SPECT branch")
         ax.plot(arc_x, arc_y, color="tab:blue", lw=3)
         ax.annotate("BHB0900", (np.mean(arc_x), np.mean(arc_y)), xytext=(0, 10),
-                    textcoords="offset points", ha="center", color="tab:orange", fontsize=8)
+                    textcoords="offset points", ha="center", color="tab:orange", fontsize=label_fontsize)
         ax.plot([arc_x[-1], end_x], [arc_y[-1], end_y], color="tab:blue", lw=2)
         bpm_s = dipole_start + dipole_length + (0.7436 - dipole_length / 2)
         bpm_x = arc_x[-1] + (bpm_s - dipole_start - dipole_length) * np.cos(theta)
         bpm_y = arc_y[-1] + (bpm_s - dipole_start - dipole_length) * np.sin(theta)
         ax.scatter(bpm_x, bpm_y, marker="s", color="tab:blue", s=25, zorder=5)
         ax.annotate(f"BPM0920\ns={common_end + bpm_s:.2f} m", (bpm_x, bpm_y),
-                    xytext=(0, -18), textcoords="offset points", ha="center", fontsize=8)
+                    xytext=(0, -18), textcoords="offset points", ha="center", fontsize=label_fontsize)
         ax.scatter(end_x, end_y, marker="s", color="tab:red", s=28, zorder=5)
         ax.annotate("BTV930", (end_x, end_y), xytext=(0, 8),
-                    textcoords="offset points", ha="center", fontsize=8)
+                    textcoords="offset points", ha="center", fontsize=label_fontsize)
         legend = [
             Line2D([0], [0], marker="^", color="none", markerfacecolor="tab:purple", label="Quadrupole"),
             Line2D([0], [0], marker="D", color="none", markerfacecolor="tab:orange", label="Corrector"),
@@ -416,6 +444,11 @@ class SpectrometerCLEAR(ImpactXSpectrometer):
                title="CLEAR sublattice survey: BTV805 to BTV910 / BTV930",
                ylim=(-0.55, 0.55))
         ax.grid(True, alpha=0.25)
-        ax.legend(handles=legend, loc="upper left", ncol=2, fontsize=8)
+        ax.set_xlabel("survey x [m]", fontsize=14)
+        ax.set_ylabel("survey y [m]", fontsize=14)
+        ax.set_title("CLEAR sublattice survey: BTV805 to BTV910 / BTV930", fontsize=16, pad=16)
+        ax.tick_params(labelsize=12)
+        ax.legend(handles=legend, loc="upper left", bbox_to_anchor=(1.01, 1),
+                  ncol=1, fontsize=legend_fontsize, markerscale=1.4)
         return fig, ax
 
