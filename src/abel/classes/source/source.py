@@ -75,10 +75,9 @@ class Source(Trackable, CostModeled):
         Defines the orientation of the spin. Can be ``'x'``, ``'y'`` or ``'z'``.
         
     """
-    #TODO: Why is accel_gradient needed??
     
     @abstractmethod
-    def __init__(self, length=0.0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, align_beam_axis=False, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0.0, waist_shift_y=0.0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None):
+    def __init__(self, length=0.0, charge=None, energy=None, accel_gradient=None, wallplug_efficiency=1, x_offset=0.0, y_offset=0.0, x_angle=0.0, y_angle=0.0, align_beam_axis=False, norm_jitter_emittance_x=None, norm_jitter_emittance_y=None, waist_shift_x=0.0, waist_shift_y=0.0, rep_rate_trains=None, num_bunches_in_train=None, bunch_separation=None, spin_polarization=0.0, spin_polarization_direction='z'):
 
         super().__init__(num_bunches_in_train=num_bunches_in_train, bunch_separation=bunch_separation, rep_rate_trains=rep_rate_trains)
         
@@ -87,6 +86,9 @@ class Source(Trackable, CostModeled):
         self.charge = charge
         self.accel_gradient = accel_gradient
         self.wallplug_efficiency = wallplug_efficiency
+
+        self.spin_polarization = spin_polarization
+        self.spin_polarization_direction = spin_polarization_direction
         
         self.x_offset = x_offset
         self.y_offset = y_offset
@@ -109,9 +111,11 @@ class Source(Trackable, CostModeled):
         self.jitter.yp = 0
         self.jitter.E = 0
 
-        self.spin_polarization = 0
-        self.spin_polarization_direction = 'z'
-        
+        self.spin_polarization = spin_polarization
+        self.spin_polarization_direction = spin_polarization_direction
+
+        self.evolution = SimpleNamespace()
+
     
     @abstractmethod
     def track(self, beam, savedepth=0, runnable=None, verbose=False):
@@ -172,11 +176,22 @@ class Source(Trackable, CostModeled):
 
         if do_beam_rotation:
             beam.add_pointing_tilts(rotation_angle_x, rotation_angle_y)
-
-            # if not np.isclose(beam.x_angle(), beam.x_tilt_angle(), rtol=1e-2, atol=0.0) or not np.isclose(beam.y_angle(), beam.y_tilt_angle(), rtol=1e-2, atol=0.0):
-            #     pointing_error_string = 'The beam may not have been accurately aligned to its propagation direction.\n' + 'beam x_angle: ' + str(beam.x_angle()) + '\nbeam x_tilt_angle: ' + str(beam.x_tilt_angle()) + '\nbeam y_angle: ' + str(beam.y_angle()) + '\nbeam y_tilt_angle: ' + str(beam.y_tilt_angle())
-            #     warnings.warn(pointing_error_string)
-
+        
+        # save evolution (output)
+        self.evolution.location = np.array([self.get_length()])
+        self.evolution.x, self.evolution.ux = np.array([beam.x_offset()]), np.array([np.mean(beam.uxs())])
+        self.evolution.y, self.evolution.uy = np.array([beam.y_offset()]), np.array([np.mean(beam.uys())])
+        self.evolution.energy, self.evolution.energy_spread = np.array([beam.energy()]), np.array([beam.energy_spread()])
+        self.evolution.rel_energy_spread = self.evolution.energy_spread/self.evolution.energy
+        self.evolution.beam_size_x, self.evolution.beam_size_y = np.array([beam.beam_size_x()]), np.array([beam.beam_size_y()])
+        self.evolution.emit_nx = np.array([beam.norm_emittance_x()])
+        self.evolution.emit_ny = np.array([beam.norm_emittance_y()])
+        self.evolution.beta_x = np.array([beam.beta_x()])
+        self.evolution.beta_y = np.array([beam.beta_y()])
+        self.evolution.z = np.array([beam.z_offset()])
+        self.evolution.charge = np.array([beam.charge()])
+        self.evolution.bunch_length = np.array([beam.bunch_length()])
+        
         # set metadata
         beam.location = 0
         beam.stage_number = 0

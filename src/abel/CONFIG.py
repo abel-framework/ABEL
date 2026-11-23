@@ -149,6 +149,9 @@ class CONFIG:
         # External codes - GuineaPig
         cls.guineapig_path = parsePath(cfdata['external_codes']['guineapig']['guineapig_path'])
 
+        # External codes - Ptarmigan
+        cls.ptarmigan_binary = parsePath(cfdata['external_codes']['ptarmigan']['ptarmigan_binary'])
+
     @classmethod
     def printCONFIG(cls):
         ls = dir(cls)

@@ -94,7 +94,7 @@ class StageWakeT(Stage):
 
         # ========== Make driver (and convert to WakeT bunch) ==========
         if not self.use_single_beam:
-            driver0 = self.driver_source.track()
+            driver0 = self.track_driver_source()
             driver_original = copy.deepcopy(driver0)
             
             # rotate the beam coordinate system to align with the driver

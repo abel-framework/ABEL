@@ -99,7 +99,7 @@ class StageBasic(Stage):
         self.stage_number = beam_incoming.stage_number
         
         # get the driver
-        driver_incoming = self.driver_source.track()
+        driver_incoming = self.track_driver_source()
 
         original_driver = copy.deepcopy(driver_incoming)
         original_beam = copy.deepcopy(beam_incoming)

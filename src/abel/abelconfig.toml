@@ -71,5 +71,8 @@ hipace_binary  = ['$hipace_path', 'build', 'bin', 'hipace']
 [external_codes.guineapig] #Configuration for GUINEA-PIG
 guineapig_path = ['$software_path', 'guineapig', 'bin'] # path to GUINEA-PIG directory
 
+[external_codes.ptarmigan] #Configuration for Ptarmigan
+ptarmigan_binary  = ['$software_path', 'ptarmigan', 'target', 'release', 'ptarmigan']  # path to Ptarmigan binary
+
 
 # Text files should end on a newline

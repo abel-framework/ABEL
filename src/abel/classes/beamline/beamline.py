@@ -211,30 +211,48 @@ class Beamline(Trackable, Runnable, CostModeled):
         # set up evolution data structure
         evol = SimpleNamespace()
         evol.location = np.array([])
-
+        location0 = 0.0
+        loc_lengths = np.array([])
+        
         # first calculate the locations
         for trackable in self[shots[0]].trackables:
-            if hasattr(trackable, 'evolution') and hasattr(trackable.evolution, 'location'):
-                evol.location = np.append(evol.location, trackable.evolution.location)
-
+            if hasattr(trackable, 'evolution'):
+                if hasattr(trackable.evolution, 'beam'):
+                    track_evol = trackable.evolution.beam
+                else:
+                    track_evol = trackable.evolution
+                if hasattr(track_evol, 'location'):
+                    loc_lengths = np.append(loc_lengths, [len(track_evol.location)])
+                    evol.location = np.append(evol.location, track_evol.location - min(track_evol.location) + location0)
+                location0 = location0 + trackable.get_length()
+        
         # declare the data structure to contain all the data
-        vals = np.zeros((8,len(shots),len(evol.location)))
-
+        vals = np.empty((8,len(shots),len(evol.location)))
+        vals.fill(np.nan)
+        
         # extract all the data
         for i, shot in enumerate(shots):
             ind0 = 0
-            for trackable in self[shot].trackables:
-                if hasattr(trackable, 'evolution') and hasattr(trackable.evolution, 'location'):
-                    inds = range(ind0, ind0+len(np.array(trackable.evolution.location)))
+            for j, trackable in enumerate(self[shot].trackables):
+                if hasattr(trackable, 'evolution'):
+                    if hasattr(trackable.evolution, 'beam'):
+                        track_evol = trackable.evolution.beam
+                    else:
+                        track_evol = trackable.evolution
+                    if not hasattr(track_evol, 'location'):
+                        continue
+                    inds = range(ind0, ind0 + round(loc_lengths[j]))
                     ind0 = max(inds)+1
-                    vals[0,i,inds] = np.array(trackable.evolution.energy)
-                    vals[1,i,inds] = np.array(trackable.evolution.charge)
-                    vals[2,i,inds] = np.array(trackable.evolution.emit_nx)
-                    vals[3,i,inds] = np.array(trackable.evolution.emit_ny)
-                    vals[4,i,inds] = np.array(trackable.evolution.rel_energy_spread)
-                    vals[5,i,inds] = np.array(trackable.evolution.bunch_length)
-                    vals[6,i,inds] = np.array(trackable.evolution.beam_size_x)
-                    vals[7,i,inds] = np.array(trackable.evolution.beam_size_y)
+                    ss = evol.location[inds]-min(evol.location[inds])
+                    ss_track_evol = track_evol.location-min(track_evol.location)
+                    vals[0,i,inds] = np.interp(ss, ss_track_evol, track_evol.energy)
+                    vals[1,i,inds] = np.interp(ss, ss_track_evol, track_evol.charge)
+                    vals[2,i,inds] = np.interp(ss, ss_track_evol, track_evol.emit_nx)
+                    vals[3,i,inds] = np.interp(ss, ss_track_evol, track_evol.emit_ny)
+                    vals[4,i,inds] = np.interp(ss, ss_track_evol, track_evol.rel_energy_spread)
+                    vals[5,i,inds] = np.interp(ss, ss_track_evol, track_evol.bunch_length)
+                    vals[6,i,inds] = np.interp(ss, ss_track_evol, track_evol.beam_size_x)
+                    vals[7,i,inds] = np.interp(ss, ss_track_evol, track_evol.beam_size_y)
 
         # get the mean
         val_mean = np.mean(vals, axis=1)
@@ -306,7 +324,7 @@ class Beamline(Trackable, Runnable, CostModeled):
         ax = fig.add_subplot(gs[2, :])
         ax.fill_between(evol.location, (evol.beam_size_x + evol_std.beam_size_x)*1e6, (evol.beam_size_x-evol_std.beam_size_x)*1e6, color=col1, alpha=af, ec=None)
         ax.plot(evol.location, evol.beam_size_x*1e6, color=col1, label=r'$\sigma_x$')
-        ax.fill_between(evol.location, (evol.beam_size_y + evol_std.beam_size_y)*1e6, (evol.beam_size_y-evol_std.beam_size_y)*1e6, color=col1, alpha=af, ec=None)
+        ax.fill_between(evol.location, (evol.beam_size_y + evol_std.beam_size_y)*1e6, (evol.beam_size_y-evol_std.beam_size_y)*1e6, color=col2, alpha=af, ec=None)
         ax.plot(evol.location, evol.beam_size_y*1e6, color=col2, label=r'$\sigma_y$')
         ax.set_xlim(long_limits)
         ax.set_ylabel(r'Beam size, rms [$\mathrm{\mu}$m]')
@@ -317,7 +335,7 @@ class Beamline(Trackable, Runnable, CostModeled):
         ax = fig.add_subplot(gs[3, :])
         ax.plot(evol.location, abs(evol.emit_ny[0]) * np.ones(evol.location.shape) * 1e6, ':', color=col2)
         ax.plot(evol.location, abs(evol.emit_nx[0]) * np.ones(evol.location.shape) * 1e6, ':', color=col1)
-        ax.fill_between(evol.location, (evol.emit_ny + evol_std.emit_ny)*1e6, (evol.emit_ny-evol_std.emit_ny)*1e6, color=col1, alpha=af, ec=None)
+        ax.fill_between(evol.location, (evol.emit_ny + evol_std.emit_ny)*1e6, (evol.emit_ny-evol_std.emit_ny)*1e6, color=col2, alpha=af, ec=None)
         ax.plot(evol.location, evol.emit_ny*1e6, color=col2, label=r'$\epsilon_y$')
         ax.fill_between(evol.location, (evol.emit_nx + evol_std.emit_nx)*1e6, (evol.emit_nx-evol_std.emit_nx)*1e6, color=col1, alpha=af, ec=None)
         ax.plot(evol.location, evol.emit_nx*1e6, color=col1, label=r'$\epsilon_x$')
@@ -329,6 +347,104 @@ class Beamline(Trackable, Runnable, CostModeled):
         
         plt.show()
         
+    
+    def plot_spin_evolution_recursive(self, shot=None, save_path=None):
+
+        """
+        Plot the full spin evolution.
+        """
+
+        from matplotlib import pyplot as plt
+        from types import SimpleNamespace
+
+        # select the shots
+        if shot is None:
+            shots = range(self.num_shots)
+        else:
+            shots = [shot]
+
+        # set up evolution data structure
+        evol = SimpleNamespace()
+        evol.location = np.array([])
+
+        # first calculate the locations
+        for trackable in self[shots[0]].trackables:
+            if hasattr(trackable, 'evolution'):
+                if hasattr(trackable.evolution, 'location'):
+                    evol_trackable = trackable.evolution
+                elif hasattr(trackable.evolution, 'beam') and hasattr(trackable.evolution.beam, 'location'):
+                    evol_trackable = trackable.evolution.beam
+                else:
+                    continue
+
+                if evol.location.size == 0:
+                    loc_start = 0
+                else:
+                    loc_start = evol.location[-1]
+                evol.location = np.append(evol.location, loc_start + evol_trackable.location - evol_trackable.location[0])
+
+        # declare the data structure to contain all the data
+        vals = np.zeros((8,len(shots),len(evol.location)))
+
+        # extract all the data
+        for i, shot in enumerate(shots):
+            ind0 = 0
+            for trackable in self[shot].trackables:
+                if hasattr(trackable, 'evolution'):
+                    if hasattr(trackable.evolution, 'spin_x'):
+                        evol_trackable = trackable.evolution
+                    elif hasattr(trackable.evolution, 'beam') and hasattr(trackable.evolution.beam, 'spin_x'):
+                        evol_trackable = trackable.evolution.beam
+                    else:
+                        continue
+                    inds = range(ind0, ind0+len(np.array(evol_trackable.location)))
+                    ind0 = max(inds)+1
+                    vals[0,i,inds] = np.array(evol_trackable.spin_x)
+                    vals[1,i,inds] = np.array(evol_trackable.spin_y)
+                    vals[2,i,inds] = np.array(evol_trackable.spin_z)
+
+        
+        # get the mean
+        val_mean = np.mean(vals, axis=1)
+        evol.spin_x = val_mean[0,:]
+        evol.spin_y = val_mean[1,:]
+        evol.spin_z = val_mean[2,:]
+        
+        # get the standard deviation
+        val_std = np.std(vals, axis=1)
+        evol_std = SimpleNamespace()
+        evol_std.spin_x = val_std[0,:]
+        evol_std.spin_y = val_std[1,:]
+        evol_std.spin_z = val_std[2,:]
+        
+        # prepare plot
+        fig, axs = plt.subplots(1,1)
+        fig.set_figwidth(CONFIG.plot_width_default)
+        fig.set_figheight(CONFIG.plot_width_default*0.5)
+        colx = "tab:blue"
+        coly = "tab:orange"
+        colz = "tab:green"
+        af = 0.15
+        long_label = 'Location [m]'
+        long_limits = [min(evol.location), max(evol.location)]
+        
+        # plot spins
+        axs.fill_between(evol.location, (evol.spin_x + evol_std.spin_x)/1e2, (evol.spin_x-evol_std.spin_x)/1e2, color=colx, alpha=af, ec=None)
+        axs.fill_between(evol.location, (evol.spin_y + evol_std.spin_y)/1e2, (evol.spin_y-evol_std.spin_y)/1e2, color=coly, alpha=af, ec=None)
+        axs.fill_between(evol.location, (evol.spin_z + evol_std.spin_z)/1e2, (evol.spin_z-evol_std.spin_z)/1e2, color=colz, alpha=af, ec=None)
+        axs.plot(evol.location, evol.spin_x, color=colx, label='x')
+        axs.plot(evol.location, evol.spin_y, color=coly, label='y')
+        axs.plot(evol.location, evol.spin_z, color=colz, label='z')
+        axs.set_ylabel('Spin polarization (%)')
+        axs.set_xlabel(long_label)
+        axs.set_xlim(long_limits)
+        axs.set_ylim(-1.02, 1.02)
+        axs.legend()
+        
+        plt.show()
+        if save_path is not None:
+            fig.savefig(save_path, format='pdf', dpi=600, bbox_inches='tight', transparent=False)
+
 
 class NotAssembledError(Exception):
     "Exception class for ``Beamline`` to throw if ``self.trackables`` have not been assembled."
