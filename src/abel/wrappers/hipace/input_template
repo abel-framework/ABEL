@@ -52,7 +52,7 @@ test_particle.iteration = 0
 test_particle.do_radiation_reaction = $radiation_reaction
 
 # external focusing
-hipace.grid_external_fields(x,y,z,t) = "$external_focusing_radial*y" "-$external_focusing_radial*x" "$external_focusing_longitudinal" "0" "0"
+hipace.grid_external_fields(x,y,z,t) = "$external_focusing_radial*y" "-$external_focusing_radial*x" "$external_focusing_longitudinal" "0"
 
 
 plasmas.names = $plasma_components # 'plasma' or 'electrons ions'

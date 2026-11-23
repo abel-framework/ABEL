@@ -160,6 +160,8 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
         num_cell_xy = new_num_cell_xy
 
     # plasma-density profile from file
+    if external_focusing_gradient is None:
+        external_focusing_gradient = 0
     if abs(external_focusing_gradient) > 0:
         external_focusing_radial_comment = ''
     else:
