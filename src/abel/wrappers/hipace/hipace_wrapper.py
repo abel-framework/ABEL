@@ -184,6 +184,11 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
     else:
         mesh_refinement_maxlevel = 1
         mesh_refinement_comment = ''
+
+    if beam_ionization:
+        ionization_product = "ions.ionization_product=electrons"
+    else:
+        ionization_product = ""
     
     # define inputs
     inputs = {'num_cell_x': int(num_cell_xy), 
@@ -211,6 +216,7 @@ def hipace_write_inputs(filename_input, filename_beam, filename_driver, plasma_d
               'plasma_components': plasma_components,
               'ion_species': ion_species,
               'beam_ionization': int(beam_ionization),
+              'ionization_product_line': ionization_product,
               'external_focusing_radial': abs(external_focusing_gradient),
               'external_focusing_radial_comment': external_focusing_radial_comment,
               'external_focusing_longitudinal': abs(external_focusing_longitudinal),
